@@ -1,0 +1,91 @@
+export const plansData = [
+  {
+    id: 'single',
+    name: 'Single Site',
+    tagline: 'Start saving from day one',
+    monthlyPrice: '$49/month',
+    annualPrice: '$490/year',
+    annualLabel: '2 mths free',
+    description:
+      'List surplus in seconds, connect with local charities, and track your impact - all in one simple platform.',
+    features: [
+      'Manage 1 site',
+      'Add up to 2 users',
+      'List surplus in seconds',
+      'Match with local charities & coordinate pickups',
+      'Track basic impact (food, money, collections)',
+      'View monthly summaries',
+      'Access email support',
+    ],
+    cta: 'Get Started',
+    type: 'base',
+  },
+
+  {
+    id: 'single_plus',
+    name: 'Single Site+',
+    badge: 'Most Popular',
+    tagline: 'Take control and reduce unnecessary costs',
+    monthlyPrice: '$69/month',
+    annualPrice: '$690/year',
+    annualLabel: '2 mths free',
+    description:
+      'Go beyond the basics with deeper insights, smarter tracking, and tools to optimise your operations.',
+    features: [
+      'Add up to 6 users',
+      'Track savings, volume, food types & charity partners',
+      'Identify inefficiencies & reduce over-ordering',
+      'Reuse previous listings to save time',
+      'Export downloadable reports (incl. ESG)',
+      'Access priority support',
+    ],
+    cta: 'Upgrade & Optimise',
+    type: 'popular',
+  },
+
+  {
+    id: 'multi',
+    name: 'Multi Site (up to 10 sites)',
+    tagline: 'Scale operations with complete visibility & control',
+    monthlyPrice: '$89/month',
+    annualPrice: '$890/year',
+    annualLabel: '2 mths free',
+    description:
+      'Manage multiple venues in one platform. Standardise operations, track performance & reduce inefficiencies at scale.',
+    features: [
+      'Manage up to 10 sites & 10 users per site',
+      'Access centralised admin & reporting',
+      'Compare performance across locations',
+      'Track performance & impact analytics',
+      'Identify inefficiencies & reduce over-ordering',
+      'Standardise processes across locations',
+      'Export reports (incl. ESG)',
+      'Access onboarding support',
+    ],
+    cta: 'Scale your operation',
+    type: 'scale',
+  },
+
+  {
+    id: 'enterprise',
+    name: 'Enterprise (10+ sites)',
+    tagline: 'Turn operational data into strategic advantage at scale',
+    monthlyPrice: 'Custom Pricing',
+    annualPrice: 'Volume based',
+    annualLabel: '',
+    description:
+      'Access network-wide insights to optimise procurement, reduce cost leakage, and drive measurable financial and ESG outcomes.',
+    features: [
+      'Manage unlimited sites & 15 users per site',
+      'Access enterprise-wide impact dashboard',
+      'Benchmark performance across your network',
+      'Optimise procurement & reduce cost leakage',
+      'Manage users & sites at scale',
+      'Integrate with existing systems (API)',
+      'Access dedicated onboarding',
+      'Work with a dedicated account manager',
+    ],
+    cta: 'Talk to our Team',
+    type: 'enterprise',
+  },
+];

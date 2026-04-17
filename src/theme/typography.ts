@@ -1,0 +1,106 @@
+export const typography = {
+  h1: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 48,
+    lineHeight: 50,
+    letterSpacing: 0.2,
+    textTransform: 'uppercase' as const,
+  },
+  h2: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 40,
+    lineHeight: 42,
+    letterSpacing: 0.2,
+    textTransform: 'uppercase' as const,
+  },
+  h3: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 32,
+    lineHeight: 35,
+    textTransform: 'uppercase' as const,
+  },
+  h4: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 28,
+    lineHeight: 31,
+    textTransform: 'uppercase' as const,
+  },
+  h5: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 26,
+    lineHeight: 30,
+    textTransform: 'uppercase' as const,
+  },
+  h6: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 22,
+    lineHeight: 25,
+    textTransform: 'uppercase' as const,
+  },
+  h7: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 20,
+    lineHeight: 23,
+    textTransform: 'uppercase' as const,
+  },
+  title: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 28,
+    lineHeight: 31,
+    textTransform: 'uppercase' as const,
+  },
+  heading: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 24,
+    lineHeight: 25,
+    textTransform: 'uppercase' as const,
+  },
+  subheading: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 20,
+    lineHeight: 23,
+  },
+  body: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: 16,
+    lineHeight: 18,
+     textTransform: 'uppercase' as const,
+  },
+  bodyLarge: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: 18,
+    lineHeight: 20,
+  },
+  bodyBold: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  bodySmall: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: 14,
+    lineHeight: 15,
+  },
+  label: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: 16,
+    lineHeight: 18,
+  },
+  caption: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: 12,
+    lineHeight: 14,
+    letterSpacing: 1,
+    textTransform: 'uppercase' as const,
+  },
+  metric: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 36,
+    lineHeight: 39,
+  },
+  counter: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 72,
+    lineHeight: 80,
+  },
+};
