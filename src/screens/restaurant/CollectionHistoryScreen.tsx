@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, FlatList, Pressable, ImageBackground } from 'react-native';
+import { View, StyleSheet, FlatList, Pressable, ImageBackground, Modal } from 'react-native';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,8 @@ const DATA = [
     {
         id: '1',
         collected_by: 'Food Rescue Org',
+        location: 'Patia, Bhubaneswar',
+        driverName: 'Rakesh Sahu',
         date: new Date('2026-04-07'),
         time: '2:30 PM',
         status: 'claimed',
@@ -20,10 +22,12 @@ const DATA = [
     },
     {
         id: '2',
-        ngo: null,
+        collected_by: null,
+        location: null,
+        driverName: null,
         date: new Date('2026-04-06'),
         time: '1:00 PM',
-        status: 'cancelled',
+        status: 'expired',
         items: [
             { name: 'Meat', qty: 4 },
         ],
@@ -31,17 +35,21 @@ const DATA = [
     {
         id: '3',
         collected_by: 'Food Rescue Org',
+        location: 'Khandagiri, Bhubaneswar',
+        driverName: 'Amit Das',
         date: new Date('2025-08-10'),
         time: '2:30 PM',
-        status: 'claimed',
+        status: 'partial claimed',
         items: [
-            { name: 'Baked Goods', qty: 3 },
-            { name: 'Fruits', qty: 2 },
+            { name: 'Baked Goods', qty: 3, claimed: 2, left: 1 },
+            { name: 'Fruits', qty: 2, claimed: 1, left: 1 },
         ],
     },
     {
         id: '4',
         collected_by: 'Food Rescue Org',
+        location: 'Saheed Nagar, Bhubaneswar',
+        driverName: 'Suman Nayak',
         date: new Date('2025-12-07'),
         time: '5:30 PM',
         status: 'claimed',
@@ -52,10 +60,12 @@ const DATA = [
     },
     {
         id: '5',
-        collected_by: 'Food Rescue Org',
+        collected_by: null,
+        location: null,
+        driverName: null,
         date: new Date('2026-04-07'),
         time: '2:30 PM',
-        status: 'claimed',
+        status: 'expired',
         items: [
             { name: 'Baked Goods', qty: 3 },
             { name: 'Fruits', qty: 2 },
@@ -64,6 +74,8 @@ const DATA = [
     {
         id: '6',
         collected_by: 'Food Rescue Org',
+        location: 'Jaydev Vihar, Bhubaneswar',
+        driverName: 'Prakash Rout',
         date: new Date('2026-02-03'),
         time: '2:30 PM',
         status: 'claimed',
@@ -101,26 +113,43 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const [showYearDropdown, setShowYearDropdown] = useState(false);
     const [showMonthDropdown, setShowMonthDropdown] = useState(false);
 
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedItems, setSelectedItems] = useState<any[]>([]);
+    const [selectedStatus, setSelectedStatus] = useState('');
 
     const months = getMonthsForYear(selectedYear);
     const years = ['All', '2026', '2025'];
 
-
-    // FILTER LOGIC
     const filteredData = useMemo(() => {
-        return DATA.filter(item => {
-            const itemMonth = item.date.toLocaleString('default', { month: 'short' });
-            const itemYear = item.date.getFullYear().toString();
+        return DATA
+            .filter(item => {
+                const itemMonth =
+                    item.date.toLocaleString('default', {
+                        month: 'short',
+                    });
 
-            const yearMatch =
-                selectedYear === 'All' || itemYear === selectedYear;
+                const itemYear =
+                    item.date.getFullYear().toString();
 
-            const monthMatch =
-                selectedMonth === 'All' || itemMonth === selectedMonth;
+                const yearMatch =
+                    selectedYear === 'All' ||
+                    itemYear === selectedYear;
 
-            return yearMatch && monthMatch;
-        });
+                const monthMatch =
+                    selectedMonth === 'All' ||
+                    itemMonth === selectedMonth;
+
+                return yearMatch && monthMatch;
+            })
+            .sort(
+                (a, b) =>
+                    b.date.getTime() - a.date.getTime()
+            );
     }, [selectedMonth, selectedYear]);
+
+    function prettyStatus(status: string) {
+        return status.replace(/\b\w/g, c => c.toUpperCase());
+    }
 
     return (
         <Screen backgroundColor={palette.creme} scrollable={false}>
@@ -151,14 +180,14 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
                     {/* YEAR */}
                     <View style={styles.filterBlock}>
-                        <AppText variant="bodyLarge">Year</AppText>
+                        <AppText variant="label">Year</AppText>
 
                         <View style={styles.dropdownWrapper}>
                             <Pressable
                                 style={styles.dropdown}
                                 onPress={() => setShowYearDropdown(!showYearDropdown)}
                             >
-                                <AppText variant="body" >{selectedYear}</AppText>
+                                <AppText variant="bodyBold" >{selectedYear}</AppText>
                                 <Ionicons name="chevron-down" size={16} />
                             </Pressable>
 
@@ -174,7 +203,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                                                 setShowYearDropdown(false);
                                             }}
                                         >
-                                            <AppText variant="body">{y}</AppText>
+                                            <AppText variant="bodySmall">{y}</AppText>
                                         </Pressable>
                                     ))}
                                 </View>
@@ -184,14 +213,14 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
                     {/* MONTH */}
                     <View style={styles.filterBlock}>
-                        <AppText variant="bodyLarge" >Month</AppText>
+                        <AppText variant="label" >Month</AppText>
 
                         <View style={styles.dropdownWrapper}>
                             <Pressable
                                 style={styles.dropdown}
                                 onPress={() => setShowMonthDropdown(!showMonthDropdown)}
                             >
-                                <AppText variant="body" >{selectedMonth}</AppText>
+                                <AppText variant="bodyBold" >{selectedMonth}</AppText>
                                 <Ionicons name="chevron-down" size={16} />
                             </Pressable>
 
@@ -206,7 +235,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                                                 setShowMonthDropdown(false);
                                             }}
                                         >
-                                            <AppText variant="body">{m}</AppText>
+                                            <AppText variant="bodySmall">{m}</AppText>
                                         </Pressable>
                                     ))}
                                 </View>
@@ -227,51 +256,169 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                         </View>
                     }
                     renderItem={({ item }) => (
-                        <View style={styles.card}>
-
+                        <View style={styles.newCard}>
                             {/* TOP */}
-                            <View style={styles.row}>
-                                <View>
-                                    <AppText variant="bodyBold">Collected By: {item.collected_by ? item.collected_by : 'None'}</AppText>
-                                    <AppText variant="caption">
-                                        {item.date.toDateString()} • {item.time}
+                            <View style={styles.topRow}>
+                                <View style={{ flex: 1 }}>
+                                    <AppText variant="bodyBold">
+                                        {item.collected_by || 'No charity accepted it'}
                                     </AppText>
+
+                                    <AppText variant="caption">
+                                        {item.location || 'Nearby charities were notified'}
+                                    </AppText>
+
+                                    {item.driverName && (
+                                        <AppText
+                                            variant="caption"
+                                            style={styles.driverText}
+                                        >
+                                            Driver: {item.driverName}
+                                        </AppText>
+                                    )}
                                 </View>
 
-                                <View style={styles.statusRow}>
-                                    <View
+                                <View
+                                    style={[
+                                        styles.statusPill,
+                                        item.status === 'expired' &&
+                                        styles.expiredPill,
+                                    ]}
+                                >
+                                    <AppText
                                         style={[
-                                            styles.dot,
-                                            item.status === 'claimed' ? styles.greenDot : styles.redDot,
+                                            styles.statusText,
+                                            item.status === 'expired' &&
+                                            styles.statusText,
                                         ]}
-                                    />
-                                    <AppText variant="caption">
-                                        {item.status}
+                                    >
+                                        {prettyStatus(item.status)}
                                     </AppText>
                                 </View>
                             </View>
 
-                            {/* ITEMS */}
-                            <View style={styles.itemsContainer}>
-                                {item.items.map((it: any, idx: number) => (
-                                    <AppText key={idx} variant="caption">
-                                        • {it.name} ({it.qty} kg)
+                            {/* 3 CARDS */}
+                            <View style={styles.metaRow}>
+                                <View style={styles.metaCard}>
+                                    <AppText variant="caption">Items</AppText>
+
+                                    <Pressable
+                                        style={styles.viewBtn}
+                                        onPress={() => {
+                                            setSelectedItems(item.items);
+                                            setSelectedStatus(item.status);
+                                            setModalVisible(true);
+                                        }}
+                                    >
+                                        <AppText style={styles.viewText}>
+                                            View
+                                        </AppText>
+                                    </Pressable>
+                                </View>
+
+                                <View style={styles.metaCard}>
+                                    <AppText variant="caption">
+                                        Pickup Date
                                     </AppText>
-                                ))}
+
+                                    <AppText variant="bodyBold">
+                                        {item.date.toLocaleDateString('en-US', {
+                                            month: 'long',
+                                            day: '2-digit',
+                                            year: 'numeric',
+                                        })}
+                                    </AppText>
+                                </View>
+
+                                <View style={styles.metaCard}>
+                                    <AppText variant="caption">
+                                        Pickup Time
+                                    </AppText>
+
+                                    <AppText variant="bodyBold">
+                                        {item.time}
+                                    </AppText>
+                                </View>
                             </View>
-
-                            {/* MEALS CALCULATION */}
-                            <AppText style={styles.meals}>
-                                ~{Math.round(
-                                    item.items.reduce((acc: number, it: any) => acc + it.qty, 0) / 0.3
-                                )} meals
-                            </AppText>
-
                         </View>
                     )}
                 />
 
             </View>
+
+
+            <Modal
+                visible={modalVisible}
+                transparent
+                animationType="fade"
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalTopBar}>
+                            <AppText variant="subheading">
+                                Listed Food
+                            </AppText>
+
+                            <Pressable
+                                style={styles.closeIconBtn}
+                                onPress={() =>
+                                    setModalVisible(false)
+                                }
+                            >
+                                <Ionicons
+                                    name="close"
+                                    size={20}
+                                    color={palette.black}
+                                />
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.modalHeaderRow}>
+                            <AppText variant='label' style={{ flex: 1 }}>
+                                Item Name
+                            </AppText>
+
+                            <AppText variant='label' style={styles.modalCol}>
+                                Available
+                            </AppText>
+
+                            {(selectedStatus === 'claimed' ||
+                                selectedStatus ===
+                                'partial claimed') && (
+                                    <AppText variant='label' style={styles.modalCol}>
+                                        Claimed
+                                    </AppText>
+                                )}
+                        </View>
+
+                        {selectedItems.map((it, idx) => (
+                            <View
+                                key={idx}
+                                style={styles.modalItemRow}
+                            >
+                                <AppText variant='bodySmall' style={{ flex: 2 }}>
+                                    {it.name}
+                                </AppText>
+
+                                <AppText variant='bodySmall' style={styles.modalCol}>
+                                    {it.qty}kg
+                                </AppText>
+
+                                {(selectedStatus === 'claimed' ||
+                                    selectedStatus ===
+                                    'partial claimed') && (
+                                        <AppText variant='bodySmall' style={styles.modalCol} >
+                                            {'claimed' in it
+                                                ? it.claimed
+                                                : it.qty}
+                                            kg
+                                        </AppText>
+                                    )}
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            </Modal>
         </Screen>
     );
 }
@@ -356,26 +503,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
 
-    impact: {
-        fontSize: 12,
-        opacity: 0.7,
-    },
-
     status: {
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 10,
         backgroundColor: '#EEE7FF',
-    },
-
-    completed: {
-        color: '#2E7D32',
-        fontWeight: '600',
-    },
-
-    cancelled: {
-        color: '#D32F2F',
-        fontWeight: '600',
     },
 
     empty: {
@@ -389,28 +521,125 @@ const styles = StyleSheet.create({
         gap: 6,
     },
 
-    dot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-    },
-
-    greenDot: {
-        backgroundColor: '#2E7D32',
-    },
-
-    redDot: {
-        backgroundColor: '#D32F2F',
-    },
-
     itemsContainer: {
         marginTop: spacing.xs,
         gap: 2,
     },
 
-    meals: {
+    newCard: {
+        backgroundColor: palette.white,
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.md,
+        padding: spacing.md,
+        borderRadius: 20,
+        gap: spacing.md,
+
+        borderWidth: 1,
+        borderColor: palette.black,
+    },
+
+    topRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+    },
+
+    driverText: {
+        marginTop: 4,
+        color: palette.textMuted,
+    },
+
+    statusPill: {
+        minWidth: 90,
+        minHeight: 38,
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        backgroundColor: palette.middlegreen,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    statusText: {
+        color: palette.white,
+    },
+
+    expiredPill: {
+        backgroundColor: palette.chilli,
+    },
+
+    metaRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
         marginTop: spacing.xs,
-        opacity: 0.7,
-        fontSize: 12,
+    },
+
+    metaCard: {
+        flex: 1,
+        backgroundColor: palette.radish,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.sm,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        borderWidth: 1,
+        borderColor: palette.border,
+    },
+
+    viewBtn: {
+        backgroundColor: palette.middlegreen,
+        paddingHorizontal: 18,
+        paddingVertical: 8,
+        borderRadius: 999,
+    },
+
+    viewText: {
+        color: palette.white,
+    },
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        justifyContent: 'center',
+        padding: spacing.lg,
+    },
+
+    modalCard: {
+        backgroundColor: palette.white,
+        borderRadius: 20,
+        padding: spacing.md,
+    },
+
+    modalTopBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+
+    closeIconBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: palette.creme,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    modalHeaderRow: {
+        flexDirection: 'row',
+        marginTop: spacing.md,
+        paddingBottom: spacing.sm,
+        borderBottomWidth: 1,
+        borderColor: '#eee',
+    },
+
+    modalItemRow: {
+        flexDirection: 'row',
+        paddingVertical: spacing.sm,
+    },
+
+    modalCol: {
+        flex: 1,
+        textAlign: 'center',
     },
 });

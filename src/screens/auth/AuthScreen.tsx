@@ -286,14 +286,8 @@ export function AuthScreen() {
               onPress={() => toggle('pickup')}
             >
               <InputField
-                label="Postcodes"
-                placeholder="3000, 3001"
-                value={charityForm.postcodes}
-                onChangeText={(v) => updateCharityField('postcodes', v)}
-              />
-              <InputField
-                label="Radius (can change it later)"
-                placeholder="10 km"
+                label="Radius in Km (can change it later)"
+                placeholder="50"
                 value={charityForm.pickupRadius}
                 onChangeText={(v) => updateCharityField('pickupRadius', v)}
               />

@@ -57,7 +57,10 @@ const screenOptions = ({ route }: any): BottomTabNavigationOptions => ({
 export function RoleTabs() {
   const { selectedRole } = useAppContext();
 
-  if (selectedRole === 'charity') {
+  if (
+    selectedRole === 'charity_single' ||
+    selectedRole === 'charity_multi'
+  ) {
     return (
       <CharityTab.Navigator screenOptions={screenOptions}>
         <CharityTab.Screen component={CharityDiscoverScreen} name="Home" />

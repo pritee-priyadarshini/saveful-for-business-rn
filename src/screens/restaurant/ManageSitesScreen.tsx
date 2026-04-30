@@ -8,6 +8,7 @@ import {
   ImageBackground,
   Linking,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,6 +19,7 @@ import { AppText } from '../../components/AppText';
 import { useAppContext } from '@/store/AppContext';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
+import { Ionicons } from '@expo/vector-icons';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'ManageSites'>;
 
@@ -26,14 +28,20 @@ type Site = {
   tradingName: string;
   logo: any;
   address: string;
+  postCode: string;
   contactName: string;
   email: string;
   mobile: string;
+  password?: string;
 };
 
 export default function ManageSitesScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { logout } = useAppContext();
+
+  const [editingSiteId, setEditingSiteId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const actions = [
     { label: 'Create Site', route: 'CreateSite' },
@@ -46,12 +54,13 @@ export default function ManageSitesScreen() {
 
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
 
-  const [sites] = useState<Site[]>([
+  const [sites, setSites] = useState<Site[]>([
     {
       id: '1',
       tradingName: 'Burger King India - DN Regalia Mall',
       logo: require('../../../assets/intro/burger_king_logo.png'),
       address: 'DN Regalia Mall, Patrapada, Bhubaneswar',
+      postCode: '751019',
       contactName: 'John Doe',
       email: 'john@demo.com',
       mobile: '+61 400 000 000',
@@ -61,6 +70,7 @@ export default function ManageSitesScreen() {
       tradingName: 'Burger King India - Esplanade Mall',
       logo: require('../../../assets/intro/burger_king_logo.png'),
       address: 'Esplanade Mall, Rasulgarh, Bhubaneswar',
+      postCode: '751001',
       contactName: 'Jack Phoe',
       email: 'jack@demo.com',
       mobile: '+61 400 123 456',
@@ -147,30 +157,124 @@ export default function ManageSitesScreen() {
                   <AppText variant='bodySmall' style={styles.siteAddress}>
                     {site.address}
                   </AppText>
+                  <AppText variant='bodySmall' style={styles.siteAddress}>
+                    {site.postCode}
+                  </AppText>
                 </View>
               </View>
 
-              {/* VIEW BUTTON */}
-              <Pressable
-                style={styles.viewBtn}
-                onPress={() =>
-                  setExpandedSite(
-                    expandedSite === site.id ? null : site.id
-                  )
-                }
-              >
-                <AppText variant='label' style={styles.viewText}>
-                  View
-                </AppText>
-              </Pressable>
+              {/* VIEW + EDIT BUTTON */}
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <Pressable
+                  style={styles.viewBtn}
+                  onPress={() => {
+                    setEditingSiteId(null);
+                    setEditForm({});
+                    if (expandedSite === site.id) {
+                      setExpandedSite(null);
+                      setEditingSiteId(null);
+                      setEditForm({});
+                    } else {
+                      setExpandedSite(site.id);
+                    }
+                  }}
+                >
+                  <AppText variant='label' style={styles.viewText}>
+                    View
+                  </AppText>
+                </Pressable>
+
+                <Pressable
+                  style={styles.editBtn}
+                  onPress={() => {
+                    setEditingSiteId(site.id);
+                    setEditForm({ ...site });
+                    setExpandedSite(site.id);
+                  }}
+                >
+                  <AppText variant='label' style={styles.viewText}>
+                    Edit
+                  </AppText>
+                </Pressable>
+
+              </View>
             </View>
 
             {/* EXPANDED DETAILS */}
             {expandedSite === site.id && (
               <View style={styles.details}>
-                <AppText variant='label'>Manager: {site.contactName}</AppText>
-                <AppText variant='label'>Email: {site.email}</AppText>
-                <AppText variant='label'>Mobile: {site.mobile}</AppText>
+
+                {editingSiteId === site.id ? (
+                  <>
+                    {[
+                      { key: 'tradingName', label: 'Location Name' },
+                      { key: 'address', label: 'Address' },
+                      { key: 'postCode', label: 'Postcode' },
+                      { key: 'contactName', label: 'Admin Name' },
+                      { key: 'email', label: 'Email' },
+                      { key: 'mobile', label: 'Phone' },
+                      { key: 'password', label: 'Password' },
+                    ].map((field: any) => (
+                      <View key={field.key} style={{ marginBottom: 10 }}>
+                        <AppText variant="label">{field.label}</AppText>
+
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            value={editForm[field.key] || ''}
+                            onChangeText={(v) =>
+                              setEditForm({ ...editForm, [field.key]: v })
+                            }
+                            style={[
+                              styles.input,
+                              field.key === 'password' && { paddingRight: 40 },
+                            ]}
+                            secureTextEntry={field.key === 'password' && !showPassword}
+                          />
+
+                          {field.key === 'password' && (
+                            <Pressable
+                              style={styles.eyeIcon}
+                              onPress={() => setShowPassword(!showPassword)}
+                            >
+                              <Ionicons
+                                name={showPassword ? 'eye-off' : 'eye'}
+                                size={18}
+                                color="#777"
+                              />
+                            </Pressable>
+                          )}
+                        </View>
+                      </View>
+                    ))}
+
+                    {/* SAVE */}
+                    <Pressable
+                      style={styles.saveBtn}
+                      onPress={() => {
+                        setSites((prev) =>
+                          prev.map((s) =>
+                            s.id === editingSiteId ? { ...s, ...editForm } : s
+                          )
+                        );
+
+                        setEditingSiteId(null);
+                        setEditForm({});
+                        setExpandedSite(site.id);
+                      }}
+                    >
+                      <AppText variant="label" style={{ color: 'white' }}>
+                        Save
+                      </AppText>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <AppText variant='label'>Manager: {site.contactName}</AppText>
+                    <AppText variant='label'>Email: {site.email}</AppText>
+                    <AppText variant='label'>Mobile: {site.mobile}</AppText>
+                  </>
+                )}
+
               </View>
             )}
           </View>
@@ -342,8 +446,41 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
+  editBtn: {
+    backgroundColor: palette.blueberry,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+
   viewText: {
     color: 'white',
+  },
+
+  input: {
+    backgroundColor: '#FAFAFA',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+
+  inputWrapper: {
+    position: 'relative',
+  },
+
+  eyeIcon: {
+    position: 'absolute',
+    right: 10,
+    top: 12,
+  },
+
+  saveBtn: {
+    marginTop: 10,
+    backgroundColor: palette.middlegreen,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 
   details: {

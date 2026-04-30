@@ -25,7 +25,8 @@ import { palette } from '@/theme/colors';
 export function CreateListingScreen({ navigation }: any) {
     const { currentProfile } = useAppContext();
 
-    const isFirstTime = false;
+    const [customFoodDetail, setCustomFoodDetail] = useState('');
+    const [otherFoodDetail, setOtherFoodDetail] = useState(false);
 
     const [customItem, setCustomItem] = useState('');
     const [location, setLocation] = useState(currentProfile.address);
@@ -365,24 +366,84 @@ export function CreateListingScreen({ navigation }: any) {
 
                     <Card style={styles.card}>
                         {[
-                            { key: 'refrigeration', label: 'Needs refrigeration ❄' },
-                            { key: 'reheating', label: 'Needs reheating 🔥' },
-                            { key: 'allergens', label: 'Contains allergens ⚠' },
-                            { key: 'glutenFree', label: 'Gluten free 🌾' },
+                            {
+                                key: 'refrigeration',
+                                label: 'Needs refrigeration ❄',
+                            },
+                            {
+                                key: 'reheating',
+                                label: 'Needs reheating 🔥',
+                            },
+                            {
+                                key: 'allergens',
+                                label: 'Contains allergens ⚠',
+                            },
+                            {
+                                key: 'glutenFree',
+                                label: 'Gluten free 🌾',
+                            },
                         ].map((item) => (
                             <Pressable
                                 key={item.key}
                                 style={styles.checkboxRow}
-                                onPress={() => toggleFoodOption(item.key as any)}
+                                onPress={() =>
+                                    toggleFoodOption(
+                                        item.key as keyof typeof foodOptions
+                                    )
+                                }
                             >
                                 <View style={styles.checkbox}>
-                                    {foodOptions[item.key as keyof typeof foodOptions] && (
-                                        <Ionicons name="checkmark" size={14} color={palette.middlegreen} />
-                                    )}
+                                    {foodOptions[
+                                        item.key as keyof typeof foodOptions
+                                    ] && (
+                                            <Ionicons
+                                                name="checkmark"
+                                                size={14}
+                                                color={palette.middlegreen}
+                                            />
+                                        )}
                                 </View>
-                                <AppText variant="bodyLarge">{item.label}</AppText>
+
+                                <AppText variant="bodyLarge">
+                                    {item.label}
+                                </AppText>
                             </Pressable>
                         ))}
+
+                        {/* OTHER BUTTON */}
+                        <Pressable
+                                style={styles.checkboxRow}
+                                onPress={() =>
+                                    setOtherFoodDetail(prev => !prev)
+                                }
+                            >
+                                <View style={styles.checkbox}>
+                                    {otherFoodDetail && (
+                                        <Ionicons
+                                            name="checkmark"
+                                            size={14}
+                                            color={palette.middlegreen}
+                                        />
+                                    )}
+                                </View>
+
+                                <AppText variant="bodyLarge">
+                                    Other
+                                </AppText>
+                            </Pressable>
+
+                            {otherFoodDetail && (
+                                <TextInput
+                                    placeholder="Add custom food details (optional)..."
+                                    value={customFoodDetail}
+                                    onChangeText={setCustomFoodDetail}
+                                    multiline
+                                    textAlignVertical="top"
+                                    style={styles.commentInput}
+                                />
+                            )}
+
+
                     </Card>
                 </View>
 
@@ -595,6 +656,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderRadius: 8,
         justifyContent: 'center',
+    },
+
+    commentInput: {
+        borderWidth: 1,
+        borderColor: palette.black,
+        backgroundColor: palette.white,
+        borderRadius: 12,
+        padding: spacing.md,
+        minHeight: 100,
+        marginTop: spacing.sm,
     },
 
     imageGrid: {

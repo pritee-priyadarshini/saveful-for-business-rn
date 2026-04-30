@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Picker } from '@react-native-picker/picker';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
@@ -103,11 +104,9 @@ export function ProfileScreen() {
 
   const { selectedRole } = useAppContext();
 
-  const isRestaurant =
-    selectedRole === 'restaurant_single' ||
-    selectedRole === 'restaurant_multi';
+  const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
 
-  const isCharity = !isRestaurant;
+  const isCharity = selectedRole === 'charity_single' || selectedRole === 'charity_multi';
 
   // DYNAMIC SECTIONS
   const sections = [
@@ -211,7 +210,7 @@ export function ProfileScreen() {
               style={styles.supportBtn}
               onPress={() => openLink('https://www.saveful.com/contact')}
             >
-              <AppText>Contact Support </AppText>
+              <AppText variant='label'>Contact Support </AppText>
             </Pressable>
           </Card>
 
@@ -222,7 +221,7 @@ export function ProfileScreen() {
                 style={styles.accordionHeader}
                 onPress={() => toggle(section.key)}
               >
-                <AppText>{section.title}</AppText>
+                <AppText variant='label'>{section.title}</AppText>
                 <Ionicons
                   name={openSection === section.key ? 'remove' : 'add'}
                   size={18}
@@ -241,54 +240,95 @@ export function ProfileScreen() {
 
                   {section.key === 'contact' && (
                     <>
-                      <InputField label="Email" value={formData.email} editable={false} />
+                      <InputField
+                        label="Email"
+                        value={formData.email}
+                        editable={false}
+                      />
+
                       <InputField
                         label="Mobile"
                         value={formData.mobile}
+                        editable={true}
                         onChangeText={(v) => updateField('mobile', v)}
                       />
+
                       <View style={styles.passwordWrapper}>
                         <InputField
                           label="Password"
                           value={formData.password}
+                          editable={true}
                           onChangeText={(v) => updateField('password', v)}
                           secureTextEntry={!showPassword}
                         />
 
-                        <Pressable
-                          style={styles.eyeIcon}
-                          onPress={() => setShowPassword(prev => !prev)}
-                        >
-                          <Ionicons
-                            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                            size={18}
-                            color="#666"
-                          />
-                        </Pressable>
+                        {true && (
+                          <Pressable
+                            style={styles.eyeIcon}
+                            onPress={() => setShowPassword(prev => !prev)}
+                          >
+                            <Ionicons
+                              name={
+                                showPassword
+                                  ? 'eye-off-outline'
+                                  : 'eye-outline'
+                              }
+                              size={18}
+                              color="#666"
+                            />
+                          </Pressable>
+                        )}
                       </View>
                     </>
                   )}
 
                   {section.key === 'business' && (
                     <>
-                      <InputField label="Name" value={formData.businessName} editable={false} />
+                      <InputField
+                        label="Name"
+                        value={formData.businessName}
+                        editable={false}
+                      />
+
                       <InputField
                         label="Address"
                         value={formData.address}
+                        editable={true}
                         onChangeText={(v) => updateField('address', v)}
                       />
+
                       <InputField
                         label="Registration No."
                         value={formData.registration}
+                        editable={true}
                         onChangeText={(v) => updateField('registration', v)}
                       />
 
                       {!isCharity && (
-                        <InputField
-                          label="Venue Type"
-                          value={formData.venueType}
-                          onChangeText={(v) => updateField('venueType', v)}
-                        />
+                        <>
+                          <AppText variant="label">Venue Type</AppText>
+
+                          <View style={[styles.dropdown,]} >
+                            <Picker
+                              enabled={true}
+                              selectedValue={formData.venueType}
+                              onValueChange={(value) =>
+                                updateField('venueType', value)
+                              }
+                            >
+                              <Picker.Item label="Select venue type" value="" />
+                              <Picker.Item label="Cafe" value="cafe" />
+                              <Picker.Item label="Bakery" value="bakery" />
+                              <Picker.Item label="Grocery Store" value="grocery_store" />
+                              <Picker.Item label="Food Truck" value="food_truck" />
+                              <Picker.Item label="Restaurant" value="restaurant" />
+                              <Picker.Item label="Hotel" value="hotel" />
+                              <Picker.Item label="Wedding" value="wedding" />
+                              <Picker.Item label="Caterers" value="caterers" />
+                              <Picker.Item label="Other" value="other" />
+                            </Picker>
+                          </View>
+                        </>
                       )}
                     </>
                   )}
@@ -298,18 +338,20 @@ export function ProfileScreen() {
                       <InputField
                         label="Branding"
                         value={formData.branding}
+                        editable={true}
                         onChangeText={(v) => updateField('branding', v)}
                       />
 
-                      <AppText variant='label'>Upload Logo</AppText>
-                      <Pressable style={styles.uploadBox} onPress={pickImage}>
+                      <AppText variant="label">Upload Logo</AppText>
+                      <Pressable style={[styles.uploadBox,]} onPress={pickImage}
+                      >
                         {logo ? (
                           <Image
                             source={{ uri: logo }}
                             style={styles.logoPreview}
                           />
                         ) : (
-                          <AppText>Select from gallery</AppText>
+                          <AppText variant="bodySmall"> Select from gallery </AppText>
                         )}
                       </Pressable>
                     </>
@@ -324,12 +366,25 @@ export function ProfileScreen() {
                   )}
 
                   {/* SAVE BUTTON */}
-                  <Pressable
-                    style={styles.saveBtn}
-                    onPress={() => console.log('Saving:', section.key, formData)}
-                  >
-                    <AppText style={{ color: 'white' }}>Save Changes</AppText>
-                  </Pressable>
+                  {((section.key === 'contact' ||
+                    section.key === 'business' ||
+                    section.key === 'extra') &&
+                    true) ||
+                    (section.key === 'pickup' && isCharity) ? (
+                    <Pressable
+                      style={styles.saveBtn}
+                      onPress={() =>
+                        console.log('Saving:', section.key, formData)
+                      }
+                    >
+                      <AppText
+                        variant="label"
+                        style={{ color: 'white' }}
+                      >
+                        Save Changes
+                      </AppText>
+                    </Pressable>
+                  ) : null}
 
                 </Card>
               )}
@@ -342,18 +397,26 @@ export function ProfileScreen() {
               style={styles.linkRow}
               onPress={() => navigation.navigate('RestaurantPlan')}
             >
-              <AppText>Plans</AppText>
+              <AppText variant='body'>Plans</AppText>
               <Ionicons name="chevron-forward" size={18} />
             </Pressable>
           )}
 
-          {isRestaurant && (
+          {(isRestaurant || isCharity) && (
             <Pressable
               style={styles.linkRow}
-              onPress={() => navigation.navigate('ManageAccess')}
+              onPress={() =>
+                navigation.navigate( isCharity ? 'CharityManageAccess' : 'ManageAccess' )
+              }
             >
-              <AppText>Manage Access</AppText>
-              <Ionicons name="people-outline" size={18} />
+              <AppText variant="body">
+                Manage Access
+              </AppText>
+
+              <Ionicons
+                name="people-outline"
+                size={18}
+              />
             </Pressable>
           )}
 
@@ -367,7 +430,7 @@ export function ProfileScreen() {
               style={styles.linkRow}
               onPress={() => openLink(item.url)}
             >
-              <AppText>{item.label}</AppText>
+              <AppText variant='body'>{item.label}</AppText>
               <Ionicons name="open-outline" size={18} />
             </Pressable>
           ))}
@@ -384,11 +447,11 @@ export function ProfileScreen() {
 
           {/* ACTIONS */}
           <Pressable style={styles.actionBtn} onPress={handleLogout}>
-            <AppText>Log out</AppText>
+            <AppText variant='label'>Log out</AppText>
           </Pressable>
 
           <Pressable style={styles.actionBtn} onPress={handleDeleteAccount}>
-            <AppText>Delete my account</AppText>
+            <AppText variant='label'>Delete my account</AppText>
           </Pressable>
 
         </ScrollView>
@@ -438,10 +501,10 @@ const styles = StyleSheet.create({
   },
 
   centerDivider: {
-  width: '96%', 
-  height: 1,
-  backgroundColor: palette.border,
-},
+    width: '96%',
+    height: 1,
+    backgroundColor: palette.border,
+  },
 
   white: {
     color: 'white',
@@ -474,15 +537,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 0.5,
-    borderColor: '#ddd',
+    borderColor: palette.white,
   },
 
   accordionContent: {
     marginHorizontal: spacing.xs,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    backgroundColor: '#fff',
-    borderRadius: 10, // ✅ less curve
+    backgroundColor: palette.white,
+    borderRadius: 10,
   },
 
   uploadBox: {
@@ -500,7 +563,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 0.5,
-    borderColor: '#ddd',
+    borderColor: palette.white,
   },
 
   actionBtn: {
@@ -522,10 +585,27 @@ const styles = StyleSheet.create({
   },
 
   saveBtn: {
-    backgroundColor: '#7B3FE4',
+    backgroundColor: palette.primary,
     padding: spacing.md,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: spacing.xs,
+  },
+
+  editableInput: {
+    backgroundColor: '#F0FFF4',
+    borderColor: palette.middlegreen,
+  },
+
+  readOnlyInput: {
+    backgroundColor: '#F4F4F5',
+    borderColor: '#D4D4D8',
+    opacity: 0.9,
+  },
+
+  dropdown: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
 });

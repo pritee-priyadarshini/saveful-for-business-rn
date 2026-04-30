@@ -15,6 +15,7 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
+import { Picker } from '@react-native-picker/picker';
 
 export default function ManageAccessScreen() {
   const navigation = useNavigation();
@@ -24,19 +25,22 @@ export default function ManageAccessScreen() {
       id: '1',
       name: 'Kim Wilson',
       email: 'kim@saveful.com',
-      role: 'owner',
+      mobile: '+91 9876543210',
+      role: 'Site Admin',
     },
     {
       id: '2',
       name: 'Alex Turner',
       email: 'alex@saveful.com',
-      role: 'manager',
+      mobile: '+91 9123456780',
+      role: 'Site Team Member',
     },
   ]);
 
   const [form, setForm] = useState({
     name: '',
     email: '',
+    mobile: '',
     password: '',
     role: '',
   });
@@ -48,7 +52,7 @@ export default function ManageAccessScreen() {
   const isLimitReached = members.length >= MAX_USERS;
 
   const handleSubmit = () => {
-    if (!form.name || !form.email || !form.password || !form.role) {
+    if (!form.name || !form.email || !form.mobile || !form.password || !form.role) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
@@ -70,6 +74,7 @@ export default function ManageAccessScreen() {
         id: Date.now().toString(),
         name: form.name,
         email: form.email,
+        mobile: form.mobile,
         role: form.role,
       };
 
@@ -79,13 +84,14 @@ export default function ManageAccessScreen() {
     setForm({
       name: '',
       email: '',
+      mobile: '',
       password: '',
       role: '',
     });
   };
 
   const handleDelete = (id: string, role: string) => {
-    if (role === 'owner') {
+    if (role === 'site_admin') {
       Alert.alert('Not allowed', 'Owner cannot be removed');
       return;
     }
@@ -96,7 +102,8 @@ export default function ManageAccessScreen() {
     setForm({
       name: member.name,
       email: member.email,
-      password: '123456',
+      mobile: member.mobile,
+      password: member.password,
       role: member.role,
     });
     setEditingId(member.id);
@@ -170,6 +177,14 @@ export default function ManageAccessScreen() {
             style={styles.input}
           />
 
+          <TextInput
+            placeholder="Phone Number"
+            value={form.mobile}
+            keyboardType="phone-pad"
+            onChangeText={(v) => setForm({ ...form, mobile: v })}
+            style={styles.input}
+          />
+
           <View style={styles.passwordContainer}>
             <TextInput
               placeholder="Password"
@@ -188,12 +203,18 @@ export default function ManageAccessScreen() {
             </Pressable>
           </View>
 
-          <TextInput
-            placeholder="Role (e.g. manager)"
-            value={form.role}
-            onChangeText={(v) => setForm({ ...form, role: v })}
-            style={styles.input}
-          />
+          <View style={styles.dropdown}>
+            <Picker
+              selectedValue={form.role}
+              onValueChange={(v) =>
+                setForm({ ...form, role: v })
+              }
+            >
+              <Picker.Item label="Select Role" value="" />
+              <Picker.Item label="Site Admin" value="site_admin" />
+              <Picker.Item label="Site Team Member" value="site_team_member" />
+            </Picker>
+          </View>
 
           <Pressable
             onPress={handleSubmit}
@@ -218,13 +239,12 @@ export default function ManageAccessScreen() {
             <View>
               <AppText variant="bodyBold">{member.name}</AppText>
               <AppText variant="bodySmall">{member.email}</AppText>
-              <AppText variant="bodySmall">
-                Role: {member.role}
-              </AppText>
+              <AppText variant="bodySmall">{member.mobile}</AppText>
+              <AppText variant="bodySmall"> Role: {member.role}</AppText>
             </View>
 
             <View style={styles.actions}>
-              {member.role !== 'owner' && (
+              {member.role !== 'site_admin' && (
                 <>
                   <Pressable onPress={() => handleEdit(member)}>
                     <Ionicons name="create-outline" size={20} />
@@ -306,6 +326,14 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderRadius: 8,
     paddingHorizontal: 12,
+    backgroundColor: palette.white,
+  },
+
+  dropdown: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 8,
+    overflow: 'hidden',
     backgroundColor: palette.white,
   },
 

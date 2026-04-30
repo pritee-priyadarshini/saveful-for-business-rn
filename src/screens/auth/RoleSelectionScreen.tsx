@@ -31,12 +31,21 @@ const roles = [
     ],
   },
   {
-    id: 'charity' as const,
-    title: 'Charity / Non-Profit',
+    id: 'charity_single' as const,
+    title: 'Charity / Non-Profit (Single Location)',
     icon: '💜',
     lines: [
       'Find and collect food from nearby businesses',
       'Support your community with ease',
+    ],
+  },
+  {
+    id: 'charity_multi' as const,
+    title: 'Charity / Non-Profit (Multiple Location)',
+    icon: '💜💜💜',
+    lines: [
+      'Find and collect food from nearby businesses for charity with multiple locations',
+      'Support your community groups',
     ],
   },
 ];
@@ -50,19 +59,14 @@ export function RoleSelectionScreen({ navigation }: Props) {
     }
   }, []);
 
-  return (<Screen
-    backgroundColor={palette.white}
-    scrollable={false}
-    contentStyle={styles.container}
-  >
-
+  return (<Screen backgroundColor={palette.creme} scrollable contentStyle={{ flexGrow: 1 }}>
     {/* HEADER */}
     <ImageBackground
       source={require('../../../assets/placeholder/kale-header.png')}
       style={styles.headerBg}
       resizeMode="cover"
     >
-      <AppText variant="heading" color={palette.white} style={styles.headerTitle}>
+      <AppText variant="h3" color={palette.white} style={styles.headerTitle}>
         HOW WILL YOU USE SAVEFUL FOR BUSINESS?
       </AppText>
     </ImageBackground>
@@ -149,10 +153,11 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: palette.white,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
 
   subtitle: {
@@ -176,8 +181,8 @@ const styles = StyleSheet.create({
   },
 
   cardActive: {
-    backgroundColor: palette.creme,
-    borderColor: palette.primary,
+    backgroundColor: palette.lemon,
+    borderColor: palette.border,
   },
 
   icon: {

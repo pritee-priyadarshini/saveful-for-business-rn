@@ -143,6 +143,8 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 14,
     borderRadius: 30,
+    borderColor: palette.border,
+    borderWidth: 1,
     alignItems: 'center',
   },
 

@@ -10,11 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
-import { Card } from '../../components/Card';
 import { useAppContext } from '../../store/AppContext';
 
 import {
-  restaurantListings,
   restaurantImpact,
 } from '../../data/mockData';
 
@@ -29,26 +27,33 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const impactConfig = [
     {
-      label: 'CO2',
-      icon: require('../../../assets/placeholder/leftovers.png'),
+      key: 'kg saved',
+      label: 'KG',
+      icon: require('../../../assets/placeholder/bowl.png'),
     },
     {
-      label: 'Money',
-      icon: require('../../../assets/placeholder/money.png'),
-    },
-    {
+      key: 'charities supported',
       label: 'Charity',
       icon: require('../../../assets/placeholder/community-icon.png'),
     },
     {
-      label: 'KG',
-      icon: require('../../../assets/placeholder/bowl.png'),
+      key: 'CO2 reduced',
+      label: 'CO2',
+      icon: require('../../../assets/placeholder/leftovers.png'),
+    },
+    {
+      key: 'money',
+      label: 'Money',
+      icon: require('../../../assets/placeholder/money.png'),
     },
   ];
 
-  const impactData = impactConfig.map((item, index) => ({
+  const impactData = impactConfig.map((item) => ({
     ...item,
-    value: restaurantImpact.snapshot[index]?.value || '--',
+    value:
+      restaurantImpact.snapshot.find(
+        (snap) => snap.label === item.key
+      )?.value || '--',
   }));
 
   return (
@@ -148,7 +153,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   ]}
                 >
                   <AppText
-                    variant="caption"
+                    variant="label"
                     style={[
                       styles.pillText,
                       activeIndex === index && styles.activePillText,
@@ -167,7 +172,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
             />
 
             {/* TEXT */}
-            <AppText variant="bodyBold">
+            <AppText variant="h7">
               You have potentially saved
             </AppText>
 
@@ -179,7 +184,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
             </View>
 
             {/* SUB TEXT */}
-            <AppText variant="bodyBold">
+            <AppText variant="h7">
               Keep making an impact!
             </AppText>
 
@@ -321,7 +326,6 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     alignItems: 'center',
     gap: spacing.md,
-    height: 300,
   },
 
   pillRow: {
@@ -353,8 +357,8 @@ const styles = StyleSheet.create({
   },
 
   impactIcon: {
-    width: 60,
-    height: 60,
+    width: 120,
+    height: 120,
     resizeMode: 'contain',
   },
 

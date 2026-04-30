@@ -14,17 +14,19 @@ import { InputField } from '../../components/InputField';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { demoRoleUsers } from '../../data/mockData';
+import { UserRole } from '../../types';
 
 export function SignInScreen() {
     const { loginDemo, setRole } = useAppContext();
 
-    const [role, setLocalRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity'>('restaurant_single');
+    const [role, setLocalRole] = useState<UserRole>('restaurant_single');
     const [email, setEmail] = useState('restaurant@demo.com');
     const [password, setPassword] = useState('123456');
     const [secure, setSecure] = useState(true);
     const [error, setError] = useState('');
 
-    const DEMO = {
+    const DEMO: Record<UserRole, { email: string; password: string }> = {
         restaurant_single: {
             email: 'restaurant@demo.com',
             password: '123456',
@@ -33,8 +35,16 @@ export function SignInScreen() {
             email: 'admin@demo.com',
             password: '123456',
         },
-        charity: {
+        charity_single: {
             email: 'charity@demo.com',
+            password: '123456',
+        },
+        charity_multi: {
+            email: 'adminCharity@demo.com',
+            password: '123456',
+        },
+        driver: {
+            email: 'driver@demo.com',
             password: '123456',
         },
     };
@@ -52,23 +62,17 @@ export function SignInScreen() {
             password === DEMO[role].password;
 
         if (!valid) {
-            setError(
-                role === 'restaurant_single'
-                    ? 'Use restaurant@demo.com / 123456'
-                    : role === 'restaurant_multi'
-                        ? 'Use admin@demo.com / 123456'
-                        : 'Use charity@demo.com / 123456'
-            );
+            setError(`Use ${DEMO[role].email} / ${DEMO[role].password}`);
             return;
         }
 
         setRole(role);
         setTimeout(() => {
-            loginDemo();
+            loginDemo(demoRoleUsers[role]);
         }, 0);
     };
 
-    const handleRoleChange = (selected: 'restaurant_single' | 'restaurant_multi' | 'charity') => {
+    const handleRoleChange = (selected: UserRole) => {
         setLocalRole(selected);
         setError('');
         setEmail(DEMO[selected].email);
@@ -92,9 +96,6 @@ export function SignInScreen() {
                             style={styles.logo}
                             resizeMode="contain"
                         />
-                        <AppText variant="caption">
-                            {role === 'charity' ? 'For Charity' : 'For Business'}
-                        </AppText>
                     </View>
 
                     {/* FORM */}
@@ -138,23 +139,36 @@ export function SignInScreen() {
                                 </AppText>
                             </TouchableOpacity>
 
-                            {/* CHARITY */}
+                            {/* CHARITY SINGLE */}
                             <TouchableOpacity
-                                style={[
-                                    styles.roleOption,
-                                    role === 'charity' && styles.activeRole,
-                                ]}
-                                onPress={() => handleRoleChange('charity')}
+                                style={[styles.roleOption, role === 'charity_single' && styles.activeRole]}
+                                onPress={() => handleRoleChange('charity_single')}
                             >
-                                <AppText
-                                    style={[
-                                        styles.roleText,
-                                        role === 'charity' && styles.activeRoleText,
-                                    ]}
-                                >
+                                <AppText style={[styles.roleText, role === 'charity_single' && styles.activeRoleText]}>
                                     Charity
                                 </AppText>
                             </TouchableOpacity>
+
+                            {/* CHARITY MULTI */}
+                            <TouchableOpacity
+                                style={[styles.roleOption, role === 'charity_multi' && styles.activeRole]}
+                                onPress={() => handleRoleChange('charity_multi')}
+                            >
+                                <AppText style={[styles.roleText, role === 'charity_multi' && styles.activeRoleText]}>
+                                    Charity+
+                                </AppText>
+                            </TouchableOpacity>
+
+                            {/* DRIVER */}
+                            <TouchableOpacity
+                                style={[styles.roleOption, role === 'driver' && styles.activeRole]}
+                                onPress={() => handleRoleChange('driver')}
+                            >
+                                <AppText style={[styles.roleText, role === 'driver' && styles.activeRoleText]}>
+                                    Driver
+                                </AppText>
+                            </TouchableOpacity>
+
                         </View>
 
                         <AppText variant="heading" style={styles.title}>
@@ -256,6 +270,7 @@ const styles = StyleSheet.create({
         backgroundColor: palette.surface,
         borderRadius: 30,
         padding: 4,
+        flexWrap: 'wrap',
     },
     roleOption: {
         flex: 1,

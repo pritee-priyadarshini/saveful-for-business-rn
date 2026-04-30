@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   View,
   ImageBackground,
+  Pressable,
+  Modal,
 } from 'react-native';
 import { Linking } from 'react-native';
 
@@ -14,12 +16,60 @@ import { Screen } from '../../components/Screen';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 
 export function ClaimConfirmationScreen({ route, navigation }: any) {
-  const { listing, payload } = route.params;
-
   const [note, setNote] = useState('');
   const [accepted, setAccepted] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState('');
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const listing = route?.params?.listing;
+  const payload = route?.params?.payload;
+
+  const totalAvailable =
+    listing?.quantityKg || 0;
+
+  const claimedItems = Array.isArray(payload)
+    ? payload
+    : payload?.items || [];
+
+  const claimedQty =
+    claimedItems.length > 0
+      ? claimedItems.reduce(
+        (sum: number, item: any) =>
+          sum +
+          Number(
+            item.claimedQty ??
+            item.quantityKg ??
+            item.qty ??
+            item.quantity ??
+            item.selectedQty ??
+            0
+          ),
+        0
+      )
+      : totalAvailable;
+
+  const isFullClaim =
+    claimedQty >= totalAvailable;
+
+  const drivers = [
+    {
+      id: '1',
+      name: 'Rahul Das',
+      online: true,
+    },
+    {
+      id: '2',
+      name: 'Sanjay Rout',
+      online: false,
+    },
+    {
+      id: '3',
+      name: 'Amit Sahu',
+      online: true,
+    },
+  ];
 
   // Build items (full vs partial)
   const itemsToShow = useMemo(() => {
@@ -59,7 +109,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
 
         {/* WHAT YOU'RE COLLECTING */}
         <View style={styles.card}>
-          <AppText variant='body'>
+          <AppText variant='bodyBold'>
             📦 What you’re collecting
           </AppText>
 
@@ -167,6 +217,75 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
           </View>
         </View>
 
+        {/* ASSIGN DRIVER */}
+        <View style={styles.card}>
+          <AppText variant="body"> 🚚 Add Driver </AppText>
+
+          <AppText variant="bodySmall" style={styles.subText} >
+            Assign a driver for collecting the surplus
+          </AppText>
+
+          <View style={styles.driverDropdown}>
+            <Picker
+              selectedValue={selectedDriver}
+              onValueChange={setSelectedDriver}
+            >
+              <Picker.Item
+                label="Select driver"
+                value=""
+              />
+
+              {drivers.map(driver => (
+                <Picker.Item
+                  key={driver.id}
+                  label={`${driver.online ? '✓' : '✕'
+                    }  ${driver.name}`}
+                  value={driver.id}
+                />
+              ))}
+            </Picker>
+          </View>
+
+          {selectedDriver ? (
+            <View style={styles.driverAssignedRow}>
+              <AppText
+                variant="bodySmall"
+                style={styles.driverAssignedText}
+              >
+                Driver to be assigned:{' '}
+                <AppText
+                  variant="label"
+                  style={styles.driverAssignedText}
+                >
+                  {
+                    drivers.find(
+                      d => d.id === selectedDriver
+                    )?.name
+                  }
+                </AppText>
+              </AppText>
+
+              <Ionicons
+                name={
+                  drivers.find(
+                    d => d.id === selectedDriver
+                  )?.online
+                    ? 'checkmark-circle'
+                    : 'close-circle'
+                }
+                size={22}
+                color={
+                  drivers.find(
+                    d => d.id === selectedDriver
+                  )?.online
+                    ? palette.middlegreen
+                    : palette.chilli
+                }
+              />
+            </View>
+          ) : null}
+        </View>
+
         {/* NOTE */}
         <View style={styles.card}>
           <AppText variant='bodyLarge'>
@@ -203,11 +322,54 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
           label="Confirm pickup"
           disabled={!accepted}
           style={styles.confirmBtn}
-          onPress={() => {
-            navigation.goBack();
-          }}
+          onPress={() => setShowPickupModal(true)}
         />
       </View>
+
+
+      <Modal
+        visible={showPickupModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setShowPickupModal(false)
+        }
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+
+            <View style={styles.modalIconWrap}>
+              <Ionicons
+                name="checkmark"
+                size={34}
+                color={palette.white}
+              />
+            </View>
+
+            <AppText variant="h6" style={styles.modalTitle} > Pickup Confirmed </AppText>
+
+            <AppText variant="bodyLarge" style={styles.modalText} >
+              {isFullClaim
+                ? `You have fully claimed ${claimedQty} kg surplus`
+                : `You have partially claimed ${claimedQty} kg from ${totalAvailable} kg surplus available`}
+            </AppText>
+
+            <Pressable
+              style={styles.modalBtn}
+              onPress={() => {
+                setShowPickupModal(false);
+
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Tabs' }],
+                });
+              }}
+            >
+              <AppText variant="label" style={styles.modalBtnText} > Go To Home </AppText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>  
     </Screen>
   );
 }
@@ -234,10 +396,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: palette.white,
     textAlign: 'center',
-  },
-
-  white: {
-    color: palette.white,
   },
 
   card: {
@@ -308,6 +466,30 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
+  subText: {
+    opacity: 0.7,
+  },
+
+  driverDropdown: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: palette.white,
+  },
+
+  driverAssignedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+
+  driverAssignedText: {
+    lineHeight: 26,
+    includeFontPadding: true,
+  },
+
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -335,6 +517,55 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginHorizontal: spacing.md,
     backgroundColor: palette.middlegreen,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+
+  modalCard: {
+    width: '100%',
+    backgroundColor: palette.white,
+    borderRadius: 24,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+
+  modalIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: palette.middlegreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  modalTitle: {
+    textAlign: 'center',
+  },
+
+  modalText: {
+    textAlign: 'center',
+    opacity: 0.8,
+    lineHeight: 24,
+  },
+
+  modalBtn: {
+    width: '100%',
+    backgroundColor: palette.middlegreen,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+
+  modalBtnText: {
+    color: palette.white,
   },
 
 });

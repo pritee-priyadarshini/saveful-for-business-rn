@@ -4,7 +4,6 @@ import {
   View,
   TextInput,
   Pressable,
-  Image,
   ImageBackground,
   Modal,
 } from 'react-native';
@@ -62,14 +61,14 @@ export function EmailVerificationScreen({ navigation }: Props) {
             style={styles.headerBg}
             resizeMode="cover"
           >
-            <AppText variant="heading" color={palette.white} style={styles.heading}>
+            <AppText variant="h5" color={palette.white} style={styles.heading}>
               Verify your email Id
             </AppText>
           </ImageBackground>
 
           {/* HEADING */}
           <View style={styles.textBlock}>
-            <AppText style={styles.subText}>
+            <AppText variant='bodyLarge' style={styles.subText}>
               A 6-digit OTP has been sent to your email. Please enter it to confirm your account and proceed with Saveful for Business.
             </AppText>
           </View>
@@ -98,11 +97,11 @@ export function EmailVerificationScreen({ navigation }: Props) {
 
           {/* RESEND */}
           <Pressable style={styles.resendButton}>
-            <AppText style={styles.resendText}>Resend Email</AppText>
+            <AppText variant='label' style={styles.resendText}>Resend Email</AppText>
           </Pressable>
 
           {/* INFO */}
-          <AppText style={styles.infoText}>
+          <AppText variant='bodyLarge' style={styles.infoText}>
             It may take up to 5 minutes to arrive. Please remember to check your junk/spam folder if you don’t see it.
           </AppText>
 
@@ -134,23 +133,23 @@ export function EmailVerificationScreen({ navigation }: Props) {
 
               {isRestaurant ? (
                 <>
-                  <AppText style={styles.text}>
+                  <AppText variant="bodyLarge" style={styles.text}>
                     Start your free 30-day trial and see how Saveful helps you save more,
                     share more, and run smarter.
                   </AppText>
 
-                  <AppText style={styles.subText}>
+                  <AppText variant="bodyBold" style={styles.subText}>
                     No payment needed to begin.
                   </AppText>
                 </>
               ) : (
                 <>
-                  <AppText style={styles.text}>
+                  <AppText variant="bodyLarge" style={styles.text}>
                     Start receiving surplus food from nearby businesses and make a bigger
                     impact in your community with Saveful for Business.
                   </AppText>
 
-                  <AppText style={styles.subText}>
+                  <AppText variant="bodyBold" style={styles.subText}>
                     Saveful is completely free for charities.
                   </AppText>
                 </>
@@ -206,7 +205,6 @@ const styles = StyleSheet.create({
 
   heading: {
     textAlign: 'center',
-    fontWeight: 'bold',
   },
 
   text: {
@@ -216,6 +214,7 @@ const styles = StyleSheet.create({
 
   subText: {
     margin: spacing.sm,
+    paddingHorizontal: spacing.sm,
     textAlign: 'center',
     opacity: 0.6,
   },
@@ -234,7 +233,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     textAlign: 'center',
-    fontSize: 22,
     backgroundColor: palette.white,
   },
 
@@ -253,13 +251,13 @@ const styles = StyleSheet.create({
 
   resendText: {
     color: palette.primary,
-    fontWeight: 'bold',
     textDecorationLine: 'underline',
   },
 
   infoText: {
     textAlign: 'center',
     margin: spacing.sm,
+    paddingHorizontal: spacing.sm,
     opacity: 0.6,
     lineHeight: 20,
   },

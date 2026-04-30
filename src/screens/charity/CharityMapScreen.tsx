@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   View,
   ImageBackground,
+  Pressable,
 } from 'react-native';
 
 import { AppText } from '../../components/AppText';
@@ -79,11 +80,14 @@ export function CharityMapScreen({ navigation }: any) {
         </AppText>
       </ImageBackground>
 
-      <View style={styles.subTextWrapper}>
-        <AppText variant="h7" style={styles.center}>
-          Surplus food near you
+      <Pressable
+        style={styles.pickupBtn}
+        onPress={() => navigation.navigate('CharityPickup')}
+      >
+        <AppText variant="label" style={styles.pickupBtnText} >
+          View Your Pickups
         </AppText>
-      </View>
+      </Pressable>
 
       {/* ACTIVE LISTINGS */}
       <View style={styles.activeRow}>
@@ -194,7 +198,7 @@ export function CharityMapScreen({ navigation }: any) {
         {/* HEADER */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <AppText variant='bodyLarge'>{item.businessName}</AppText>
+            <AppText variant='bodyBold'>{item.businessName}</AppText>
             <AppText variant='bodySmall'>
               {item.suburb} · {item.type}
             </AppText>
@@ -208,7 +212,7 @@ export function CharityMapScreen({ navigation }: any) {
         {/* INFO STRIP */}
         <View style={styles.infoRow}>
           <View style={styles.infoCard}>
-            <AppText variant='label'>Qty</AppText>
+            <AppText variant='label'>Quantity</AppText>
             <AppText variant='bodySmall'>{item.quantityKg} kg</AppText>
           </View>
 
@@ -230,7 +234,7 @@ export function CharityMapScreen({ navigation }: any) {
 
         {/* ITEMS */}
         <View style={styles.section}>
-          <AppText style={styles.sectionTitle}>Select quantity</AppText>
+          <AppText variant='label' style={styles.sectionTitle}>Select quantity</AppText>
           {item.items.map((i: any) => renderItemRow(item, i))}
         </View>
 
@@ -249,8 +253,8 @@ export function CharityMapScreen({ navigation }: any) {
           />
 
           <Button
-            label="Claim all"
-            variant="secondary"
+            label="Claim All"
+            variant="primary"
             style={styles.flexBtn}
             onPress={() =>
               navigation.navigate('ClaimConfirm', {
@@ -307,17 +311,22 @@ const styles = StyleSheet.create({
     marginHorizontal: -spacing.md,
   },
 
-  white: {
-    color: palette.white,
-    textAlign: 'center',
-  },
-
-  subTextWrapper: {
-    marginTop: spacing.sm,
+  pickupBtn: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: palette.primary,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
     alignItems: 'center',
   },
 
-  center: {
+  pickupBtnText: {
+    color: palette.white,
+  },
+
+  white: {
+    color: palette.white,
     textAlign: 'center',
   },
 
@@ -343,7 +352,7 @@ const styles = StyleSheet.create({
 
   filterPill: {
     flex: 1,
-    backgroundColor: palette.strokecream,
+    backgroundColor: palette.radish,
     paddingVertical: 10,
     borderRadius: 20,
     alignItems: 'center',
@@ -379,9 +388,9 @@ const styles = StyleSheet.create({
 
   distanceChip: {
     backgroundColor: palette.radish,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
 
   infoRow: {
@@ -392,8 +401,9 @@ const styles = StyleSheet.create({
 
   infoCard: {
     flex: 1,
-    backgroundColor: '#F7F7F9',
+    backgroundColor: palette.radish,
     padding: spacing.sm,
+    gap: 8,
     borderRadius: 14,
   },
 
@@ -448,6 +458,7 @@ const styles = StyleSheet.create({
 
   flexBtn: {
     flex: 1,
+    backgroundColor: palette.middlegreen,
   },
 
 });

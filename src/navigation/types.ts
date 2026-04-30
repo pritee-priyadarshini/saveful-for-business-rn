@@ -23,3 +23,11 @@ export type CharityTabsParamList = {
   Updates: undefined;
   Account: undefined;
 };
+
+export type DriverStackParamList = {
+  DriverDeliveries: undefined;
+  DriverPickupConfirm: {
+    pickup: any;
+    onConfirm?: (id: string) => void;
+  };
+};

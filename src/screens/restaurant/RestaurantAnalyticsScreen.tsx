@@ -128,90 +128,15 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* STATUS */}
-        <View style={styles.section}>
-          <View style={styles.headingContainer}>
-            <Image
-              source={require('../../../assets/placeholder/Illustration.png')}
-              style={styles.headingBg}
-            />
-
-            <AppText variant="heading" style={styles.headingText}>
-              Today's Status
-            </AppText>
-          </View>
-        </View>
-        {sortedListings.length === 0 ? (
-
-          <View style={styles.emptyStateBox}>
-            <AppText variant="bodyBold">
-              You haven’t listed anything today
-            </AppText>
-
-            <Pressable
-              style={styles.smallBtn}
-              onPress={() =>
-                navigation.navigate('Listings', {
-                  screen: 'CreateListing',
-                })
-              }
-            >
-              <AppText style={styles.smallBtnText}>
-                + Add Listing
-              </AppText>
-            </Pressable>
-          </View>
-
-        ) : (
-
-          sortedListings.slice(0, 1).map((item) => (
-            <View key={item.id} style={styles.listingBox}>
-
-              {/* TOP */}
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <AppText variant="bodyBold">{item.title}</AppText>
-                  <AppText variant="caption">
-                    {item.quantityKg}kg • {item.pickupWindow}
-                  </AppText>
-                </View>
-
-                <View style={styles.status}>
-                  <AppText variant="caption">{item.status}</AppText>
-                </View>
-              </View>
-
-              {/* DETAILS */}
-              <View style={styles.detailsRow}>
-                <Image
-                  source={require('../../../assets/placeholder/bowl.png')}
-                  style={styles.image}
-                />
-
-                <View style={{ flex: 1 }}>
-                  <AppText variant="caption">
-                    📍 {item.suburb}
-                  </AppText>
-
-                  <AppText variant="caption">
-                    {item.receiver
-                      ? `Collected by ${item.receiver}`
-                      : 'Waiting for charity'}
-                  </AppText>
-                </View>
-              </View>
-
-            </View>
-          ))
-
-        )}
-
-
         <Pressable
           style={styles.createBtn}
-          onPress={() => navigation.navigate('CreateListing')}
+          onPress={() =>
+            navigation.navigate('Listings', {
+              screen: 'RestaurantListings',
+            })
+          }
         >
-          <AppText style={styles.createText}>+ Create New Listing</AppText>
+          <AppText variant='bodyBold' style={styles.createText}>+ Create New Listing</AppText>
         </Pressable>
 
         {/* TREND CARDS */}

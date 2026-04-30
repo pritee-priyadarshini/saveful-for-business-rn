@@ -9,7 +9,6 @@ import {
   ImageBackground,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
@@ -32,7 +31,7 @@ export function CharityDiscoverScreen() {
 
   /*DEMO COORDINATES*/
   const demoCoords = [
-    { lat: 13.0827, lng: 80.2707 }, // Central Chennai
+    { lat: 20.2827, lng: 85.8707 }, // Bhubaneswar
     { lat: 13.0674, lng: 80.2376 }, // T Nagar
     { lat: 13.0569, lng: 80.2425 }, // Kodambakkam
     { lat: 13.0358, lng: 80.2446 }, // Saidapet
@@ -81,7 +80,7 @@ export function CharityDiscoverScreen() {
           <AppText variant="bodyBold">
             {item.title}
           </AppText>
-          <AppText style={styles.business}>
+          <AppText variant="bodyBold" style={styles.business}>
             {item.businessName}
           </AppText>
         </View>
@@ -120,7 +119,7 @@ export function CharityDiscoverScreen() {
 
       <View style={styles.footer}>
         <AppText variant='bodySmall'>
-          ❄ {item.storage}
+          Instructions: {item.storage}
         </AppText>
 
         <Button
@@ -345,11 +344,11 @@ const styles = StyleSheet.create({
   },
 
   toggleText: {
-    opacity: 0.6,
+    opacity: 0.8,
   },
 
   toggleTextActive: {
-    color: palette.white,
+    color: palette.black,
   },
 
   activeListingRow: {
