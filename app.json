@@ -12,7 +12,11 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.priteepriyadarshini.savefulbusiness",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.priteepriyadarshini.savefulbusiness"
@@ -27,8 +31,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "2b74cb7a-25b8-4135-ba23-cf40f11f9508"
+        "projectId": "2a58007e-5109-45fe-b80e-e0831772628e"
       }
-    }
+    },
+    "owner": "pritee_priyadarshini"
   }
 }
