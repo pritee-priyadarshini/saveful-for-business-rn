@@ -21,9 +21,11 @@ import { useAppContext } from '../../store/AppContext';
 
 import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
+import { foodListingService } from '@/services/foodListing.service';
 
 export function CreateListingScreen({ navigation }: any) {
-    const { currentProfile } = useAppContext();
+    const { currentProfile, authUser } = useAppContext();
+    const siteId = authUser?.profile?.sites?.[0]?.id || authUser?.profile?.site?.id || null;
 
     const [customFoodDetail, setCustomFoodDetail] = useState('');
     const [otherFoodDetail, setOtherFoodDetail] = useState(false);
@@ -32,6 +34,8 @@ export function CreateListingScreen({ navigation }: any) {
     const [location, setLocation] = useState(currentProfile.address);
     const [images, setImages] = useState<string[]>([]);
 
+    const [pickupPostcode, setPickupPostcode] = useState('');
+    const [bestBefore, setBestBefore] = useState<Date | null>(null);
     const [pickupFrom, setPickupFrom] = useState<Date | null>(null);
     const [pickupTo, setPickupTo] = useState<Date | null>(null);
 
@@ -46,7 +50,6 @@ export function CreateListingScreen({ navigation }: any) {
         refrigeration: false,
         reheating: false,
         allergens: false,
-        glutenFree: false,
     });
 
     const [safeFood, setSafeFood] = useState(false);
@@ -91,7 +94,7 @@ export function CreateListingScreen({ navigation }: any) {
         setImages(prev => prev.filter((_, i) => i !== index));
     };
 
-    const openDateTimePicker = (type: 'from' | 'to') => {
+    const openDateTimePicker = (type: 'from' | 'to' | 'bestBefore') => {
         DateTimePickerAndroid.open({
             value: new Date(),
             mode: 'date',
@@ -109,7 +112,8 @@ export function CreateListingScreen({ navigation }: any) {
                                 finalDate.setMinutes(selectedTime.getMinutes());
 
                                 if (type === 'from') setPickupFrom(finalDate);
-                                else setPickupTo(finalDate);
+                                else if (type === 'to') setPickupTo(finalDate);
+                                else setBestBefore(finalDate);
                             }
                         },
                     });
@@ -125,55 +129,119 @@ export function CreateListingScreen({ navigation }: any) {
         }));
     };
 
-    const handleSubmit = () => {
-        if (!safeFood) {
-            setSafeFoodError(true);
-            return;
-        }
+    const handleSubmit = async () => {
+        try {
+            if (!safeFood) {
+                setSafeFoodError(true);
+                return;
+            }
 
-        setSafeFoodError(false);
+            if (!siteId) {
+                Alert.alert('Error', 'Site not found');
+                return;
+            }
 
-        const hasItems = items.some(item => item.qty > 0);
-        if (!hasItems) {
-            Alert.alert('Error', 'Please add at least one item');
-            return;
-        }
+            const hasItems = items.some(i => i.qty > 0);
 
-        if (!pickupFrom || !pickupTo) {
-            Alert.alert('Error', 'Please select pickup time');
-            return;
-        }
+            if (!hasItems) {
+                Alert.alert('Error', 'Please add at least one item');
+                return;
+            }
 
-        if (pickupTo <= pickupFrom) {
+            if (!bestBefore) {
+                Alert.alert('Error', 'Select best before time');
+                return;
+            }
+
+            if (!pickupFrom || !pickupTo) {
+                Alert.alert('Error', 'Select pickup window');
+                return;
+            }
+
+            if (pickupTo <= pickupFrom) {
+                Alert.alert('Invalid Time', 'Pickup end must be after pickup start');
+                return;
+            }
+
+            if (!location.trim()) {
+                Alert.alert('Error', 'Pickup address required');
+                return;
+            }
+
+            const foodItems = items
+                .filter(i => i.qty > 0)
+                .map(i => ({
+                    category: i.name,
+                    totalQtyKg: i.qty,
+                    remainingQtyKg: i.qty,
+                }));
+
+            await foodListingService.createListing({
+                siteId,
+                foodItems,
+                pickupAddress: location,
+                pickupPostcode: pickupPostcode || undefined,
+                bestBefore: bestBefore.toISOString(),
+                pickupFromTime: pickupFrom.toISOString(),
+                pickupByTime: pickupTo.toISOString(),
+                needsRefrigeration: foodOptions.refrigeration,
+                needsReheating: foodOptions.reheating,
+                containsAllergens: foodOptions.allergens,
+                isGlutenFree: false,
+                isSafeForDonation: safeFood,
+            });
+
+            const res = await foodListingService.createListing({
+                siteId,
+                foodItems,
+                pickupAddress: location,
+                pickupPostcode: pickupPostcode || undefined,
+                bestBefore: bestBefore.toISOString(),
+                pickupFromTime: pickupFrom.toISOString(),
+                pickupByTime: pickupTo.toISOString(),
+                needsRefrigeration: foodOptions.refrigeration,
+                needsReheating: foodOptions.reheating,
+                containsAllergens: foodOptions.allergens,
+            });
+
+            navigation.navigate('ListingConfirmation', {
+                listing: res.data,
+            });
+
+        } catch (error: any) {
             Alert.alert(
-                'Invalid Time',
-                'Pickup end must be after start'
-            );
-            return;
+                'Error', error?.response?.data?.message || 'Failed to create listing');
         }
-
-        if (!location?.trim()) {
-            Alert.alert('Error', 'Please enter pickup location');
-            return;
-        }
-
-        const totalQuantity = items.reduce((sum, item) => sum + item.qty, 0);
-
-        if (totalQuantity === 0) {
-            Alert.alert('Error', 'Quantity cannot be zero');
-            return;
-        }
-
-        navigation.replace('ListingConfirmation', {
-            items,
-            pickupFrom,
-            pickupTo,
-            location,
-            totalKg: totalQuantity.toString(),
-        });
     };
 
     const totalQuantity = items.reduce((sum, item) => sum + item.qty, 0);
+
+    const handleRelist = async () => {
+        try {
+            const res = await foodListingService.getListings({
+                page: 1,
+                limit: 1,
+            });
+
+            const latest = res.data?.listings?.[0];
+
+            if (!latest) {
+                Alert.alert('No previous listing found');
+                return;
+            }
+
+            await foodListingService.relist(latest.id, {
+                bestBefore: new Date(
+                    Date.now() + 4 * 60 * 60 * 1000
+                ).toISOString(),
+            });
+
+            Alert.alert('Success', 'Listing relisted');
+            navigation.goBack();
+        } catch (error: any) {
+            Alert.alert('Error', error?.response?.data?.message || 'Failed to relist');
+        }
+    };
 
     return (
         <Screen backgroundColor={palette.creme}>
@@ -197,7 +265,7 @@ export function CreateListingScreen({ navigation }: any) {
                     </AppText>
 
                     <AppText variant="bodyLarge" style={styles.headerSubText}>
-                       Add what’s left and we’ll do the rest - we’ll notify nearby charities to come & collect
+                        Add what’s left and we’ll do the rest - we’ll notify nearby charities to come & collect
                     </AppText>
                 </ImageBackground>
 
@@ -207,7 +275,7 @@ export function CreateListingScreen({ navigation }: any) {
                     <AppText variant="bodyBold" style={styles.centerText}>Same as yesterday?</AppText>
 
                     <View style={styles.centerRow}>
-                        <Pressable style={styles.primaryBtn}>
+                        <Pressable style={styles.primaryBtn} onPress={handleRelist} >
                             <AppText variant="caption" style={styles.primaryText}>Yes, list again</AppText>
                         </Pressable>
                     </View>
@@ -325,39 +393,50 @@ export function CreateListingScreen({ navigation }: any) {
                             onChangeText={setLocation}
                             style={styles.input}
                         />
+
+                        <TextInput
+                            placeholder="Postcode (optional)"
+                            value={pickupPostcode}
+                            onChangeText={setPickupPostcode}
+                            style={styles.input}
+                        />
                     </Card>
+
                 </View>
 
                 {/* BEST BEFORE */}
                 <View style={styles.section}>
-                        <AppText variant="heading"> ⏱️ Pickup Time</AppText>
-                        <View style={styles.row}>
+                    <AppText variant="heading"> ⏱️ Pickup Time</AppText>
+                    <View style={styles.row}>
 
-                            {/* FROM */}
-                            <Pressable
-                                style={[styles.input, { flex: 1 }]}
-                                onPress={() => openDateTimePicker('from')}
-                            >
-                                <AppText variant="bodyLarge">
-                                    {pickupFrom
-                                        ? pickupFrom.toLocaleString()
-                                        : 'From'}
-                                </AppText>
-                            </Pressable>
+                        <Pressable
+                            style={styles.input}
+                            onPress={() => openDateTimePicker('bestBefore')}
+                        >
+                            <AppText variant='bodySmall'>
+                                {bestBefore ? bestBefore.toLocaleString() : 'Select best before'}
+                            </AppText>
+                        </Pressable>
 
-                            {/* TO */}
-                            <Pressable
-                                style={[styles.input, { flex: 1 }]}
-                                onPress={() => openDateTimePicker('to')}
-                            >
-                                <AppText variant="bodyLarge">
-                                    {pickupTo
-                                        ? pickupTo.toLocaleString()
-                                        : 'To'}
-                                </AppText>
-                            </Pressable>
+                        <Pressable
+                            style={[styles.input, { flex: 1 }]}
+                            onPress={() => openDateTimePicker('from')}
+                        >
+                            <AppText variant="bodySmall">
+                                {pickupFrom ? pickupFrom.toLocaleString() : 'From'}
+                            </AppText>
+                        </Pressable>
 
-                        </View>
+                        <Pressable
+                            style={[styles.input, { flex: 1 }]}
+                            onPress={() => openDateTimePicker('to')}
+                        >
+                            <AppText variant="bodySmall">
+                                {pickupTo ? pickupTo.toLocaleString() : 'To'}
+                            </AppText>
+                        </Pressable>
+
+                    </View>
                 </View>
 
                 {/* FOOD DETAILS */}
@@ -380,8 +459,12 @@ export function CreateListingScreen({ navigation }: any) {
                             },
                             {
                                 key: 'glutenFree',
-                                label: 'Gluten free 🌾',
+                                label: 'Gluten-free ✅',
                             },
+                            {
+                                key: 'safeForDonation',
+                                label: 'Safe for donation 🤝',
+                            }
                         ].map((item) => (
                             <Pressable
                                 key={item.key}
@@ -412,36 +495,36 @@ export function CreateListingScreen({ navigation }: any) {
 
                         {/* OTHER BUTTON */}
                         <Pressable
-                                style={styles.checkboxRow}
-                                onPress={() =>
-                                    setOtherFoodDetail(prev => !prev)
-                                }
-                            >
-                                <View style={styles.checkbox}>
-                                    {otherFoodDetail && (
-                                        <Ionicons
-                                            name="checkmark"
-                                            size={14}
-                                            color={palette.middlegreen}
-                                        />
-                                    )}
-                                </View>
+                            style={styles.checkboxRow}
+                            onPress={() =>
+                                setOtherFoodDetail(prev => !prev)
+                            }
+                        >
+                            <View style={styles.checkbox}>
+                                {otherFoodDetail && (
+                                    <Ionicons
+                                        name="checkmark"
+                                        size={14}
+                                        color={palette.middlegreen}
+                                    />
+                                )}
+                            </View>
 
-                                <AppText variant="bodyLarge">
-                                    Other
-                                </AppText>
-                            </Pressable>
+                            <AppText variant="bodyLarge">
+                                Other
+                            </AppText>
+                        </Pressable>
 
-                            {otherFoodDetail && (
-                                <TextInput
-                                    placeholder="Add custom food details (optional)..."
-                                    value={customFoodDetail}
-                                    onChangeText={setCustomFoodDetail}
-                                    multiline
-                                    textAlignVertical="top"
-                                    style={styles.commentInput}
-                                />
-                            )}
+                        {otherFoodDetail && (
+                            <TextInput
+                                placeholder="Add custom food details (optional)..."
+                                value={customFoodDetail}
+                                onChangeText={setCustomFoodDetail}
+                                multiline
+                                textAlignVertical="top"
+                                style={styles.commentInput}
+                            />
+                        )}
 
 
                     </Card>

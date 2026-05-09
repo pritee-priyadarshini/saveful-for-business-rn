@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -16,26 +16,10 @@ import { AppText } from '../../components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Picker } from '@react-native-picker/picker';
+import { sitesService } from '@/services/sites.service';
 
 export default function ManageAccessScreen() {
   const navigation = useNavigation();
-
-  const [members, setMembers] = useState([
-    {
-      id: '1',
-      name: 'Kim Wilson',
-      email: 'kim@saveful.com',
-      mobile: '+91 9876543210',
-      role: 'Site Admin',
-    },
-    {
-      id: '2',
-      name: 'Alex Turner',
-      email: 'alex@saveful.com',
-      mobile: '+91 9123456780',
-      role: 'Site Team Member',
-    },
-  ]);
 
   const [form, setForm] = useState({
     name: '',
@@ -45,68 +29,119 @@ export default function ManageAccessScreen() {
     role: '',
   });
 
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [siteId, setSiteId] = useState<number | null>(null);
+  const [maxUsers, setMaxUsers] = useState(0);
+  const [members, setMembers] = useState<any[]>([]);
 
-  const MAX_USERS = 6;
-  const isLimitReached = members.length >= MAX_USERS;
+  const isLimitReached = maxUsers > 0 && members.length >= maxUsers;
 
-  const handleSubmit = () => {
-    if (!form.name || !form.email || !form.mobile || !form.password || !form.role) {
-      Alert.alert('Error', 'Please fill all fields');
-      return;
-    }
+  const handleSubmit = async () => {
+    try {
+      if (!siteId) {
+        Alert.alert('Error', 'No site found');
+        return;
+      }
 
-    if (!editingId && isLimitReached) {
-      Alert.alert('Limit reached', 'Upgrade your plan to add more users.');
-      return;
-    }
+      const [firstName, ...rest] = form.name.trim().split(' ');
+      const lastName = rest.join(' ');
 
-    if (editingId) {
-      setMembers((prev) =>
-        prev.map((m) =>
-          m.id === editingId ? { ...m, ...form } : m
-        )
-      );
-      setEditingId(null);
-    } else {
-      const newUser = {
-        id: Date.now().toString(),
-        name: form.name,
+      const payload = {
+        firstName,
+        lastName,
         email: form.email,
-        mobile: form.mobile,
-        role: form.role,
+        password: form.password,
+        phoneNumber: form.mobile || undefined,
       };
 
-      setMembers((prev) => [...prev, newUser]);
-    }
+      if (form.role === 'SITE_ADMIN') {
+        await sitesService.assignManager(siteId, payload);
+      } else {
+        await sitesService.addStaff(siteId, payload);
+      }
 
-    setForm({
-      name: '',
-      email: '',
-      mobile: '',
-      password: '',
-      role: '',
-    });
+      Alert.alert('Success', 'User added');
+
+      setForm({
+        name: '',
+        email: '',
+        mobile: '',
+        password: '',
+        role: '',
+      });
+
+      fetchTeam();
+
+    } catch (err: any) {
+      Alert.alert(
+        'Error',
+        err?.response?.data?.message || 'Failed'
+      );
+    }
   };
 
-  const handleDelete = (id: string, role: string) => {
-    if (role === 'site_admin') {
-      Alert.alert('Not allowed', 'Owner cannot be removed');
-      return;
-    }
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+  const handleDelete = (userId: number) => {
+    if (!siteId) return;
+
+    Alert.alert(
+      'Remove user',
+      'Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await sitesService.removeAccess(siteId, userId);
+              fetchTeam();
+            } catch {
+              Alert.alert('Error', 'Failed');
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const handleEdit = (member: any) => {
-    setForm({
-      name: member.name,
-      email: member.email,
-      mobile: member.mobile,
-      password: member.password,
-      role: member.role,
-    });
-    setEditingId(member.id);
+  useEffect(() => {
+    fetchTeam();
+  }, []);
+
+  const fetchTeam = async () => {
+    try {
+      setLoading(true);
+
+      const orgRes = await sitesService.getOrganisation();
+
+      const firstSite = orgRes.data?.sites?.[0];
+
+      if (!firstSite) return;
+
+      setSiteId(firstSite.id);
+      setMaxUsers(
+        orgRes.data?.subscription?.plan?.maxUsersPerSite || 0
+      );
+
+      const staffRes = await sitesService.listStaff(firstSite.id);
+
+      const formatted = staffRes.data.map((item: any) => ({
+        id: item.user.id,
+        firstName: item.user.firstName,
+        lastName: item.user.lastName,
+        email: item.user.email,
+        mobile: item.user.phoneNumber,
+        role: item.siteRole,
+      }));
+
+      setMembers(formatted);
+
+    } catch (err) {
+      Alert.alert('Error', 'Failed to load team');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -153,14 +188,14 @@ export default function ManageAccessScreen() {
           </AppText>
 
           <AppText variant="bodySmall">
-            {members.length} / {MAX_USERS} users added
+            {members.length} / {maxUsers} users have been added
           </AppText>
         </View>
 
         {/* FORM CARD */}
         <View style={styles.sectionBox}>
           <AppText variant="label">
-            {editingId ? 'Edit Member' : 'Add Team Member'}
+            Add Team Member
           </AppText>
 
           <TextInput
@@ -206,25 +241,26 @@ export default function ManageAccessScreen() {
           <View style={styles.dropdown}>
             <Picker
               selectedValue={form.role}
-              onValueChange={(v) =>
+              onValueChange={(v: string) =>
                 setForm({ ...form, role: v })
               }
             >
               <Picker.Item label="Select Role" value="" />
-              <Picker.Item label="Site Admin" value="site_admin" />
-              <Picker.Item label="Site Team Member" value="site_team_member" />
+              <Picker.Item label="Site Admin" value="SITE_ADMIN" />
+              <Picker.Item label="Staff" value="STAFF" />
             </Picker>
           </View>
 
           <Pressable
+            disabled={loading || isLimitReached}
             onPress={handleSubmit}
             style={[
               styles.addBtn,
-              isLimitReached && !editingId && { backgroundColor: '#ccc' },
+              isLimitReached && { backgroundColor: '#ccc' },
             ]}
           >
             <AppText variant="label" style={styles.white}>
-              {editingId ? 'Update User' : '+ Add User'}
+              + Add User
             </AppText>
           </Pressable>
         </View>
@@ -237,22 +273,16 @@ export default function ManageAccessScreen() {
         {members.map((member) => (
           <View key={member.id} style={styles.memberRow}>
             <View>
-              <AppText variant="bodyBold">{member.name}</AppText>
+              <AppText variant="bodyBold"> {member.firstName} {member.lastName} </AppText>
               <AppText variant="bodySmall">{member.email}</AppText>
               <AppText variant="bodySmall">{member.mobile}</AppText>
-              <AppText variant="bodySmall"> Role: {member.role}</AppText>
+              <AppText variant="bodySmall"> Role: {member.role === 'SITE_ADMIN' ? 'Site Admin' : 'Staff'}</AppText>
             </View>
 
             <View style={styles.actions}>
-              {member.role !== 'site_admin' && (
+              {member.role !== 'SITE_ADMIN' && (
                 <>
-                  <Pressable onPress={() => handleEdit(member)}>
-                    <Ionicons name="create-outline" size={20} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => handleDelete(member.id, member.role)}
-                  >
+                  <Pressable onPress={() => handleDelete(member.id)} >
                     <Ionicons name="trash-outline" size={20} color="red" />
                   </Pressable>
                 </>

@@ -317,15 +317,15 @@ export function ProfileScreen() {
                               }
                             >
                               <Picker.Item label="Select venue type" value="" />
-                              <Picker.Item label="Cafe" value="cafe" />
-                              <Picker.Item label="Bakery" value="bakery" />
-                              <Picker.Item label="Grocery Store" value="grocery_store" />
-                              <Picker.Item label="Food Truck" value="food_truck" />
-                              <Picker.Item label="Restaurant" value="restaurant" />
-                              <Picker.Item label="Hotel" value="hotel" />
-                              <Picker.Item label="Wedding" value="wedding" />
-                              <Picker.Item label="Caterers" value="caterers" />
-                              <Picker.Item label="Other" value="other" />
+                              <Picker.Item label="Cafe/Restaurant" value="CAFE_RESTAURANT" />
+                              <Picker.Item label="Bakery" value="BAKERY" />
+                              <Picker.Item label="Grocery Store" value="GROCERY_STORE" />
+                              <Picker.Item label="Food Truck" value="FOOD_TRUCK" />
+                              <Picker.Item label="Caterers" value="CATERING_SERVICE" />
+                              <Picker.Item label="Hotel" value="HOTEL" />
+                              <Picker.Item label="Wedding Venue" value="WEDDING_VENUE" />
+                              <Picker.Item label="Cloud Kitchen" value="CLOUD_KITCHEN" />
+                              <Picker.Item label="Other" value="OTHER" />
                             </Picker>
                           </View>
                         </>
@@ -406,7 +406,7 @@ export function ProfileScreen() {
             <Pressable
               style={styles.linkRow}
               onPress={() =>
-                navigation.navigate( isCharity ? 'CharityManageAccess' : 'ManageAccess' )
+                navigation.navigate(isCharity ? 'CharityManageAccess' : 'ManageAccess')
               }
             >
               <AppText variant="body">

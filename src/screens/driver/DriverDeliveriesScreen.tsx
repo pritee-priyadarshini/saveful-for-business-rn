@@ -100,25 +100,36 @@ export function DriverDeliveriesScreen() {
         return selectedItems.reduce((sum, item) => sum + (item.qty || 0), 0);
     }, [selectedItems]);
 
+    const [mapReady, setMapReady] = useState(false);
+
     const mapRef = useRef<MapView>(null);
 
     /* MAP */
     useEffect(() => {
-        if (mapRef.current && data.length > 0) {
-            setTimeout(() => {
-                mapRef.current?.fitToCoordinates(
-                    data.map((item) => ({
-                        latitude: item.lat,
-                        longitude: item.lng,
-                    })),
-                    {
-                        edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-                        animated: true,
-                    }
-                );
-            }, 300);
-        }
-    }, [data, viewMode]);
+        if (!mapReady) return;
+        if (!mapRef.current) return;
+        if (!data.length) return;
+
+        const timer = setTimeout(() => {
+            mapRef.current?.fitToCoordinates(
+                data.map((item) => ({
+                    latitude: item.lat,
+                    longitude: item.lng,
+                })),
+                {
+                    edgePadding: {
+                        top: 80,
+                        right: 80,
+                        bottom: 80,
+                        left: 80,
+                    },
+                    animated: true,
+                }
+            );
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [mapReady, data]);
 
     const statusFlow: DeliveryStatus[] = [
         'Assigned',
@@ -221,12 +232,12 @@ export function DriverDeliveriesScreen() {
 
                 <View style={styles.inlineCard}>
                     <AppText variant="label">Date</AppText>
-                    <AppText variant="bodySmall" style={{marginTop: 10}}>{item.date}</AppText>
+                    <AppText variant="bodySmall" style={{ marginTop: 10 }}>{item.date}</AppText>
                 </View>
 
                 <View style={styles.inlineCard}>
                     <AppText variant="label">Time</AppText>
-                    <AppText variant="bodySmall" style={{marginTop: 6}}>{item.time}</AppText>
+                    <AppText variant="bodySmall" style={{ marginTop: 6 }}>{item.time}</AppText>
                 </View>
             </View>
 
@@ -251,7 +262,7 @@ export function DriverDeliveriesScreen() {
                 </View>
             </View>
 
-            <AppText variant="bodyLarge" style={{marginBottom: 10}}>{item.storage}</AppText>
+            <AppText variant="bodyLarge" style={{ marginBottom: 10 }}>{item.storage}</AppText>
 
             {/* STATUS + CTA */}
             <View style={styles.rowBetween}>
@@ -369,7 +380,7 @@ export function DriverDeliveriesScreen() {
                         ]}
                         onPress={() => setViewMode(mode as any)}
                     >
-                        <AppText variant='label' style={ viewMode === mode ? styles.toggleTextActive : styles.toggleText  } >
+                        <AppText variant='label' style={viewMode === mode ? styles.toggleTextActive : styles.toggleText} >
                             {mode.toUpperCase()}
                         </AppText>
                     </TouchableOpacity>
@@ -392,7 +403,20 @@ export function DriverDeliveriesScreen() {
     const MapViewComponent = () => (
         <View>
             <View style={{ height: height * 0.55, borderRadius: 16, overflow: 'hidden' }}>
-                <MapView ref={mapRef} style={{ flex: 1 }}>
+                <MapView
+                    ref={mapRef}
+                    style={{ flex: 1 }}
+                    liteMode={true}
+                    initialRegion={{
+                        latitude: 12.9716,
+                        longitude: 77.5946,
+                        latitudeDelta: 0.15,
+                        longitudeDelta: 0.15,
+                    }}
+                    onMapReady={() => {
+                        setMapReady(true);
+                    }}
+                >
                     {sortedData.map((item) => (
                         <Marker
                             key={item.id}
@@ -400,8 +424,11 @@ export function DriverDeliveriesScreen() {
                                 latitude: item.lat,
                                 longitude: item.lng,
                             }}
+                            title={item.title}
+                            description={item.address}
                             onPress={() => {
                                 const index = indexMap[item.id];
+
                                 if (index !== undefined) {
                                     listRef.current?.scrollToIndex({
                                         index,
@@ -669,7 +696,7 @@ const styles = StyleSheet.create({
     },
 
     switchOn: {
-        backgroundColor: palette.success, 
+        backgroundColor: palette.success,
     },
 
     switchOff: {

@@ -24,6 +24,7 @@ import CharitySiteAnalyticsScreen from '@/screens/charity/CharitySiteAnalyticsSc
 import CharityAdminProfileScreen from '@/screens/charity/CharityAdminProfileScreen';
 import DriverTrackingScreen from '@/screens/shared/DriverTrackingScreen';
 import CharityManageAccessScreen from '@/screens/charity/CharityManageAccessScreen';
+import ForgotPasswordScreen from '@/screens/shared/ForgotPasswordScreen';
 
 export type RootStackParamList = {
   Tabs: undefined;
@@ -33,10 +34,12 @@ export type RootStackParamList = {
   RestaurantPlan: undefined;
   ManageAccess: undefined;
   ManageSites: undefined;
-  CreateSite: undefined;
-  SiteAnalytics : undefined;
+  //CreateSite: undefined;
+  CreateSite: { mode?: 'site' | 'manager'; siteId?: number };
+  SiteAnalytics: undefined;
   AdminProfile: undefined;
   Calculation: undefined;
+  ForgotPassword: { from: 'SignIn' | 'Profile' };
 
   CharityManageAccess: undefined;
 
@@ -47,7 +50,7 @@ export type RootStackParamList = {
   CharityAdminProfile: undefined;
 
   //Tracking
-  DriverTracking: { 
+  DriverTracking: {
     trackingId: string;
     source: 'restaurant' | 'charity';
   };
@@ -68,14 +71,15 @@ const navTheme = {
 };
 
 export function AppNavigator() {
-  const { isAuthenticated, selectedRole } = useAppContext();
+const { isAuthenticated, selectedRole, authUser } = useAppContext();
+const effectiveRole = selectedRole;
 
   return (
     <NavigationContainer theme={navTheme}>
       {isAuthenticated ? (
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
 
-          {selectedRole === 'driver' ? (
+          {/* {selectedRole === 'driver' ? (
             <RootStack.Screen name="Tabs" component={DriverTabs} />
           ) : selectedRole === 'restaurant_multi' ? (
             <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
@@ -86,7 +90,18 @@ export function AppNavigator() {
             />
           ) : (
             <RootStack.Screen name="Tabs" component={RoleTabs} />
+          )} */}
+
+
+          {effectiveRole === 'restaurant_multi' ? (
+            <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
+          ) : effectiveRole === 'charity_multi' ? (
+            <RootStack.Screen
+              name="MultiCharityManageSites" component={MultiCharityManageSitesScreen} />
+          ) : (
+            <RootStack.Screen name="Tabs" component={RoleTabs} />
           )}
+
           {/* GLOBAL */}
           <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />
           <RootStack.Screen name="ClaimConfirm" component={ClaimConfirmationScreen} />
@@ -100,7 +115,8 @@ export function AppNavigator() {
           <RootStack.Screen name="CharitySiteAnalytics" component={CharitySiteAnalyticsScreen} />
           <RootStack.Screen name="CharityAdminProfile" component={CharityAdminProfileScreen} />
           <RootStack.Screen name="DriverTracking" component={DriverTrackingScreen} />
-          <RootStack.Screen name= "CharityManageAccess" component={CharityManageAccessScreen} />
+          <RootStack.Screen name="CharityManageAccess" component={CharityManageAccessScreen} />
+          <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 
         </RootStack.Navigator>
       ) : (

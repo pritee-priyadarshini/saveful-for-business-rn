@@ -16,71 +16,11 @@ import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 
-import { restaurantListings } from '../../data/mockData';
 import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
 import { ListingStatus, OrderStatus } from '@/types';
+import { foodListingService } from '@/services/foodListing.service';
 
-const listingDetails: {
-  charityName: string | null;
-  charityLocation: string | null;
-  charityPhone: string | null;
-  driverName: string | null;
-  driverPhone: string | null;
-  listingStatus: ListingStatus;
-  orderStatus: OrderStatus | null;
-  instructions: string;
-  items: any[];
-}[] = [
-    {
-      charityName: 'Feeding Hands Foundation',
-      charityLocation: 'Patia, Bhubaneswar',
-      charityPhone: '+91 9876511111',
-      driverName: 'Rakesh Kumar',
-      driverPhone: '+91 9876522222',
-      listingStatus: 'Claimed',
-      orderStatus: 'driver_assigned',
-      instructions: 'Needs refrigeration',
-      items: [
-        { name: 'Rice', qty: 5 },
-        { name: 'Dal', qty: 8 },
-        { name: 'Sweets', qty: 4 },
-      ],
-    },
-
-    {
-      charityName: 'Odisha Food Relief',
-      charityLocation: 'Khandagiri, Bhubaneswar',
-      charityPhone: '+91 9876533333',
-      driverName: 'Amit Das',
-      driverPhone: '+91 9876544444',
-      listingStatus: 'Partial claimed',
-      orderStatus: 'enroute',
-      instructions: 'Consume within 6 hours',
-      items: [
-        { name: 'Fruits', claimed: 6, left: 4 },
-        { name: 'Vegetables', claimed: 4, left: 2 },
-        { name: 'Bread', claimed: 3, left: 1 },
-      ],
-    },
-
-    {
-      charityName: null,
-      charityLocation: null,
-      charityPhone: null,
-      driverName: null,
-      driverPhone: null,
-      listingStatus: 'Available',
-      orderStatus: null,
-      instructions: 'Needs reheating before serving',
-      items: [
-        { name: 'Rice', qty: 10 },
-        { name: 'Fruits', qty: 5 },
-        { name: 'Bakery Products', qty: 7 },
-        { name: 'Cookies', qty: 3 },
-      ],
-    },
-  ];
 
 function prettyStatus(status: string) {
   return status
@@ -89,29 +29,31 @@ function prettyStatus(status: string) {
 }
 
 export function RestaurantListingsScreen({ navigation }: any) {
-  const localListings = [
-    ...restaurantListings,
-    {
-      id: 'available-surplus',
-      title: 'Surplus Listing',
-      businessName: 'Demo',
-      type: 'Food',
-      suburb: 'Saheed Nagar, Bhubaneswar',
-      quantityKg: 26,
-      distance: '',
-      pickupWindow: '7:00pm - 9:00pm',
-      pickupDate: '28/04/2026',
-      pickupTime: '7:00pm - 9:00pm',
-    },
-  ];
-
-  const sortedListings = [...localListings].reverse();
 
   const [modalVisible, setModalVisible] = React.useState(false);
 
   const [selectedItems, setSelectedItems] = React.useState<any[]>([]);
-
   const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('Available');
+  const [listings, setListings] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchListings();
+  }, []);
+
+  const fetchListings = async () => {
+    try {
+      setLoading(true);
+
+      const res = await foodListingService.getListings();
+
+      setListings(res.data?.listings || []);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to load listings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   const makeCall = async (phone?: string | null) => {
@@ -196,8 +138,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
             </AppText>
           </View>
 
-          {sortedListings.map((item, index) => {
-            const detail = Object.values(listingDetails)[index] || Object.values(listingDetails)[0];
+          {listings.map((item) => {
+            const detail = item;
 
             return (
               <Card
@@ -209,25 +151,24 @@ export function RestaurantListingsScreen({ navigation }: any) {
                   {/* LEFT */}
                   <View style={styles.charityBlock}>
                     <AppText variant="bodyBold">
-                      {detail.charityName || 'Surplus still available'}
+                      {detail.claimedByOrganisation?.name || 'Surplus still available'}
                     </AppText>
 
                     <AppText variant="caption">
-                      📍 {detail.charityLocation || 'Nearby charities have been notified'}
+                      📍 {detail.claimedByOrganisation?.address || 'Nearby charities have been notified'}
                     </AppText>
 
                     <AppText variant="caption" style={styles.driverText}
                     >
-                      {detail.listingStatus === 'Available'
+                      {prettyStatus(detail.status) === 'Available'
                         ? 'Driver will be assigned once surplus is accepted'
-                        : prettyStatus(
-                          detail.orderStatus || 'awaiting_driver'
-                        )}
+                        : prettyStatus(detail.claimStatus || 'awaiting_driver')
+                      }
                     </AppText>
 
-                    {!!detail.driverName && (
+                    {!!detail.driver?.name && (
                       <AppText variant="caption">
-                        Driver: {detail.driverName}
+                        Driver: {detail.driver?.name}
                       </AppText>
                     )}
                   </View>
@@ -236,11 +177,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
                   <View style={styles.statusWrap}>
                     <View style={styles.statusPill}>
                       <AppText variant="label" style={styles.statusText} >
-                        {detail.listingStatus}
+                        {prettyStatus(detail.status)}
                       </AppText>
                     </View>
 
-                    {detail.listingStatus !== 'Available' && (
+                    {!!detail.claimStatus && (
                       <Pressable
                         style={styles.trackBtn}
                         onPress={() =>
@@ -269,8 +210,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
                   <Pressable
                     style={styles.metaCard}
                     onPress={() => {
-                      setSelectedItems(detail.items);
-                      setSelectedListingStatus(detail.listingStatus);
+                      setSelectedItems(detail.foodItems || []);
+                      setSelectedListingStatus(detail.status);
                       setModalVisible(true);
                     }}
                   >
@@ -283,22 +224,36 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
                   <View style={styles.metaCard} >
                     <AppText variant="label"> Pickup Date </AppText>
-                    <AppText variant="bodySmall"> {item.pickupDate} </AppText>
+                    <AppText variant="bodySmall"> {new Date(item.pickupFromTime || item.createdAt).toLocaleDateString()}</AppText>
                   </View>
 
                   <View style={styles.metaCard} >
                     <AppText variant="label"> Pickup Time </AppText>
-                    <AppText variant="bodySmall"> {item.pickupTime} </AppText>
+                    <AppText variant="bodySmall"> {`${new Date(item.pickupFromTime).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })} - ${new Date(item.pickupByTime).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}`}
+                    </AppText>
                   </View>
                 </View>
 
                 {/* Instructions */}
                 <View style={styles.infoBlock} >
-                  <AppText variant="caption"> Instructions:{' '} {detail.instructions} </AppText>
+                  <AppText variant="caption"> Instructions:{' '} {[
+                    detail.needsRefrigeration && 'Needs refrigeration',
+                    detail.needsReheating && 'Needs reheating',
+                    detail.containsAllergens && 'Contains allergens',
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || 'No special instructions'}
+                  </AppText>
                 </View>
 
                 {/* Contact */}
-                {detail.charityName && (
+                {detail.claimedByOrganisation?.name && (
                   <View style={styles.contactLine}>
                     <AppText variant="bodyBold"> Contact Charity </AppText>
 
@@ -306,7 +261,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       <Pressable
                         style={styles.iconPill}
                         onPress={() =>
-                          makeCall(detail.charityPhone)
+                          makeCall(detail.claimedByOrganisation?.phoneNumber)
                         }
                       >
                         <Ionicons
@@ -320,7 +275,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       <Pressable
                         style={styles.iconPill}
                         onPress={() =>
-                          sendMessage(detail.charityPhone)
+                          sendMessage(detail.claimedByOrganisation?.phoneNumber)
                         }
                       >
                         <Ionicons
@@ -335,7 +290,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                   </View>
                 )}
 
-                {detail.driverName && (
+                {detail.driver?.name && (
                   <View style={styles.contactLine}>
                     <AppText variant="bodyBold"> Contact Driver </AppText>
 
@@ -343,7 +298,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       <Pressable
                         style={styles.iconPill}
                         onPress={() =>
-                          makeCall(detail.driverPhone)
+                          makeCall(detail.driver?.phoneNumber)
                         }
                       >
                         <Ionicons
@@ -357,7 +312,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       <Pressable
                         style={styles.iconPill}
                         onPress={() =>
-                          sendMessage(detail.driverPhone)
+                          sendMessage(detail.driver?.phoneNumber)
                         }
                       >
                         <Ionicons
@@ -413,16 +368,25 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
             {/* ROWS */}
             {selectedItems.map((item, idx) => {
-              const available = 'claimed' in item ? item.claimed + item.left : item.qty;
-              const claimed = 'claimed' in item ? item.claimed : item.qty;
+              const available = item.totalQtyKg;
+              const claimed =
+                item.totalQtyKg - item.remainingQtyKg;
 
               return (
-                <View key={idx} style={styles.modalItemRow} >
-                  <AppText variant="label" style={{ flex: 2 }} > {item.name} </AppText>
-                  <AppText variant="bodySmall" style={styles.modalCol} > {available}kg </AppText>
-                  {selectedListingStatus !== 'Available' && (
-                    <AppText variant="bodySmall" style={styles.modalCol} > {claimed}kg </AppText>
-                  )}
+                <View key={idx} style={styles.modalItemRow}>
+                  <AppText variant="label" style={{ flex: 2 }}>
+                    {item.category}
+                  </AppText>
+
+                  <AppText variant="bodySmall" style={styles.modalCol}>
+                    {available}kg
+                  </AppText>
+
+                  {/* {selectedListingStatus !== 'ACTIVE' && (
+                    <AppText variant="bodySmall" style={styles.modalCol}>
+                      {claimed}kg
+                    </AppText>
+                  )} */}
                 </View>
               );
             })}
@@ -528,7 +492,7 @@ const styles = StyleSheet.create({
     width: 115,
     paddingVertical: spacing.sm,
     borderRadius: 999,
-    alignItems:'center',
+    alignItems: 'center',
   },
 
   statusText: {

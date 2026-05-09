@@ -6,220 +6,154 @@ import React, {
   useState,
 } from 'react';
 
-import {
-  organizationSites,
-  users,
-  subscriptions,
-} from '../data/mockData';
-
 import { plansData } from '../data/plansData';
 
+import { UserProfile } from '../types';
 import {
-  DemoPlan,
-  OrganizationSite,
-  UserAccount,
-  UserProfile,
-  UserRole,
-} from '../types';
+  AppContextValue,
+  AuthUser,
+  CharityForm,
+  RestaurantForm,
+  Subscription,
+} from './types';
 
-type RestaurantForm = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  mobile: string;
-  businessName: string;
-  businessAddress: string;
-  registrationNumber: string;
-  venueType: string;
-  branding: string;
-  logo: string;
+const defaultRestaurantForm: RestaurantForm = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  mobile: '',
+  businessName: '',
+  businessAddress: '',
+  registrationNumber: '',
+  venueType: '',
+  branding: '',
+  logo: '',
+  region: '',
+  latitude: '',
+  longitude: '',
 };
 
-type CharityForm = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  mobile: string;
-  charityName: string;
-  charityAddress: string;
-  registrationNumber: string;
-  branding: string;
-  logo: string;
-  postcodes: string;
-  pickupRadius: string;
-};
-
-type Subscription = {
-  planId: string | null;
-  isActive: boolean;
-  billingCycle: 'monthly' | 'annual' | null;
-  isFreeTier: boolean;
-};
-
-type AppContextValue = {
-  isAuthenticated: boolean;
-  selectedRole: UserRole;
-  selectedPlanId: string;
-  currentUser: UserAccount | null;
-  currentSite: OrganizationSite | null;
-  childSites: OrganizationSite[];
-  currentProfile: UserProfile;
-  subscription: Subscription;
-  currentPlan: DemoPlan | null;
-  restaurantForm: RestaurantForm;
-  charityForm: CharityForm;
-  setRole: (role: UserRole) => void;
-  selectPlan: (planId: string) => void;
-  upgradePlan: (planId: string) => void;
-
-  updateRestaurantField: (
-    field: keyof RestaurantForm,
-    value: string
-  ) => void;
-
-  updateCharityField: (
-    field: keyof CharityForm,
-    value: string
-  ) => void;
-
-  loginDemo: (userId?: string) => void;
-  logout: () => void;
+const defaultCharityForm: CharityForm = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  mobile: '',
+  charityName: '',
+  charityAddress: '',
+  registrationNumber: '',
+  branding: '',
+  logo: '',
+  postcodes: '',
+  pickupRadius: '',
+  region: '',
+  latitude: '',
+  longitude: '',
+  pickupPostCode: '',
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: PropsWithChildren) {
   const [isAuthenticated, setAuthenticated] = useState(false);
-
-  const [selectedRole, setSelectedRole] = useState<UserRole>('restaurant_single');
-
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
+  const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi'>('restaurant_single');
   const [selectedPlanId, setSelectedPlanId] = useState('single_plus');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>(defaultRestaurantForm);
+  const [charityForm, setCharityForm] = useState<CharityForm>(defaultCharityForm);
 
-  const [manualSubscription, setManualSubscription] =
-    useState<Subscription>({
-      planId: 'single_plus',
-      billingCycle: 'monthly',
-      isActive: true,
-      isFreeTier: false,
-    });
+  const resetForms = () => {
+    setRestaurantForm(defaultRestaurantForm);
+    setCharityForm(defaultCharityForm);
+  };
 
-  const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    mobile: '',
-    businessName: '',
-    businessAddress: '',
-    registrationNumber: '',
-    venueType: '',
-    branding: '',
-    logo: '',
-  });
+  const resolvedRole = (() => {
+    if (!authUser) return selectedRole;
 
-  const [charityForm, setCharityForm] = useState<CharityForm>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    mobile: '',
-    charityName: '',
-    charityAddress: '',
-    registrationNumber: '',
-    branding: '',
-    logo: '',
-    postcodes: '',
-    pickupRadius: '',
-  });
+    const orgType = authUser?.orgType?.toUpperCase();
+    const orgRole = authUser?.orgRole?.toUpperCase();
+    const siteRole = authUser?.siteRole?.toUpperCase();
+
+    if (orgType === 'BUSINESS_MULTI') {
+      if (orgRole === 'SUPER_ADMIN') {
+        return 'restaurant_multi';
+      }
+      if (siteRole === 'SITE_ADMIN' || siteRole === 'STAFF') {
+        return 'restaurant_single';
+      }
+      return 'restaurant_multi';
+    }
+
+    if (orgType === 'BUSINESS_SINGLE') return 'restaurant_single';
+    if (orgType === 'CHARITY_SINGLE') return 'charity_single';
+    if (orgType === 'CHARITY_MULTI') return 'charity_multi';
+
+    return selectedRole;
+  })();
 
   const value = useMemo<AppContextValue>(() => {
-    const currentUser = currentUserId
-      ? users.find((u) => u.id === currentUserId) ||
-      null
-      : null;
 
-    const currentSite = currentUser
-      ? organizationSites.find(
-        (site) =>
-          site.id === currentUser.organizationId
-      ) || null
-      : null;
+    const isMultiSiteUser =
+      authUser?.orgType === 'BUSINESS_MULTI' &&
+      (authUser?.siteRole === 'SITE_ADMIN' ||
+        authUser?.siteRole === 'STAFF');
 
-    const childSites = currentSite
-      ? organizationSites.filter(
-        (site) =>
-          site.parentId === currentSite.id
-      )
-      : [];
+    const assignedSite =
+      isMultiSiteUser && authUser?.profile?.sites?.length
+        ? authUser.profile.sites[0]
+        : null;
 
-    const currentProfile: UserProfile = {
-      name: currentUser?.name || '',
-      organization: currentSite?.name || '',
-      address: currentSite?.address || '',
-      verificationStatus: currentSite?.verificationStatus || 'Pending',
-      phone: currentSite?.phone || '',
-      logo: currentUser?.avatar,
-    };
-
-    const isCharity = selectedRole.includes('charity');
-
-    let subscription: Subscription;
-    if (isCharity) {
-      subscription = {
-        planId: null,
-        billingCycle: null,
-        isActive: true,
-        isFreeTier: true,
+    const currentProfile: UserProfile = authUser?.profile
+      ? {
+        name: `${authUser.profile.user.firstName} ${authUser.profile.user.lastName}`,
+        organization: assignedSite?.name || authUser.profile.organisation?.name || '',
+        address: assignedSite?.address || authUser.profile.organisation?.address || '',
+        verificationStatus: 'Verified',
+        phone: authUser.profile.user.phoneNumber || '',
+        logo: authUser.profile.organisation?.logoUrl || '',
+      }
+      : {
+        name: '',
+        organization: '',
+        address: '',
+        verificationStatus: 'Pending',
+        phone: '',
+        logo: '',
       };
-    } else {
-      const subscriptionOrgId = currentSite?.parentId || currentSite?.id;
 
-      const existingSubscription = subscriptions.find((sub) =>
-        sub.organizationId === subscriptionOrgId
-      );
+    const isCharity = resolvedRole.includes('charity');
 
-      subscription = existingSubscription
-        ? {
-          planId: existingSubscription.planId,
-          billingCycle: existingSubscription.billingCycle,
-          isActive: existingSubscription.isActive,
-          isFreeTier: existingSubscription.isFreeTier,
-        }
-        : manualSubscription;
-    }
+    const subscription: Subscription = {
+      planId: null,
+      billingCycle: null,
+      isActive: true,
+      isFreeTier: resolvedRole.includes('charity'),
+    };
 
     const currentPlan =
       plansData.find(
-        (plan) => plan.id === subscription.planId 
+        (plan) => plan.id === subscription.planId
       ) || null;
 
     return {
       isAuthenticated,
-      selectedRole,
+      selectedRole: resolvedRole,
       selectedPlanId,
-      currentUser,
-      currentSite,
-      childSites,
       currentProfile,
       subscription,
       currentPlan,
       restaurantForm,
       charityForm,
+      authUser,
+
       setRole: setSelectedRole,
       selectPlan: setSelectedPlanId,
-      upgradePlan: (planId: string) => {
-        setManualSubscription((current) => ({
-          ...current,
-          planId,
-        }));
+
+      upgradePlan: () => {
+        console.log('Upgrade handled via backend later/ API to be integrated');
       },
 
       updateRestaurantField: (field, value) => {
@@ -236,46 +170,43 @@ export function AppProvider({ children }: PropsWithChildren) {
         }));
       },
 
-      loginDemo: (userId?: string) => {
-        if (userId) {
-          const user =
-            users.find(
-              (u) => u.id === userId
-            ) || null;
-
-          if (user) {
-            setCurrentUserId(user.id);
-            setSelectedRole(user.role);
-          }
-        }
-
-        setAuthenticated(true);
+      setAuthUser: (user) => {
+        setAuthUser(user);
+        setAuthenticated(!!user);
       },
 
       logout: () => {
         setAuthenticated(false);
-        setCurrentUserId(null);
-        setSelectedRole( 'restaurant_single' );
+        setAuthUser(null);
+        setSelectedRole('restaurant_single');
+        resetForms();
       },
+
+      resetForms,
     };
   }, [
+    authUser,
     charityForm,
-    currentUserId,
     isAuthenticated,
-    manualSubscription,
     restaurantForm,
     selectedPlanId,
     selectedRole,
   ]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 export function useAppContext() {
   const context = useContext(AppContext);
 
   if (!context) {
-    throw new Error('useAppContext must be used within AppProvider');
+    throw new Error(
+      'useAppContext must be used within AppProvider'
+    );
   }
 
   return context;

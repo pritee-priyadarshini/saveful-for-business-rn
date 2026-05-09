@@ -2,14 +2,31 @@ export type UserRole =
   | 'restaurant_single'
   | 'restaurant_multi'
   | 'charity_single'
-  | 'charity_multi'
-  | 'driver';
+  | 'charity_multi';
 
 export type OrganizationType = 'restaurant' | 'charity';
-
 export type SiteType = 'head_office' | 'branch';
-
 export type VerificationStatus = 'Pending' | 'Verified';
+
+
+export type BackendOrgType =
+  | 'BUSINESS_SINGLE'
+  | 'BUSINESS_MULTI'
+  | 'CHARITY_SINGLE'
+  | 'CHARITY_MULTI';
+
+export type BackendVenueType =
+  | 'CAFE_RESTAURANT'
+  | 'BAKERY'
+  | 'GROCERY_STORE'
+  | 'FOOD_TRUCK'
+  | 'CATERING_SERVICE'
+  | 'HOTEL'
+  | 'WEDDING_VENUE'
+  | 'CLOUD_KITCHEN'
+  | 'OTHER';
+
+export type Region = 'IN' | 'US' | 'AU';
 
 export type ListingStatus =
   | 'Available'

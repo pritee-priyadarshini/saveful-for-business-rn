@@ -16,8 +16,9 @@ import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
 
 export function ListingConfirmationScreen({ navigation, route }: any) {
-    const { items, pickupFrom, pickupTo, location, totalKg } = route.params;
+    const { listing } = route.params;
 
+    const totalKg = listing.totalQtyKg || 0;
     const meals = Math.floor((totalKg * 1000) / 300);
 
     const formatDateTime = (date: Date) => {
@@ -61,33 +62,34 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Items</AppText>
 
-                        {items
-                            .filter((i: any) => i.qty > 0)
-                            .map((item: any, index: number) => (
-                                <View key={index} style={styles.itemRow}>
-                                    <AppText variant="caption">
-                                        {item.name}
-                                    </AppText>
+                        {listing.foodItems?.map((item: any, index: number) => (
+                            <View key={index} style={styles.itemRow}>
+                                <AppText variant="caption">
+                                    {item.category}
+                                </AppText>
 
-                                    <AppText variant="caption" style={styles.qtyText}>
-                                        {item.qty} kg
-                                    </AppText>
-                                </View>
-                            ))}
+                                <AppText
+                                    variant="caption"
+                                    style={styles.qtyText}
+                                >
+                                    {item.totalQtyKg} kg
+                                </AppText>
+                            </View>
+                        ))}
                     </View>
 
                     {/* PICKUP */}
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Pickup Time</AppText>
                         <AppText variant="caption">
-                            {formatDateTime(pickupFrom)} - {formatDateTime(pickupTo)}
+                            {formatDateTime(listing.pickupFromTime)} - {formatDateTime(listing.pickupByTime)}
                         </AppText>
                     </View>
 
                     {/* LOCATION */}
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Pickup Location</AppText>
-                        <AppText variant="caption">{location}</AppText>
+                        <AppText variant="caption">{listing.pickupAddress}</AppText>
                     </View>
 
                 </Card>

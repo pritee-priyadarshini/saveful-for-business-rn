@@ -5,8 +5,12 @@ import {
     StyleSheet,
     ImageBackground,
     Image,
+    Alert,
 } from 'react-native';
 import Icon from '@expo/vector-icons/Ionicons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as SecureStore from 'expo-secure-store';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
@@ -14,70 +18,59 @@ import { InputField } from '../../components/InputField';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { demoRoleUsers } from '../../data/mockData';
-import { UserRole } from '../../types';
+
+import type { AuthStackParamList } from '../../navigation/types';
+import { authService } from '../../services/auth.service';
 
 export function SignInScreen() {
-    const { loginDemo, setRole } = useAppContext();
+    const { setAuthUser } = useAppContext();
 
-    const [role, setLocalRole] = useState<UserRole>('restaurant_single');
-    const [email, setEmail] = useState('restaurant@demo.com');
-    const [password, setPassword] = useState('123456');
+    const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+
     const [secure, setSecure] = useState(true);
     const [error, setError] = useState('');
 
-    const DEMO: Record<UserRole, { email: string; password: string }> = {
-        restaurant_single: {
-            email: 'restaurant@demo.com',
-            password: '123456',
-        },
-        restaurant_multi: {
-            email: 'admin@demo.com',
-            password: '123456',
-        },
-        charity_single: {
-            email: 'charity@demo.com',
-            password: '123456',
-        },
-        charity_multi: {
-            email: 'adminCharity@demo.com',
-            password: '123456',
-        },
-        driver: {
-            email: 'driver@demo.com',
-            password: '123456',
-        },
-    };
+    const handleLogin = async () => {
+        try {
+            setError('');
+            if (!email || !password) {
+                setError('Please enter email and password');
+                return;
+            }
+            setLoading(true);
 
-    const handleLogin = () => {
-        setError('');
+            const res = await authService.login(
+                email.trim().toLowerCase(),
+                password
+            );
+            const data = res.data;
 
-        if (!email || !password) {
-            setError('Please enter email and password');
-            return;
+            await SecureStore.setItemAsync('accessToken', data.accessToken);
+
+            const profileRes = await authService.profile();
+            const profile = profileRes.data;
+ 
+            setAuthUser({
+                ...profile.user,
+                accessToken: data.accessToken,
+                orgType: profile.organisation?.type,
+                orgRole: profile.role?.orgRole,
+                siteRole: profile.role?.siteRole,
+                profile: profile,
+            });
+
+        } catch (error: any) {
+            console.log('LOGIN ERROR', error?.response?.data || error);
+            setError(error?.response?.data?.message || 'Invalid credentials');
         }
-
-        const valid =
-            email === DEMO[role].email &&
-            password === DEMO[role].password;
-
-        if (!valid) {
-            setError(`Use ${DEMO[role].email} / ${DEMO[role].password}`);
-            return;
+        finally {
+            setLoading(false);
         }
-
-        setRole(role);
-        setTimeout(() => {
-            loginDemo(demoRoleUsers[role]);
-        }, 0);
-    };
-
-    const handleRoleChange = (selected: UserRole) => {
-        setLocalRole(selected);
-        setError('');
-        setEmail(DEMO[selected].email);
-        setPassword(DEMO[selected].password);
-    };
+    }
 
     return (
         <ImageBackground
@@ -100,77 +93,6 @@ export function SignInScreen() {
 
                     {/* FORM */}
                     <View style={styles.form}>
-
-                        {/* ROLE SWITCH */}
-                        <View style={styles.roleContainer}>
-                            {/* SINGLE RESTAURANT */}
-                            <TouchableOpacity
-                                style={[
-                                    styles.roleOption,
-                                    role === 'restaurant_single' && styles.activeRole,
-                                ]}
-                                onPress={() => handleRoleChange('restaurant_single')}
-                            >
-                                <AppText
-                                    style={[
-                                        styles.roleText,
-                                        role === 'restaurant_single' && styles.activeRoleText,
-                                    ]}
-                                >
-                                    Restaurant
-                                </AppText>
-                            </TouchableOpacity>
-
-                            {/* MULTI RESTAURANT */}
-                            <TouchableOpacity
-                                style={[
-                                    styles.roleOption,
-                                    role === 'restaurant_multi' && styles.activeRole,
-                                ]}
-                                onPress={() => handleRoleChange('restaurant_multi')}
-                            >
-                                <AppText
-                                    style={[
-                                        styles.roleText,
-                                        role === 'restaurant_multi' && styles.activeRoleText,
-                                    ]}
-                                >
-                                    Multi
-                                </AppText>
-                            </TouchableOpacity>
-
-                            {/* CHARITY SINGLE */}
-                            <TouchableOpacity
-                                style={[styles.roleOption, role === 'charity_single' && styles.activeRole]}
-                                onPress={() => handleRoleChange('charity_single')}
-                            >
-                                <AppText style={[styles.roleText, role === 'charity_single' && styles.activeRoleText]}>
-                                    Charity
-                                </AppText>
-                            </TouchableOpacity>
-
-                            {/* CHARITY MULTI */}
-                            <TouchableOpacity
-                                style={[styles.roleOption, role === 'charity_multi' && styles.activeRole]}
-                                onPress={() => handleRoleChange('charity_multi')}
-                            >
-                                <AppText style={[styles.roleText, role === 'charity_multi' && styles.activeRoleText]}>
-                                    Charity+
-                                </AppText>
-                            </TouchableOpacity>
-
-                            {/* DRIVER */}
-                            <TouchableOpacity
-                                style={[styles.roleOption, role === 'driver' && styles.activeRole]}
-                                onPress={() => handleRoleChange('driver')}
-                            >
-                                <AppText style={[styles.roleText, role === 'driver' && styles.activeRoleText]}>
-                                    Driver
-                                </AppText>
-                            </TouchableOpacity>
-
-                        </View>
-
                         <AppText variant="heading" style={styles.title}>
                             Welcome Back
                         </AppText>
@@ -190,8 +112,17 @@ export function SignInScreen() {
                         <View>
                             <View style={styles.passwordHeader}>
                                 <AppText variant="label">Password</AppText>
-                                <TouchableOpacity>
-                                    <AppText variant="caption">Forgot?</AppText>
+
+                                <TouchableOpacity
+                                    onPress={() =>
+                                        navigation.navigate('ForgotPassword', {
+                                            from: 'SignIn',
+                                        })
+                                    }
+                                >
+                                    <AppText variant="caption">
+                                        Forgot Password?
+                                    </AppText>
                                 </TouchableOpacity>
                             </View>
 
@@ -227,14 +158,14 @@ export function SignInScreen() {
                         {/* BUTTON */}
                         <TouchableOpacity style={styles.button} onPress={handleLogin}>
                             <AppText variant="label" style={styles.buttonText}>
-                                Sign In
+                                {loading ? 'Signing In...' : 'Sign In'}
                             </AppText>
                         </TouchableOpacity>
 
                     </View>
                 </View>
             </Screen>
-        </ImageBackground>
+        </ImageBackground >
 
     );
 }
