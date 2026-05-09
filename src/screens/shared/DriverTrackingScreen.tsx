@@ -150,7 +150,7 @@ export default function DriverTrackingScreen() {
     const route = useRoute<RouteProp<Params, 'DriverTracking'>>();
     const { trackingId, source } = route.params;
 
-    const data = trackingData.find( x => x.id === trackingId && x.source === source) || trackingData[0];
+    const data = trackingData.find(x => x.id === trackingId && x.source === source) || trackingData[0];
 
     const [carCoordinate, setCarCoordinate] = useState({
         latitude: 20.2961,
@@ -242,6 +242,7 @@ export default function DriverTrackingScreen() {
                 <Card style={styles.mapCard}>
                     <MapView
                         style={styles.map}
+                        liteMode={true}
                         initialRegion={{
                             latitude: 20.2961,
                             longitude: 85.8245,
@@ -258,7 +259,7 @@ export default function DriverTrackingScreen() {
                         </Marker>
 
                         <Marker coordinate={{ latitude: 20.315, longitude: 85.835 }}>
-                            <Ionicons name="flag" size={34}  color={palette.middlegreen} />
+                            <Ionicons name="flag" size={34} color={palette.middlegreen} />
                         </Marker>
 
                         <Polyline

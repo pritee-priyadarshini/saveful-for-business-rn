@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     ScrollView,
@@ -7,136 +7,430 @@ import {
     StyleSheet,
     Alert,
     ImageBackground,
+    KeyboardAvoidingView,
+    Platform,
+    TouchableWithoutFeedback,
+    Keyboard,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import * as Location from 'expo-location';
+import MapView, { Marker } from 'react-native-maps';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
+import { sitesService } from '@/services/sites.service';
+
 
 export default function CreateSiteScreen() {
     const navigation = useNavigation();
-    const [showPassword, setShowPassword] = useState(false);
 
-    const [form, setForm] = useState({
-        restaurantName: '',
-        location: '',
-        postcode: '',
-        adminName: '',
-        email: '',
-        mobile: '',
-        password: '',
-    });
+    const route = useRoute<any>();
 
-    const handleCreate = () => {
-        const {
-            restaurantName,
-            location,
-            postcode,
-            adminName,
-            email,
-            mobile,
-            password,
-        } = form;
-
-        if (
-            !restaurantName ||
-            !location ||
-            !postcode ||
-            !adminName ||
-            !email ||
-            !mobile ||
-            !password
-        ) {
-            Alert.alert('Error', 'Please fill all fields');
-            return;
+    useEffect(() => {
+        if (route.params?.mode === 'manager') {
+            setActiveTab('manager');
+            setSelectedSiteId(route.params.siteId);
         }
+    }, []);
 
-        const newSite = {
-            id: Date.now().toString(),
-            ...form,
+    const [activeTab, setActiveTab] = useState<'site' | 'manager'>('site');
+    const [loading, setLoading] = useState(false);
+
+    const [createdSiteId, setCreatedSiteId] = useState<number | null>(null);
+
+    const [sites, setSites] = useState<any[]>([]);
+    const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
+    const [openSiteDropdown, setOpenSiteDropdown] = useState(false);
+
+    const [region, setRegion] = useState<any>(null);
+    const [marker, setMarker] = useState<any>(null);
+    const [selectedAddress, setSelectedAddress] = useState('');
+
+    const [siteForm, setSiteForm] = useState({
+        siteName: '',
+        address: '',
+        postcode: '',
+        latitude: null as number | null,
+        longitude: null as number | null,
+    });
+    const [managerForm, setManagerForm] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        phoneNumber: '',
+    });
+    useEffect(() => {
+        const fetchSites = async () => {
+            try {
+                const res = await sitesService.getOrganisation();
+                setSites(res.data?.sites || []);
+            } catch (e) {
+                console.log('Failed to fetch sites');
+            }
         };
 
-        console.log('Created Site:', newSite);
+        fetchSites();
+    }, []);
 
-        Alert.alert('Success', 'Site Created Successfully');
 
-        navigation.goBack();
+    useEffect(() => {
+        (async () => {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+
+            if (status === 'granted') {
+                const loc = await Location.getCurrentPositionAsync({});
+                setRegion({
+                    latitude: loc.coords.latitude,
+                    longitude: loc.coords.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                });
+            } else {
+                setRegion({
+                    latitude: 20.5937,
+                    longitude: 78.9629,
+                    latitudeDelta: 5,
+                    longitudeDelta: 5,
+                });
+            }
+        })();
+    }, []);
+
+    const handleCreateSite = async () => {
+        try {
+            const {
+                siteName,
+                address,
+                postcode,
+                latitude,
+                longitude,
+            } = siteForm;
+
+            if (
+                !siteName ||
+                !address ||
+                !postcode ||
+                !latitude ||
+                !longitude
+            ) {
+                Alert.alert('Error', 'Fill all required site fields');
+                return;
+            }
+
+            setLoading(true);
+
+            const res = await sitesService.createSite({
+                siteName,
+                address,
+                postcode,
+
+                // 🔥 dummy system values
+                contactName: 'Business Multi Admin',
+                contactEmail: 'businessmulti@gmail.com',
+                phoneNumber: '9999999999',
+
+                latitude,
+                longitude,
+            });
+
+            const siteId = res.data.id;
+            setCreatedSiteId(siteId);
+            Alert.alert('Success', 'Site created. Now assign manager.');
+            setActiveTab('manager');
+        } catch (err: any) {
+            Alert.alert(
+                'Error',
+                err?.response?.data?.message || 'Failed to create site'
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAssignManager = async () => {
+        try {
+            const siteId = createdSiteId || selectedSiteId;
+
+            if (!siteId) {
+                Alert.alert('Please select a site');
+                return;
+            }
+
+            const { firstName, lastName, email, password } = managerForm;
+
+            if (!firstName || !lastName || !email || !password) {
+                Alert.alert('Fill all required manager fields');
+                return;
+            }
+
+            setLoading(true);
+
+            await sitesService.assignManager(siteId, managerForm);
+
+            Alert.alert('Success', 'Manager assigned');
+
+            navigation.goBack();
+
+        } catch (err: any) {
+            Alert.alert(
+                'Error',
+                err?.response?.data?.message || 'Failed to assign manager'
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <Screen backgroundColor={palette.creme}>
-            <ScrollView >
-
-                <ImageBackground
-                    source={require('../../../assets/placeholder/feed-bg.png')}
-                    style={styles.headerBg}
-                >
-                    <Pressable
-                        onPress={() => navigation.goBack()}
-                        style={styles.backBtn}
+        <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={20}
+        >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <Screen backgroundColor={palette.creme}>
+                    <ScrollView
+                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={{ paddingBottom: 120 }}
                     >
-                        <Ionicons name="arrow-back" size={24} color={palette.white} />
-                    </Pressable>
 
-                    <AppText variant='h5' style={styles.headerTitle}>
-                        Add Sites
-                    </AppText>
-                </ImageBackground>
+                        {/* HEADER */}
+                        <ImageBackground
+                            source={require('../../../assets/placeholder/feed-bg.png')}
+                            style={styles.headerBg}
+                        >
+                            <Pressable
+                                onPress={() => navigation.goBack()}
+                                style={styles.backBtn}
+                            >
+                                <Ionicons name="arrow-back" size={24} color={palette.white} />
+                            </Pressable>
 
+                            <AppText variant='h5' style={styles.headerTitle}>
+                                Create Site
+                            </AppText>
+                        </ImageBackground>
 
-                {[
-                    { key: 'restaurantName', label: 'Restaurant Name' },
-                    { key: 'location', label: 'Location / Address' },
-                    { key: 'postcode', label: 'Postcode' },
-                    { key: 'adminName', label: 'Site Admin Name' },
-                    { key: 'email', label: 'Site Admin Email ID' },
-                    { key: 'mobile', label: 'Site Admin Mobile Number' },
-                    { key: 'password', label: 'Site Admin Password', secure: true },
-                ].map((field: any) => (
-                    <View key={field.key} style={styles.fieldWrapper}>
-
-                        <AppText variant='label' style={styles.label}>
-                            {field.label}
-                        </AppText>
-
-                        <View style={styles.inputWrapper}>
-                            <TextInput
-                                placeholder={`Enter ${field.label}`}
-                                secureTextEntry={field.key === 'password' ? !showPassword : field.secure}
-                                value={(form as any)[field.key]}
-                                onChangeText={(v) =>
-                                    setForm({ ...form, [field.key]: v })
-                                }
-                                style={styles.inputFlex}
-                            />
-
-                            {field.key === 'password' && (
-                                <Pressable onPress={() => setShowPassword(!showPassword)}>
-                                    <Ionicons
-                                        name={showPassword ? 'eye-off' : 'eye'}
-                                        size={20}
-                                        color="#777"
-                                    />
+                        <View style={{ flexDirection: 'row', margin: 15, gap: 10 }}>
+                            {[
+                                { key: 'site', label: 'Add Site' },
+                                { key: 'manager', label: 'Add Manager' },
+                            ].map((tab) => (
+                                <Pressable
+                                    key={tab.key}
+                                    onPress={() => {
+                                        if (tab.key === 'manager' && sites.length === 0 && !createdSiteId) {
+                                            Alert.alert('No sites available. Please create a site first.');
+                                            return;
+                                        }
+                                        setActiveTab(tab.key as any);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: 10,
+                                        borderRadius: 20,
+                                        backgroundColor:
+                                            activeTab === tab.key ? palette.primary : '#eee',
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    <AppText
+                                        style={{
+                                            color:
+                                                activeTab === tab.key ? 'white' : palette.text,
+                                        }}
+                                    >
+                                        {tab.label}
+                                    </AppText>
                                 </Pressable>
-                            )}
+                            ))}
                         </View>
 
-                    </View>
-                ))}
+                        {activeTab === 'site' && (
+                            <>
+                                {[
+                                    { key: 'siteName', label: 'Site Name *' },
+                                    { key: 'address', label: 'Address *' },
+                                    { key: 'postcode', label: 'Postcode *' },
+                                ].map((field: any) => (
+                                    <View key={field.key} style={styles.fieldWrapper}>
+                                        <AppText style={styles.label}>{field.label}</AppText>
 
+                                        <TextInput
+                                            style={styles.inputWrapper}
+                                            value={(siteForm as any)[field.key]}
+                                            onChangeText={(v) =>
+                                                setSiteForm({ ...siteForm, [field.key]: v })
+                                            }
+                                        />
+                                    </View>
+                                ))}
 
+                                {/* MAP */}
+                                <AppText style={{ textAlign: 'center', marginTop: 20 }}>
+                                    Tap map to select location *
+                                </AppText>
 
-                <Pressable style={styles.createBtn} onPress={handleCreate}>
-                    <AppText variant='label' style={styles.btnText}>
-                        Add Site
-                    </AppText>
-                </Pressable>
+                                <View style={{ height: 250, margin: 15 }}>
+                                    {region && (
+                                        <MapView
+                                            style={{ flex: 1 }}
+                                            region={region}
+                                            onPress={async (e) => {
+                                                const { latitude, longitude } =
+                                                    e.nativeEvent.coordinate;
 
-            </ScrollView>
-        </Screen >
+                                                setMarker({ latitude, longitude });
+
+                                                setSiteForm((prev) => ({
+                                                    ...prev,
+                                                    latitude,
+                                                    longitude,
+                                                }));
+
+                                                const res = await Location.reverseGeocodeAsync({
+                                                    latitude,
+                                                    longitude,
+                                                });
+
+                                                if (res.length > 0) {
+                                                    const place = res[0];
+
+                                                    const addr = [
+                                                        place.name,
+                                                        place.street,
+                                                        place.city,
+                                                        place.region,
+                                                        place.postalCode,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(', ');
+
+                                                    setSelectedAddress(addr);
+
+                                                    setSiteForm((prev) => ({
+                                                        ...prev,
+                                                        address: addr,
+                                                        postcode: place.postalCode || '',
+                                                    }));
+                                                }
+                                            }}
+                                        >
+                                            {marker && <Marker coordinate={marker} />}
+                                        </MapView>
+                                    )}
+                                </View>
+
+                                <Pressable style={styles.createBtn} onPress={handleCreateSite}>
+                                    <AppText style={styles.btnText}>
+                                        {loading ? 'Creating...' : 'Create Site'}
+                                    </AppText>
+                                </Pressable>
+                            </>
+                        )}
+
+                        {activeTab === 'manager' && (
+                            <>
+                                <View style={{ marginHorizontal: 15, marginBottom: 15 }}>
+                                    <AppText variant="label">Select Site *</AppText>
+
+                                    <Pressable
+                                        onPress={() => setOpenSiteDropdown(!openSiteDropdown)}
+                                        style={{
+                                            backgroundColor: 'white',
+                                            borderRadius: 10,
+                                            borderWidth: 1,
+                                            borderColor: '#ddd',
+                                            padding: 12,
+                                            marginTop: 5,
+                                            flexDirection: 'row',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        <AppText variant='bodySmall'>
+                                            {selectedSiteId
+                                                ? sites.find((s) => s.id === selectedSiteId)?.siteName ||
+                                                'Selected Site'
+                                                : sites.length === 0
+                                                    ? 'No site added yet'
+                                                    : 'Select a site'}
+                                        </AppText>
+
+                                        <Ionicons name="chevron-down" size={18} />
+                                    </Pressable>
+
+                                    {/* DROPDOWN LIST */}
+                                    {openSiteDropdown && (
+                                        <View
+                                            style={{
+                                                backgroundColor: 'white',
+                                                borderWidth: 1,
+                                                borderColor: '#ddd',
+                                                borderRadius: 10,
+                                                marginTop: 5,
+                                            }}
+                                        >
+                                            {sites.length === 0 ? (
+                                                <AppText style={{ padding: 12, color: '#888' }}>
+                                                    No site added yet
+                                                </AppText>
+                                            ) : (
+                                                sites.map((site) => (
+                                                    <Pressable
+                                                        key={site.id}
+                                                        onPress={() => {
+                                                            setSelectedSiteId(site.id);
+                                                            setOpenSiteDropdown(false);
+                                                        }}
+                                                        style={{ padding: 12 }}
+                                                    >
+                                                        <AppText variant='bodySmall'>
+                                                            {site.siteName} - {site.address}
+                                                        </AppText>
+                                                    </Pressable>
+                                                ))
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+                                {[
+                                    { key: 'firstName', label: 'First Name *' },
+                                    { key: 'lastName', label: 'Last Name *' },
+                                    { key: 'email', label: 'Email *' },
+                                    { key: 'password', label: 'Password *' },
+                                    { key: 'phoneNumber', label: 'Phone (Optional)' },
+                                ].map((field: any) => (
+                                    <View key={field.key} style={styles.fieldWrapper}>
+                                        <AppText style={styles.label}>{field.label}</AppText>
+
+                                        <TextInput
+                                            style={styles.inputWrapper}
+                                            secureTextEntry={field.key === 'password'}
+                                            value={(managerForm as any)[field.key]}
+                                            onChangeText={(v) =>
+                                                setManagerForm({ ...managerForm, [field.key]: v })
+                                            }
+                                        />
+                                    </View>
+                                ))}
+
+                                <Pressable style={styles.createBtn} onPress={handleAssignManager}>
+                                    <AppText style={styles.btnText}>
+                                        {loading ? 'Assigning...' : 'Assign Manager'}
+                                    </AppText>
+                                </Pressable>
+                            </>
+                        )}
+
+                    </ScrollView>
+                </Screen>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
     );
 }
 

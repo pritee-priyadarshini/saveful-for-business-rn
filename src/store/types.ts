@@ -1,0 +1,91 @@
+import {
+  DemoPlan,
+  OrganizationSite,
+  UserAccount,
+  UserProfile,
+  UserRole,
+} from '../types';
+
+export type RestaurantForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  mobile: string;
+  businessName: string;
+  businessAddress: string;
+  registrationNumber: string;
+  venueType: string;
+  branding: string;
+  logo: string;
+  region: string;
+  latitude: string;
+  longitude: string;
+};
+
+export type CharityForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  mobile: string;
+  charityName: string;
+  charityAddress: string;
+  registrationNumber: string;
+  branding: string;
+  logo: string;
+  postcodes: string;
+  pickupRadius: string;
+  region: string;
+  latitude: string;
+  longitude: string;
+  pickupPostCode: string;
+};
+
+export type Subscription = {
+  planId: string | null;
+  isActive: boolean;
+  billingCycle: 'monthly' | 'annual' | null;
+  isFreeTier: boolean;
+};
+
+export type AuthUser = {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  platformRole: string;
+  accessToken: string;
+  orgType?: string;
+  profile?: any;
+  orgRole?: string;
+  siteRole?: string;
+};
+
+export type AppContextValue = {
+  isAuthenticated: boolean;
+  selectedRole: UserRole;
+  selectedPlanId: string;
+  currentProfile: UserProfile;
+  subscription: Subscription;
+  currentPlan: DemoPlan | null;
+  restaurantForm: RestaurantForm;
+  charityForm: CharityForm;
+  authUser: AuthUser | null;
+  setRole: (role: UserRole) => void;
+  selectPlan: (planId: string) => void;
+  upgradePlan: (planId: string) => void;
+  updateRestaurantField: (
+    field: keyof RestaurantForm,
+    value: string
+  ) => void;
+  updateCharityField: (
+    field: keyof CharityForm,
+    value: string
+  ) => void;
+  setAuthUser: (user: AuthUser | null) => void;
+  logout: () => void;
+  resetForms: () => void;
+};

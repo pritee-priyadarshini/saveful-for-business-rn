@@ -4,3 +4,13 @@ dist
 web-build
 *.log
 .env.local
+
+.expo-shared/
+coverage/
+.metro-cache/
+
+.env
+.env.*
+!.env.example
+
+*.tsbuildinfo

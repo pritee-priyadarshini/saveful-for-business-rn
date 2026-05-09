@@ -6,6 +6,7 @@ import {
   ScrollView,
   Image,
   ImageBackground,
+  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
@@ -21,6 +22,8 @@ import { spacing } from '../../theme/spacing';
 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/types';
+import { authService } from '@/services/auth.service';
+import { mapRole } from '@/utils/roleMapper';
 
 type NavProp = NativeStackNavigationProp<AuthStackParamList>;
 
@@ -39,6 +42,7 @@ export function AuthScreen() {
     selectedRole === 'restaurant_single' ||
     selectedRole === 'restaurant_multi';
 
+  const [loading, setLoading] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(['personal']);
   const [isChecked, setIsChecked] = useState(false);
 
@@ -64,6 +68,83 @@ export function AuthScreen() {
       } else {
         updateCharityField('logo' as any, uri);
       }
+    }
+  };
+
+  const handleRegister = async () => {
+    try {
+      setLoading(true);
+
+      const form = new FormData();
+
+      if (isRestaurant) {
+        if (restaurantForm.password !== restaurantForm.confirmPassword) {
+          Alert.alert('Passwords do not match');
+          return;
+        }
+
+        form.append('firstName', restaurantForm.firstName);
+        form.append('lastName', restaurantForm.lastName);
+        form.append('email', restaurantForm.email);
+        form.append('password', restaurantForm.password);
+        form.append('mobile', restaurantForm.mobile);
+        form.append('businessName', restaurantForm.businessName);
+        form.append('businessAddress', restaurantForm.businessAddress);
+        form.append('registrationNumber', restaurantForm.registrationNumber);
+        form.append('brandName', restaurantForm.branding);
+        form.append('venueType', restaurantForm.venueType);
+        form.append('orgType', mapRole(selectedRole));
+        form.append('region', 'IN');
+        form.append('latitude', '20.2961');
+        form.append('longitude', '85.8245');
+
+        if (restaurantForm.logo) {
+          form.append('logo', {
+            uri: restaurantForm.logo,
+            name: 'logo.jpg',
+            type: 'image/jpeg',
+          } as any);
+        }
+
+        await authService.registerBusiness(form);
+      } else {
+        if (charityForm.password !== charityForm.confirmPassword) {
+          Alert.alert('Passwords do not match');
+          return;
+        }
+
+        form.append('firstName', charityForm.firstName);
+        form.append('lastName', charityForm.lastName);
+        form.append('email', charityForm.email);
+        form.append('password', charityForm.password);
+        form.append('mobile', charityForm.mobile);
+        form.append('charityName', charityForm.charityName);
+        form.append('charityAddress', charityForm.charityAddress);
+        form.append('registrationNumber', charityForm.registrationNumber);
+        form.append('brandName', charityForm.branding);
+        form.append('charityType', mapRole(selectedRole));
+        form.append('pickupPostCode', charityForm.postcodes);
+        form.append('pickupRadiusKm', charityForm.pickupRadius || '5');
+        form.append('region', 'IN');
+        form.append('latitude', '20.2961');
+        form.append('longitude', '85.8245');
+
+        if (charityForm.logo) {
+          form.append('logo', {
+            uri: charityForm.logo,
+            name: 'logo.jpg',
+            type: 'image/jpeg',
+          } as any);
+        }
+
+        await authService.registerCharity(form);
+      }
+
+      navigation.navigate('EmailVerification');
+    } catch (error: any) {
+      Alert.alert('Registration failed', error?.response?.data?.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -200,15 +281,15 @@ export function AuthScreen() {
                   onValueChange={(value) => updateRestaurantField('venueType', value)}
                 >
                   <Picker.Item label="Select venue type" value="" />
-                  <Picker.Item label="Cafe" value="cafe" />
-                  <Picker.Item label="Bakery" value="bakery" />
-                  <Picker.Item label="Grocery Store" value="grocery_store" />
-                  <Picker.Item label="Food Truck" value="food_truck" />
-                  <Picker.Item label="Restaurant" value="restaurant" />
-                  <Picker.Item label="Hotel" value="hotel" />
-                  <Picker.Item label="Wedding" value="wedding" />
-                  <Picker.Item label="Caterers" value="caterers" />
-                  <Picker.Item label="Other" value="other" />
+                  <Picker.Item label="Cafe/Restaurant" value="CAFE_RESTAURANT" />
+                  <Picker.Item label="Bakery" value="BAKERY" />
+                  <Picker.Item label="Grocery Store" value="GROCERY_STORE" />
+                  <Picker.Item label="Food Truck" value="FOOD_TRUCK" />
+                  <Picker.Item label="Caterers" value="CATERING_SERVICE" />
+                  <Picker.Item label="Hotel" value="HOTEL" />
+                  <Picker.Item label="Wedding Venue" value="WEDDING_VENUE" />
+                  <Picker.Item label="Cloud Kitchen" value="CLOUD_KITCHEN" />
+                  <Picker.Item label="Other" value="OTHER" />
                 </Picker>
               </View>
             </Section>
@@ -235,6 +316,12 @@ export function AuthScreen() {
                 placeholder="Enter number"
                 value={charityForm.registrationNumber}
                 onChangeText={(v) => updateCharityField('registrationNumber', v)}
+              />
+              <InputField
+                label="Postcode *"
+                placeholder="Enter postcode"
+                value={charityForm.postcodes}
+                onChangeText={(v) => updateCharityField('postcodes', v)}
               />
             </Section>
           )}
@@ -310,13 +397,9 @@ export function AuthScreen() {
           {/* BUTTON + TIP + DISCLAIMER */}
           <View style={styles.bottomInline}>
             <Button
-              label="Create Account"
-              onPress={() => {
-                if (isChecked) {
-                  navigation.navigate('EmailVerification');
-                }
-              }}
-              disabled={!isChecked}
+              label={loading ? 'Creating...' : 'Create Account'}
+              onPress={handleRegister}
+              disabled={!isChecked || loading}
               style={{ backgroundColor: palette.middlegreen }}
             />
 

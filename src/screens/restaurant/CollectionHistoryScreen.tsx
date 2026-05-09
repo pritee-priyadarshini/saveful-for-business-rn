@@ -1,90 +1,91 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, Pressable, ImageBackground, Modal } from 'react-native';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing } from '../../theme/spacing';
 import { palette } from '../../theme/colors';
+import { foodListingService } from '@/services/foodListing.service';
 
-const DATA = [
-    {
-        id: '1',
-        collected_by: 'Food Rescue Org',
-        location: 'Patia, Bhubaneswar',
-        driverName: 'Rakesh Sahu',
-        date: new Date('2026-04-07'),
-        time: '2:30 PM',
-        status: 'claimed',
-        items: [
-            { name: 'Baked Goods', qty: 3 },
-            { name: 'Fruits', qty: 2 },
-        ],
-    },
-    {
-        id: '2',
-        collected_by: null,
-        location: null,
-        driverName: null,
-        date: new Date('2026-04-06'),
-        time: '1:00 PM',
-        status: 'expired',
-        items: [
-            { name: 'Meat', qty: 4 },
-        ],
-    },
-    {
-        id: '3',
-        collected_by: 'Food Rescue Org',
-        location: 'Khandagiri, Bhubaneswar',
-        driverName: 'Amit Das',
-        date: new Date('2025-08-10'),
-        time: '2:30 PM',
-        status: 'partial claimed',
-        items: [
-            { name: 'Baked Goods', qty: 3, claimed: 2, left: 1 },
-            { name: 'Fruits', qty: 2, claimed: 1, left: 1 },
-        ],
-    },
-    {
-        id: '4',
-        collected_by: 'Food Rescue Org',
-        location: 'Saheed Nagar, Bhubaneswar',
-        driverName: 'Suman Nayak',
-        date: new Date('2025-12-07'),
-        time: '5:30 PM',
-        status: 'claimed',
-        items: [
-            { name: 'Baked Goods', qty: 3 },
-            { name: 'Fruits', qty: 2 },
-        ],
-    },
-    {
-        id: '5',
-        collected_by: null,
-        location: null,
-        driverName: null,
-        date: new Date('2026-04-07'),
-        time: '2:30 PM',
-        status: 'expired',
-        items: [
-            { name: 'Baked Goods', qty: 3 },
-            { name: 'Fruits', qty: 2 },
-        ],
-    },
-    {
-        id: '6',
-        collected_by: 'Food Rescue Org',
-        location: 'Jaydev Vihar, Bhubaneswar',
-        driverName: 'Prakash Rout',
-        date: new Date('2026-02-03'),
-        time: '2:30 PM',
-        status: 'claimed',
-        items: [
-            { name: 'Baked Goods', qty: 3 },
-            { name: 'Fruits', qty: 2 },
-        ],
-    },
-];
+// const DATA = [
+//     {
+//         id: '1',
+//         collected_by: 'Food Rescue Org',
+//         location: 'Patia, Bhubaneswar',
+//         driverName: 'Rakesh Sahu',
+//         date: new Date('2026-04-07'),
+//         time: '2:30 PM',
+//         status: 'claimed',
+//         items: [
+//             { name: 'Baked Goods', qty: 3 },
+//             { name: 'Fruits', qty: 2 },
+//         ],
+//     },
+//     {
+//         id: '2',
+//         collected_by: null,
+//         location: null,
+//         driverName: null,
+//         date: new Date('2026-04-06'),
+//         time: '1:00 PM',
+//         status: 'expired',
+//         items: [
+//             { name: 'Meat', qty: 4 },
+//         ],
+//     },
+//     {
+//         id: '3',
+//         collected_by: 'Food Rescue Org',
+//         location: 'Khandagiri, Bhubaneswar',
+//         driverName: 'Amit Das',
+//         date: new Date('2025-08-10'),
+//         time: '2:30 PM',
+//         status: 'partial claimed',
+//         items: [
+//             { name: 'Baked Goods', qty: 3, claimed: 2, left: 1 },
+//             { name: 'Fruits', qty: 2, claimed: 1, left: 1 },
+//         ],
+//     },
+//     {
+//         id: '4',
+//         collected_by: 'Food Rescue Org',
+//         location: 'Saheed Nagar, Bhubaneswar',
+//         driverName: 'Suman Nayak',
+//         date: new Date('2025-12-07'),
+//         time: '5:30 PM',
+//         status: 'claimed',
+//         items: [
+//             { name: 'Baked Goods', qty: 3 },
+//             { name: 'Fruits', qty: 2 },
+//         ],
+//     },
+//     {
+//         id: '5',
+//         collected_by: null,
+//         location: null,
+//         driverName: null,
+//         date: new Date('2026-04-07'),
+//         time: '2:30 PM',
+//         status: 'expired',
+//         items: [
+//             { name: 'Baked Goods', qty: 3 },
+//             { name: 'Fruits', qty: 2 },
+//         ],
+//     },
+//     {
+//         id: '6',
+//         collected_by: 'Food Rescue Org',
+//         location: 'Jaydev Vihar, Bhubaneswar',
+//         driverName: 'Prakash Rout',
+//         date: new Date('2026-02-03'),
+//         time: '2:30 PM',
+//         status: 'claimed',
+//         items: [
+//             { name: 'Baked Goods', qty: 3 },
+//             { name: 'Fruits', qty: 2 },
+//         ],
+//     },
+// ];
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH_INDEX = new Date().getMonth(); // 0-based
@@ -117,38 +118,81 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const [selectedItems, setSelectedItems] = useState<any[]>([]);
     const [selectedStatus, setSelectedStatus] = useState('');
 
+    const [history, setHistory] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchHistory();
+    }, []);
+
+    const fetchHistory = async () => {
+        try {
+            setLoading(true);
+
+            const res = await foodListingService.getListings({
+                page: 1,
+                limit: 200,
+            });
+
+            setHistory(res.data?.listings || []);
+        } catch (error) {
+            console.log('history fetch failed', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const months = getMonthsForYear(selectedYear);
-    const years = ['All', '2026', '2025'];
+    const years = useMemo(() => {
+        const uniqueYears = [
+            ...new Set(
+                history.map((item) =>
+                    new Date(item.createdAt)
+                        .getFullYear()
+                        .toString()
+                )
+            ),
+        ];
+
+        uniqueYears.sort((a, b) => Number(b) - Number(a));
+
+        return ['All', ...uniqueYears];
+    }, [history]);
 
     const filteredData = useMemo(() => {
-        return DATA
-            .filter(item => {
-                const itemMonth =
-                    item.date.toLocaleString('default', {
-                        month: 'short',
-                    });
-
-                const itemYear =
-                    item.date.getFullYear().toString();
-
-                const yearMatch =
-                    selectedYear === 'All' ||
-                    itemYear === selectedYear;
-
-                const monthMatch =
-                    selectedMonth === 'All' ||
-                    itemMonth === selectedMonth;
-
+        return history
+            .filter((item) => {
+                const date = new Date(item.createdAt);
+                const itemMonth = date.toLocaleString('default', { month: 'short', });
+                const itemYear = date.getFullYear().toString();
+                const yearMatch = selectedYear === 'All' || itemYear === selectedYear;
+                const monthMatch = selectedMonth === 'All' || itemMonth === selectedMonth;
                 return yearMatch && monthMatch;
             })
             .sort(
                 (a, b) =>
-                    b.date.getTime() - a.date.getTime()
+                    new Date(b.createdAt).getTime() -
+                    new Date(a.createdAt).getTime()
             );
-    }, [selectedMonth, selectedYear]);
+    }, [history, selectedMonth, selectedYear]);
 
     function prettyStatus(status: string) {
-        return status.replace(/\b\w/g, c => c.toUpperCase());
+        if (status === 'PARTIAL') return 'Partial Claimed';
+
+        return (
+            status.charAt(0) +
+            status.slice(1).toLowerCase()
+        );
+    }
+
+    if (loading) {
+        return (
+            <Screen>
+                <AppText>
+                    Loading collection history...
+                </AppText>
+            </Screen>
+        );
     }
 
     return (
@@ -252,7 +296,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                     contentContainerStyle={{ paddingBottom: 40 }}
                     ListEmptyComponent={
                         <View style={styles.empty}>
-                            <AppText variant="body">No Collection Found For This Month</AppText>
+                            <AppText variant="body">No Collection Found </AppText>
                         </View>
                     }
                     renderItem={({ item }) => (
@@ -261,14 +305,14 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                             <View style={styles.topRow}>
                                 <View style={{ flex: 1 }}>
                                     <AppText variant="bodyBold">
-                                        {item.collected_by || 'No charity accepted it'}
+                                        {item.foodClaims?.[0]?.charityName || 'No charity accepted it'}
                                     </AppText>
 
                                     <AppText variant="caption">
-                                        {item.location || 'Nearby charities were notified'}
+                                        {item.pickupAddress || 'Nearby charities were notified'}
                                     </AppText>
 
-                                    {item.driverName && (
+                                    {item.foodClaims?.[0]?.driverName && (
                                         <AppText
                                             variant="caption"
                                             style={styles.driverText}
@@ -305,7 +349,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                                     <Pressable
                                         style={styles.viewBtn}
                                         onPress={() => {
-                                            setSelectedItems(item.items);
+                                            setSelectedItems(item.foodItems);
                                             setSelectedStatus(item.status);
                                             setModalVisible(true);
                                         }}
@@ -397,11 +441,11 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                                 style={styles.modalItemRow}
                             >
                                 <AppText variant='bodySmall' style={{ flex: 2 }}>
-                                    {it.name}
+                                    {it.category}
                                 </AppText>
 
                                 <AppText variant='bodySmall' style={styles.modalCol}>
-                                    {it.qty}kg
+                                    {it.totalQtyKg}kg
                                 </AppText>
 
                                 {(selectedStatus === 'claimed' ||

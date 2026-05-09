@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,10 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
-
-import {
-  restaurantImpact,
-} from '../../data/mockData';
+import { dashboardService } from '@/services/dashboard.service';
 
 import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
@@ -22,39 +19,65 @@ import { palette } from '@/theme/colors';
 export function RestaurantHomeScreen({ navigation }: any) {
 
   const { currentProfile } = useAppContext();
-  const firstName = currentProfile.name.split(' ')[0];
+  const firstName = currentProfile.name?.split(' ')[0] || 'User';
   const [activeIndex, setActiveIndex] = React.useState(0);
+
+  const [impact, setImpact] = React.useState({
+    kgSaved: 0,
+    charitiesSupported: 0,
+    co2SavedKg: 0,
+    moneySaved: 0,
+    currency: '₹',
+  });
+
+  const [loadingImpact, setLoadingImpact] = React.useState(true);
 
   const impactConfig = [
     {
-      key: 'kg saved',
       label: 'KG',
       icon: require('../../../assets/placeholder/bowl.png'),
+      title: 'You have potentially saved',
+      value: `${impact.kgSaved} KGs`,
     },
     {
-      key: 'charities supported',
       label: 'Charity',
       icon: require('../../../assets/placeholder/community-icon.png'),
+      title: 'You have potentially helped',
+      value: `${impact.charitiesSupported} Charities`,
     },
     {
-      key: 'CO2 reduced',
       label: 'CO2',
       icon: require('../../../assets/placeholder/leftovers.png'),
+      title: 'You have potentially saved',
+      value: `${impact.co2SavedKg} KGs`,
     },
     {
-      key: 'money',
       label: 'Money',
       icon: require('../../../assets/placeholder/money.png'),
+      title: 'You have potentially saved',
+      value: `${impact.currency}${impact.moneySaved}`,
     },
   ];
 
-  const impactData = impactConfig.map((item) => ({
-    ...item,
-    value:
-      restaurantImpact.snapshot.find(
-        (snap) => snap.label === item.key
-      )?.value || '--',
-  }));
+  const impactData = impactConfig;
+
+  React.useEffect(() => {
+    fetchImpact();
+  }, []);
+
+  const fetchImpact = async () => {
+    try {
+      setLoadingImpact(true);
+
+      const res = await dashboardService.getBusinessImpact();
+
+      setImpact(res.data);
+    } catch (error) {
+      console.log('Impact fetch failed', error);
+    } finally {
+      setLoadingImpact(false);
+    }
+  };
 
   return (
     <Screen backgroundColor={palette.creme}>
@@ -77,7 +100,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
               <View style={styles.locationRow}>
                 <Ionicons name="location-outline" size={26} color="white" />
                 <AppText variant="body" style={styles.location}>
-                  {currentProfile.address}
+                  {currentProfile.address || 'No address available'}
                 </AppText>
               </View>
             </View>
@@ -173,13 +196,13 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
             {/* TEXT */}
             <AppText variant="h7">
-              You have potentially saved
+              {impactData[activeIndex].title}
             </AppText>
 
             {/* VALUE */}
             <View style={styles.valuePill}>
               <AppText variant="h5" style={styles.valueText}>
-                {impactData[activeIndex].value} {impactData[activeIndex].label}
+                {loadingImpact ? '...' : impactData[activeIndex].value}
               </AppText>
             </View>
 

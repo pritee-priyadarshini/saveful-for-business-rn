@@ -221,6 +221,7 @@ export function CharityDiscoverScreen() {
     <View style={[styles.mapContainer, { marginTop: spacing.md }]}>
       <MapView
         style={styles.map}
+        liteMode={true}
         initialRegion={{
           latitude: 13.0827,
           longitude: 80.2707,

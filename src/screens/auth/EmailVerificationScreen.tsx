@@ -6,8 +6,10 @@ import {
   Pressable,
   ImageBackground,
   Modal,
+  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as SecureStore from 'expo-secure-store';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
@@ -16,17 +18,51 @@ import { AuthStackParamList } from '../../navigation/types';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useAppContext } from '@/store/AppContext';
+import { authService } from '@/services/auth.service';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
 export function EmailVerificationScreen({ navigation }: Props) {
+
+  const {
+    selectedRole,
+    restaurantForm,
+    charityForm,
+    setAuthUser,
+  } = useAppContext();
+
+  const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
+
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const inputs = useRef<Array<TextInput | null>>([]);
 
-  const validateOtp = () => {
-    const enteredOtp = otp.join('');
-    return enteredOtp === '123456';
+  const handleVerify = async () => {
+    try {
+      setLoading(true);
+
+      const enteredOtp = otp.join('');
+      const email = isRestaurant ? restaurantForm.email : charityForm.email;
+
+      const res = await authService.verifyEmail(email, enteredOtp);
+      const data = res.data;
+
+      await SecureStore.setItemAsync('accessToken', data.accessToken);
+
+      setAuthUser({
+        ...data.user,
+        platformRole: 'ORG_USER',
+        accessToken: data.accessToken,
+      });
+
+      setShowSuccess(true);
+    } catch (error: any) {
+      Alert.alert('Verification failed', error?.response?.data?.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (text: string, index: number) => {
@@ -45,11 +81,9 @@ export function EmailVerificationScreen({ navigation }: Props) {
     }
   };
 
-  const { selectedRole } = useAppContext();
-
-  const isRestaurant =
-    selectedRole === 'restaurant_single' ||
-    selectedRole === 'restaurant_multi';
+  const handleResend = () => {
+    Alert.alert('OTP already sent', 'Please check your inbox / spam folder.');
+  };
 
   return (
     <>
@@ -96,7 +130,7 @@ export function EmailVerificationScreen({ navigation }: Props) {
           </View>
 
           {/* RESEND */}
-          <Pressable style={styles.resendButton}>
+          <Pressable style={styles.resendButton} onPress={handleResend}>
             <AppText variant='label' style={styles.resendText}>Resend Email</AppText>
           </Pressable>
 
@@ -110,14 +144,8 @@ export function EmailVerificationScreen({ navigation }: Props) {
         {/* CTA */}
         <View style={styles.bottom}>
           <Button
-            label="Continue"
-            onPress={() => {
-              if (validateOtp()) {
-                setShowSuccess(true);
-              } else {
-                alert('Invalid/Wrong OTP. Please try again.');
-              }
-            }}
+            label={loading ? 'Verifying...' : 'Continue'}
+            onPress={handleVerify}
           />
         </View>
 
@@ -161,7 +189,6 @@ export function EmailVerificationScreen({ navigation }: Props) {
               label={isRestaurant ? 'Start Free Trial' : "Let’s be Saveful"}
               onPress={() => {
                 setShowSuccess(false);
-                navigation.replace('SignIn');
               }}
             />
 
