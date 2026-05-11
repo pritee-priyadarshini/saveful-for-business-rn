@@ -20,26 +20,33 @@ import { useAppContext } from '@/store/AppContext';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
+import { charityService } from '@/services/charity.service';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'MultiCharityManageSites'>;
 
 type Site = {
-    id: string;
+    id: number;
     tradingName: string;
-    logo: any;
     address: string;
     postCode: string;
     contactName: string;
     email: string;
     mobile: string;
+    latitude?: number;
+    longitude?: number;
+    radiusKm?: number;
+    logoUrl?: string;
 };
-
 export default function MultiCharityManageSitesScreen() {
     const navigation = useNavigation<NavigationProp>();
-    const { logout } = useAppContext();
+    const { logout, currentProfile, authUser } = useAppContext();
     const [showPassword, setShowPassword] = useState(false);
-    const [editingSiteId, setEditingSiteId] = useState<string | null>(null);
+    const [editingSiteId, setEditingSiteId] = useState<number | null>(null);
     const [editForm, setEditForm] = useState<any>({});
+    const [loading, setLoading] = useState(true);
+    const [sites, setSites] = useState<Site[]>([]);
+    const [expandedSite, setExpandedSite] = useState<number | null>(null);
+    const businessLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
 
     const actions = [
         { label: 'Create Site', route: 'CreateCharitySite' },
@@ -51,43 +58,71 @@ export default function MultiCharityManageSitesScreen() {
         },
     ];
 
-    const businessName = 'Kindness Welfare Association';
-    const [expandedSite, setExpandedSite] = useState<string | null>(null);
-    const [sites, setSites] = useState<Site[]>([
-        {
-            id: '1',
-            tradingName: 'Kindness Welfare Association - Patrapada',
-            logo: require('../../../assets/intro/charity_logo.png'),
-            address: 'Patrapada, Bhubaneswar, Khordha',
-            postCode: '751019',
-            contactName: 'Amit Sharma',
-            email: 'amit@kwa.org',
-            mobile: '+91 90000 00000',
-        },
-        {
-            id: '2',
-            tradingName: 'Kindness Welfare Association - Baramunda',
-            logo: require('../../../assets/intro/charity_logo.png'),
-            address: 'Baramunda, Bhubaneswar, Khordha',
-            postCode: '751001',
-            contactName: 'Priya Das',
-            email: 'priya@kwa.org',
-            mobile: '+91 98888 88888',
-        },
+    React.useEffect(() => {
+        fetchLocations();
+    }, []);
 
-        {
-            id: '3',
-            tradingName: 'Kindness Welfare Association - Rasulgarh',
-            logo: require('../../../assets/intro/charity_logo.png'),
-            address: 'Rasulgarh, Bhubaneswar, Khordha',
-            postCode: '751010',
-            contactName: 'Neha Sahoo',
-            email: 'neha@kwa.org',
-            mobile: '+91 98888 11111',
-        },
-    ]);
+    const fetchLocations = async () => {
+        try {
+            setLoading(true);
 
-    const businessLogo = sites[0]?.logo;
+            const [locationsRes, usersRes] = await Promise.all([charityService.listLocations(), charityService.listUsers(),]);
+            const locations = locationsRes.data || [];
+            const users = usersRes.data || [];
+            const formattedSites = locations.map(
+                (location: any) => {
+                    const admin =
+                        users.find(
+                            (u: any) =>
+                                u.locationId === location.id &&
+                                (
+                                    u.role === 'LOCATION_ADMIN' ||
+                                    u.role === 'HEAD_OFFICE_ADMIN'
+                                )
+                        ) || null;
+
+                    return {
+                        id: location.id,
+                        tradingName: location.locationName,
+                        address: location.address,
+                        postCode: location.postcode,
+                        contactName: admin ? `${admin.firstName} ${admin.lastName}` : 'No Admin',
+                        email: admin?.email || '-',
+                        mobile: admin?.mobile || '-',
+                        latitude: location.latitude,
+                        longitude: location.longitude,
+                        radiusKm: location.radiusKm,
+                        logoUrl: currentProfile.logo ||  authUser?.profile?.organisation?.logoUrl || '',
+                    };
+                }
+            );
+
+            setSites(formattedSites);
+
+        } catch (err) {
+            Alert.alert('Error', 'Failed to load locations');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <Screen backgroundColor={palette.creme}>
+                <View
+                    style={{
+                        flex: 1,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                    }}
+                >
+                    <AppText variant="bodyLarge">
+                        Loading locations...
+                    </AppText>
+                </View>
+            </Screen>
+        );
+    }
 
     return (
         <Screen backgroundColor={palette.creme}>
@@ -99,10 +134,10 @@ export default function MultiCharityManageSitesScreen() {
                     style={styles.heroBg}
                 >
                     <View style={styles.heroContent}>
-                        <AppText variant="h5" style={styles.businessName}> {businessName} </AppText>
+                        <AppText variant="h5" style={styles.businessName}>  {currentProfile.organization}</AppText>
 
                         {businessLogo && (
-                            <Image source={businessLogo} style={styles.logoTopRight} />
+                            <Image source={{ uri: businessLogo }} style={styles.logoTopRight} />
                         )}
                     </View>
                 </ImageBackground>
@@ -147,7 +182,12 @@ export default function MultiCharityManageSitesScreen() {
                         <View style={styles.siteHeader}>
 
                             <View style={styles.siteLeft}>
-                                <Image source={site.logo} style={styles.siteLogo} />
+                                <Image source={site.logoUrl
+                                    ? { uri: site.logoUrl }
+                                    : require('../../../assets/intro/charity_logo.png')
+                                }
+                                    style={styles.siteLogo}
+                                />
 
                                 <View style={{ flex: 1 }}>
                                     <AppText variant="label" style={styles.siteName}>
@@ -169,11 +209,32 @@ export default function MultiCharityManageSitesScreen() {
                                 {/* VIEW */}
                                 <Pressable
                                     style={styles.viewBtn}
-                                    onPress={() =>
-                                        setExpandedSite(
-                                            expandedSite === site.id ? null : site.id
-                                        )
-                                    }
+                                    onPress={async () => {
+                                        try {
+                                            if (!editingSiteId) return;
+                                            await charityService.updateLocation(
+                                                Number(editingSiteId),
+                                                {
+                                                    locationName: editForm.tradingName,
+                                                    address: editForm.address,
+                                                    postcode: editForm.postCode,
+                                                    contactName: editForm.contactName,
+                                                    contactEmail: editForm.email,
+                                                    contactMobile: editForm.mobile,
+                                                }
+                                            );
+
+                                            await fetchLocations();
+
+                                            setEditingSiteId(null);
+                                            setEditForm({});
+
+                                            Alert.alert('Success', 'Location updated');
+
+                                        } catch (err: any) {
+                                            Alert.alert('Error', err?.response?.data?.message || 'Failed to update location');
+                                        }
+                                    }}
                                 >
                                     <AppText variant="label" style={styles.viewText}>
                                         View
@@ -183,13 +244,47 @@ export default function MultiCharityManageSitesScreen() {
                                 {/* EDIT */}
                                 <Pressable
                                     style={styles.editBtn}
-                                    onPress={() => {
-                                        setEditingSiteId(site.id);
-                                        setEditForm({ ...site });
-                                        setExpandedSite(site.id);
+                                    onPress={async () => {
+                                        try {
+                                            const [locationRes, usersRes] =
+                                                await Promise.all([
+                                                    charityService.getLocation(site.id),
+                                                    charityService.listUsers(),
+                                                ]);
+
+                                            const location = locationRes.data;
+                                            const admin =
+                                                usersRes.data?.find(
+                                                    (u: any) =>
+                                                        u.locationId === site.id &&
+                                                        (
+                                                            u.role === 'LOCATION_ADMIN' ||
+                                                            u.role === 'HEAD_OFFICE_ADMIN'
+                                                        )
+                                                );
+
+                                            setEditingSiteId(site.id);
+
+                                            setEditForm({
+                                                tradingName: location.locationName || '',
+                                                address: location.address || '',
+                                                postCode: location.postcode || '',
+                                                contactName: admin ? `${admin.firstName} ${admin.lastName}` : '',
+                                                email: admin?.email || '',
+                                                mobile: admin?.mobile || '',
+                                                radiusKm: location.radiusKm || '',
+                                                latitude: location.latitude || '',
+                                                longitude: location.longitude || '',
+                                            });
+
+                                            setExpandedSite(site.id);
+
+                                        } catch (err) {
+                                            Alert.alert('Error', 'Failed to load location details');
+                                        }
                                     }}
                                 >
-                                    <AppText variant="label" style={{ color: 'white' }}>
+                                    <AppText variant="label" style={{ color: 'white' }} >
                                         Edit
                                     </AppText>
                                 </Pressable>
@@ -199,63 +294,169 @@ export default function MultiCharityManageSitesScreen() {
 
                         {expandedSite === site.id && (
                             <View style={styles.details}>
-
                                 {editingSiteId === site.id ? (
                                     <>
                                         {[
-                                            { key: 'tradingName', label: 'Location Name' },
-                                            { key: 'address', label: 'Address' },
-                                            { key: 'postCode', label: 'Post Code' },
-                                            { key: 'contactName', label: 'Admin Name' },
-                                            { key: 'email', label: 'Email' },
-                                            { key: 'mobile', label: 'Phone' },
-                                            { key: 'password', label: 'Password' },
+                                            {
+                                                key: 'tradingName',
+                                                label: 'Location Name',
+                                            },
+                                            {
+                                                key: 'address',
+                                                label: 'Address',
+                                            },
+                                            {
+                                                key: 'postCode',
+                                                label: 'Post Code',
+                                            },
+                                            {
+                                                key: 'contactName',
+                                                label: 'Admin Name',
+                                            },
+                                            {
+                                                key: 'email',
+                                                label: 'Email',
+                                            },
+                                            {
+                                                key: 'mobile',
+                                                label: 'Phone',
+                                            },
+                                            {
+                                                key: 'radiusKm',
+                                                label: 'Pickup Radius (km)',
+                                            },
                                         ].map((field: any) => (
-                                            <View key={field.key} style={{ marginBottom: 10 }}>
-                                                <AppText variant="label">{field.label}</AppText>
+                                            <View
+                                                key={field.key}
+                                                style={{ marginBottom: 10 }}
+                                            >
+                                                <AppText variant="label">
+                                                    {field.label}
+                                                </AppText>
 
                                                 <View style={styles.inputWrapper}>
                                                     <TextInput
-                                                        value={editForm[field.key] || ''}
-                                                        onChangeText={(v) => setEditForm({ ...editForm, [field.key]: v }) }
-                                                        style={[
-                                                            styles.input,
-                                                            field.key === 'password' && { paddingRight: 40 },
-                                                        ]}
-                                                        secureTextEntry={field.key === 'password' && !showPassword}
+                                                        value={String(editForm[field.key] || '')
+                                                        }
+                                                        onChangeText={(v) =>
+                                                            setEditForm({
+                                                                ...editForm,
+                                                                [field.key]: v,
+                                                            })
+                                                        }
+                                                        style={styles.input}
                                                     />
-
-                                                    {field.key === 'password' && (
-                                                        <Pressable
-                                                            style={styles.eyeIcon}
-                                                            onPress={() => setShowPassword(!showPassword)}
-                                                        >
-                                                            <Ionicons
-                                                                name={showPassword ? 'eye-off' : 'eye'}
-                                                                size={18}
-                                                                color="#777"
-                                                            />
-                                                        </Pressable>
-                                                    )}
                                                 </View>
                                             </View>
                                         ))}
 
-                                        {/* SAVE BUTTON */}
+                                        {/* SAVE */}
                                         <Pressable
                                             style={styles.saveBtn}
-                                            onPress={() => {
-                                                setSites((prev) =>
-                                                    prev.map((s) =>
-                                                        s.id === editingSiteId ? { ...s, ...editForm } : s
-                                                    )
-                                                );
-                                                setEditingSiteId(null);
-                                                setEditForm({});
+                                            onPress={async () => {
+                                                try {
+
+                                                    if (!editingSiteId) {
+                                                        return;
+                                                    }
+
+                                                    await charityService.updateLocation(
+                                                        editingSiteId,
+                                                        {
+                                                            locationName: editForm.tradingName,
+                                                            address: editForm.address,
+                                                            postcode: editForm.postCode,
+                                                            contactName: editForm.contactName,
+                                                            contactEmail: editForm.email,
+                                                            contactMobile: editForm.mobile,
+                                                            radiusKm: Number(editForm.radiusKm),
+                                                        }
+                                                    );
+                                                    const usersRes = await charityService.listUsers();
+                                                    const admin =
+                                                        usersRes.data?.find(
+                                                            (u: any) =>
+                                                                u.locationId === editingSiteId &&
+                                                                (
+                                                                    u.role === 'LOCATION_ADMIN' ||
+                                                                    u.role === 'HEAD_OFFICE_ADMIN'
+                                                                )
+                                                        );
+
+                                                    if (admin) {
+                                                        await charityService.updateUser(
+                                                            admin.id,
+                                                            {
+                                                                firstName: editForm.contactName?.split(' ')[0] || '',
+                                                                lastName: editForm.contactName?.split(' ')?.slice(1)?.join(' ') || '',
+                                                                mobile: editForm.mobile,
+                                                            }
+                                                        );
+                                                    }
+
+                                                    await fetchLocations();
+
+                                                    setEditingSiteId(null);
+                                                    setEditForm({});
+
+                                                    Alert.alert('Success', 'Location updated successfully');
+
+                                                } catch (err: any) {
+                                                    Alert.alert(
+                                                        'Error',
+                                                        err?.response?.data?.message ||
+                                                        'Failed to update location'
+                                                    );
+                                                }
                                             }}
                                         >
-                                            <AppText variant="label" style={{ color: 'white' }}>
+                                            <AppText variant="label" style={{ color: 'white' }} >
                                                 Save
+                                            </AppText>
+                                        </Pressable>
+
+                                        {/* DELETE */}
+                                        <Pressable
+                                            style={[
+                                                styles.saveBtn,
+                                                {
+                                                    backgroundColor: '#D9534F',
+                                                    marginTop: 10,
+                                                },
+                                            ]}
+                                            onPress={() => {
+                                                Alert.alert(
+                                                    'Delete Location',
+                                                    'Are you sure you want to delete this location?',
+                                                    [
+                                                        {
+                                                            text: 'Cancel',
+                                                            style: 'cancel',
+                                                        },
+                                                        {
+                                                            text: 'Delete',
+                                                            style: 'destructive',
+                                                            onPress: async () => {
+                                                                try {
+                                                                    await charityService.deactivateLocation(site.id);
+                                                                    await fetchLocations();
+                                                                    setExpandedSite(null);
+                                                                    Alert.alert('Deleted', 'Location removed successfully');
+
+                                                                } catch {
+                                                                    Alert.alert(
+                                                                        'Error',
+                                                                        'Failed to remove location'
+                                                                    );
+                                                                }
+                                                            },
+                                                        },
+                                                    ]
+                                                );
+                                            }}
+                                        >
+                                            <AppText variant="label" style={{ color: 'white' }} >
+                                                Delete Location
                                             </AppText>
                                         </Pressable>
                                     </>
@@ -264,12 +465,20 @@ export default function MultiCharityManageSitesScreen() {
                                         <AppText variant="label">
                                             Manager: {site.contactName}
                                         </AppText>
+
                                         <AppText variant="label">
                                             Email: {site.email}
                                         </AppText>
+
                                         <AppText variant="label">
                                             Mobile: {site.mobile}
                                         </AppText>
+
+                                        {!!site.radiusKm && (
+                                            <AppText variant="label">
+                                                Pickup Radius: {site.radiusKm} km
+                                            </AppText>
+                                        )}
                                     </>
                                 )}
 

@@ -88,28 +88,42 @@ export function AppProvider({ children }: PropsWithChildren) {
     }
 
     if (orgType === 'BUSINESS_SINGLE') return 'restaurant_single';
-    if (orgType === 'CHARITY_SINGLE') return 'charity_single';
-    if (orgType === 'CHARITY_MULTI') return 'charity_multi';
+
+
+    if (orgType === 'CHARITY_MULTI') {
+      if (orgRole === 'SUPER_ADMIN' || orgRole === 'HEAD_OFFICE_ADMIN' || orgRole === 'HEAD_OFFICE') {
+        return 'charity_multi';
+      }
+
+      if (siteRole === 'SITE_ADMIN' || siteRole === 'LOCATION_ADMIN' || siteRole === 'TEAM_MEMBER') {
+        return 'charity_single';
+      }
+      return 'charity_multi';
+    }
+
+    if (orgType === 'CHARITY_SINGLE') {
+      return 'charity_single';
+    }
 
     return selectedRole;
   })();
 
   const value = useMemo<AppContextValue>(() => {
 
-    const isMultiSiteUser =
-      authUser?.orgType === 'BUSINESS_MULTI' &&
-      (authUser?.siteRole === 'SITE_ADMIN' ||
-        authUser?.siteRole === 'STAFF');
+    const isBusinessLocationUser = authUser?.orgType === 'BUSINESS_MULTI' &&
+      (authUser?.siteRole === 'SITE_ADMIN' || authUser?.siteRole === 'STAFF');
 
-    const assignedSite =
-      isMultiSiteUser && authUser?.profile?.sites?.length
-        ? authUser.profile.sites[0]
-        : null;
+    const isCharityLocationUser = authUser?.orgType === 'CHARITY_MULTI' &&
+      (authUser?.siteRole === 'LOCATION_ADMIN' || authUser?.siteRole === 'TEAM_MEMBER');
+
+    const isLocationUser = isBusinessLocationUser || isCharityLocationUser;
+
+    const assignedSite = isLocationUser && authUser?.profile?.sites?.length ? authUser.profile.sites[0] : null;
 
     const currentProfile: UserProfile = authUser?.profile
       ? {
         name: `${authUser.profile.user.firstName} ${authUser.profile.user.lastName}`,
-        organization: assignedSite?.name || authUser.profile.organisation?.name || '',
+        organization: assignedSite?.locationName || assignedSite?.name || authUser.profile.organisation?.name || '',
         address: assignedSite?.address || authUser.profile.organisation?.address || '',
         verificationStatus: 'Verified',
         phone: authUser.profile.user.phoneNumber || '',
@@ -124,8 +138,6 @@ export function AppProvider({ children }: PropsWithChildren) {
         logo: '',
       };
 
-    const isCharity = resolvedRole.includes('charity');
-
     const subscription: Subscription = {
       planId: null,
       billingCycle: null,
@@ -137,6 +149,17 @@ export function AppProvider({ children }: PropsWithChildren) {
       plansData.find(
         (plan) => plan.id === subscription.planId
       ) || null;
+
+    console.log(
+      'CURRENT PROFILE',
+      JSON.stringify(currentProfile, null, 2)
+    );
+
+    console.log(
+      'AUTH USER',
+      JSON.stringify(authUser, null, 2)
+    );
+
 
     return {
       isAuthenticated,

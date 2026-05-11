@@ -33,7 +33,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [modalVisible, setModalVisible] = React.useState(false);
 
   const [selectedItems, setSelectedItems] = React.useState<any[]>([]);
-  const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('Available');
+  const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
   const [listings, setListings] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -358,64 +358,71 @@ export function RestaurantListingsScreen({ navigation }: any) {
             {/* HEADER */}
             <View style={styles.modalHeaderRow}>
               <AppText variant="bodyBold" style={{ flex: 2 }} > Item Name </AppText>
-
               <AppText variant="bodyBold" style={styles.modalCol} > Available </AppText>
 
-              {selectedListingStatus !== 'Available' && (
-                <AppText variant="bodyBold" style={styles.modalCol} > Claimed </AppText>
+              {selectedListingStatus !== 'ACTIVE' && (
+                <AppText  variant="bodyBold" style={styles.modalCol} >
+                  Claimed
+                </AppText>
               )}
             </View>
 
-            {/* ROWS */}
-            {selectedItems.map((item, idx) => {
-              const available = item.totalQtyKg;
-              const claimed =
-                item.totalQtyKg - item.remainingQtyKg;
+            {/* ITEMS */}
+            {selectedItems?.length ? (
+              selectedItems.map((item, idx) => {
+                const totalQty = Number(item.totalQtyKg || 0);
+                const remainingQty = Number(item.remainingQtyKg || 0);
+                const claimedQty = totalQty - remainingQty;
 
-              return (
-                <View key={idx} style={styles.modalItemRow}>
-                  <AppText variant="label" style={{ flex: 2 }}>
-                    {item.category}
-                  </AppText>
-
-                  <AppText variant="bodySmall" style={styles.modalCol}>
-                    {available}kg
-                  </AppText>
-
-                  {/* {selectedListingStatus !== 'ACTIVE' && (
-                    <AppText variant="bodySmall" style={styles.modalCol}>
-                      {claimed}kg
+                return (
+                  <View key={`${item.category}-${idx}`} style={styles.modalItemRow}>
+                    <AppText variant="label"  style={{ flex: 2 }}  >
+                      {item.category}
                     </AppText>
-                  )} */}
-                </View>
-              );
-            })}
 
-            <AppText variant="bodyBold">
-              Total Quantity:{' '}
-              {selectedItems.reduce(
-                (sum, item) =>
-                  sum +
-                  ('claimed' in item
-                    ? item.claimed + item.left
-                    : item.qty),
-                0
-              )} kg
-            </AppText>
+                    <AppText variant="bodySmall" style={styles.modalCol} >
+                      {totalQty} kg
+                    </AppText>
 
-            {selectedListingStatus !== 'Available' && (
+                    {selectedListingStatus !== 'ACTIVE' && (
+                      <AppText variant="bodySmall" style={styles.modalCol} >
+                        {claimedQty} kg
+                      </AppText>
+                    )}
+                  </View>
+                );
+              })
+            ) : (
+              <View style={{ paddingVertical: spacing.md }}>
+                <AppText variant="bodySmall">
+                  No items available
+                </AppText>
+              </View>
+            )}
+
+            {/* TOTALS */}
+            <View style={{ marginTop: spacing.lg, gap: spacing.sm, }} >
               <AppText variant="bodyBold">
-                Total Claimed:{' '}
+                Total Quantity:{' '}
                 {selectedItems.reduce(
                   (sum, item) =>
-                    sum +
-                    ('claimed' in item
-                      ? item.claimed
-                      : item.qty),
+                    sum + Number(item.totalQtyKg || 0),
                   0
-                )} kg
+                )}{' '} kg
               </AppText>
-            )}
+
+              {selectedListingStatus !== 'ACTIVE' && (
+                <AppText variant="bodyBold">
+                  Total Claimed:{' '}
+                  {selectedItems.reduce(
+                    (sum, item) =>
+                      sum + ( Number(item.totalQtyKg || 0) - Number(item.remainingQtyKg || 0) ),
+                    0
+                  )}{' '} kg
+                </AppText>
+              )}
+            </View>
+
           </View>
         </View>
       </Modal>

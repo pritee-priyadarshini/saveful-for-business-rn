@@ -1,7 +1,5 @@
 import {
   DemoPlan,
-  OrganizationSite,
-  UserAccount,
   UserProfile,
   UserRole,
 } from '../types';

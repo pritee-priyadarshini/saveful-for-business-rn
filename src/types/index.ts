@@ -29,10 +29,11 @@ export type BackendVenueType =
 export type Region = 'IN' | 'US' | 'AU';
 
 export type ListingStatus =
-  | 'Available'
-  | 'Claimed'
-  | 'Partial claimed'
-  | 'Expired';
+  | 'ACTIVE'
+  | 'PARTIAL'
+  | 'CLAIMED'
+  | 'EXPIRED'
+  | 'CANCELLED';
 
 export type OrderStatus =
   | 'awaiting_driver'
