@@ -47,12 +47,10 @@ export default {
       "expo-font",
     ],
 
-    extra: {
-      eas: {
-        projectId: "2a58007e-5109-45fe-b80e-e0831772628e",
-      },
-    },
-
-    owner: "pritee_priyadarshini",
+     "extra": {
+      "eas": {
+        "projectId": "6863db47-e894-4b7e-944c-c0c66152e71d"
+      }
+    }
   },
 };
