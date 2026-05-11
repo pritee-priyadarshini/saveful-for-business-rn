@@ -3,7 +3,6 @@ import { StyleSheet, View, Image, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AppText } from '../../components/AppText';
-import { useAppContext } from '../../store/AppContext';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
@@ -13,7 +12,6 @@ import { spacing } from '../../theme/spacing';
 type Props = NativeStackScreenProps<AuthStackParamList, 'TeamInvite'>;
 
 export function TeamInviteScreen({ navigation }: Props) {
-    const { loginDemo } = useAppContext();
     const inviteCode = '123456';
 
     return (
@@ -59,7 +57,7 @@ export function TeamInviteScreen({ navigation }: Props) {
             <View style={styles.bottom}>
                 <Button label="Continue" onPress={() => { }} />
 
-                <Pressable onPress={() => { loginDemo(); }} >
+                <Pressable onPress={() => { }}>
                     <AppText style={styles.skip}>Skip for now</AppText>
                 </Pressable>
             </View>

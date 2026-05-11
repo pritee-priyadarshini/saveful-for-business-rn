@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  baseURL: 'https://s4b.saveful.app/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
