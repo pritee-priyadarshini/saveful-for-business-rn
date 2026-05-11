@@ -7,6 +7,8 @@ import {
   Image,
   ImageBackground,
   Alert,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
@@ -18,12 +20,20 @@ import { InputField } from '../../components/InputField';
 import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/types';
 import { authService } from '@/services/auth.service';
 import { mapRole } from '@/utils/roleMapper';
+import { spacing } from '@/theme/spacing';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type NavProp = NativeStackNavigationProp<AuthStackParamList>;
 
@@ -432,104 +442,108 @@ function Section({ title, active, onPress, children }: any) {
 
 const styles = StyleSheet.create({
   content: {
-    gap: spacing.md,
-    paddingBottom: spacing.xxl,
+    gap: hp(1.5),
+    paddingBottom: hp(4),
   },
 
   headerBg: {
     width: '100%',
-    height: 160,
+    height: hp(20),
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   headerTitle: {
     textAlign: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: wp(5),
+    fontSize: normalize(24),
   },
 
   cremeSection: {
     backgroundColor: palette.creme,
-    padding: spacing.lg,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: spacing.md,
+    padding: wp(5),
+    borderBottomLeftRadius: normalize(24),
+    borderBottomRightRadius: normalize(24),
+    marginBottom: hp(1.5),
   },
 
   subHeader: {
     textAlign: 'center',
     opacity: 0.7,
+    fontSize: normalize(16),
   },
 
   section: {
-    borderRadius: 20,
+    borderRadius: normalize(20),
     backgroundColor: palette.creme,
   },
 
   sectionHeader: {
-    padding: spacing.md,
+    padding: wp(4),
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
 
   sectionContent: {
-    padding: spacing.md,
-    gap: spacing.sm,
+    padding: wp(4),
+    gap: hp(1),
     borderTopWidth: 1,
   },
 
   dropdown: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 14,
+    borderRadius: normalize(14),
   },
 
   upload: {
-    padding: spacing.md,
+    padding: wp(4),
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 14,
+    borderRadius: normalize(14),
     alignItems: 'center',
   },
 
   logoPreview: {
-    width: 120,
-    height: 120,
-    marginTop: spacing.sm,
-    borderRadius: 12,
+    width: normalize(120),
+    height: normalize(120),
+    marginTop: hp(1),
+    borderRadius: normalize(12),
     borderWidth: 1,
     borderColor: palette.border,
   },
 
   bottomInline: {
-    gap: spacing.sm,
-    marginTop: spacing.lg,
+    gap: hp(1),
+    marginTop: hp(2),
   },
 
   tip: {
     textAlign: 'center',
     opacity: 0.6,
+    fontSize: normalize(12),
   },
 
   disclaimer: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     textAlign: 'center',
     opacity: 0.5,
     flex: 1,
+    fontSize: normalize(11),
   },
 
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: wp(2),
   },
 
   checkbox: {
-    width: 18,
-    height: 18,
+    width: normalize(20),
+    height: normalize(20),
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 4,
+    borderRadius: normalize(4),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -540,5 +554,6 @@ const styles = StyleSheet.create({
 
   tick: {
     color: palette.white,
+    fontSize: normalize(14),
   },
 });

@@ -21,6 +21,14 @@ import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
+
 const screenWidth = Dimensions.get('window').width;
 
 export function RestaurantAnalyticsScreen({ navigation }: any) {
@@ -298,13 +306,14 @@ const chartConfig = {
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.lg,
+    gap: hp(2),
+    paddingBottom: hp(4),
   },
 
   heroContainer: {
-    height: 200,
+    height: hp(25),
     width: '100%',
-    paddingTop: spacing.lg,
+    paddingTop: hp(2),
     overflow: 'hidden',
     position: 'relative',
   },
@@ -317,19 +326,21 @@ const styles = StyleSheet.create({
 
   topBar: {
     flexDirection: 'row',
-    paddingLeft: spacing.md,
+    paddingLeft: wp(4),
     justifyContent: 'space-between',
+    zIndex: 1,
   },
 
   locationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginTop: spacing.xs,
-    gap: 6,
+    marginTop: hp(0.5),
+    gap: wp(1.5),
   },
 
   whiteText: {
     color: 'white',
+    fontSize: normalize(18),
   },
 
   location: {
@@ -337,13 +348,14 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     flex: 1,
     flexWrap: 'wrap',
+    fontSize: normalize(14),
   },
 
   logoCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginHorizontal: spacing.sm,
+    width: normalize(48),
+    height: normalize(48),
+    borderRadius: normalize(24),
+    marginHorizontal: wp(3),
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
@@ -352,91 +364,99 @@ const styles = StyleSheet.create({
   logoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: normalize(24),
   },
 
   logoFallback: {
     color: '#7B3FE4',
     fontWeight: 'bold',
+    fontSize: normalize(18),
   },
   header: {
-    gap: spacing.sm,
+    gap: hp(1),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: hp(2),
   },
 
   heroText: {
-    paddingTop: spacing.xxl,
     color: palette.white,
     textAlign: 'center',
+    fontSize: normalize(24),
+    fontWeight: 'bold',
   },
 
   heroSubText: {
     color: palette.white,
-    lineHeight: 10,
+    lineHeight: normalize(18),
     textAlign: 'center',
-    paddingBottom: spacing.sm,
+    paddingBottom: hp(1),
     opacity: 0.9,
+    fontSize: normalize(14),
   },
 
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: spacing.xxl,
+    marginVertical: hp(2),
   },
 
   headingBg: {
     position: 'absolute',
     width: '100%',
-    height: 80,
+    height: hp(10),
     resizeMode: 'contain',
-    borderRadius: 12,
+    borderRadius: normalize(12),
   },
 
   headingText: {
     textAlign: 'center',
+    fontSize: normalize(20),
   },
 
   emptyStateBox: {
-    marginHorizontal: spacing.lg,
-    padding: spacing.md,
-    borderRadius: 16,
+    marginHorizontal: wp(4),
+    padding: wp(4),
+    borderRadius: normalize(16),
     backgroundColor: '#EEE7FF',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: hp(1),
   },
 
   smallBtn: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     backgroundColor: palette.eggplant,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 12,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    borderRadius: normalize(12),
   },
 
   smallBtnText: {
     color: palette.white,
+    fontSize: normalize(14),
   },
 
   createBtn: {
     backgroundColor: palette.eggplant,
-    padding: spacing.md,
-    borderRadius: 16,
-    marginLeft: spacing.xl,
-    marginRight: spacing.xl,
+    padding: hp(1.8),
+    borderRadius: normalize(16),
+    marginHorizontal: wp(8),
     alignItems: 'center',
   },
 
   createText: {
     color: 'white',
+    fontSize: normalize(16),
   },
 
   listingBox: {
-    marginHorizontal: spacing.lg,
-    padding: spacing.md,
-    borderRadius: 20,
+    marginHorizontal: wp(4),
+    padding: wp(4),
+    borderRadius: normalize(20),
     borderWidth: 1,
     borderColor: palette.black,
     backgroundColor: palette.creme,
-    gap: spacing.md,
+    gap: hp(2),
   },
 
   row: {
@@ -446,33 +466,33 @@ const styles = StyleSheet.create({
 
   status: {
     backgroundColor: '#EEE7FF',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 14,
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.5),
+    borderRadius: normalize(14),
   },
 
   detailsRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: wp(4),
     alignItems: 'center',
   },
 
   image: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: normalize(50),
+    height: normalize(50),
+    borderRadius: normalize(12),
   },
 
   filterContainer: {
     flexDirection: 'row',
-    gap: 8,
-    marginVertical: 10,
+    gap: wp(2),
+    marginVertical: hp(1),
   },
 
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    borderRadius: normalize(20),
     backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.strokecream,
@@ -484,70 +504,74 @@ const styles = StyleSheet.create({
 
   activeText: {
     color: palette.white,
+    fontSize: normalize(12),
   },
 
   inactiveText: {
     color: palette.textMuted,
+    fontSize: normalize(12),
   },
 
   trendRow: {
     flexDirection: 'row',
+    paddingHorizontal: wp(4),
+    gap: wp(2),
   },
 
   trendCard: {
     flex: 1,
-    marginLeft: spacing.sm,
-    marginRight: spacing.sm,
-    padding: spacing.md,
-    borderRadius: 16,
+    padding: wp(4),
+    borderRadius: normalize(16),
     alignItems: 'center',
   },
 
   trendUp: {
     color: 'green',
-    marginTop: spacing.xs,
+    marginTop: hp(0.5),
+    fontSize: normalize(12),
   },
 
   section: {
-    marginHorizontal: spacing.md,
-    gap: spacing.sm,
+    marginHorizontal: wp(4),
+    gap: hp(1),
   },
 
   pill: {
     backgroundColor: palette.middlegreen,
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-    borderRadius: 999,
-    marginTop: spacing.xs,
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(5),
+    borderRadius: normalize(30),
+    marginTop: hp(0.5),
   },
 
   pillText: {
     color: palette.white,
     textAlign: 'center',
+    fontSize: normalize(18),
   },
 
   chart: {
-    borderRadius: 16,
+    borderRadius: normalize(16),
   },
 
   gamificationCard: {
-    margin: spacing.lg,
-    padding: spacing.md,
-    borderRadius: 16,
+    margin: wp(4),
+    padding: wp(4),
+    borderRadius: normalize(16),
     backgroundColor: '#EDE7FF',
   },
 
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: spacing.lg,
-    gap: spacing.sm,
+    marginHorizontal: wp(4),
+    gap: wp(2),
   },
 
   impactCard: {
     width: '48%',
-    borderRadius: 16,
+    borderRadius: normalize(16),
     alignItems: 'center',
-    textAlign: 'center',
+    paddingVertical: hp(2),
   },
 });

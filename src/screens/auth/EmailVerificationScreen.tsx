@@ -7,6 +7,8 @@ import {
   ImageBackground,
   Modal,
   Alert,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
@@ -16,9 +18,16 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
 import { palette } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { useAppContext } from '@/store/AppContext';
 import { authService } from '@/services/auth.service';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
@@ -215,62 +224,66 @@ const styles = StyleSheet.create({
 
   headerBg: {
     width: '100%',
-    height: 160,
+    height: hp(20),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: hp(2),
   },
 
   content: {
-    gap: spacing.lg,
+    gap: hp(2),
   },
 
   logoContainer: {
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: hp(1),
   },
 
   logo: {
-    width: 140,
-    height: 60,
+    width: normalize(140),
+    height: normalize(60),
   },
 
   textBlock: {
-    gap: spacing.sm,
+    gap: hp(1),
     alignItems: 'center',
   },
 
   heading: {
     textAlign: 'center',
+    fontSize: normalize(20),
   },
 
   text: {
     opacity: 0.85,
     textAlign: 'center',
+    fontSize: normalize(16),
   },
 
   subText: {
-    margin: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    margin: hp(1),
+    paddingHorizontal: wp(4),
     textAlign: 'center',
     opacity: 0.6,
+    fontSize: normalize(14),
   },
 
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.md,
-    marginHorizontal: spacing.md,
+    marginTop: hp(2),
+    marginHorizontal: wp(4),
   },
 
   otpInput: {
-    width: 50,
-    height: 60,
-    borderRadius: 16,
+    width: normalize(50),
+    height: normalize(60),
+    borderRadius: normalize(16),
     borderWidth: 1,
     borderColor: palette.border,
     textAlign: 'center',
     backgroundColor: palette.white,
+    fontSize: normalize(20),
   },
 
   otpFilled: {
@@ -282,25 +295,27 @@ const styles = StyleSheet.create({
   },
 
   resendButton: {
-    marginTop: spacing.md,
+    marginTop: hp(2),
     alignSelf: 'center',
   },
 
   resendText: {
     color: palette.primary,
     textDecorationLine: 'underline',
+    fontSize: normalize(14),
   },
 
   infoText: {
     textAlign: 'center',
-    margin: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    margin: hp(1),
+    paddingHorizontal: wp(4),
     opacity: 0.6,
-    lineHeight: 20,
+    lineHeight: normalize(20),
+    fontSize: normalize(14),
   },
 
   bottom: {
-    margin: spacing.xxl,
+    margin: hp(4),
   },
 
   /* MODAL */
@@ -308,14 +323,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
-    padding: spacing.lg,
+    padding: wp(6),
   },
 
   modalCard: {
     backgroundColor: palette.creme,
-    borderRadius: 24,
-    padding: spacing.lg,
-    gap: spacing.lg,
+    borderRadius: normalize(24),
+    padding: wp(6),
+    gap: hp(3),
     alignItems: 'center',
   },
 });

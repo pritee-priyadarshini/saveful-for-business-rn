@@ -5,6 +5,7 @@ import {
   ScrollView,
   Pressable,
   Image,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,6 +16,14 @@ import { dashboardService } from '@/services/dashboard.service';
 
 import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export function RestaurantHomeScreen({ navigation }: any) {
 
@@ -71,9 +80,15 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
       const res = await dashboardService.getBusinessImpact();
 
-      setImpact(res.data);
-    } catch (error) {
-      console.log('Impact fetch failed', error);
+      if (res.data) {
+        setImpact(res.data);
+      }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        console.log('Impact data not yet available (404)');
+      } else {
+        console.log('Impact fetch failed', error);
+      }
     } finally {
       setLoadingImpact(false);
     }
@@ -195,19 +210,19 @@ export function RestaurantHomeScreen({ navigation }: any) {
             />
 
             {/* TEXT */}
-            <AppText variant="h7">
+            <AppText variant="h7" numberOfLines={1} adjustsFontSizeToFit>
               {impactData[activeIndex].title}
             </AppText>
 
             {/* VALUE */}
             <View style={styles.valuePill}>
-              <AppText variant="h5" style={styles.valueText}>
+              <AppText variant="h5" style={styles.valueText} numberOfLines={1}>
                 {loadingImpact ? '...' : impactData[activeIndex].value}
               </AppText>
             </View>
 
             {/* SUB TEXT */}
-            <AppText variant="h7">
+            <AppText variant="h7" numberOfLines={1}>
               Keep making an impact!
             </AppText>
 
@@ -236,7 +251,7 @@ const styles = StyleSheet.create({
   },
 
   heroContainer: {
-    height: 150,
+    height: hp(18),
     width: '100%',
     paddingTop: spacing.lg,
     paddingRight: spacing.lg,
@@ -260,21 +275,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginTop: spacing.sm,
-    gap: 6,
+    gap: 4,
   },
 
   whiteText: {
     color: 'white',
+    fontSize: normalize(20),
   },
 
   welcomeSection: {
     paddingHorizontal: spacing.sm,
-    gap: 10,
+    gap: hp(0.75),
     alignItems: 'center',
   },
 
   welcomeSub: {
     color: '#666',
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
+    textAlign: 'center',
   },
 
   location: {
@@ -282,12 +301,14 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     flex: 1,
     flexWrap: 'wrap',
+    fontSize: normalize(18),
+    paddingTop: hp(1),
   },
 
   logoCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: normalize(50),
+    height: normalize(50),
+    borderRadius: normalize(25),
     marginLeft: spacing.md,
     backgroundColor: 'white',
     justifyContent: 'center',
@@ -297,64 +318,69 @@ const styles = StyleSheet.create({
   logoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: normalize(25),
   },
 
   logoFallback: {
     color: '#7B3FE4',
     fontWeight: 'bold',
+    fontSize: normalize(18),
   },
 
   ctaButton: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: wp(8),
     backgroundColor: '#7B3FE4',
-    padding: spacing.md,
-    borderRadius: 16,
+    padding: hp(1.8),
+    borderRadius: normalize(14),
     alignItems: 'center',
   },
 
   ctaText: {
     color: 'white',
+    fontSize: normalize(18),
   },
 
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.xxl,
-    marginBottom: spacing.xxl,
+    marginTop: hp(1),
+    marginBottom: hp(1),
+    paddingHorizontal: wp(5),
   },
 
   headingBg: {
     position: 'absolute',
     width: '100%',
-    height: 80,
+    height: hp(10),
     resizeMode: 'contain',
-    borderRadius: 12,
+    borderRadius: normalize(12),
   },
 
   headingText: {
     textAlign: 'center',
+    fontSize: normalize(18),
   },
 
   section: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
+    paddingHorizontal: wp(5),
+    gap: hp(2),
   },
 
   impactCardContainer: {
     backgroundColor: palette.creme,
     borderColor: palette.black,
     borderWidth: 1,
-    borderRadius: 20,
-    padding: spacing.xxl,
+    borderRadius: normalize(20),
+    paddingVertical: hp(2),
+    paddingHorizontal: wp(5),
     alignItems: 'center',
-    gap: spacing.md,
+    gap: hp(1.5),
   },
 
   pillRow: {
     flexDirection: 'row',
     backgroundColor: '#F3E8FF',
-    borderRadius: 999,
+    borderRadius: normalize(30),
     padding: 4,
   },
 
@@ -362,9 +388,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 999,
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(25),
   },
 
   activePill: {
@@ -373,6 +399,7 @@ const styles = StyleSheet.create({
 
   pillText: {
     color: palette.black,
+    fontSize: normalize(12),
   },
 
   activePillText: {
@@ -380,22 +407,24 @@ const styles = StyleSheet.create({
   },
 
   impactIcon: {
-    width: 120,
-    height: 120,
+    width: wp(25),
+    height: wp(25),
+    maxHeight: 100,
     resizeMode: 'contain',
   },
 
   valuePill: {
     backgroundColor: palette.middlegreen,
-    paddingVertical: 20,
-    paddingHorizontal: 35,
-    borderRadius: 999,
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(6),
+    borderRadius: normalize(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   valueText: {
     color: palette.white,
+    fontSize: normalize(24),
   },
 
   calculationRow: {

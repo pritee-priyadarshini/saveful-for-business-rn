@@ -84,6 +84,7 @@ export type AppContextValue = {
     value: string
   ) => void;
   setAuthUser: (user: AuthUser | null) => void;
+  setAuthenticated: (auth: boolean) => void;
   logout: () => void;
   resetForms: () => void;
 };

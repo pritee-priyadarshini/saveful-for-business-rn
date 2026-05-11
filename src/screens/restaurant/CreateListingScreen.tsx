@@ -8,10 +8,13 @@ import {
     TextInput,
     Alert,
     ImageBackground,
+    Dimensions,
+    Platform,
+    Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 
 import { AppText } from '../../components/AppText';
@@ -19,9 +22,16 @@ import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
 import { useAppContext } from '../../store/AppContext';
 
-import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
 import { foodListingService } from '@/services/foodListing.service';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export function CreateListingScreen({ navigation }: any) {
     const { currentProfile, authUser } = useAppContext();
@@ -46,14 +56,22 @@ export function CreateListingScreen({ navigation }: any) {
         { name: 'Meat & dairy', qty: 0 },
     ]);
 
-    const [foodOptions, setFoodOptions] = useState({
+    const [foodOptions, setFoodOptions] = useState<any>({
         refrigeration: false,
         reheating: false,
         allergens: false,
+        glutenFree: false,
+        safeForDonation: false,
     });
 
-    const [safeFood, setSafeFood] = useState(false);
+    const [safeFood, setSafeFood] = useState(true);
     const [safeFoodError, setSafeFoodError] = useState(false);
+
+    // DateTimePicker States
+    const [showPicker, setShowPicker] = useState(false);
+    const [pickerTarget, setPickerTarget] = useState<'from' | 'to' | 'bestBefore' | null>(null);
+    const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
+    const [tempDate, setTempDate] = useState(new Date());
 
     const updateQty = (index: number, change: number) => {
         const updated = [...items];
@@ -94,36 +112,54 @@ export function CreateListingScreen({ navigation }: any) {
         setImages(prev => prev.filter((_, i) => i !== index));
     };
 
-    const openDateTimePicker = (type: 'from' | 'to' | 'bestBefore') => {
-        DateTimePickerAndroid.open({
-            value: new Date(),
-            mode: 'date',
-            is24Hour: true,
-            onChange: (_, selectedDate) => {
-                if (selectedDate) {
-                    DateTimePickerAndroid.open({
-                        value: selectedDate,
-                        mode: 'time',
-                        is24Hour: true,
-                        onChange: (_, selectedTime) => {
-                            if (selectedTime) {
-                                const finalDate = new Date(selectedDate);
-                                finalDate.setHours(selectedTime.getHours());
-                                finalDate.setMinutes(selectedTime.getMinutes());
+    const handlePickerChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowPicker(false);
+            if (event.type === 'dismissed' || !selectedDate) {
+                setPickerTarget(null);
+                return;
+            }
 
-                                if (type === 'from') setPickupFrom(finalDate);
-                                else if (type === 'to') setPickupTo(finalDate);
-                                else setBestBefore(finalDate);
-                            }
-                        },
-                    });
-                }
-            },
-        });
+            if (pickerMode === 'date') {
+                setTempDate(selectedDate);
+                setPickerMode('time');
+                // Small delay to ensure the previous picker is gone before opening the next one on Android
+                setTimeout(() => setShowPicker(true), 100);
+            } else {
+                const finalDate = new Date(tempDate);
+                finalDate.setHours(selectedDate.getHours());
+                finalDate.setMinutes(selectedDate.getMinutes());
+
+                if (pickerTarget === 'from') setPickupFrom(finalDate);
+                else if (pickerTarget === 'to') setPickupTo(finalDate);
+                else if (pickerTarget === 'bestBefore') setBestBefore(finalDate);
+                setPickerTarget(null);
+            }
+        } else {
+            // iOS
+            if (selectedDate) setTempDate(selectedDate);
+        }
+    };
+
+    const confirmIOSDate = () => {
+        if (pickerTarget === 'from') setPickupFrom(tempDate);
+        else if (pickerTarget === 'to') setPickupTo(tempDate);
+        else if (pickerTarget === 'bestBefore') setBestBefore(tempDate);
+        setShowPicker(false);
+        setPickerTarget(null);
+    };
+
+    const openDateTimePicker = (type: 'from' | 'to' | 'bestBefore') => {
+        setPickerTarget(type);
+        setTempDate(new Date());
+        if (Platform.OS === 'android') {
+            setPickerMode('date');
+        }
+        setShowPicker(true);
     };
 
     const toggleFoodOption = (key: keyof typeof foodOptions) => {
-        setFoodOptions(prev => ({
+        setFoodOptions((prev: any) => ({
             ...prev,
             [key]: !prev[key],
         }));
@@ -176,8 +212,8 @@ export function CreateListingScreen({ navigation }: any) {
                     remainingQtyKg: i.qty,
                 }));
 
-            await foodListingService.createListing({
-                siteId,
+            const payload = {
+                siteId: Number(siteId),
                 foodItems,
                 pickupAddress: location,
                 pickupPostcode: pickupPostcode || undefined,
@@ -187,34 +223,43 @@ export function CreateListingScreen({ navigation }: any) {
                 needsRefrigeration: foodOptions.refrigeration,
                 needsReheating: foodOptions.reheating,
                 containsAllergens: foodOptions.allergens,
-                isGlutenFree: false,
-                isSafeForDonation: safeFood,
-            });
+            };
 
-            const res = await foodListingService.createListing({
-                siteId,
-                foodItems,
-                pickupAddress: location,
-                pickupPostcode: pickupPostcode || undefined,
-                bestBefore: bestBefore.toISOString(),
-                pickupFromTime: pickupFrom.toISOString(),
-                pickupByTime: pickupTo.toISOString(),
-                needsRefrigeration: foodOptions.refrigeration,
-                needsReheating: foodOptions.reheating,
-                containsAllergens: foodOptions.allergens,
-            });
+            const response = await foodListingService.createListing(payload);
 
-            navigation.navigate('ListingConfirmation', {
-                listing: res.data,
-            });
+            if (response.data) {
+                navigation.navigate('ListingConfirmation', {
+                    listing: response.data, 
+                });
+            } else {
+                throw new Error('No data received from server');
+            }
 
         } catch (error: any) {
             Alert.alert(
-                'Error', error?.response?.data?.message || 'Failed to create listing');
+                'Error', 
+                error?.response?.data?.message || error.message || 'Failed to create listing'
+            );
         }
     };
 
     const totalQuantity = items.reduce((sum, item) => sum + item.qty, 0);
+
+    const formatDateTime = (date: Date | null) => {
+        if (!date) return '';
+        return date.toLocaleDateString([], { day: '2-digit', month: 'short' }) + ' @ ' + 
+               date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
+    const formatDate = (date: Date | null) => {
+        if (!date) return '';
+        return date.toLocaleDateString([], { day: '2-digit', month: 'long', year: 'numeric' });
+    };
+
+    const formatTime = (date: Date | null) => {
+        if (!date) return '';
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
 
     const handleRelist = async () => {
         try {
@@ -315,7 +360,8 @@ export function CreateListingScreen({ navigation }: any) {
                                 placeholder="Add other item..."
                                 value={customItem}
                                 onChangeText={setCustomItem}
-                                style={styles.input}
+                                style={styles.customInput}
+                                numberOfLines={1}
                             />
 
                             <Pressable style={styles.addBtn} onPress={addCustomItem}>
@@ -369,11 +415,11 @@ export function CreateListingScreen({ navigation }: any) {
                         </View>
                         <View style={styles.row}>
                             <Pressable style={styles.secondaryBtn} onPress={pickImage}>
-                                <AppText variant="bodyLarge">Gallery</AppText>
+                                <AppText variant="bodyLarge" style={styles.btnTextCenter}>Gallery</AppText>
                             </Pressable>
 
                             <Pressable style={styles.primaryBtn} onPress={takePhoto}>
-                                <AppText variant="bodyLarge" style={{ color: 'white' }}>Camera</AppText>
+                                <AppText variant="bodyLarge" style={[styles.btnTextCenter, { color: 'white' }]}>Camera</AppText>
                             </Pressable>
                         </View>
 
@@ -399,43 +445,55 @@ export function CreateListingScreen({ navigation }: any) {
                             value={pickupPostcode}
                             onChangeText={setPickupPostcode}
                             style={styles.input}
+                            keyboardType='number-pad'
                         />
                     </Card>
 
                 </View>
 
                 {/* BEST BEFORE */}
+                <View style={[styles.section, { marginTop: hp(1) }]}>
+                    <AppText variant="bodyBold" style={{ marginBottom: hp(0.5) }}>Best Before Time</AppText>
+                    <Pressable
+                        style={styles.timeInputFull}
+                        onPress={() => openDateTimePicker('bestBefore')}
+                    >
+                        <Ionicons name="time-outline" size={20} color={palette.middlegreen} style={{ marginRight: wp(2) }} />
+                        <AppText variant='bodyLarge'>
+                            {bestBefore ? formatDateTime(bestBefore) : 'Select best before date & time'}
+                        </AppText>
+                    </Pressable>
+                </View>
+
+                {/* PICKUP WINDOW */}
                 <View style={styles.section}>
-                    <AppText variant="heading"> ⏱️ Pickup Time</AppText>
-                    <View style={styles.row}>
+                    <AppText variant="bodyBold" style={{ marginBottom: hp(0.5) }}>Pickup Window</AppText>
+                    <View style={styles.pickupCard}>
+                        <View style={styles.pickupTimeRow}>
+                            <Pressable 
+                                style={styles.timePart} 
+                                onPress={() => openDateTimePicker('from')}
+                            >
+                                <AppText variant="caption" color={palette.midgray}>From</AppText>
+                                <AppText variant="bodyBold" style={{ fontSize: normalize(12) }}>
+                                    {pickupFrom ? formatDate(pickupFrom) : 'Date'}
+                                </AppText>
+                                <AppText variant="bodyBold">{pickupFrom ? formatTime(pickupFrom) : '--:--'}</AppText>
+                            </Pressable>
 
-                        <Pressable
-                            style={styles.input}
-                            onPress={() => openDateTimePicker('bestBefore')}
-                        >
-                            <AppText variant='bodySmall'>
-                                {bestBefore ? bestBefore.toLocaleString() : 'Select best before'}
-                            </AppText>
-                        </Pressable>
+                            <View style={styles.verticalDivider} />
 
-                        <Pressable
-                            style={[styles.input, { flex: 1 }]}
-                            onPress={() => openDateTimePicker('from')}
-                        >
-                            <AppText variant="bodySmall">
-                                {pickupFrom ? pickupFrom.toLocaleString() : 'From'}
-                            </AppText>
-                        </Pressable>
-
-                        <Pressable
-                            style={[styles.input, { flex: 1 }]}
-                            onPress={() => openDateTimePicker('to')}
-                        >
-                            <AppText variant="bodySmall">
-                                {pickupTo ? pickupTo.toLocaleString() : 'To'}
-                            </AppText>
-                        </Pressable>
-
+                            <Pressable 
+                                style={styles.timePart} 
+                                onPress={() => openDateTimePicker('to')}
+                            >
+                                <AppText variant="caption" color={palette.midgray}>To</AppText>
+                                <AppText variant="bodyBold" style={{ fontSize: normalize(12) }}>
+                                    {pickupTo ? formatDate(pickupTo) : 'Date'}
+                                </AppText>
+                                <AppText variant="bodyBold">{pickupTo ? formatTime(pickupTo) : '--:--'}</AppText>
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
 
@@ -563,43 +621,80 @@ export function CreateListingScreen({ navigation }: any) {
                 </Pressable>
 
             </ScrollView>
+
+            {showPicker && (
+                Platform.OS === 'ios' ? (
+                    <Modal transparent visible={showPicker} animationType="slide">
+                        <View style={styles.iosPickerModal}>
+                            <View style={styles.iosPickerContainer}>
+                                <View style={styles.iosPickerHeader}>
+                                    <Pressable onPress={() => setShowPicker(false)}>
+                                        <AppText color={palette.radish} variant="bodyLarge">Cancel</AppText>
+                                    </Pressable>
+                                    <Pressable onPress={confirmIOSDate}>
+                                        <AppText color={palette.primary} variant="bodyBold">Done</AppText>
+                                    </Pressable>
+                                </View>
+                                <DateTimePicker
+                                    value={tempDate}
+                                    mode="datetime"
+                                    display="spinner"
+                                    onChange={handlePickerChange}
+                                    textColor={palette.black}
+                                />
+                            </View>
+                        </View>
+                    </Modal>
+                ) : (
+                    <DateTimePicker
+                        value={tempDate}
+                        mode={pickerMode}
+                        is24Hour={true}
+                        display="default"
+                        onChange={handlePickerChange}
+                    />
+                )
+            )}
         </Screen>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        gap: spacing.lg,
+        gap: hp(2),
+        paddingBottom: hp(4),
     },
 
     headerBg: {
         width: '100%',
-        height: 160,
+        height: hp(20),
         justifyContent: 'center',
         alignItems: 'center',
     },
 
     backButton: {
         position: 'absolute',
-        top: spacing.lg,
-        left: spacing.lg,
+        top: hp(2),
+        left: wp(4),
     },
 
     headerTitle: {
         color: palette.white,
         textAlign: 'center',
-        margin: 4,
+        margin: normalize(4),
+        fontSize: normalize(24),
     },
 
     headerSubText: {
         color: palette.white,
         opacity: 0.9,
-        margin: 4,
+        margin: normalize(4),
         textAlign: 'center',
+        fontSize: normalize(14),
     },
 
     centerCard: {
-        marginHorizontal: spacing.md,
+        marginHorizontal: wp(4),
         alignItems: 'center',
     },
 
@@ -615,7 +710,7 @@ const styles = StyleSheet.create({
     headerRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: spacing.sm,
+        gap: wp(2),
     },
 
     backBtn: {
@@ -625,39 +720,52 @@ const styles = StyleSheet.create({
 
     subtext: {
         opacity: 0.7,
+        fontSize: normalize(14),
     },
 
     section: {
-        marginHorizontal: spacing.md,
-        gap: spacing.sm,
+        marginHorizontal: wp(4),
+        gap: hp(1),
     },
 
     card: {
-        padding: spacing.md,
-        borderRadius: 16,
-        gap: spacing.md,
+        padding: wp(4),
+        borderRadius: normalize(16),
+        gap: hp(2),
     },
 
     row: {
         flexDirection: 'row',
-        gap: spacing.md,
+        gap: wp(4),
     },
 
     primaryBtn: {
         backgroundColor: palette.middlegreen,
-        padding: spacing.md,
-        borderRadius: 12,
+        padding: hp(1.8),
+        borderRadius: normalize(12),
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     primaryText: {
         color: 'white',
+        fontSize: normalize(14),
+        textAlign: 'center',
     },
 
     secondaryBtn: {
         borderWidth: 1,
         borderColor: '#ccc',
-        padding: spacing.sm,
-        borderRadius: 12,
+        padding: hp(1.2),
+        borderRadius: normalize(12),
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    btnTextCenter: {
+        textAlign: 'center',
     },
 
     itemRow: {
@@ -669,13 +777,13 @@ const styles = StyleSheet.create({
     qtyContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
+        gap: wp(3),
     },
 
     qtyBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 8,
+        width: normalize(32),
+        height: normalize(32),
+        borderRadius: normalize(8),
         backgroundColor: '#EEE7FF',
         borderColor: palette.black,
         alignItems: 'center',
@@ -686,31 +794,42 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: palette.black,
         backgroundColor: 'white',
-        borderRadius: 12,
-        padding: spacing.sm,
+        borderRadius: normalize(12),
+        padding: wp(3),
         justifyContent: 'center',
-        minHeight: 46,
+        minHeight: hp(6),
+    },
+
+    customInput: {
+        width: wp(40),
+        borderWidth: 1,
+        borderColor: palette.black,
+        backgroundColor: 'white',
+        borderRadius: normalize(12),
+        padding: wp(3),
+        justifyContent: 'center',
+        minHeight: hp(6),
     },
 
     quantityBox: {
         backgroundColor: '#F3EEFF',
-        padding: spacing.md,
-        borderRadius: 12,
+        padding: wp(4),
+        borderRadius: normalize(12),
         alignItems: 'center',
     },
 
     checkboxRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: spacing.md,
-        gap: spacing.sm,
+        marginHorizontal: wp(4),
+        gap: wp(3),
     },
 
     checkbox: {
-        width: 18,
-        height: 18,
+        width: normalize(20),
+        height: normalize(20),
         borderWidth: 1,
-        borderRadius: 4,
+        borderRadius: normalize(4),
         borderColor: palette.black,
         backgroundColor: palette.white,
         alignItems: 'center',
@@ -719,25 +838,27 @@ const styles = StyleSheet.create({
 
     submitBtn: {
         backgroundColor: palette.middlegreen,
-        padding: spacing.md,
-        marginHorizontal: spacing.md,
-        borderRadius: 16,
+        padding: hp(2),
+        marginHorizontal: wp(4),
+        borderRadius: normalize(16),
         alignItems: 'center',
+        marginTop: hp(2),
     },
 
     submitText: {
         color: 'white',
+        fontSize: normalize(16),
     },
 
     addRow: {
         flexDirection: 'row',
-        gap: spacing.sm,
+        gap: wp(3),
     },
 
     addBtn: {
         backgroundColor: palette.middlegreen,
-        paddingHorizontal: 12,
-        borderRadius: 8,
+        paddingHorizontal: wp(4),
+        borderRadius: normalize(8),
         justifyContent: 'center',
     },
 
@@ -745,32 +866,34 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: palette.black,
         backgroundColor: palette.white,
-        borderRadius: 12,
-        padding: spacing.md,
-        minHeight: 100,
-        marginTop: spacing.sm,
+        borderRadius: normalize(12),
+        padding: wp(4),
+        minHeight: hp(12),
+        maxWidth: wp(60),
+        marginTop: hp(1),
+        fontSize: normalize(14),
     },
 
     imageGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.sm,
+        gap: wp(2),
     },
 
     previewSmall: {
-        width: 70,
-        height: 70,
-        borderRadius: 8,
+        width: wp(18),
+        height: wp(18),
+        borderRadius: normalize(8),
     },
 
     addImageBox: {
-        width: 70,
-        height: 70,
+        width: wp(18),
+        height: wp(18),
         borderWidth: 1,
         borderStyle: 'dashed',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 8,
+        borderRadius: normalize(8),
     },
 
     imageWrapper: {
@@ -779,20 +902,103 @@ const styles = StyleSheet.create({
 
     removeIcon: {
         position: 'absolute',
-        top: -6,
-        right: -6,
+        top: -normalize(6),
+        right: -normalize(6),
         backgroundColor: '#7B3FE4',
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: normalize(20),
+        height: normalize(20),
+        borderRadius: normalize(10),
         alignItems: 'center',
         justifyContent: 'center',
+        zIndex: 1,
     },
 
     errorText: {
         color: palette.chilli,
-        fontSize: 12,
-        marginHorizontal: spacing.md,
+        fontSize: normalize(12),
+        marginHorizontal: wp(4),
+    },
+    timeInputFull: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: normalize(12),
+        padding: wp(4),
+        minHeight: hp(6.5),
+    },
+    pickupCard: {
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: normalize(12),
+        overflow: 'hidden',
+    },
+    pickupDateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: wp(4),
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    pickupTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: hp(1.5),
+    },
+    timePart: {
+        flex: 1,
+        alignItems: 'center',
+        gap: hp(0.2),
+    },
+    verticalDivider: {
+        width: 1,
+        height: '80%',
+        backgroundColor: '#F1F5F9',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+    },
+    pickupRow: {
+        flexDirection: 'row',
+        padding: wp(4),
+        alignItems: 'center',
+    },
+    pickupLabelSide: {
+        width: wp(15),
+        alignItems: 'center',
+        borderRightWidth: 1,
+        borderRightColor: '#F1F5F9',
+        paddingRight: wp(2),
+    },
+    pickupActionSide: {
+        flex: 1,
+        paddingLeft: wp(4),
+    },
+    pickupSubButton: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    iosPickerModal: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    iosPickerContainer: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: normalize(20),
+        borderTopRightRadius: normalize(20),
+        paddingBottom: hp(4),
+    },
+    iosPickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: wp(4),
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
     },
 
 });

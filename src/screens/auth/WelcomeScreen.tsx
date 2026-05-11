@@ -1,12 +1,19 @@
 import React from 'react';
-import { Pressable, StyleSheet, View, Image, ImageBackground } from 'react-native';
+import { Pressable, StyleSheet, View, Image, ImageBackground, Dimensions, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
 import { palette } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
@@ -82,9 +89,9 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: wp(6),
+    paddingTop: hp(4),
+    paddingBottom: hp(4),
   },
 
   topSection: {
@@ -94,55 +101,58 @@ const styles = StyleSheet.create({
 
   headerTop: {
     alignItems: 'center',
-    marginTop: spacing.xl,
-    gap: spacing.xs,
+    marginTop: hp(4),
+    gap: hp(0.5),
   },
 
   centerText: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
+    gap: hp(2),
+    paddingHorizontal: wp(4),
   },
 
   logo: {
-    width: 160,
-    height: 80,
+    width: wp(50),
+    height: hp(10),
   },
 
   subText: {
     textAlign: 'center',
+    fontSize: normalize(14),
   },
 
   heading: {
     textAlign: 'center',
+    fontSize: normalize(26),
   },
 
   buttonContainer: {
-    marginTop: spacing.lg,
+    marginTop: hp(2),
     width: '100%',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: hp(1.5),
   },
 
   primaryButton: {
     backgroundColor: palette.eggplant, 
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 30, 
+    paddingVertical: hp(1.8),
+    borderRadius: normalize(30), 
     alignItems: 'center',
   },
 
   primaryButtonText: {
     color: palette.white,
+    fontSize: normalize(18),
   },
 
   secondaryButton: {
     backgroundColor: palette.white,
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 30,
+    paddingVertical: hp(1.8),
+    borderRadius: normalize(30),
     borderColor: palette.border,
     borderWidth: 1,
     alignItems: 'center',
@@ -150,6 +160,7 @@ const styles = StyleSheet.create({
 
   secondaryButtonText: {
     color: palette.black,
+    fontSize: normalize(16),
   },
 
 });

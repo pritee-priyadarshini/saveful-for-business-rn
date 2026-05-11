@@ -18,6 +18,15 @@ import { palette } from '../theme/colors';
 import { RestaurantStack } from './RestaurantStack';
 import { CharityStack } from './CharityStack';
 import { RestaurantUpdatesScreen } from '@/screens/restaurant/RestaurantUpdatesScreen';
+import { Dimensions } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 const RestaurantTab = createBottomTabNavigator<RestaurantTabsParamList>();
 const CharityTab = createBottomTabNavigator<CharityTabsParamList>();
@@ -38,16 +47,16 @@ const screenOptions = ({ route }: any): BottomTabNavigationOptions => ({
   tabBarActiveTintColor: palette.primary,
   tabBarInactiveTintColor: palette.textMuted,
   tabBarStyle: {
-    height: 76,
-    paddingBottom: 12,
-    paddingTop: 10,
+    height: hp(10),
+    paddingBottom: hp(2),
     backgroundColor: palette.surface,
     borderTopColor: palette.strokecream,
   },
   tabBarLabelStyle: {
     fontFamily: 'Saveful-SemiBold',
-    fontSize: 11,
+    fontSize: normalize(11),
     textTransform: 'uppercase' as const,
+    paddingBottom: hp(1),
   },
   tabBarIcon: ({ color, size }: { color: string; size: number }) => (
     <Ionicons color={color} name={iconMap[route.name as keyof typeof iconMap]} size={size} />

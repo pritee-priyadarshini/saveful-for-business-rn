@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, View, ImageBackground } from 'react-native';
+import { Pressable, StyleSheet, View, ImageBackground, Dimensions, Platform, StatusBar } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { AppText } from '../../components/AppText';
@@ -7,7 +7,14 @@ import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelection'>;
 
@@ -142,39 +149,41 @@ const styles = StyleSheet.create({
 
   headerBg: {
     width: '100%',
-    height: 200,
+    height: hp(25),
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   headerTitle: {
     textAlign: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: wp(5),
+    fontSize: normalize(24),
   },
 
   content: {
     flexGrow: 1,
     backgroundColor: palette.white,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    paddingBottom: hp(4),
   },
 
   subtitle: {
     textAlign: 'center',
     opacity: 0.7,
-    marginBottom: spacing.lg,
+    marginBottom: hp(2),
+    fontSize: normalize(16),
   },
 
   rolesContainer: {
-    gap: spacing.md,
+    gap: hp(1.5),
   },
 
   card: {
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: 20,
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(2),
+    borderRadius: normalize(20),
     backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: '#E8E8E8',
@@ -186,30 +195,32 @@ const styles = StyleSheet.create({
   },
 
   icon: {
-    fontSize: 36,
-    marginBottom: spacing.sm,
-    lineHeight: 36,
+    fontSize: normalize(36),
+    marginBottom: hp(1),
+    lineHeight: hp(5),
   },
 
   textContainer: {
     alignItems: 'center',
-    gap: 6,
+    gap: hp(0.8),
   },
 
   titleText: {
     textAlign: 'center',
+    fontSize: normalize(16),
   },
 
   cardText: {
     opacity: 0.7,
     textAlign: 'center',
+    fontSize: normalize(14),
   },
 
   ctaButton: {
-    marginTop: spacing.lg,
+    marginTop: hp(3),
     width: '100%',
-    paddingVertical: spacing.md,
-    borderRadius: 30,
+    paddingVertical: hp(1.8),
+    borderRadius: normalize(30),
     backgroundColor: palette.primary,
     alignItems: 'center',
   },
