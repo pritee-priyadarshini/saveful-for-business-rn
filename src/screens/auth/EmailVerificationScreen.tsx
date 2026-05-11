@@ -62,8 +62,18 @@ export function EmailVerificationScreen({ navigation }: Props) {
 
       setAuthUser({
         ...data.user,
-        platformRole: 'ORG_USER',
+        platformRole: data.user.platformRole || 'ORG_USER',
         accessToken: data.accessToken,
+        orgType: data.organisation?.type,
+        orgRole: data.role?.orgRole,
+        siteRole: data.role?.siteRole,
+        profile: {
+          user: data.user,
+          organisation: data.organisation,
+          subscription: data.subscription,
+          sites: data.sites || [],
+          role: data.role,
+        },
       });
 
       setShowSuccess(true);
