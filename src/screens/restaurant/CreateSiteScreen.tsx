@@ -11,6 +11,7 @@ import {
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
+    Dimensions,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -23,6 +24,13 @@ import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { sitesService } from '@/services/sites.service';
 
+  const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export default function CreateSiteScreen() {
     const navigation = useNavigation();
@@ -436,56 +444,62 @@ export default function CreateSiteScreen() {
 
 const styles = StyleSheet.create({
     headerBg: {
-        height: 160,
+        height: hp(20),
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: hp(2),
     },
 
     backBtn: {
         position: 'absolute',
-        left: 15,
-        top: 20,
+        left: wp(4),
+        top: hp(2.5),
     },
 
     headerTitle: {
         color: palette.white,
+        fontSize: normalize(24),
     },
 
     fieldWrapper: {
-        marginVertical: spacing.sm,
-        marginHorizontal: spacing.lg,
+        marginVertical: hp(1),
+        marginHorizontal: wp(5),
     },
 
     label: {
-        marginBottom: spacing.sm,
+        marginBottom: hp(0.5),
         color: '#555',
+        fontSize: normalize(14),
     },
 
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'white',
-        borderRadius: 10,
+        borderRadius: normalize(10),
         borderWidth: 1,
         borderColor: palette.border,
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: wp(3),
+        height: hp(6),
     },
 
     inputFlex: {
         flex: 1,
+        fontSize: normalize(14),
     },
 
     createBtn: {
         backgroundColor: palette.middlegreen,
-        padding: 14,
-        marginHorizontal: spacing.xxl,
-        borderRadius: 10,
+        padding: hp(1.8),
+        marginHorizontal: wp(10),
+        borderRadius: normalize(10),
         alignItems: 'center',
-        margin: spacing.md,
+        marginVertical: hp(2),
     },
 
     btnText: {
         color: 'white',
+        fontSize: normalize(16),
+        fontWeight: '600',
     },
 });

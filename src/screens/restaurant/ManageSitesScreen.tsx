@@ -8,7 +8,7 @@ import {
   ImageBackground,
   Linking,
   Alert,
-  TextInput,
+  Dimensions,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,8 +19,15 @@ import { AppText } from '../../components/AppText';
 import { useAppContext } from '@/store/AppContext';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
-import { Ionicons } from '@expo/vector-icons';
 import { sitesService } from '@/services/sites.service';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'ManageSites'>;
 
@@ -317,74 +324,82 @@ export default function ManageSitesScreen() {
 const styles = StyleSheet.create({
 
   heroBg: {
-    height: 140,
+    height: hp(18),
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: hp(2),
   },
 
   logoTopRight: {
-    width: 120,
-    height: 80,
+    width: wp(30),
+    height: hp(10),
     resizeMode: 'contain',
     position: 'absolute',
-    right: 20,
+    right: wp(5),
   },
 
   heroContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: wp(4),
   },
 
   businessName: {
     color: 'white',
+    fontSize: normalize(24),
   },
 
   logo: {
-    width: 90,
-    height: 50,
+    width: wp(24),
+    height: hp(6),
     resizeMode: 'contain',
   },
 
   sectionTitle: {
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.xl,
+    marginHorizontal: wp(5),
+    marginBottom: hp(2),
     textAlign: 'center',
+    fontSize: normalize(20),
   },
 
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    paddingHorizontal: wp(4),
+    marginBottom: hp(2.5),
   },
 
   actionCard: {
     backgroundColor: 'white',
     width: '48%',
-    paddingVertical: 20,
-    borderRadius: 14,
-    marginBottom: 12,
+    paddingVertical: hp(2.5),
+    borderRadius: normalize(14),
+    marginBottom: hp(1.5),
     alignItems: 'center',
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
 
   actionText: {
     textAlign: 'center',
+    fontSize: normalize(14),
   },
+
   bottomActions: {
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
+    marginTop: hp(2),
+    paddingHorizontal: wp(5),
+    gap: hp(1),
+    paddingBottom: hp(4),
   },
 
   logoutBtn: {
     backgroundColor: palette.creme,
-    paddingVertical: spacing.md,
-    marginHorizontal: spacing.md,
-    borderRadius: 12,
+    paddingVertical: hp(1.8),
+    borderRadius: normalize(12),
     alignItems: 'center',
     borderWidth: 1,
     borderColor: palette.border,
@@ -392,10 +407,15 @@ const styles = StyleSheet.create({
 
   siteCard: {
     backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 12,
+    marginHorizontal: wp(4),
+    marginBottom: hp(1.5),
+    padding: wp(4),
+    borderRadius: normalize(12),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
 
   siteHeader: {
@@ -411,49 +431,54 @@ const styles = StyleSheet.create({
   },
 
   siteLogo: {
-    width: 40,
-    height: 40,
-    marginRight: 10,
+    width: normalize(40),
+    height: normalize(40),
+    marginRight: wp(3),
     resizeMode: 'contain',
   },
 
   siteIndex: {
     color: palette.primary,
-    marginBottom: 6,
+    marginBottom: hp(0.5),
+    fontSize: normalize(14),
   },
 
   siteName: {
     flexShrink: 1,
+    fontSize: normalize(16),
   },
 
   siteAddress: {
     color: '#777',
+    fontSize: normalize(14),
   },
 
   viewBtn: {
     backgroundColor: palette.middlegreen,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    borderRadius: normalize(8),
   },
 
   editBtn: {
     backgroundColor: palette.blueberry,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.8),
+    borderRadius: normalize(8),
   },
 
   viewText: {
     color: 'white',
+    fontSize: normalize(14),
   },
 
   input: {
     backgroundColor: '#FAFAFA',
-    padding: 10,
-    borderRadius: 8,
+    padding: hp(1.2),
+    borderRadius: normalize(8),
     borderWidth: 1,
     borderColor: '#eee',
+    fontSize: normalize(14),
   },
 
   inputWrapper: {
@@ -462,22 +487,23 @@ const styles = StyleSheet.create({
 
   eyeIcon: {
     position: 'absolute',
-    right: 10,
-    top: 12,
+    right: wp(2.5),
+    top: hp(1.5),
   },
 
   saveBtn: {
-    marginTop: 10,
+    marginTop: hp(1.2),
     backgroundColor: palette.middlegreen,
-    padding: 12,
-    borderRadius: 8,
+    padding: hp(1.5),
+    borderRadius: normalize(8),
     alignItems: 'center',
   },
 
   details: {
-    marginTop: 10,
+    marginTop: hp(1.2),
     borderTopWidth: 1,
     borderTopColor: '#eee',
-    paddingTop: 10,
+    paddingTop: hp(1.2),
+    gap: hp(0.8),
   },
 });

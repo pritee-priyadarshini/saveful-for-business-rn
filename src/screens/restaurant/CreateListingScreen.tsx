@@ -580,7 +580,7 @@ export function CreateListingScreen({ navigation }: any) {
                                 onChangeText={setCustomFoodDetail}
                                 multiline
                                 textAlignVertical="top"
-                                style={styles.commentInput}
+                                style={styles.commentInputa}
                             />
                         )}
 
@@ -873,7 +873,17 @@ const styles = StyleSheet.create({
         marginTop: hp(1),
         fontSize: normalize(14),
     },
-
+    commentInputa: {
+        borderWidth: 1,
+        borderColor: palette.black,
+        backgroundColor: palette.white,
+        borderRadius: normalize(12),
+        padding: wp(4),
+        minHeight: hp(12),
+        width: '100%',
+        marginTop: hp(1),
+        fontSize: normalize(14),
+    },
     imageGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
