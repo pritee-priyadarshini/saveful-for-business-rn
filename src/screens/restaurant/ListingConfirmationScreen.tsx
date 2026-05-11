@@ -6,6 +6,7 @@ import {
     ScrollView,
     Image,
     ImageBackground,
+    Dimensions,
 } from 'react-native';
 
 import { AppText } from '../../components/AppText';
@@ -15,19 +16,46 @@ import { Card } from '../../components/Card';
 import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
 
-export function ListingConfirmationScreen({ navigation, route }: any) {
-    const { listing } = route.params;
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
-    const totalKg = listing.totalQtyKg || 0;
+export function ListingConfirmationScreen({ navigation, route }: any) {
+    const { listing } = route.params || {};
+
+    if (!listing) {
+        return (
+            <Screen backgroundColor={palette.creme}>
+                <View style={styles.container}>
+                    <AppText>No listing data found.</AppText>
+                    <Pressable onPress={() => navigation.navigate('RestaurantHomeScreen')}>
+                        <AppText color={palette.primary}>Back to Home</AppText>
+                    </Pressable>
+                </View>
+            </Screen>
+        );
+    }
+
+    const totalKg = listing?.totalQtyKg || 
+                  listing?.foodItems?.reduce((sum: number, item: any) => sum + (item.totalQtyKg || 0), 0) || 0;
     const meals = Math.floor((totalKg * 1000) / 300);
 
-    const formatDateTime = (date: Date) => {
-        return new Date(date).toLocaleString([], {
-            day: 'numeric',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
+    const formatDateTime = (date: any) => {
+        if (!date) return 'N/A';
+        try {
+            return new Date(date).toLocaleString([], {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch (e) {
+            return 'N/A';
+        }
     };
 
     return (
@@ -62,7 +90,7 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Items</AppText>
 
-                        {listing.foodItems?.map((item: any, index: number) => (
+                        {listing?.foodItems?.map((item: any, index: number) => (
                             <View key={index} style={styles.itemRow}>
                                 <AppText variant="caption">
                                     {item.category}
@@ -82,14 +110,14 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Pickup Time</AppText>
                         <AppText variant="caption">
-                            {formatDateTime(listing.pickupFromTime)} - {formatDateTime(listing.pickupByTime)}
+                            {listing?.pickupFromTime ? formatDateTime(listing.pickupFromTime) : '--'} - {listing?.pickupByTime ? formatDateTime(listing.pickupByTime) : '--'}
                         </AppText>
                     </View>
 
                     {/* LOCATION */}
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Pickup Location</AppText>
-                        <AppText variant="caption">{listing.pickupAddress}</AppText>
+                        <AppText variant="caption">{listing?.pickupAddress || 'N/A'}</AppText>
                     </View>
 
                 </Card>
@@ -155,12 +183,13 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
     container: {
-        gap: spacing.lg,
+        gap: hp(2),
+        paddingBottom: hp(4),
     },
 
     headerBg: {
         width: '100%',
-        height: 160,
+        height: hp(20),
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -168,32 +197,36 @@ const styles = StyleSheet.create({
     headerTitle: {
         color: palette.white,
         textAlign: 'center',
+        fontSize: normalize(24),
     },
 
     subHeader: {
         alignItems: 'center',
-        gap: spacing.xs,
+        paddingHorizontal: wp(5),
+        gap: hp(1),
+        marginVertical: hp(2),
     },
 
     center: {
         textAlign: 'center',
+        fontSize: normalize(14),
     },
 
     card: {
-        padding: spacing.md,
-        marginHorizontal: spacing.md,
-        borderRadius: 16,
-        gap: spacing.md,
+        padding: wp(4),
+        marginHorizontal: wp(4),
+        borderRadius: normalize(16),
+        gap: hp(2),
     },
 
     section: {
-        gap: spacing.xs,
+        gap: hp(0.5),
     },
 
     impactCard: {
-        padding: spacing.lg,
-        marginHorizontal: spacing.md,
-        borderRadius: 20,
+        padding: wp(5),
+        marginHorizontal: wp(4),
+        borderRadius: normalize(20),
         alignItems: 'center',
         backgroundColor: '#EEE7FF',
     },
@@ -202,55 +235,59 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        width: '100%',
     },
 
     impactLeft: {
         flex: 1,
-        gap: spacing.sm,
+        gap: hp(1),
     },
 
     mealPill: {
         backgroundColor: palette.middlegreen,
-        paddingVertical: 6,
-        paddingHorizontal: 14,
-        borderRadius: 999,
+        paddingVertical: hp(0.8),
+        paddingHorizontal: wp(3.5),
+        borderRadius: normalize(20),
         alignSelf: 'flex-start',
     },
 
     mealText: {
         color: palette.white,
+        fontSize: normalize(18),
     },
 
     bowlImage: {
-        width: 80,
-        height: 80,
+        width: wp(20),
+        height: wp(20),
     },
 
     actions: {
-        gap: spacing.md,
+        gap: hp(2),
+        marginVertical: hp(2),
     },
 
     primaryBtn: {
         backgroundColor: palette.middlegreen,
-        borderColor: palette.black,
-        marginHorizontal: spacing.md,
-        padding: spacing.md,
-        borderRadius: 16,
+        marginHorizontal: wp(4),
+        padding: hp(1.8),
+        borderRadius: normalize(16),
         alignItems: 'center',
     },
 
     primaryText: {
         color: 'white',
+        fontSize: normalize(16),
     },
 
     secondaryBtn: {
         borderWidth: 1,
         borderColor: palette.black,
-        padding: spacing.md,
-        marginHorizontal: spacing.md,
-        borderRadius: 16,
+        padding: hp(1.8),
+        marginHorizontal: wp(4),
+        borderRadius: normalize(16),
         alignItems: 'center',
     },
+
     itemRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -259,5 +296,6 @@ const styles = StyleSheet.create({
 
     qtyText: {
         fontWeight: '600',
+        fontSize: normalize(14),
     },
 });

@@ -114,8 +114,8 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    width: normalize(160),
-    height: normalize(80),
+    width: wp(50),
+    height: hp(10),
   },
 
   subText: {
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
 
   heading: {
     textAlign: 'center',
-    fontSize: normalize(28),
+    fontSize: normalize(26),
   },
 
   buttonContainer: {

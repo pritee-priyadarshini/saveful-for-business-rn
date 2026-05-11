@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
-import { Modal, FlatList, Pressable, StyleSheet, View, ImageBackground, Alert, Linking } from 'react-native';
+import { Modal, FlatList, Pressable, StyleSheet, View, ImageBackground, Alert, Linking, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 
 import { palette } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { PostPickupSurveyModal } from './components/postPickupSurveyModal';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
+
 
 export function RestaurantUpdatesScreen() {
 
@@ -114,24 +122,24 @@ export function RestaurantUpdatesScreen() {
     if (item.type === 'completed') {
       return (
         <View style={[styles.cardBase, { backgroundColor: bgColor }]}>
-          <AppText variant="h7"> Surplus Collected 🎉 </AppText>
+          <AppText variant="h7" numberOfLines={1}> Surplus Collected 🎉 </AppText>
 
-          <AppText variant="bodySmall" > You’ve successfully shared food with a charity </AppText>
+          <AppText variant="bodySmall" numberOfLines={1}> You’ve successfully shared food with a charity </AppText>
 
           <View style={styles.metaRow}>
             <View style={styles.metaCard}>
-              <AppText variant='label' style={{ textAlign: 'center' }}>Date</AppText>
-              <AppText variant='bodySmall'>14/04/2026</AppText>
+              <AppText style={styles.metaTextLabel} variant='label'>Date</AppText>
+              <AppText style={styles.metaTextValue} variant='bodySmall'>14/04/2026</AppText>
             </View>
 
             <View style={styles.metaCard}>
-              <AppText variant='label' style={{ textAlign: 'center' }}> Food Saved (Kgs)</AppText>
-              <AppText variant='bodySmall'>8 kg</AppText>
+              <AppText style={styles.metaTextLabel} variant='label'> Food Saved (Kgs)</AppText>
+              <AppText style={styles.metaTextValue} variant='bodySmall'>8 kg</AppText>
             </View>
 
             <View style={styles.metaCard}>
-              <AppText variant='label' style={{ textAlign: 'center' }}>Meals Created</AppText>
-              <AppText variant='bodySmall'>20</AppText>
+              <AppText style={styles.metaTextLabel} variant='label'>Meals Created</AppText>
+              <AppText style={styles.metaTextValue} variant='bodySmall'>20</AppText>
             </View>
           </View>
         </View>
@@ -149,7 +157,7 @@ export function RestaurantUpdatesScreen() {
         <View style={styles.topInfoRow}>
           {/* LEFT */}
           <View style={{ flex: 1 }}>
-            <AppText variant="bodySmall">
+            <AppText style={{ fontSize: normalize(14) }} variant="bodySmall">
               <AppText variant="label"> {item.charity} </AppText>{' '}
               {item.type === 'full' ? 'is on the way' : `claimed ${item.quantity} kg`}
             </AppText>
@@ -174,18 +182,18 @@ export function RestaurantUpdatesScreen() {
         {/* META ROW */}
         <View style={styles.metaRow}>
           <View style={styles.metaCard}>
-            <AppText variant='label'>Qty</AppText>
-            <AppText variant='bodySmall'>{item.quantity}kg</AppText>
+            <AppText style={styles.metaTextLabel} variant='label'>Qty</AppText>
+            <AppText style={styles.metaTextValue} variant='bodySmall'>{item.quantity}kg</AppText>
           </View>
 
           <View style={styles.metaCard}>
-            <AppText variant='label'>Date</AppText>
-            <AppText variant='bodySmall'>{item.date}</AppText>
+            <AppText style={styles.metaTextLabel} variant='label'>Date</AppText>
+            <AppText style={styles.metaTextValue} variant='bodySmall'>{item.date}</AppText>
           </View>
 
           <View style={styles.metaCard}>
-            <AppText variant='label'>Time</AppText>
-            <AppText variant='bodySmall'>{item.time}</AppText>
+            <AppText style={styles.metaTextLabel} variant='label'>Time</AppText>
+            <AppText style={styles.metaTextValue} variant='bodySmall'>{item.time}</AppText>
           </View>
 
           <Pressable
@@ -195,7 +203,7 @@ export function RestaurantUpdatesScreen() {
               setDetailsModalVisible(true);
             }}
           >
-            <AppText variant='bodySmall'>Click Here For Details</AppText>
+            <AppText style={styles.metaTextValue} variant='bodySmall'>Click Here For Details</AppText>
           </Pressable>
         </View>
 
@@ -360,73 +368,79 @@ export function RestaurantUpdatesScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: spacing.lg,
-    gap: spacing.lg,
+    paddingBottom: hp(3),
+    gap: hp(2),
   },
 
   headerBg: {
-    height: 140,
+    height: hp(15),
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: wp(5),
+    paddingBottom: hp(2),
     alignItems: 'center',
   },
 
   headerTitle: {
     color: palette.white,
+    fontSize: normalize(24),
   },
 
   section: {
-    marginHorizontal: spacing.xl,
-    gap: spacing.sm,
+    marginHorizontal: wp(5),
+    gap: hp(1),
+    marginBottom: hp(2),
   },
 
   sectionCard: {
     backgroundColor: palette.white,
-    borderRadius: 22,
-    padding: spacing.sm,
-    gap: spacing.sm,
+    borderRadius: normalize(22),
+    padding: wp(2),
+    gap: hp(1),
     elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
 
   cardBase: {
-    padding: spacing.md,
-    borderRadius: 18,
-    gap: spacing.sm,
+    padding: wp(4),
+    borderRadius: normalize(18),
+    gap: hp(1),
   },
 
   metaRow: {
     flexDirection: 'row',
-    marginTop: spacing.xs,
-    gap: spacing.xs,
+    marginTop: hp(0.5),
+    gap: wp(2),
   },
 
   metaCard: {
     flex: 1,
     minWidth: 0,
     backgroundColor: palette.white,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: 4,
-    borderRadius: 12,
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(1),
+    borderRadius: normalize(12),
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   nextBox: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
   },
 
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: wp(2),
   },
 
   driverStatusPill: {
-    minWidth: 90,
-    minHeight: 28,
+    minWidth: wp(25),
+    minHeight: hp(3.5),
     backgroundColor: palette.creme,
-    borderRadius: 999,
-    paddingHorizontal: 12,
+    borderRadius: normalize(15),
+    paddingHorizontal: wp(3),
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
@@ -435,42 +449,49 @@ const styles = StyleSheet.create({
   driverStatusText: {
     color: palette.stone,
     includeFontPadding: false,
+    fontSize: normalize(10),
   },
 
   iconPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    borderRadius: 999,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    borderRadius: normalize(20),
     backgroundColor: palette.creme,
   },
 
   iconText: {
     color: palette.black,
+    fontSize: normalize(12),
   },
 
   ctaBtn: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     backgroundColor: palette.primary,
-    padding: spacing.sm,
-    borderRadius: 12,
+    padding: hp(1.5),
+    borderRadius: normalize(12),
     alignItems: 'center',
   },
 
   ctaText: {
     color: palette.white,
+    fontSize: normalize(14),
   },
 
   completedText: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     color: '#2E7D32',
+    fontSize: normalize(14),
+    textAlign: 'center',
   },
 
   cancelledText: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     color: palette.chilli,
+    fontSize: normalize(14),
+    textAlign: 'center',
   },
 
   modalOverlay: {
@@ -481,51 +502,64 @@ const styles = StyleSheet.create({
   },
 
   modalContent: {
-    width: '85%',
+    width: wp(85),
     backgroundColor: palette.white,
-    borderRadius: 16,
-    padding: spacing.lg,
-    gap: spacing.sm,
+    borderRadius: normalize(16),
+    padding: wp(6),
+    gap: hp(1.5),
   },
 
   closeBtn: {
-    marginTop: spacing.md,
+    marginTop: hp(2),
     backgroundColor: palette.primary,
-    padding: spacing.sm,
-    borderRadius: 10,
+    padding: hp(1.5),
+    borderRadius: normalize(10),
     alignItems: 'center',
   },
 
   closeBtnText: {
     color: palette.white,
+    fontSize: normalize(14),
   },
 
   topInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: spacing.sm,
+    gap: wp(2),
   },
 
   rightStatus: {
     alignItems: 'flex-end',
-    gap: spacing.xs,
+    gap: hp(0.5),
   },
 
   locationText: {
     marginTop: 4,
     opacity: 0.8,
-  },
-
-  driverName: {
-    marginTop: spacing.sm,
-    opacity: 0.8,
+    fontSize: normalize(12),
+    lineHeight: 18,
   },
 
   contactRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.xs,
+    marginTop: hp(1.5),
+    gap: hp(0.5),
   },
+
+  metaTextLabel: {
+    fontSize: normalize(10),
+    color: palette.stone,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+
+  metaTextValue: {
+    fontSize: normalize(12),
+    textAlign: 'center',
+    color: palette.black,
+  },
+  driverName:{
+    marginTop: hp(0.5),
+    fontSize: normalize(12),
+  }
 });

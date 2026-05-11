@@ -5,6 +5,7 @@ import {
   ScrollView,
   Pressable,
   ImageBackground,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,6 +16,14 @@ import { Button } from '@/components/Button';
 import { spacing } from '@/theme/spacing';
 import { palette } from '@/theme/colors';
 import { plansData } from '@/data/plansData';
+
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 
 export function RestaurantPlansScreen({ navigation }: any) {
@@ -134,19 +143,20 @@ export function RestaurantPlansScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.lg,
+    gap: hp(2),
+    paddingBottom: hp(4),
   },
 
   headerBg: {
-    height: 160,
+    height: hp(20),
     justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: wp(5),
   },
 
   backIcon: {
     position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
+    top: hp(2),
+    left: wp(4),
   },
 
   headerContent: {
@@ -156,22 +166,25 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: palette.white,
     textAlign: 'center',
+    fontSize: normalize(24),
   },
 
   headerSubtitle: {
     color: palette.white,
     textAlign: 'center',
     opacity: 0.9,
+    fontSize: normalize(14),
+    marginTop: hp(0.5),
   },
 
   planCard: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 22,
-    margin: spacing.md,
-    padding: spacing.lg,
+    borderRadius: normalize(22),
+    margin: wp(4),
+    padding: wp(5),
     backgroundColor: palette.surface,
-    gap: spacing.sm, // 🔥 increased spacing
+    gap: hp(1),
   },
 
   currentPlanCard: {
@@ -183,50 +196,54 @@ const styles = StyleSheet.create({
   priceText: {
     color: palette.middlegreen, 
     fontFamily: 'Saveful-Bold',
-    fontSize: 16,
-    lineHeight: 18,
+    fontSize: normalize(16),
+    lineHeight: normalize(20),
   },
 
   tagline: {
     opacity: 0.7,
+    fontSize: normalize(12),
   },
 
   description: {
-    marginTop: 4,
+    marginTop: hp(0.5),
+    fontSize: normalize(14),
   },
 
   featuresBox: {
-    marginTop: spacing.sm,
-    gap: 6,
+    marginTop: hp(1),
+    gap: hp(0.8),
   },
 
   /* TAGS */
   popularTag: {
     position: 'absolute',
-    top: -10,
-    left: 10,
+    top: -normalize(10),
+    left: wp(3),
     backgroundColor: palette.black,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.5),
+    borderRadius: normalize(12),
     zIndex: 2,
   },
 
   popularText: {
     color: palette.white,
+    fontSize: normalize(10),
   },
 
   currentTag: {
     position: 'absolute',
-    top: -10,
-    right: 10,
+    top: -normalize(10),
+    right: wp(3),
     backgroundColor: palette.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.5),
+    borderRadius: normalize(12),
   },
 
   currentText: {
     color: palette.white,
+    fontSize: normalize(10),
   },
 });

@@ -2,9 +2,11 @@ import React, {
   createContext,
   PropsWithChildren,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
+import * as SecureStore from 'expo-secure-store';
 
 import { plansData } from '../data/plansData';
 
@@ -16,6 +18,7 @@ import {
   RestaurantForm,
   Subscription,
 } from './types';
+import { authService } from '../services/auth.service';
 
 const defaultRestaurantForm: RestaurantForm = {
   firstName: '',
@@ -59,11 +62,42 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: PropsWithChildren) {
   const [isAuthenticated, setAuthenticated] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi'>('restaurant_single');
   const [selectedPlanId, setSelectedPlanId] = useState('single_plus');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>(defaultRestaurantForm);
   const [charityForm, setCharityForm] = useState<CharityForm>(defaultCharityForm);
+
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        const token = await SecureStore.getItemAsync('accessToken');
+        if (token) {
+          const profileRes = await authService.profile();
+          const profile = profileRes.data;
+
+          setAuthUser({
+            ...profile.user,
+            accessToken: token,
+            orgType: profile.organisation?.type,
+            orgRole: profile.role?.orgRole,
+            siteRole: profile.role?.siteRole,
+            profile: profile,
+          });
+          setAuthenticated(true);
+        }
+      } catch (error) {
+        console.log('SESSION RESTORE ERROR', error);
+        // If token is invalid or expired, clear it
+        await SecureStore.deleteItemAsync('accessToken');
+      } finally {
+        setIsInitialLoading(false);
+      }
+    }
+
+    restoreSession();
+  }, []);
 
   const resetForms = () => {
     setRestaurantForm(defaultRestaurantForm);
@@ -175,12 +209,15 @@ export function AppProvider({ children }: PropsWithChildren) {
         setAuthenticated(!!user);
       },
 
-      logout: () => {
+      logout: async () => {
+        await SecureStore.deleteItemAsync('accessToken');
         setAuthenticated(false);
         setAuthUser(null);
         setSelectedRole('restaurant_single');
         resetForms();
       },
+
+      setAuthenticated,
 
       resetForms,
     };
@@ -192,6 +229,10 @@ export function AppProvider({ children }: PropsWithChildren) {
     selectedPlanId,
     selectedRole,
   ]);
+
+  if (isInitialLoading) {
+    return null; // Or a loading spinner
+  }
 
   return (
     <AppContext.Provider value={value}>
