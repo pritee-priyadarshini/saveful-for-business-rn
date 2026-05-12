@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
@@ -440,7 +441,23 @@ export function AuthScreen() {
             </Pressable>
 
             <AppText variant="label" style={styles.disclaimer}>
-              By continuing, you agree to the Saveful for Business Terms & Conditions and Privacy Policy. We’ll send you important updates - you can opt out anytime.
+              By continuing, I agree to the Saveful for Business{' '}
+              <AppText
+                variant="label"
+                style={styles.disclaimerLink}
+                onPress={() => Linking.openURL('https://www.saveful.com/app-terms-conditions')}
+              >
+                Terms & Conditions
+              </AppText>
+              {' '}and{' '}
+              <AppText
+                variant="label"
+                style={styles.disclaimerLink}
+                onPress={() => Linking.openURL('https://www.saveful.com/privacy-policy')}
+              >
+                Privacy Policy
+              </AppText>
+              . We’ll send me important updates - I can opt out anytime.
             </AppText>
           </View>
 
@@ -614,6 +631,11 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     flex: 1,
     fontSize: normalize(11),
+  },
+
+  disclaimerLink: {
+    color: palette.primary,
+    textDecorationLine: 'underline',
   },
 
   checkboxRow: {
