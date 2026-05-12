@@ -5,7 +5,7 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
-
+    icon: "./assets/intro/Saveful-for-Business-logo.png",
     splash: {
       backgroundColor: "#F6F4EE",
     },
@@ -14,6 +14,7 @@ export default {
 
     ios: {
       supportsTablet: true,
+      icon: "./assets/intro/Saveful-for-Business-logo.png",
       bundleIdentifier: "com.priteepriyadarshini.savefulbusiness",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -25,6 +26,10 @@ export default {
 
     android: {
       package: "com.priteepriyadarshini.savefulbusiness",
+      adaptiveIcon: {
+        foregroundImage: "./assets/intro/Saveful-for-Business-logo.png",
+        backgroundColor: "#F6F4EE",
+      },
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",

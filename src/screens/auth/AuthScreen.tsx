@@ -64,13 +64,20 @@ export function AuthScreen() {
     );
   };
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-    });
+  const currentLogo = isRestaurant
+    ? restaurantForm.logo
+    : (charityForm as any).logo;
 
-    if (!result.canceled) {
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+
       const uri = result.assets[0].uri;
 
       if (isRestaurant) {
@@ -78,6 +85,21 @@ export function AuthScreen() {
       } else {
         updateCharityField('logo' as any, uri);
       }
+    } catch (error: any) {
+      Alert.alert('Image selection failed', 'Please try again.');
+    }
+  };
+
+  const editLogo = async () => {
+    if (!currentLogo) return;
+    await pickImage();
+  };
+
+  const removeLogo = () => {
+    if (isRestaurant) {
+      updateRestaurantField('logo', '');
+    } else {
+      updateCharityField('logo' as any, '');
     }
   };
 
@@ -308,7 +330,7 @@ export function AuthScreen() {
               title="Charity / Non Profit Details"
               active={openSections.includes('charity')}
               onPress={() => toggle('charity')}
-            >
+            >yyy
               <InputField
                 label="Charity / Non Profit Name"
                 placeholder="Enter name"
@@ -360,17 +382,35 @@ export function AuthScreen() {
             <View style={{ gap: spacing.xs }}>
               <AppText variant="label">Logo</AppText>
 
-              <Pressable style={styles.upload} onPress={pickImage}>
-                <AppText>Upload</AppText>
-              </Pressable>
+              {!currentLogo ? (
+                <Pressable style={styles.upload} onPress={pickImage}>
+                  <AppText>Upload</AppText>
+                </Pressable>
+              ) : (
+                <View style={styles.logoActions}>
+                  <Pressable style={styles.logoPreviewWrap} onPress={editLogo}>
+                    <Image
+                      source={{ uri: currentLogo }}
+                      style={styles.logoPreview}
+                      resizeMode="contain"
+                    />
+                    <View style={styles.editBadge}>
+                      <AppText variant="label" style={styles.editBadgeText}>Edit</AppText>
+                    </View>
+                  </Pressable>
 
-              {/* Image Preview */}
-              {(isRestaurant ? restaurantForm.logo : (charityForm as any).logo) && (
-                <Image
-                  source={{ uri: isRestaurant ? restaurantForm.logo : (charityForm as any).logo }}
-                  style={styles.logoPreview}
-                  resizeMode="contain"
-                />
+                  <View style={styles.logoButtons}>
+                    <Pressable style={styles.secondaryButton} onPress={editLogo}>
+                      <AppText variant="label">Crop / Zoom</AppText>
+                    </Pressable>
+                    <Pressable style={styles.secondaryButton} onPress={removeLogo}>
+                      <AppText variant="label">Remove</AppText>
+                    </Pressable>
+                    <Pressable style={styles.primaryButton} onPress={pickImage}>
+                      <AppText variant="label" style={{ color: palette.white }}>Replace</AppText>
+                    </Pressable>
+                  </View>
+                </View>
               )}
             </View>
           </Section>
@@ -504,6 +544,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  logoActions: {
+    gap: hp(1.2),
+  },
+
+  logoPreviewWrap: {
+    alignSelf: 'flex-start',
+  },
+
   logoPreview: {
     width: normalize(120),
     height: normalize(120),
@@ -511,6 +559,42 @@ const styles = StyleSheet.create({
     borderRadius: normalize(12),
     borderWidth: 1,
     borderColor: palette.border,
+  },
+
+  editBadge: {
+    position: 'absolute',
+    right: -wp(2),
+    bottom: -hp(0.6),
+    backgroundColor: palette.primary,
+    paddingHorizontal: wp(2.2),
+    paddingVertical: hp(0.4),
+    borderRadius: normalize(999),
+  },
+
+  editBadgeText: {
+    color: palette.white,
+    fontSize: normalize(11),
+  },
+
+  logoButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+  },
+
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: normalize(12),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+  },
+
+  primaryButton: {
+    backgroundColor: palette.middlegreen,
+    borderRadius: normalize(12),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
   },
 
   bottomInline: {
