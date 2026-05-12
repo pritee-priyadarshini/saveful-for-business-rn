@@ -50,6 +50,13 @@ export default {
       "@react-native-community/datetimepicker",
       "expo-secure-store",
       "expo-font",
+      [
+        "expo-location",
+        {
+          locationWhenInUsePermission:
+            "Allow Saveful for Business to access your location."
+        }
+      ]
     ],
 
      "extra": {

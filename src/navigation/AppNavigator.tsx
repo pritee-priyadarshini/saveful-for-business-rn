@@ -45,7 +45,10 @@ export type RootStackParamList = {
 
   //MultiCharity
   MultiCharityManageSites: undefined;
-  CreateCharitySite: undefined;
+  CreateCharitySite: | undefined | {
+    mode?: 'manager';
+    siteId?: number;
+  };
   CharitySiteAnalytics: undefined;
   CharityAdminProfile: undefined;
 
@@ -71,8 +74,8 @@ const navTheme = {
 };
 
 export function AppNavigator() {
-const { isAuthenticated, selectedRole, authUser } = useAppContext();
-const effectiveRole = selectedRole;
+  const { isAuthenticated, selectedRole, authUser } = useAppContext();
+  const effectiveRole = selectedRole;
 
   return (
     <NavigationContainer theme={navTheme}>

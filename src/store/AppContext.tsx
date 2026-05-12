@@ -184,17 +184,6 @@ export function AppProvider({ children }: PropsWithChildren) {
         (plan) => plan.id === subscription.planId
       ) || null;
 
-    console.log(
-      'CURRENT PROFILE',
-      JSON.stringify(currentProfile, null, 2)
-    );
-
-    console.log(
-      'AUTH USER',
-      JSON.stringify(authUser, null, 2)
-    );
-
-
     return {
       isAuthenticated,
       selectedRole: resolvedRole,

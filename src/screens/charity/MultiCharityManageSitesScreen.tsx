@@ -9,6 +9,7 @@ import {
     Linking,
     Alert,
     TextInput,
+    RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -44,6 +45,7 @@ export default function MultiCharityManageSitesScreen() {
     const [editingSiteId, setEditingSiteId] = useState<number | null>(null);
     const [editForm, setEditForm] = useState<any>({});
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [sites, setSites] = useState<Site[]>([]);
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
     const businessLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
@@ -58,6 +60,15 @@ export default function MultiCharityManageSitesScreen() {
         },
     ];
 
+    const onRefresh = async () => {
+        try {
+            setRefreshing(true);
+            await fetchLocations();
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     React.useEffect(() => {
         fetchLocations();
     }, []);
@@ -67,17 +78,24 @@ export default function MultiCharityManageSitesScreen() {
             setLoading(true);
 
             const [locationsRes, usersRes] = await Promise.all([charityService.listLocations(), charityService.listUsers(),]);
-            const locations = locationsRes.data || [];
-            const users = usersRes.data || [];
+
+            const locations = Array.isArray(locationsRes.data)
+                ? locationsRes.data
+                : locationsRes.data?.locations || [];
+            const users = [
+                ...(usersRes.data?.headOfficeAdmins || []),
+                ...(usersRes.data?.headOfficeMembers || []),
+                ...(usersRes.data?.locationAdmins || []),
+                ...(usersRes.data?.teamMembers || []),
+                ...(usersRes.data?.drivers || []),
+            ];
             const formattedSites = locations.map(
                 (location: any) => {
                     const admin =
                         users.find(
                             (u: any) =>
-                                u.locationId === location.id &&
-                                (
-                                    u.role === 'LOCATION_ADMIN' ||
-                                    u.role === 'HEAD_OFFICE_ADMIN'
+                                u.locations?.some(
+                                    (loc: any) => loc.id === location.id
                                 )
                         ) || null;
 
@@ -91,8 +109,8 @@ export default function MultiCharityManageSitesScreen() {
                         mobile: admin?.mobile || '-',
                         latitude: location.latitude,
                         longitude: location.longitude,
-                        radiusKm: location.radiusKm,
-                        logoUrl: currentProfile.logo ||  authUser?.profile?.organisation?.logoUrl || '',
+                        radiusKm: location.pickupRadiusKm,
+                        logoUrl: currentProfile.logo || authUser?.profile?.organisation?.logoUrl || '',
                     };
                 }
             );
@@ -126,7 +144,7 @@ export default function MultiCharityManageSitesScreen() {
 
     return (
         <Screen backgroundColor={palette.creme}>
-            <ScrollView>
+            <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} >
 
                 {/* HERO HEADER */}
                 <ImageBackground
@@ -172,6 +190,14 @@ export default function MultiCharityManageSitesScreen() {
                     Your Sites
                 </AppText>
 
+                {sites.length === 0 && (
+                    <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
+                        <AppText variant="bodyLarge">
+                            No charity locations added yet
+                        </AppText>
+                    </View>
+                )}
+
                 {sites.map((site, index) => (
                     <View key={site.id} style={styles.siteCard}>
 
@@ -209,32 +235,7 @@ export default function MultiCharityManageSitesScreen() {
                                 {/* VIEW */}
                                 <Pressable
                                     style={styles.viewBtn}
-                                    onPress={async () => {
-                                        try {
-                                            if (!editingSiteId) return;
-                                            await charityService.updateLocation(
-                                                Number(editingSiteId),
-                                                {
-                                                    locationName: editForm.tradingName,
-                                                    address: editForm.address,
-                                                    postcode: editForm.postCode,
-                                                    contactName: editForm.contactName,
-                                                    contactEmail: editForm.email,
-                                                    contactMobile: editForm.mobile,
-                                                }
-                                            );
-
-                                            await fetchLocations();
-
-                                            setEditingSiteId(null);
-                                            setEditForm({});
-
-                                            Alert.alert('Success', 'Location updated');
-
-                                        } catch (err: any) {
-                                            Alert.alert('Error', err?.response?.data?.message || 'Failed to update location');
-                                        }
-                                    }}
+                                    onPress={() => { setExpandedSite(expandedSite === site.id ? null : site.id); }}
                                 >
                                     <AppText variant="label" style={styles.viewText}>
                                         View
@@ -251,33 +252,26 @@ export default function MultiCharityManageSitesScreen() {
                                                     charityService.getLocation(site.id),
                                                     charityService.listUsers(),
                                                 ]);
-
-                                            const location = locationRes.data;
-                                            const admin =
-                                                usersRes.data?.find(
-                                                    (u: any) =>
-                                                        u.locationId === site.id &&
-                                                        (
-                                                            u.role === 'LOCATION_ADMIN' ||
-                                                            u.role === 'HEAD_OFFICE_ADMIN'
-                                                        )
-                                                );
+                                            const location =
+                                                locationRes.data?.location ||
+                                                locationRes.data;
 
                                             setEditingSiteId(site.id);
 
                                             setEditForm({
-                                                tradingName: location.locationName || '',
-                                                address: location.address || '',
-                                                postCode: location.postcode || '',
-                                                contactName: admin ? `${admin.firstName} ${admin.lastName}` : '',
-                                                email: admin?.email || '',
-                                                mobile: admin?.mobile || '',
-                                                radiusKm: location.radiusKm || '',
-                                                latitude: location.latitude || '',
-                                                longitude: location.longitude || '',
+                                                tradingName: String(location?.locationName || ''),
+                                                address: String(location?.address || ''),
+                                                postCode: String(location?.postcode || ''),
+                                                radiusKm: String(location?.pickupRadiusKm || ''),
+                                                latitude: location?.latitude || '',
+                                                longitude: location?.longitude || '',
                                             });
 
                                             setExpandedSite(site.id);
+
+                                            setTimeout(() => {
+                                                setEditingSiteId(site.id);
+                                            }, 0);
 
                                         } catch (err) {
                                             Alert.alert('Error', 'Failed to load location details');
@@ -308,18 +302,6 @@ export default function MultiCharityManageSitesScreen() {
                                             {
                                                 key: 'postCode',
                                                 label: 'Post Code',
-                                            },
-                                            {
-                                                key: 'contactName',
-                                                label: 'Admin Name',
-                                            },
-                                            {
-                                                key: 'email',
-                                                label: 'Email',
-                                            },
-                                            {
-                                                key: 'mobile',
-                                                label: 'Phone',
                                             },
                                             {
                                                 key: 'radiusKm',
@@ -366,34 +348,9 @@ export default function MultiCharityManageSitesScreen() {
                                                             locationName: editForm.tradingName,
                                                             address: editForm.address,
                                                             postcode: editForm.postCode,
-                                                            contactName: editForm.contactName,
-                                                            contactEmail: editForm.email,
-                                                            contactMobile: editForm.mobile,
                                                             radiusKm: Number(editForm.radiusKm),
                                                         }
                                                     );
-                                                    const usersRes = await charityService.listUsers();
-                                                    const admin =
-                                                        usersRes.data?.find(
-                                                            (u: any) =>
-                                                                u.locationId === editingSiteId &&
-                                                                (
-                                                                    u.role === 'LOCATION_ADMIN' ||
-                                                                    u.role === 'HEAD_OFFICE_ADMIN'
-                                                                )
-                                                        );
-
-                                                    if (admin) {
-                                                        await charityService.updateUser(
-                                                            admin.id,
-                                                            {
-                                                                firstName: editForm.contactName?.split(' ')[0] || '',
-                                                                lastName: editForm.contactName?.split(' ')?.slice(1)?.join(' ') || '',
-                                                                mobile: editForm.mobile,
-                                                            }
-                                                        );
-                                                    }
-
                                                     await fetchLocations();
 
                                                     setEditingSiteId(null);
@@ -479,6 +436,111 @@ export default function MultiCharityManageSitesScreen() {
                                                 Pickup Radius: {site.radiusKm} km
                                             </AppText>
                                         )}
+
+                                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 15, }}>
+                                            {/* ASSIGN MANAGER */}
+                                            <Pressable
+                                                style={[styles.saveBtn, {
+                                                    flex: 1,
+                                                    marginTop: 0,
+                                                    backgroundColor: palette.middlegreen,
+                                                },
+                                                ]}
+                                                onPress={() =>
+                                                    navigation.navigate(
+                                                        'CreateCharitySite',
+                                                        {
+                                                            mode: 'manager',
+                                                            siteId: site.id,
+                                                        }
+                                                    )
+                                                }
+                                            >
+                                                <AppText variant="label" style={{ color: 'white' }} >
+                                                    Assign Manager
+                                                </AppText>
+                                            </Pressable>
+
+                                            {/* REMOVE MANAGER */}
+                                            <Pressable
+                                                style={[
+                                                    styles.saveBtn,
+                                                    {
+                                                        flex: 1,
+                                                        marginTop: 0,
+                                                        backgroundColor: '#D9534F',
+                                                    },
+                                                ]}
+                                                onPress={() => {
+                                                    Alert.alert(
+                                                        'Remove Manager',
+                                                        'Are you sure you want to remove this manager?',
+                                                        [
+                                                            {
+                                                                text: 'Cancel',
+                                                                style: 'cancel',
+                                                            },
+                                                            {
+                                                                text: 'Remove',
+                                                                style: 'destructive',
+                                                                onPress: async () => {
+                                                                    try {
+
+                                                                        const usersRes = await charityService.listUsers();
+                                                                        const users = [
+                                                                            ...(usersRes.data?.headOfficeAdmins || []),
+                                                                            ...(usersRes.data?.headOfficeMembers || []),
+                                                                            ...(usersRes.data?.locationAdmins || []),
+                                                                            ...(usersRes.data?.teamMembers || []),
+                                                                            ...(usersRes.data?.drivers || []),
+                                                                        ];
+
+                                                                        const admin =
+                                                                            users.find(
+                                                                                (u: any) =>
+                                                                                    u.locations?.some(
+                                                                                        (loc: any) =>
+                                                                                            loc.id === site.id
+                                                                                    )
+                                                                            );
+
+                                                                        if (!admin) {
+                                                                            Alert.alert(
+                                                                                'No manager assigned'
+                                                                            );
+                                                                            return;
+                                                                        }
+
+                                                                        await charityService.deleteUser(
+                                                                            admin.id
+                                                                        );
+
+                                                                        await fetchLocations();
+
+                                                                        Alert.alert(
+                                                                            'Success',
+                                                                            'Manager removed successfully'
+                                                                        );
+
+                                                                    } catch (err: any) {
+                                                                        Alert.alert(
+                                                                            'Error',
+                                                                            err?.response?.data?.message ||
+                                                                            'Failed to remove manager'
+                                                                        );
+                                                                    }
+                                                                },
+                                                            },
+                                                        ]
+                                                    );
+                                                }}
+                                            >
+                                                <AppText variant="label" style={{ color: 'white' }} >
+                                                    Remove Manager
+                                                </AppText>
+                                            </Pressable>
+
+                                        </View>
                                     </>
                                 )}
 
