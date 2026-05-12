@@ -9,6 +9,7 @@ import {
   Linking,
   Alert,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,9 +17,9 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { Skeleton } from '../../components/Skeleton';
 import { useAppContext } from '@/store/AppContext';
 import { palette } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
 import { sitesService } from '@/services/sites.service';
 
 const { width, height } = Dimensions.get('window');
@@ -39,6 +40,7 @@ export default function ManageSitesScreen() {
   const [sites, setSites] = useState<any[]>([]);
   const [organisation, setOrganisation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const actions = [
     { label: 'Create Site', route: 'CreateSite' },
@@ -53,9 +55,11 @@ export default function ManageSitesScreen() {
     }, [])
   );
 
-  const fetchSites = async () => {
+  const fetchSites = async (isRefreshing = false) => {
     try {
-      setLoading(true);
+      if (isRefreshing) setRefreshing(true);
+      else setLoading(true);
+      
       const res = await sitesService.getOrganisation();
       const data = res.data;
       setOrganisation(data.organisation);
@@ -106,7 +110,12 @@ export default function ManageSitesScreen() {
       console.log('Fetch sites error', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    fetchSites(true);
   };
 
   const handleRemoveManager = async (siteId: number, userId: number) => {
@@ -142,180 +151,225 @@ export default function ManageSitesScreen() {
     Alert.alert('Delete Site', 'API to be integrated', [{ text: 'OK' }]);
   };
 
-  if (loading) {
-    return (
-      <Screen>
-        <AppText>Loading sites...</AppText>
-      </Screen>
-    );
-  }
+  const renderSkeleton = () => (
+    <View style={{ paddingHorizontal: wp(5) }}>
+      <View style={{ height: hp(18), width: '100%', marginBottom: hp(2), overflow: 'hidden' }}>
+        <Skeleton width="100%" height="100%" borderRadius={0} />
+      </View>
+      
+      <View style={{ alignItems: 'center', marginBottom: hp(2) }}>
+        <Skeleton width={wp(50)} height={normalize(24)} />
+      </View>
+
+      <View style={styles.actionGrid}>
+        {[1, 2, 3, 4].map((i) => (
+          <View key={i} style={[styles.actionCard, { elevation: 0, shadowOpacity: 0 }]}>
+            <Skeleton width="60%" height={normalize(14)} />
+          </View>
+        ))}
+      </View>
+
+      <View style={{ alignItems: 'center', marginBottom: hp(2) }}>
+        <Skeleton width={wp(40)} height={normalize(24)} />
+      </View>
+
+      {[1, 2].map((i) => (
+        <View key={i} style={[styles.siteCard, { elevation: 0, shadowOpacity: 0 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <Skeleton width={normalize(60)} height={normalize(60)} borderRadius={normalize(10)} style={{ marginRight: wp(3) }} />
+            <View style={{ flex: 1, gap: 5 }}>
+              <Skeleton width="70%" height={normalize(18)} />
+              <Skeleton width="90%" height={normalize(14)} />
+              <Skeleton width="40%" height={normalize(14)} />
+            </View>
+          </View>
+          <Skeleton width={normalize(60)} height={normalize(35)} borderRadius={normalize(8)} />
+        </View>
+      ))}
+    </View>
+  );
 
   return (
     <Screen backgroundColor={palette.creme}>
-      <ScrollView>
-
-        {/* HERO */}
-        <ImageBackground
-          source={require('../../../assets/placeholder/feed-bg.png')}
-          style={styles.heroBg}
-        >
-          <View style={styles.heroContent}>
-            <AppText variant="h5" style={styles.businessName}>
-              {organisation?.name || 'Business'}
-            </AppText>
-
-            {organisation?.logoUrl && (
-              <Image
-                source={{ uri: organisation.logoUrl }}
-                style={styles.logoTopRight}
-              />
-            )}
-          </View>
-        </ImageBackground>
-
-        {/* ACTIONS */}
-        <AppText variant="subheading" style={styles.sectionTitle}>
-          What to do today !
-        </AppText>
-
-        <View style={styles.actionGrid}>
-          {actions.map((item) => (
-            <Pressable
-              key={item.label}
-              style={styles.actionCard}
-              onPress={() => {
-                if (item.route) navigation.navigate(item.route as any);
-                else item.action?.();
-              }}
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]} // Android
+            tintColor={palette.primary} // iOS
+          />
+        }
+      >
+        {loading ? (
+          renderSkeleton()
+        ) : (
+          <>
+            {/* HERO */}
+            <ImageBackground
+              source={require('../../../assets/placeholder/feed-bg.png')}
+              style={styles.heroBg}
             >
-              <AppText variant="label" style={styles.actionText}>
-                {item.label}
-              </AppText>
-            </Pressable>
-          ))}
-        </View>
+              <View style={styles.heroContent}>
+                <AppText variant="h5" style={styles.businessName}>
+                  {organisation?.name || 'Business'}
+                </AppText>
 
-        {/* SITES */}
-        <AppText variant="subheading" style={styles.sectionTitle}>
-          Your Sites
-        </AppText>
+                {organisation?.logoUrl && (
+                  <Image
+                    source={{ uri: organisation.logoUrl }}
+                    style={styles.logoTopRight}
+                  />
+                )}
+              </View>
+            </ImageBackground>
 
-        {sites.length === 0 && (
-          <AppText style={{ textAlign: 'center', marginTop: 20 }}>
-            No sites created yet
-          </AppText>
-        )}
-
-        {sites.map((site, index) => (
-          <View key={site.id} style={styles.siteCard}>
-
-            <AppText variant="bodyBold" style={styles.siteIndex}>
-              Site {index + 1}
+            {/* ACTIONS */}
+            <AppText variant="subheading" style={styles.sectionTitle}>
+              What to do today !
             </AppText>
 
-            <View style={styles.siteHeader}>
-              <View style={styles.siteLeft}>
-                <Image
-                  source={require('../../../assets/placeholder/kale-header.png')}
-                  style={styles.siteLogo}
-                />
-
-                <View style={{ flex: 1 }}>
-                  <AppText variant="label" style={styles.siteName}>
-                    {site.tradingName}
+            <View style={styles.actionGrid}>
+              {actions.map((item) => (
+                <Pressable
+                  key={item.label}
+                  style={styles.actionCard}
+                  onPress={() => {
+                    if (item.route) navigation.navigate(item.route as any);
+                    else item.action?.();
+                  }}
+                >
+                  <AppText variant="label" style={styles.actionText}>
+                    {item.label}
                   </AppText>
-
-                  <AppText variant="bodySmall">
-                    {site.address}
-                  </AppText>
-
-                  <AppText variant="bodySmall">
-                    {site.postCode}
-                  </AppText>
-                </View>
-              </View>
-
-              <Pressable
-                style={styles.viewBtn}
-                onPress={() =>
-                  setExpandedSite(
-                    expandedSite === site.id ? null : site.id
-                  )
-                }
-              >
-                <AppText variant="label" style={{ color: palette.white }}>View</AppText>
-              </Pressable>
+                </Pressable>
+              ))}
             </View>
 
-            {expandedSite === site.id && (
-              <View style={styles.details}>
+            {/* SITES */}
+            <AppText variant="subheading" style={styles.sectionTitle}>
+              Your Sites
+            </AppText>
 
-                <AppText variant="label">
-                  Manager: {site.contactName}
+            {sites.length === 0 && (
+              <AppText style={{ textAlign: 'center', marginTop: 20 }}>
+                No sites created yet
+              </AppText>
+            )}
+
+            {sites.map((site, index) => (
+              <View key={site.id} style={styles.siteCard}>
+
+                <AppText variant="bodyBold" style={styles.siteIndex}>
+                  Site {index + 1}
                 </AppText>
 
-                <AppText variant="label">
-                  Email: {site.email}
-                </AppText>
+                <View style={styles.siteHeader}>
+                  <View style={styles.siteLeft}>
+                    <Image
+                      source={require('../../../assets/placeholder/kale-header.png')}
+                      style={styles.siteLogo}
+                    />
 
-                <AppText variant="label">
-                  Mobile: {site.mobile}
-                </AppText>
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="label" style={styles.siteName}>
+                        {site.tradingName}
+                      </AppText>
 
-                {/* ACTIONS */}
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                      <AppText variant="bodySmall">
+                        {site.address}
+                      </AppText>
 
-                  {/* ADD / REPLACE MANAGER */}
+                      <AppText variant="bodySmall">
+                        {site.postCode}
+                      </AppText>
+                    </View>
+                  </View>
+
                   <Pressable
                     style={styles.viewBtn}
-                    onPress={() => handleAssignManager(site.id)}
+                    onPress={() =>
+                      setExpandedSite(
+                        expandedSite === site.id ? null : site.id
+                      )
+                    }
                   >
-                    <AppText variant="label" style={{ color: palette.white }}>Add / Replace Manager</AppText>
+                    <AppText variant="label" style={{ color: palette.white }}>View</AppText>
                   </Pressable>
-
-                  {/* REMOVE MANAGER */}
-                  {site.managerId && (
-                    <Pressable
-                      style={styles.viewBtn}
-                      onPress={() =>
-                        handleRemoveManager(site.id, site.managerId)
-                      }
-                    >
-                      <AppText variant="label" style={{ color: palette.white }}>Remove Manager</AppText>
-                    </Pressable>
-                  )}
-
                 </View>
 
-                {/* DELETE SITE */}
-                <Pressable
-                  style={[styles.logoutBtn, { marginTop: 10 }]}
-                  onPress={() => handleDeleteSite(site.id)}
-                >
-                  <AppText variant="label">Delete Site</AppText>
-                </Pressable>
+                {expandedSite === site.id && (
+                  <View style={styles.details}>
 
+                    <AppText variant="label">
+                      Manager: {site.contactName}
+                    </AppText>
+
+                    <AppText variant="label">
+                      Email: {site.email}
+                    </AppText>
+
+                    <AppText variant="label">
+                      Mobile: {site.mobile}
+                    </AppText>
+
+                    {/* ACTIONS */}
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+
+                      {/* ADD / REPLACE MANAGER */}
+                      <Pressable
+                        style={styles.viewBtn}
+                        onPress={() => handleAssignManager(site.id)}
+                      >
+                        <AppText variant="label" style={{ color: palette.white }}>
+                          {site.managerId ? 'Replace Manager' : 'Add Manager'}
+                        </AppText>
+                      </Pressable>
+
+                      {/* REMOVE MANAGER */}
+                      {site.managerId && (
+                        <Pressable
+                          style={styles.viewBtn}
+                          onPress={() =>
+                            handleRemoveManager(site.id, site.managerId)
+                          }
+                        >
+                          <AppText variant="label" style={{ color: palette.white }}>Remove Manager</AppText>
+                        </Pressable>
+                      )}
+
+                    </View>
+
+                    {/* DELETE SITE */}
+                    <Pressable
+                      style={[styles.logoutBtn, { marginTop: 10 }]}
+                      onPress={() => handleDeleteSite(site.id)}
+                    >
+                      <AppText variant="label">Delete Site</AppText>
+                    </Pressable>
+
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-        ))}
+            ))}
 
-        {/* FOOTER */}
-        <View style={styles.bottomActions}>
-          <Pressable style={styles.logoutBtn} onPress={logout}>
-            <AppText variant="label">Logout</AppText>
-          </Pressable>
+            {/* FOOTER */}
+            <View style={styles.bottomActions}>
+              <Pressable style={styles.logoutBtn} onPress={logout}>
+                <AppText variant="label">Logout</AppText>
+              </Pressable>
 
-          <Pressable
-            style={styles.logoutBtn}
-            onPress={() =>
-              Alert.alert('Delete Account', 'API to be added soon')
-            }
-          >
-            <AppText variant="label">Delete My Account</AppText>
-          </Pressable>
-        </View>
-
+              <Pressable
+                style={styles.logoutBtn}
+                onPress={() =>
+                  Alert.alert('Delete Account', 'API to be added soon')
+                }
+              >
+                <AppText variant="label">Delete My Account</AppText>
+              </Pressable>
+            </View>
+          </>
+        )}
       </ScrollView>
     </Screen>
   );

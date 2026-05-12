@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,7 +8,6 @@ import {
   Modal,
   Alert,
   Dimensions,
-  Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
@@ -31,7 +30,7 @@ const normalize = (size: number) => {
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
-export function EmailVerificationScreen({ navigation }: Props) {
+export function EmailVerificationScreen({ navigation, route }: Props) {
 
   const {
     selectedRole,
@@ -45,6 +44,9 @@ export function EmailVerificationScreen({ navigation }: Props) {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const emailFromRoute = route.params?.email?.trim().toLowerCase();
 
   const inputs = useRef<Array<TextInput | null>>([]);
 
@@ -53,26 +55,35 @@ export function EmailVerificationScreen({ navigation }: Props) {
       setLoading(true);
 
       const enteredOtp = otp.join('');
-      const email = isRestaurant ? restaurantForm.email : charityForm.email;
+      const email = emailFromRoute || (isRestaurant ? restaurantForm.email : charityForm.email);
+
+      if (!email) {
+        Alert.alert('Missing email', 'Please enter your email to verify.');
+        setLoading(false);
+        return;
+      }
 
       const res = await authService.verifyEmail(email, enteredOtp);
       const data = res.data;
 
       await SecureStore.setItemAsync('accessToken', data.accessToken);
 
+      const profileRes = await authService.profile();
+      const profile = profileRes.data;
+
       setAuthUser({
-        ...data.user,
-        platformRole: data.user.platformRole || 'ORG_USER',
+        ...profile.user,
+        platformRole: profile.user.platformRole || 'ORG_USER',
         accessToken: data.accessToken,
-        orgType: data.organisation?.type,
-        orgRole: data.role?.orgRole,
-        siteRole: data.role?.siteRole,
+        orgType: profile.organisation?.type,
+        orgRole: profile.role?.orgRole,
+        siteRole: profile.role?.siteRole,
         profile: {
-          user: data.user,
-          organisation: data.organisation,
-          subscription: data.subscription,
-          sites: data.sites || [],
-          role: data.role,
+          user: profile.user,
+          organisation: profile.organisation,
+          subscription: profile.subscription,
+          sites: profile.sites || [],
+          role: profile.role,
         },
       });
 
@@ -101,8 +112,30 @@ export function EmailVerificationScreen({ navigation }: Props) {
   };
 
   const handleResend = () => {
-    Alert.alert('OTP already sent', 'Please check your inbox / spam folder.');
+    const email = emailFromRoute || (isRestaurant ? restaurantForm.email : charityForm.email);
+
+    if (!email) {
+      Alert.alert('Missing email', 'Please enter your email to resend the code.');
+      return;
+    }
+
+    setResending(true);
+    authService
+      .resendVerification(email)
+      .then(() => {
+        Alert.alert('Verification code sent', 'Please check your inbox / spam folder.');
+      })
+      .catch((error: any) => {
+        Alert.alert('Resend failed', error?.response?.data?.message || 'Please try again.');
+      })
+      .finally(() => setResending(false));
   };
+
+  useEffect(() => {
+    if (route.params?.autoResend) {
+      handleResend();
+    }
+  }, [route.params?.autoResend]);
 
   return (
     <>
@@ -150,7 +183,9 @@ export function EmailVerificationScreen({ navigation }: Props) {
 
           {/* RESEND */}
           <Pressable style={styles.resendButton} onPress={handleResend}>
-            <AppText variant='label' style={styles.resendText}>Resend Email</AppText>
+            <AppText variant='label' style={styles.resendText}>
+              {resending ? 'Resending...' : 'Resend Email'}
+            </AppText>
           </Pressable>
 
           {/* INFO */}

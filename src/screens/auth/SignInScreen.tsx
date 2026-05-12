@@ -75,8 +75,24 @@ export function SignInScreen() {
             });
 
         } catch (error: any) {
+            const message = error?.response?.data?.message || 'Invalid credentials';
+            const status = error?.response?.status;
+            const isUnverified =
+                status === 403 &&
+                typeof message === 'string' &&
+                message.toLowerCase().includes('verify');
+
             console.log('LOGIN ERROR', error?.response?.data || error);
-            setError(error?.response?.data?.message || 'Invalid credentials');
+
+            if (isUnverified) {
+                navigation.navigate('EmailVerification', {
+                    email: email.trim().toLowerCase(),
+                    autoResend: true,
+                });
+                return;
+            }
+
+            setError(message);
         }
         finally {
             setLoading(false);

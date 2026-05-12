@@ -40,9 +40,43 @@ export default function CreateSiteScreen() {
     useEffect(() => {
         if (route.params?.mode === 'manager') {
             setActiveTab('manager');
-            setSelectedSiteId(route.params.siteId);
+            const siteId = route.params.siteId;
+            setSelectedSiteId(siteId);
+
+            // Prefill if siteId is provided (Replace manager mode)
+            if (siteId) {
+                fetchSiteDetails(siteId);
+            }
         }
-    }, []);
+    }, [route.params?.mode, route.params?.siteId]);
+
+    const fetchSiteDetails = async (siteId: number) => {
+        try {
+            setLoading(true);
+            const res = await sitesService.getSiteDetails(siteId);
+            const siteDetails = res.data;
+
+            // Find manager in staff
+            const staffRes = await sitesService.listStaff(siteId);
+            const staff = staffRes.data || [];
+            const managerEntry = staff.find((u: any) => u.siteRole === 'SITE_ADMIN');
+
+            if (managerEntry?.user) {
+                const { firstName, lastName, email, phoneNumber } = managerEntry.user;
+                setManagerForm({
+                    firstName: firstName || '',
+                    lastName: lastName || '',
+                    email: email || '',
+                    password: '', // Password shouldn't be prefilled for security/API reasons
+                    phoneNumber: phoneNumber || '',
+                });
+            }
+        } catch (error) {
+            console.log('Failed to fetch site details or staff', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const [activeTab, setActiveTab] = useState<'site' | 'manager'>('site');
     const [loading, setLoading] = useState(false);
@@ -394,6 +428,7 @@ export default function CreateSiteScreen() {
                                                         onPress={() => {
                                                             setSelectedSiteId(site.id);
                                                             setOpenSiteDropdown(false);
+                                                            fetchSiteDetails(site.id);
                                                         }}
                                                         style={{ padding: 12 }}
                                                     >
@@ -419,6 +454,8 @@ export default function CreateSiteScreen() {
                                         <TextInput
                                             style={styles.inputWrapper}
                                             secureTextEntry={field.key === 'password'}
+                                            keyboardType={field.key === 'phoneNumber' ? 'number-pad' : 'default'}
+                                            maxLength={field.key === 'phoneNumber' ? 10 : undefined}
                                             value={(managerForm as any)[field.key]}
                                             onChangeText={(v) =>
                                                 setManagerForm({ ...managerForm, [field.key]: v })

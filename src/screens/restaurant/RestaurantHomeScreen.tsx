@@ -11,10 +11,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { Skeleton } from '../../components/Skeleton';
 import { useAppContext } from '../../store/AppContext';
 import { dashboardService } from '@/services/dashboard.service';
 
-import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -94,9 +94,38 @@ export function RestaurantHomeScreen({ navigation }: any) {
     }
   };
 
+  const renderSkeleton = () => (
+    <View style={styles.skeletonWrap}>
+      <Skeleton width="100%" height={hp(18)} borderRadius={normalize(12)} />
+      <View style={styles.skeletonCenter}>
+        <Skeleton width={wp(60)} height={normalize(20)} />
+        <Skeleton width={wp(50)} height={normalize(18)} />
+      </View>
+      <Skeleton width={wp(70)} height={normalize(48)} borderRadius={normalize(16)} />
+      <View style={styles.skeletonHeadingWrap}>
+        <Skeleton width={wp(70)} height={normalize(20)} />
+      </View>
+      <View style={styles.skeletonCard}>
+        <View style={styles.skeletonPillRow}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} width={wp(18)} height={normalize(28)} borderRadius={normalize(20)} />
+          ))}
+        </View>
+        <Skeleton width={wp(30)} height={wp(30)} borderRadius={normalize(12)} />
+        <Skeleton width={wp(70)} height={normalize(16)} />
+        <Skeleton width={wp(40)} height={normalize(24)} borderRadius={normalize(20)} />
+      </View>
+      <Skeleton width={wp(80)} height={normalize(18)} />
+    </View>
+  );
+
   return (
     <Screen backgroundColor={palette.creme}>
       <ScrollView contentContainerStyle={styles.container}>
+        {loadingImpact ? (
+          renderSkeleton()
+        ) : (
+          <>
 
         {/* HERO */}
         <View style={styles.heroContainer}>
@@ -113,7 +142,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
               </AppText>
 
               <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={26} color="white" />
+                <Ionicons name="location-outline" size={normalize(24)} color="white" />
                 <AppText variant="body" style={styles.location}>
                   {currentProfile.address || 'No address available'}
                 </AppText>
@@ -236,9 +265,11 @@ export function RestaurantHomeScreen({ navigation }: any) {
             About our calculation
           </AppText>
 
-          <Ionicons name="chevron-forward" size={20} color="black" />
+          <Ionicons name="chevron-forward" size={normalize(20)} color="black" />
         </Pressable>
 
+          </>
+        )}
       </ScrollView>
     </Screen>
   );
@@ -246,15 +277,15 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: spacing.xl,
-    gap: spacing.lg,
+    paddingBottom: hp(3),
+    gap: hp(2),
   },
 
   heroContainer: {
     height: hp(18),
     width: '100%',
-    paddingTop: spacing.lg,
-    paddingRight: spacing.lg,
+    paddingTop: hp(2),
+    paddingRight: wp(4),
     overflow: 'hidden',
     position: 'relative',
   },
@@ -267,15 +298,15 @@ const styles = StyleSheet.create({
 
   topBar: {
     flexDirection: 'row',
-    paddingLeft: spacing.md,
+    paddingLeft: wp(4),
     justifyContent: 'space-between',
   },
 
   locationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginTop: spacing.sm,
-    gap: 4,
+    marginTop: hp(0.8),
+    gap: wp(1),
   },
 
   whiteText: {
@@ -284,7 +315,7 @@ const styles = StyleSheet.create({
   },
 
   welcomeSection: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: wp(4),
     gap: hp(0.75),
     alignItems: 'center',
   },
@@ -309,7 +340,7 @@ const styles = StyleSheet.create({
     width: normalize(50),
     height: normalize(50),
     borderRadius: normalize(25),
-    marginLeft: spacing.md,
+    marginLeft: wp(3),
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
@@ -381,13 +412,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#F3E8FF',
     borderRadius: normalize(30),
-    padding: 4,
+    padding: wp(1),
   },
 
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: wp(1.2),
     paddingVertical: hp(0.8),
     paddingHorizontal: wp(3),
     borderRadius: normalize(25),
@@ -409,7 +440,7 @@ const styles = StyleSheet.create({
   impactIcon: {
     width: wp(25),
     height: wp(25),
-    maxHeight: 100,
+    maxHeight: normalize(100),
     resizeMode: 'contain',
   },
 
@@ -431,10 +462,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    paddingVertical: spacing.md,
+    marginHorizontal: wp(5),
+    marginTop: hp(2),
+    paddingVertical: hp(1.6),
     borderTopWidth: 1,
     borderColor: palette.border,
+  },
+
+  skeletonWrap: {
+    paddingHorizontal: wp(5),
+    gap: hp(1.6),
+  },
+
+  skeletonCenter: {
+    alignItems: 'center',
+    gap: hp(0.8),
+  },
+
+  skeletonHeadingWrap: {
+    alignItems: 'center',
+    marginTop: hp(1),
+  },
+
+  skeletonCard: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(20),
+    paddingVertical: hp(2),
+    paddingHorizontal: wp(5),
+    alignItems: 'center',
+    gap: hp(1.5),
+  },
+
+  skeletonPillRow: {
+    flexDirection: 'row',
+    gap: wp(2),
   },
 });

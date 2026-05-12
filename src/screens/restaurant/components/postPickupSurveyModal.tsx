@@ -316,6 +316,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: '700',
         fontSize: 18,
+        lineHeight: 24,
     },
 
     row: {

@@ -278,7 +278,7 @@ export function AuthScreen() {
                 onChangeText={(v) => updateRestaurantField('businessAddress', v)}
               />
               <InputField
-                label="Registration Number"
+                label="Business Registration Number"
                 placeholder="Enter number"
                 value={restaurantForm.registrationNumber}
                 onChangeText={(v) => updateRestaurantField('registrationNumber', v)}

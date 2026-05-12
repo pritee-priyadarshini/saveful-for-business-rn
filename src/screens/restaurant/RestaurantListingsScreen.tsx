@@ -9,18 +9,26 @@ import {
   Modal,
   Alert,
   Linking,
+  Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
+import { Skeleton } from '../../components/Skeleton';
 
-import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
-import { ListingStatus, OrderStatus } from '@/types';
+import { ListingStatus } from '@/types';
 import { foodListingService } from '@/services/foodListing.service';
 
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 function prettyStatus(status: string) {
   return status
@@ -85,9 +93,44 @@ export function RestaurantListingsScreen({ navigation }: any) {
     }
   };
 
+  const renderSkeleton = () => (
+    <View style={styles.skeletonWrap}>
+      <Skeleton width="100%" height={hp(18)} borderRadius={normalize(12)} />
+      <View style={styles.skeletonCenter}>
+        <Skeleton width={wp(60)} height={normalize(18)} />
+      </View>
+      <Skeleton width={wp(80)} height={normalize(48)} borderRadius={normalize(16)} />
+      <Skeleton width={wp(80)} height={normalize(48)} borderRadius={normalize(16)} />
+      <View style={styles.skeletonHeadingWrap}>
+        <Skeleton width={wp(50)} height={normalize(20)} />
+      </View>
+      {[1, 2].map((i) => (
+        <View key={i} style={styles.skeletonCard}>
+          <View style={styles.skeletonRowBetween}>
+            <View style={styles.skeletonBlock}>
+              <Skeleton width={wp(50)} height={normalize(16)} />
+              <Skeleton width={wp(65)} height={normalize(12)} />
+              <Skeleton width={wp(45)} height={normalize(12)} />
+            </View>
+            <Skeleton width={wp(22)} height={normalize(28)} borderRadius={normalize(999)} />
+          </View>
+          <View style={styles.skeletonMetaRow}>
+            <Skeleton width={wp(24)} height={normalize(50)} borderRadius={normalize(12)} />
+            <Skeleton width={wp(24)} height={normalize(50)} borderRadius={normalize(12)} />
+            <Skeleton width={wp(24)} height={normalize(50)} borderRadius={normalize(12)} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
   return (
     <Screen backgroundColor={palette.creme}>
       <ScrollView contentContainerStyle={styles.container}>
+        {loading ? (
+          renderSkeleton()
+        ) : (
+          <>
         <ImageBackground
           source={require('../../../assets/placeholder/kale-header.png')}
           style={styles.headerBg}
@@ -266,7 +309,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       >
                         <Ionicons
                           name="call-outline"
-                          size={18}
+                          size={normalize(18)}
                           color={palette.white}
                         />
                         <AppText variant="label" style={styles.iconText} > Call </AppText>
@@ -280,7 +323,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       >
                         <Ionicons
                           name="chatbubble-outline"
-                          size={18}
+                          size={normalize(18)}
                           color={palette.white}
                         />
                         <AppText variant="label" style={styles.iconText} > Message </AppText>
@@ -303,7 +346,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       >
                         <Ionicons
                           name="call-outline"
-                          size={18}
+                          size={normalize(18)}
                           color={palette.white}
                         />
                         <AppText variant="label" style={styles.iconText} > Call </AppText>
@@ -317,7 +360,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       >
                         <Ionicons
                           name="chatbubble-outline"
-                          size={18}
+                          size={normalize(18)}
                           color={palette.white}
                         />
                         <AppText variant="label" style={styles.iconText} > Message </AppText>
@@ -329,6 +372,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
             );
           })}
         </View>
+          </>
+        )}
       </ScrollView>
 
       <Modal
@@ -349,7 +394,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
               >
                 <Ionicons
                   name="close"
-                  size={20}
+                  size={normalize(20)}
                   color={palette.black}
                 />
               </Pressable>
@@ -393,7 +438,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 );
               })
             ) : (
-              <View style={{ paddingVertical: spacing.md }}>
+              <View style={{ paddingVertical: hp(1.6) }}>
                 <AppText variant="bodySmall">
                   No items available
                 </AppText>
@@ -401,7 +446,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
             )}
 
             {/* TOTALS */}
-            <View style={{ marginTop: spacing.lg, gap: spacing.sm, }} >
+            <View style={{ marginTop: hp(2), gap: hp(1) }} >
               <AppText variant="bodyBold">
                 Total Quantity:{' '}
                 {selectedItems.reduce(
@@ -431,11 +476,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.lg },
+  container: { gap: hp(2) },
 
   headerBg: {
     width: '100%',
-    height: 140,
+    height: hp(18),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -443,6 +488,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: palette.white,
     textAlign: 'center',
+    fontSize: normalize(24),
   },
 
   subHeaderContainer: {
@@ -451,53 +497,54 @@ const styles = StyleSheet.create({
 
   heroSubText: {
     color: palette.black,
-    lineHeight: 30,
+    lineHeight: normalize(22),
     opacity: 0.9,
   },
 
   createBtn: {
     backgroundColor: palette.primary,
-    padding: spacing.md,
-    borderRadius: 16,
-    marginHorizontal: spacing.xl,
+    paddingVertical: hp(1.6),
+    borderRadius: normalize(16),
+    marginHorizontal: wp(6),
     alignItems: 'center',
   },
 
   createText: { color: 'white' },
 
-  section: { gap: spacing.md },
+  section: { gap: hp(1.6) },
 
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.xxl,
-    marginBottom: spacing.xxl,
+    marginTop: hp(2.5),
+    marginBottom: hp(2.5),
   },
 
   headingBg: {
     position: 'absolute',
     width: '100%',
-    height: 80,
+    height: hp(10),
     resizeMode: 'contain',
   },
 
   headingText: {
     textAlign: 'center',
+    fontSize: normalize(18),
   },
 
   card: {
-    padding: spacing.md,
-    marginHorizontal: spacing.lg,
-    borderRadius: 16,
-    gap: spacing.md,
+    padding: hp(1.6),
+    marginHorizontal: wp(4),
+    borderRadius: normalize(16),
+    gap: hp(1.4),
     backgroundColor: palette.radish,
   },
 
   statusPill: {
     alignSelf: 'flex-start',
     backgroundColor: palette.middlegreen,
-    width: 115,
-    paddingVertical: spacing.sm,
+    width: wp(28),
+    paddingVertical: hp(0.8),
     borderRadius: 999,
     alignItems: 'center',
   },
@@ -508,14 +555,14 @@ const styles = StyleSheet.create({
 
   modalHeaderRow: {
     flexDirection: 'row',
-    paddingBottom: 10,
+    paddingBottom: hp(1),
     borderBottomWidth: 1,
     borderColor: palette.border,
   },
 
   modalItemRow: {
     flexDirection: 'row',
-    paddingVertical: spacing.xs,
+    paddingVertical: hp(0.6),
   },
 
   modalCol: {
@@ -535,24 +582,24 @@ const styles = StyleSheet.create({
 
   charityBlock: {
     flex: 1,
-    gap: 4,
+    gap: hp(0.4),
   },
 
   contactLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    paddingVertical: hp(0.6),
   },
 
   trackBtn: {
-    minWidth: 120,
+    minWidth: wp(26),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: palette.primary,
-    paddingVertical: spacing.sm,
+    paddingVertical: hp(0.9),
     borderRadius: 999,
-    width: 115,
+    width: wp(28),
   },
 
   trackText: {
@@ -561,28 +608,28 @@ const styles = StyleSheet.create({
 
   metaRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: wp(2.2),
   },
 
   metaCard: {
     flex: 1,
     backgroundColor: palette.creme,
-    padding: spacing.sm,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: hp(1),
+    borderRadius: normalize(12),
+    gap: hp(0.8),
     alignItems: 'center',
   },
 
   infoBlock: {
     backgroundColor: palette.white,
-    padding: spacing.sm,
-    borderRadius: 10,
+    padding: hp(1),
+    borderRadius: normalize(10),
   },
 
   viewBtn: {
     backgroundColor: palette.middlegreen,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(0.7),
     borderRadius: 999,
   },
 
@@ -593,10 +640,10 @@ const styles = StyleSheet.create({
   iconPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: wp(1.2),
     backgroundColor: palette.middlegreen,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: wp(2.8),
+    paddingVertical: hp(0.9),
     borderRadius: 999,
   },
 
@@ -606,12 +653,12 @@ const styles = StyleSheet.create({
 
   iconRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: wp(2.5),
   },
 
   statusWrap: {
     alignItems: 'flex-end',
-    gap: 8,
+    gap: hp(0.8),
   },
 
   modalWrap: {
@@ -621,25 +668,62 @@ const styles = StyleSheet.create({
 
   modalCard: {
     backgroundColor: 'white',
-    padding: spacing.lg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    gap: spacing.md,
+    padding: wp(5),
+    borderTopLeftRadius: normalize(24),
+    borderTopRightRadius: normalize(24),
+    gap: hp(1.6),
+    marginBottom: hp(2),
   },
 
   modalTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: hp(1),
   },
 
   closeIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: normalize(36),
+    height: normalize(36),
+    borderRadius: normalize(18),
     backgroundColor: '#dadbdd',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  skeletonWrap: {
+    paddingHorizontal: wp(5),
+    gap: hp(1.6),
+  },
+
+  skeletonCenter: {
+    alignItems: 'center',
+    marginTop: hp(0.5),
+  },
+
+  skeletonHeadingWrap: {
+    alignItems: 'center',
+    marginTop: hp(1.5),
+  },
+
+  skeletonCard: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(16),
+    padding: hp(1.6),
+    gap: hp(1.4),
+  },
+
+  skeletonRowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  skeletonBlock: {
+    gap: hp(0.6),
+  },
+
+  skeletonMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });
