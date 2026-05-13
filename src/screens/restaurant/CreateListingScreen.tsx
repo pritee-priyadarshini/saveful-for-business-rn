@@ -40,20 +40,22 @@ export function CreateListingScreen({ navigation }: any) {
     const [customFoodDetail, setCustomFoodDetail] = useState('');
     const [otherFoodDetail, setOtherFoodDetail] = useState(false);
 
+    const [hasPreviousListing, setHasPreviousListing] = useState<boolean | null>(null);
     const [customItem, setCustomItem] = useState('');
     const [location, setLocation] = useState(currentProfile.address);
     const [images, setImages] = useState<string[]>([]);
 
-    const [pickupPostcode, setPickupPostcode] = useState('');
     const [bestBefore, setBestBefore] = useState<Date | null>(null);
     const [pickupFrom, setPickupFrom] = useState<Date | null>(null);
     const [pickupTo, setPickupTo] = useState<Date | null>(null);
 
     const [items, setItems] = useState([
         { name: 'Prepared meals', qty: 0 },
-        { name: 'Baked goods', qty: 0 },
+        { name: 'Bread', qty: 0 },
+        { name: 'Baked Goods', qty: 0 },
         { name: 'Fresh fruit & vegetables', qty: 0 },
-        { name: 'Meat & dairy', qty: 0 },
+        { name: 'Meat', qty: 0 },
+        { name: 'Dairy', qty: 0 },
     ]);
 
     const [foodOptions, setFoodOptions] = useState<any>({
@@ -64,7 +66,7 @@ export function CreateListingScreen({ navigation }: any) {
         safeForDonation: false,
     });
 
-    const [safeFood, setSafeFood] = useState(true);
+    const [safeFood, setSafeFood] = useState(false);
     const [safeFoodError, setSafeFoodError] = useState(false);
 
     // DateTimePicker States
@@ -75,7 +77,7 @@ export function CreateListingScreen({ navigation }: any) {
 
     const updateQty = (index: number, change: number) => {
         const updated = [...items];
-        updated[index].qty = Math.max(0, updated[index].qty + change);
+        updated[index].qty = Math.max(0, Math.round((updated[index].qty + change) * 10) / 10);
         setItems(updated);
     };
 
@@ -216,7 +218,6 @@ export function CreateListingScreen({ navigation }: any) {
                 siteId: Number(siteId),
                 foodItems,
                 pickupAddress: location,
-                pickupPostcode: pickupPostcode || undefined,
                 bestBefore: bestBefore.toISOString(),
                 pickupFromTime: pickupFrom.toISOString(),
                 pickupByTime: pickupTo.toISOString(),
@@ -260,6 +261,12 @@ export function CreateListingScreen({ navigation }: any) {
         if (!date) return '';
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     };
+
+    React.useEffect(() => {
+        foodListingService.getListings({ page: 1, limit: 1 })
+            .then(res => setHasPreviousListing((res.data?.listings?.length ?? 0) > 0))
+            .catch(() => setHasPreviousListing(false));
+    }, []);
 
     const handleRelist = async () => {
         try {
@@ -315,22 +322,30 @@ export function CreateListingScreen({ navigation }: any) {
                 </ImageBackground>
 
 
-                {/* SAME AS YESTERDAY */}
-                <Card style={[styles.card, styles.centerCard]}>
-                    <AppText variant="bodyBold" style={styles.centerText}>Same as yesterday?</AppText>
+                {/* SAME AS YESTERDAY - only show when a previous listing exists */}
+                {hasPreviousListing && (
+                    <Card style={[styles.card, styles.centerCard]}>
+                        <AppText variant="bodyBold" style={styles.centerText}>Same as yesterday?</AppText>
 
-                    <View style={styles.centerRow}>
-                        <Pressable style={styles.primaryBtn} onPress={handleRelist} >
-                            <AppText variant="caption" style={styles.primaryText}>Yes, list again</AppText>
-                        </Pressable>
-                    </View>
-                </Card>
+                        <View style={styles.centerRow}>
+                            <Pressable style={styles.primaryBtn} onPress={handleRelist}>
+                                <AppText variant="caption" style={styles.primaryText}>Yes, list again</AppText>
+                            </Pressable>
+                        </View>
+                    </Card>
+                )}
 
                 {/* WHAT DO YOU HAVE */}
                 <View style={styles.section}>
-                    <AppText variant="heading">What do you have (in kg)?</AppText>
+                    <AppText variant="heading">What do you have?</AppText>
 
                     <Card style={styles.card}>
+                        {/* Column header */}
+                        <View style={styles.itemRow}>
+                            <View style={{ flex: 1 }} />
+                            <AppText variant="caption" style={styles.kgHeader}>kg</AppText>
+                        </View>
+
                         {items.map((item, index) => (
                             <View key={index} style={styles.itemRow}>
                                 <AppText variant="bodyLarge">{item.name}</AppText>
@@ -338,16 +353,18 @@ export function CreateListingScreen({ navigation }: any) {
                                 <View style={styles.qtyContainer}>
                                     <Pressable
                                         style={styles.qtyBtn}
-                                        onPress={() => updateQty(index, -1)}
+                                        onPress={() => updateQty(index, -0.5)}
                                     >
                                         <AppText variant="bodyLarge">-</AppText>
                                     </Pressable>
 
-                                    <AppText variant="bodyLarge">{item.qty}</AppText>
+                                    <AppText variant="bodyLarge" style={styles.qtyValue}>
+                                        {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
+                                    </AppText>
 
                                     <Pressable
                                         style={styles.qtyBtn}
-                                        onPress={() => updateQty(index, 1)}
+                                        onPress={() => updateQty(index, 0.5)}
                                     >
                                         <AppText variant="bodyLarge">+</AppText>
                                     </Pressable>
@@ -439,21 +456,13 @@ export function CreateListingScreen({ navigation }: any) {
                             onChangeText={setLocation}
                             style={styles.input}
                         />
-
-                        <TextInput
-                            placeholder="Postcode (optional)"
-                            value={pickupPostcode}
-                            onChangeText={setPickupPostcode}
-                            style={styles.input}
-                            keyboardType='number-pad'
-                        />
                     </Card>
 
                 </View>
 
                 {/* BEST BEFORE */}
                 <View style={[styles.section, { marginTop: hp(1) }]}>
-                    <AppText variant="bodyBold" style={{ marginBottom: hp(0.5) }}>Best Before Time</AppText>
+                    <AppText variant="bodyBold" style={{ marginBottom: hp(0.5) }}>Food Best Before</AppText>
                     <Pressable
                         style={styles.timeInputFull}
                         onPress={() => openDateTimePicker('bestBefore')}
@@ -518,10 +527,6 @@ export function CreateListingScreen({ navigation }: any) {
                             {
                                 key: 'glutenFree',
                                 label: 'Gluten-free ✅',
-                            },
-                            {
-                                key: 'safeForDonation',
-                                label: 'Safe for donation 🤝',
                             }
                         ].map((item) => (
                             <Pressable
@@ -614,7 +619,14 @@ export function CreateListingScreen({ navigation }: any) {
                 )}
 
                 {/* SUBMIT */}
-                <Pressable style={styles.submitBtn} onPress={handleSubmit}>
+                <Pressable
+                    style={[
+                        styles.submitBtn,
+                        !safeFood && { backgroundColor: palette.midgray, opacity: 0.7 }
+                    ]}
+                    onPress={handleSubmit}
+                    disabled={!safeFood}
+                >
                     <AppText variant="h7" style={styles.submitText}>
                         Create Listing
                     </AppText>
@@ -721,6 +733,7 @@ const styles = StyleSheet.create({
     subtext: {
         opacity: 0.7,
         fontSize: normalize(14),
+        width: wp(85),
     },
 
     section: {
@@ -779,7 +792,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: wp(3),
     },
+    kgHeader: {
+        width: normalize(32) * 2 + normalize(40) + wp(6),
+        textAlign: 'center',
+        opacity: 0.5,
+        fontSize: normalize(12),
+    },
 
+    qtyValue: {
+        minWidth: normalize(32),
+        textAlign: 'center',
+    },
     qtyBtn: {
         width: normalize(32),
         height: normalize(32),
@@ -789,7 +812,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-
     input: {
         borderWidth: 1,
         borderColor: palette.black,

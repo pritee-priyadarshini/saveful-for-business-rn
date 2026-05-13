@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RestaurantListingsScreen } from '../screens/restaurant/RestaurantListingsScreen';
 import { CreateListingScreen } from '@/screens/restaurant/CreateListingScreen';
+import { EditListingScreen } from '@/screens/restaurant/EditListingScreen';
 import { ListingConfirmationScreen } from '@/screens/restaurant/ListingConfirmationScreen';
 import CollectionHistoryScreen from '@/screens/restaurant/CollectionHistoryScreen';
 
@@ -8,6 +9,7 @@ import CollectionHistoryScreen from '@/screens/restaurant/CollectionHistoryScree
 type RestaurantStackParamList = {
   RestaurantListings: undefined;
   CreateListing: undefined;
+  EditListing: { listingId: number };
   ListingConfirmation: undefined;
   CollectionHistory: undefined;
 };
@@ -19,6 +21,7 @@ export function RestaurantStack() {
     <Stack.Navigator initialRouteName="RestaurantListings" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="RestaurantListings" component={RestaurantListingsScreen} />
       <Stack.Screen name="CreateListing" component={CreateListingScreen} />
+      <Stack.Screen name="EditListing" component={EditListingScreen} />
       <Stack.Screen name="ListingConfirmation" component={ ListingConfirmationScreen } />
       <Stack.Screen name="CollectionHistory" component={CollectionHistoryScreen} />
     </Stack.Navigator>

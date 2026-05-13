@@ -55,12 +55,35 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
       const res = await foodListingService.getListings();
 
-      setListings(res.data?.listings || []);
+      const all: any[] = res.data?.listings || [];
+      setListings(all.filter(l => l.status !== 'CANCELLED'));
     } catch (err) {
       Alert.alert('Error', 'Failed to load listings');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelListing = (id: number) => {
+    Alert.alert(
+      'Cancel Listing',
+      'Are you sure you want to cancel this listing? This cannot be undone.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await foodListingService.cancelListing(id);
+              await fetchListings();
+            } catch (error: any) {
+              Alert.alert('Error', error?.response?.data?.message || 'Failed to cancel listing');
+            }
+          },
+        },
+      ]
+    );
   };
 
 
@@ -218,7 +241,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
                   {/* RIGHT */}
                   <View style={styles.statusWrap}>
-                    <View style={styles.statusPill}>
+                    <View>
                       <AppText variant="label" style={styles.statusText} >
                         {prettyStatus(detail.status)}
                       </AppText>
@@ -366,6 +389,27 @@ export function RestaurantListingsScreen({ navigation }: any) {
                         <AppText variant="label" style={styles.iconText} > Message </AppText>
                       </Pressable>
                     </View>
+                  </View>
+                )}
+
+                {/* EDIT / CANCEL ACTIONS */}
+                {(detail.status === 'ACTIVE' || detail.status === 'PARTIAL') && (
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      style={styles.editBtn}
+                      onPress={() => navigation.navigate('EditListing', { listingId: item.id })}
+                    >
+                      <Ionicons name="create-outline" size={normalize(16)} color={palette.white} />
+                      <AppText variant="label" style={styles.actionBtnText}>Edit</AppText>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.cancelBtn}
+                      onPress={() => handleCancelListing(item.id)}
+                    >
+                      <Ionicons name="close-circle-outline" size={normalize(16)} color={palette.white} />
+                      <AppText variant="label" style={styles.actionBtnText}>Cancel Listing</AppText>
+                    </Pressable>
                   </View>
                 )}
               </Card>
@@ -550,7 +594,7 @@ const styles = StyleSheet.create({
   },
 
   statusText: {
-    color: palette.white,
+    color: palette.kale,
   },
 
   modalHeaderRow: {
@@ -636,7 +680,6 @@ const styles = StyleSheet.create({
   viewText: {
     color: palette.white,
   },
-
   iconPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -646,7 +689,6 @@ const styles = StyleSheet.create({
     paddingVertical: hp(0.9),
     borderRadius: 999,
   },
-
   iconText: {
     color: palette.white,
   },
@@ -725,5 +767,37 @@ const styles = StyleSheet.create({
   skeletonMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    gap: wp(2.5),
+    marginTop: hp(0.5),
+  },
+
+  editBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1.5),
+    backgroundColor: palette.primary,
+    paddingVertical: hp(1),
+    borderRadius: normalize(10),
+  },
+
+  cancelBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1.5),
+    backgroundColor: palette.danger,
+    paddingVertical: hp(1),
+    borderRadius: normalize(10),
+  },
+
+  actionBtnText: {
+    color: palette.white,
   },
 });

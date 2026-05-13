@@ -12,8 +12,6 @@ import {
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-
-import { spacing } from '../../theme/spacing';
 import { palette } from '@/theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -42,7 +40,7 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
 
     const totalKg = listing?.totalQtyKg || 
                   listing?.foodItems?.reduce((sum: number, item: any) => sum + (item.totalQtyKg || 0), 0) || 0;
-    const meals = Math.floor((totalKg * 1000) / 300);
+    const meals = Math.floor((totalKg * 1000) / 420);
 
     const formatDateTime = (date: any) => {
         if (!date) return 'N/A';
@@ -92,12 +90,12 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
 
                         {listing?.foodItems?.map((item: any, index: number) => (
                             <View key={index} style={styles.itemRow}>
-                                <AppText variant="caption">
+                                <AppText variant="body">
                                     {item.category}
                                 </AppText>
 
                                 <AppText
-                                    variant="caption"
+                                    variant="body"
                                     style={styles.qtyText}
                                 >
                                     {item.totalQtyKg} kg
@@ -109,7 +107,7 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                     {/* PICKUP */}
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Pickup Time</AppText>
-                        <AppText variant="caption">
+                        <AppText variant="body">
                             {listing?.pickupFromTime ? formatDateTime(listing.pickupFromTime) : '--'} - {listing?.pickupByTime ? formatDateTime(listing.pickupByTime) : '--'}
                         </AppText>
                     </View>
@@ -117,7 +115,7 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                     {/* LOCATION */}
                     <View style={styles.section}>
                         <AppText variant="bodyBold">Pickup Location</AppText>
-                        <AppText variant="caption">{listing?.pickupAddress || 'N/A'}</AppText>
+                        <AppText variant="body">{listing?.pickupAddress || 'N/A'}</AppText>
                     </View>
 
                 </Card>
@@ -139,8 +137,8 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                                 </AppText>
                             </View>
 
-                            <AppText variant="caption">
-                                (300g = 1 meal)
+                            <AppText variant="body">
+                                (420g = 1 meal)
                             </AppText>
                         </View>
 
@@ -168,12 +166,11 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                     </Pressable>
 
                     <Pressable
-                        style={styles.secondaryBtn}
+                        style={styles.primaryBtn}
                         onPress={() => navigation.navigate('RestaurantListings')}
                     >
-                        <AppText variant="caption">Go to Listing</AppText>
+                    <AppText variant="caption" style={styles.primaryText}>Go to Listing</AppText>
                     </Pressable>
-
                 </View>
 
             </ScrollView>
@@ -277,6 +274,7 @@ const styles = StyleSheet.create({
     primaryText: {
         color: 'white',
         fontSize: normalize(16),
+        lineHeight: normalize(18),
     },
 
     secondaryBtn: {

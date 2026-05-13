@@ -28,7 +28,7 @@ export function CalculationScreen({ navigation }: any) {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={22} color="#FFF" />
+          <Ionicons name="arrow-back" size={22} color="#FFF" />
           </Pressable>
 
           <AppText variant="heading" color="#FFF" style={styles.headerTitle}>

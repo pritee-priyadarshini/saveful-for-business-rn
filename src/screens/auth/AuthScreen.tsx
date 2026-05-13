@@ -74,6 +74,7 @@ export function AuthScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
+        aspect: [1, 1],
         quality: 0.8,
       });
 
@@ -393,7 +394,7 @@ export function AuthScreen() {
                     <Image
                       source={{ uri: currentLogo }}
                       style={styles.logoPreview}
-                      resizeMode="contain"
+                      resizeMode="cover"
                     />
                     <View style={styles.editBadge}>
                       <AppText variant="label" style={styles.editBadgeText}>Edit</AppText>
@@ -567,15 +568,18 @@ const styles = StyleSheet.create({
 
   logoPreviewWrap: {
     alignSelf: 'flex-start',
+    width: normalize(120),
+    height: normalize(120),
+    borderRadius: normalize(60),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginTop: hp(1),
   },
 
   logoPreview: {
-    width: normalize(120),
-    height: normalize(120),
-    marginTop: hp(1),
-    borderRadius: normalize(12),
-    borderWidth: 1,
-    borderColor: palette.border,
+    width: '100%',
+    height: '100%',
   },
 
   editBadge: {

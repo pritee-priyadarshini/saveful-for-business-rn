@@ -56,8 +56,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
     },
     {
       label: 'CO2',
-      icon: require('../../../assets/placeholder/leftovers.png'),
-      title: 'You have potentially saved',
+      icon: require('../../../assets/track/co2.png'),
+      title: 'You have avoided',
       value: `${impact.co2SavedKg} KGs`,
     },
     {
@@ -137,7 +137,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
           {/* TOP ROW */}
           <View style={styles.topBar}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <AppText variant="h6" style={styles.whiteText}>
+              <AppText variant="h6" style={styles.whiteText} >
                 {currentProfile.organization}
               </AppText>
 
@@ -334,6 +334,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     fontSize: normalize(18),
     paddingTop: hp(1),
+    justifyContent: 'center',
   },
 
   logoCircle: {
