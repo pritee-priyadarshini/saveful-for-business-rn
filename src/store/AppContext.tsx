@@ -129,7 +129,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         return 'charity_multi';
       }
 
-      if (siteRole === 'SITE_ADMIN' || siteRole === 'LOCATION_ADMIN' || siteRole === 'TEAM_MEMBER') {
+      if (siteRole === 'SITE_ADMIN' || siteRole === 'LOCATION_ADMIN' || siteRole === 'TEAM_MEMBER' || siteRole === 'STAFF') {
         return 'charity_single';
       }
       return 'charity_multi';
@@ -162,6 +162,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         verificationStatus: 'Verified',
         phone: authUser.profile.user.phoneNumber || '',
         logo: authUser.profile.organisation?.logoUrl || '',
+        email: authUser.profile.user.email || '',
       }
       : {
         name: '',
@@ -170,6 +171,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         verificationStatus: 'Pending',
         phone: '',
         logo: '',
+        email:'',
       };
 
     const subscription: Subscription = {

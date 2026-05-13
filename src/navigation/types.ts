@@ -5,7 +5,6 @@ export type AuthStackParamList = {
   EmailVerification: { email?: string; autoResend?: boolean; } | undefined;
   TeamInvite: undefined;
   SignIn: undefined;
-  ForgotPassword: { from: 'SignIn' | 'Profile'; };
 };
 
 export type RestaurantTabsParamList = {

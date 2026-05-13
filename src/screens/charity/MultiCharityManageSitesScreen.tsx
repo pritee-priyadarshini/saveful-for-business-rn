@@ -235,7 +235,10 @@ export default function MultiCharityManageSitesScreen() {
                                 {/* VIEW */}
                                 <Pressable
                                     style={styles.viewBtn}
-                                    onPress={() => { setExpandedSite(expandedSite === site.id ? null : site.id); }}
+                                    onPress={() => {
+                                        setEditingSiteId(null); 
+                                        setExpandedSite(expandedSite === site.id ? null : site.id);
+                                    }}
                                 >
                                     <AppText variant="label" style={styles.viewText}>
                                         View

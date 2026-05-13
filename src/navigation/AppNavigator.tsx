@@ -32,16 +32,26 @@ export type RootStackParamList = {
   ClaimConfirm: undefined;
   CharityPostCollectSurvey: undefined;
   RestaurantPlan: undefined;
-  ManageAccess: undefined;
+  //ManageAccess: undefined;
   ManageSites: undefined;
   //CreateSite: undefined;
   CreateSite: { mode?: 'site' | 'manager'; siteId?: number };
   SiteAnalytics: undefined;
   AdminProfile: undefined;
   Calculation: undefined;
-  ForgotPassword: { from: 'SignIn' | 'Profile' };
+  ForgotPassword: undefined;
+  //CharityManageAccess: undefined;
 
-  CharityManageAccess: undefined;
+   ManageAccess: {
+    locationId: number;
+    orgType: 'restaurant' | 'charity';
+  };
+
+  CharityManageAccess: {
+    locationId: number;
+    orgType: 'restaurant' | 'charity';
+  };
+  
 
   //MultiCharity
   MultiCharityManageSites: undefined;

@@ -1,12 +1,14 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   FlatList,
   Image,
-  StyleSheet,
   View,
   TouchableOpacity,
   Dimensions,
   ImageBackground,
+  RefreshControl,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
@@ -14,12 +16,12 @@ import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 
-import { charityListings } from '../../data/mockData';
 import { useAppContext } from '../../store/AppContext';
 
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useNavigation } from '@react-navigation/native';
+import { foodListingService } from '@/services/foodListing.service';
 
 const { height } = Dimensions.get('window');
 
@@ -27,34 +29,94 @@ export function CharityDiscoverScreen() {
   const navigation = useNavigation<any>();
   const { currentProfile } = useAppContext();
   const listRef = useRef<FlatList>(null);
+
+  const [listings, setListings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  /*DEMO COORDINATES*/
-  const demoCoords = [
-    { lat: 20.2827, lng: 85.8707 }, // Bhubaneswar
-    { lat: 13.0674, lng: 80.2376 }, // T Nagar
-    { lat: 13.0569, lng: 80.2425 }, // Kodambakkam
-    { lat: 13.0358, lng: 80.2446 }, // Saidapet
-    { lat: 13.0106, lng: 80.2209 }, // Guindy
-    { lat: 12.9716, lng: 80.2214 }, // Velachery
-  ];
+  const fetchListings = async () => {
+    try {
+      setLoading(true);
 
-  /* ENRICH DATA */
-  const enrichedListings = useMemo(() => {
-    return charityListings.map((item, index) => {
-      const coord = demoCoords[index % demoCoords.length];
-      return {
-        ...item,
-        lat: coord.lat,
-        lng: coord.lng,
-      };
-    });
+      const res = await foodListingService.getListings({
+        status: 'ACTIVE',
+      });
+
+      const raw = res?.data;
+
+      let data: any[] = [];
+
+      if (Array.isArray(raw)) {
+        data = raw;
+      } else if (Array.isArray(raw?.data)) {
+        data = raw.data;
+      } else if (Array.isArray(raw?.data?.listings)) {
+        data = raw.data.listings;
+      } else if (Array.isArray(raw?.listings)) {
+        data = raw.listings;
+      } else {
+        console.log('Unexpected Data :', raw);
+        data = [];
+      }
+
+      const mapped = data.map((item: any) => {
+        const totalQty =
+          item.foodItems?.reduce(
+            (sum: number, f: any) =>
+              sum + (f.remainingQtyKg || f.totalQtyKg || 0),
+            0
+          ) || item.totalQtyKg || 0;
+
+        return {
+          id: String(item.id),
+          title: 'Surplus Food',
+          businessName: item.site?.locationName || item.site?.name || item.businessName || 'Food Provider',
+          quantityKg: totalQty,
+          date: item.bestBefore,
+          pickupWindow:
+            item.pickupFromTime && item.pickupByTime
+              ? `${item.pickupFromTime} - ${item.pickupByTime}`
+              : 'Flexible',
+
+          storage: item.needsRefrigeration ? 'Keep Refrigerated' : 'Room Temperature',
+          status:
+            item.status === 'ACTIVE'
+              ? 'Available'
+              : item.status === 'PARTIAL'
+                ? 'Partial claimed'
+                : item.status,
+
+          lat: Number(item.pickupLat) || 20.2961,
+          lng: Number(item.pickupLng) || 85.8245,
+
+          distance: '—',
+        };
+      });
+      console.log('availableListings:', availableListings);
+
+      setListings(mapped);
+    } catch (err) {
+      console.log('LISTING_FETCH_ERROR:', err);
+      setListings([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchListings();
   }, []);
 
-  const allowedStatuses = ['Available', 'Partial claimed'];
-
-  const availableListings = enrichedListings.filter((item) =>
-    allowedStatuses.includes(item.status)
+  const availableListings = useMemo(
+    () =>
+      Array.isArray(listings)
+        ? listings.filter((i) =>
+          ['Available', 'Partial claimed'].includes(i.status)
+        )
+        : [],
+    [listings]
   );
 
   const listingIndexMap = useMemo(() => {
@@ -72,7 +134,16 @@ export function CharityDiscoverScreen() {
     return 'Good evening';
   }, []);
 
-  /* LIST ITEM */
+  if (loading) {
+    return (
+      <Screen backgroundColor={palette.creme}>
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color={palette.middlegreen} />
+        </View>
+      </Screen>
+    );
+  }
+
   const renderListing = ({ item }: any) => (
     <TouchableOpacity activeOpacity={0.9} style={styles.card}>
       <View style={styles.cardTop}>
@@ -141,8 +212,14 @@ export function CharityDiscoverScreen() {
         source={require('../../../assets/placeholder/kale-header.png')}
         style={[styles.headerBg, { width: '100%' }]}
       >
+        <AppText variant="h6" style={styles.white}>
+          {currentProfile.organization || 'Your Organisation'}
+        </AppText>
+
+        <View style={{ height: 30 }} />
+
         <AppText variant="heading" style={styles.white}>
-          {greeting}, {currentProfile.name.split(' ')[0]}
+          {greeting}, {currentProfile.name.split(' ')[0] || 'User'}
         </AppText>
 
         <View style={{ height: 6 }} />
@@ -216,52 +293,50 @@ export function CharityDiscoverScreen() {
     </View>
   );
 
-  /* MAP */
-  const MapComponent = () => (
-    <View style={[styles.mapContainer, { marginTop: spacing.md }]}>
-      <MapView
-        style={styles.map}
-        liteMode={true}
-        initialRegion={{
-          latitude: 13.0827,
-          longitude: 80.2707,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        }}
-      >
-        {availableListings.map((item) => (
-          <Marker
-            key={item.id}
-            coordinate={{
-              latitude: item.lat,
-              longitude: item.lng,
-            }}
-            onPress={() => {
-              const index = listingIndexMap[item.id];
-              if (index !== undefined) {
-                listRef.current?.scrollToIndex({
-                  index,
-                  animated: true,
-                });
-              }
-            }}
-          />
-        ))}
-      </MapView>
+  const MapComponent = () => {
+    if (availableListings.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <AppText variant="h7">No surplus available</AppText>
+        </View>
+      );
+    }
 
-      {/* CARDS BELOW MAP */}
-      <View style={styles.cardListWrapper}>
-        <FlatList
-          ref={listRef}
-          data={availableListings}
-          keyExtractor={(item) => item.id}
-          renderItem={renderListing}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
+    return (
+      <View style={[styles.mapContainer, { marginTop: spacing.md }]}>
+        <MapView
+          style={styles.map}
+          liteMode
+          initialRegion={{
+            latitude: availableListings[0].lat,
+            longitude: availableListings[0].lng,
+            latitudeDelta: 0.08,
+            longitudeDelta: 0.08,
+          }}
+        >
+          {availableListings.map((item) => (
+            <Marker
+              key={item.id}
+              coordinate={{
+                latitude: item.lat,
+                longitude: item.lng,
+              }}
+            />
+          ))}
+        </MapView>
+
+        <View style={styles.cardListWrapper}>
+          <FlatList
+            ref={listRef}
+            data={availableListings}
+            keyExtractor={(item) => item.id}
+            renderItem={renderListing}
+            horizontal
+          />
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   /* RENDER */
   return (
@@ -272,11 +347,27 @@ export function CharityDiscoverScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderListing}
           ListHeaderComponent={Header}
-          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <AppText variant="h7">No surplus available</AppText>
+              <AppText variant="bodySmall">
+                There are currently no food listings near you
+              </AppText>
+            </View>
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchListings();
+              }}
+            />
+          }
         />
       ) : (
         <FlatList
-          data={[{ key: 'map' }]} // dummy single item
+          data={[{ key: 'map' }]}
           renderItem={() => (
             <>
               <Header />
@@ -284,7 +375,6 @@ export function CharityDiscoverScreen() {
             </>
           )}
           keyExtractor={(item) => item.key}
-          showsVerticalScrollIndicator={false}
         />
       )}
     </Screen>
@@ -294,6 +384,8 @@ export function CharityDiscoverScreen() {
 /* STYLES */
 
 const styles = StyleSheet.create({
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
   headerBg: {
     height: 180,
     justifyContent: 'center',
@@ -435,5 +527,11 @@ const styles = StyleSheet.create({
 
   cardListWrapper: {
     marginTop: spacing.sm,
+  },
+
+  emptyContainer: {
+    marginTop: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

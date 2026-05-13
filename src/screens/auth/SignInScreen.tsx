@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     View,
     TouchableOpacity,
@@ -10,8 +10,8 @@ import {
     Platform,
     KeyboardAvoidingView,
     ScrollView,
+    TextInput,
 } from 'react-native';
-import Icon from '@expo/vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
@@ -40,6 +40,14 @@ export function SignInScreen() {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+
+    const [mode, setMode] = useState<'login' | 'forgot' | 'reset'>('login');
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const inputs = useRef<(TextInput | null)[]>([]);
+
     const [loading, setLoading] = useState(false);
 
     const [secure, setSecure] = useState(true);
@@ -93,11 +101,78 @@ export function SignInScreen() {
             }
 
             setError(message);
-        }
-        finally {
+        } finally {
             setLoading(false);
         }
-    }
+    };
+
+    const handleSendCode = async () => {
+        try {
+            if (!email) {
+                setError('Enter your email');
+                return;
+            }
+
+            setLoading(true);
+
+            await authService.forgotPassword(email.trim().toLowerCase());
+
+            Alert.alert('Verification Email Sent', 'Check your inbox for OTP');
+            setMode('reset');
+
+        } catch (e: any) {
+            setError(e?.response?.data?.message || 'Failed to send code');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReset = async () => {
+        try {
+            const enteredOtp = otp.join('');
+
+            if (enteredOtp.length !== 6) {
+                setError('Enter valid OTP');
+                return;
+            }
+
+            if (newPassword.length < 8) {
+                setError('Password must be 8+ characters');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                setError('Passwords do not match');
+                return;
+            }
+
+            setLoading(true);
+
+            await authService.resetPassword(
+                email.trim().toLowerCase(),
+                enteredOtp,
+                newPassword
+            );
+
+            Alert.alert('Success', 'Password reset successful');
+            setMode('login');
+
+        } catch (e: any) {
+            setError(e?.response?.data?.message || 'Reset failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOtpChange = (text: string, index: number) => {
+        const next = [...otp];
+        next[index] = text.replace(/[^0-9]/g, '');
+        setOtp(next);
+
+        if (text && index < 5) {
+            inputs.current[index + 1]?.focus();
+        }
+    };
 
     return (
         <ImageBackground
@@ -128,13 +203,15 @@ export function SignInScreen() {
 
                             {/* FORM */}
                             <View style={styles.form}>
-                                <AppText variant="heading" style={styles.title}>
-                                    Welcome Back
+                                <AppText variant="subheading" style={styles.title}>
+                                    {mode === 'login' && 'Welcome Back'}
+                                    {mode === 'forgot' && 'Forgot Password'}
+                                    {mode === 'reset' && 'Reset Password'}
                                 </AppText>
 
                                 {/* EMAIL */}
                                 <InputField
-                                    label="Email Address"
+                                    label="Email Address *"
                                     placeholder="your@email.com"
                                     value={email}
                                     onChangeText={(text) => {
@@ -143,59 +220,122 @@ export function SignInScreen() {
                                     }}
                                 />
 
-                                {/* PASSWORD */}
-                                <View>
-                                    <View style={styles.passwordHeader}>
-                                        <AppText variant="label">Password</AppText>
+                                {/* LOGIN MODE */}
+                                {mode === 'login' && (
+                                    <>
+                                        <InputField
+                                            label="Password *"
+                                            value={password}
+                                            secureTextEntry
+                                            isPassword
+                                            onChangeText={(t) => {
+                                                setPassword(t);
+                                                setError('');
+                                            }}
+                                        />
 
-                                        <TouchableOpacity
-                                            onPress={() =>
-                                                navigation.navigate('ForgotPassword', {
-                                                    from: 'SignIn',
-                                                })
-                                            }
-                                        >
+                                        <TouchableOpacity onPress={() => setMode('forgot')}>
                                             <AppText variant="caption">
                                                 Forgot Password?
                                             </AppText>
                                         </TouchableOpacity>
-                                    </View>
+                                    </>
+                                )}
 
-                                    <View>
-                                        <InputField
-                                            label=""
-                                            placeholder="Enter your password"
-                                            value={password}
-                                            secureTextEntry={secure}
-                                            onChangeText={(text) => {
-                                                setPassword(text);
+                                {/* FORGOT MODE */}
+                                {mode === 'forgot' && (
+                                    <>
+                                        {/* SUBTEXT */}
+                                        <AppText variant='bodySmall' style={styles.subText}>
+                                            Enter your registered email address. We’ll send you a verification code to reset your password.
+                                        </AppText>
+
+                                        {/* SEND CODE */}
+                                        <TouchableOpacity
+                                            style={styles.button}
+                                            onPress={handleSendCode}
+                                            disabled={loading}
+                                        >
+                                            <AppText variant='label' style={styles.buttonText}>
+                                                {loading ? 'Sending...' : 'Send Verification Code'}
+                                            </AppText>
+                                        </TouchableOpacity>
+
+                                        {/* BACK TO SIGN IN */}
+                                        <TouchableOpacity
+                                            style={styles.backToLogin}
+                                            onPress={() => {
+                                                setMode('login');
                                                 setError('');
                                             }}
-                                        />
-                                        <TouchableOpacity
-                                            style={styles.eye}
-                                            onPress={() => setSecure((prev) => !prev)}
                                         >
-                                            <Icon
-                                                name={secure ? 'eye-off-outline' : 'eye-outline'}
-                                                size={20}
-                                                color={palette.textMuted}
-                                            />
+                                            <AppText variant='label' style={styles.backText}>
+                                                Back to Sign In
+                                            </AppText>
                                         </TouchableOpacity>
-                                    </View>
-                                </View>
+                                    </>
+                                )}
+
+                                {/* RESET MODE */}
+                                {mode === 'reset' && (
+                                    <>
+                                        <AppText variant='label' >
+                                            Enter your verification code
+                                        </AppText>
+                                        <View style={{ flexDirection: 'row', gap: 6 }}>
+
+                                            {otp.map((d, i) => (
+                                                <TextInput
+                                                    key={i}
+                                                    ref={(r) => {
+                                                        inputs.current[i] = r;
+                                                    }}
+                                                    style={styles.otp}
+                                                    maxLength={1}
+                                                    keyboardType="number-pad"
+                                                    value={d}
+                                                    onChangeText={(t) => handleOtpChange(t, i)}
+                                                />
+                                            ))}
+                                        </View>
+
+                                        <InputField
+                                            label="New Password"
+                                            value={newPassword}
+                                            secureTextEntry
+                                            isPassword
+                                            onChangeText={setNewPassword}
+                                        />
+
+                                        <InputField
+                                            label="Confirm Password"
+                                            value={confirmPassword}
+                                            secureTextEntry
+                                            isPassword
+                                            onChangeText={setConfirmPassword}
+                                        />
+
+                                        <TouchableOpacity style={styles.button} onPress={handleReset}>
+                                            <AppText style={styles.buttonText}>
+                                                {loading ? 'Resetting...' : 'Reset Password'}
+                                            </AppText>
+                                        </TouchableOpacity>
+                                    </>
+                                )}
 
                                 {/* ERROR */}
                                 {error ? (
                                     <AppText style={styles.error}>{error}</AppText>
                                 ) : null}
 
-                                {/* BUTTON */}
-                                <TouchableOpacity style={styles.button} onPress={handleLogin}>
-                                    <AppText variant="label" style={styles.buttonText}>
-                                        {loading ? 'Signing In...' : 'Sign In'}
-                                    </AppText>
-                                </TouchableOpacity>
+                                {/* LOGIN BUTTON */}
+                                {mode === 'login' && (
+                                    <TouchableOpacity style={styles.button} onPress={handleLogin}>
+                                        <AppText style={styles.buttonText}>
+                                            {loading ? 'Signing In...' : 'Sign In'}
+                                        </AppText>
+                                    </TouchableOpacity>
+                                )}
 
                             </View>
                         </View>
@@ -227,6 +367,8 @@ const styles = StyleSheet.create({
         height: hp(10),
     },
     form: {
+        borderColor: palette.border,
+        borderWidth: 1,
         backgroundColor: palette.white,
         borderRadius: normalize(20),
         padding: wp(6),
@@ -235,7 +377,7 @@ const styles = StyleSheet.create({
     },
     title: {
         textAlign: 'center',
-        fontSize: normalize(24),
+        fontSize: normalize(20),
     },
     passwordHeader: {
         flexDirection: 'row',
@@ -261,5 +403,33 @@ const styles = StyleSheet.create({
         color: palette.danger,
         textAlign: 'center',
         fontSize: normalize(12),
+    },
+
+    otp: {
+        flex: 1,
+        height: 50,
+        borderWidth: 1,
+        borderRadius: 10,
+        textAlign: 'center',
+    },
+
+    subText: {
+        textAlign: 'center',
+        color: palette.textMuted,
+        fontSize: normalize(13),
+        lineHeight: normalize(15),
+        marginBottom: hp(1),
+    },
+
+    backToLogin: {
+        backgroundColor: palette.radish,
+        padding: hp(1.8),
+        borderRadius: normalize(14),
+        alignItems: 'center',
+    },
+
+    backText: {
+        color: palette.primary,
+        fontSize: normalize(13),
     },
 });

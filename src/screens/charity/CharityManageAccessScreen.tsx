@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -9,174 +9,222 @@ import {
   ImageBackground,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
+import { CharityMemberRole, charityService } from '@/services/charity.service';
 
 type AccessType = 'user' | 'driver';
 
 type Member = {
-  id: string;
-  type: AccessType;
-  name: string;
+  id: number;
+  firstName: string;
+  lastName: string;
   email: string;
   mobile: string;
   role: string;
-  password: string;
 };
 
 export default function CharityManageAccessScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const { locationId, orgType } = route.params as {
+    locationId: number;
+    orgType: 'charity' | 'restaurant';
+  };
   const [activeTab, setActiveTab] = useState<AccessType>('user');
 
-  const [members, setMembers] = useState<Member[]>([
-    {
-      id: '1',
-      type: 'user',
-      name: 'Sarah Wilson',
-      email: 'sarah@charity.org',
-      mobile: '+91 9876543210',
-      role: 'site_admin',
-      password: '123456',
-    },
-    {
-      id: '2',
-      type: 'user',
-      name: 'John Mathew',
-      email: 'john@charity.org',
-      mobile: '+91 9123456780',
-      role: 'site_team_member',
-      password: '123456',
-    },
-    {
-      id: '3',
-      type: 'driver',
-      name: 'Rahul Das',
-      email: 'rahul@charity.org',
-      mobile: '+91 9876512345',
-      role: 'driver',
-      password: '123456',
-    },
-    {
-      id: '4',
-      type: 'driver',
-      name: 'Sanjay Rout',
-      email: 'sanjay@charity.org',
-      mobile: '+91 9876523456',
-      role: 'driver',
-      password: '123456',
-    },
-  ]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+  useEffect(() => {
+    fetchMembers();
+  }, []);
+
+  const fetchMembers = async () => {
+    try {
+      setLoadingMembers(true);
+
+      const res = await charityService.listUsers();
+
+      //onsole.log('USERS API RESPONSE:', res.data);
+
+      const normalizeUsers = (data: any) => [
+        ...(data.headOfficeAdmins || []).map((u: any) => ({
+          ...u,
+          role: 'HEAD_OFFICE_ADMIN',
+        })),
+
+        ...(data.headOfficeMembers || []).map((u: any) => ({
+          ...u,
+          role: 'HEAD_OFFICE',
+        })),
+
+        ...(data.locationAdmins || []).map((u: any) => ({
+          ...u,
+          role: 'LOCATION_ADMIN',
+        })),
+
+        ...(data.teamMembers || []).map((u: any) => ({
+          ...u,
+          role: 'TEAM_MEMBER',
+        })),
+
+        ...(data.drivers || []).map((u: any) => ({
+          ...u,
+          role: 'DRIVER',
+        })),
+      ];
+
+      setMembers(normalizeUsers(res.data));
+
+    } catch (e) {
+      Alert.alert('Error', 'Failed to load members');
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
 
   const [form, setForm] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     mobile: '',
     password: '',
     role: '',
   });
 
+  const mapRoleToApi = (role: string): CharityMemberRole => {
+    switch (role) {
+      case 'site_admin':
+        return CharityMemberRole.LOCATION_ADMIN;
+      case 'site_team_member':
+        return CharityMemberRole.TEAM_MEMBER;
+      case 'driver':
+        return CharityMemberRole.DRIVER;
+      default:
+        return CharityMemberRole.TEAM_MEMBER;
+    }
+  };
+
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
 
-  const filteredMembers = members.filter(m => m.type === activeTab);
-
-  const handleSubmit = () => {
-    const finalRole =
-      activeTab === 'driver' ? 'driver' : form.role;
-    if (
-      !form.name ||
-      !form.email ||
-      !form.mobile ||
-      !form.password ||
-      !finalRole
-    ) {
-      Alert.alert('Error', 'Please fill all fields');
-      return;
+  const filteredMembers = members.filter(m => {
+    if (activeTab === 'driver') {
+      return m.role === 'DRIVER';
     }
+    return m.role !== 'DRIVER';
+  });
 
-    if (editingId) {
-      setMembers(prev =>
-        prev.map(member =>
-          member.id === editingId
-            ? {
-              ...member,
-              ...form,
-              role: finalRole,
-              type: activeTab,
-            }
-            : member
-        )
-      );
+  const mapApiRoleToUI = (role: string) => {
+    switch (role) {
+      case 'LOCATION_ADMIN':
+        return 'site_admin';
+      case 'TEAM_MEMBER':
+        return 'site_team_member';
+      case 'DRIVER':
+        return 'driver';
+      default:
+        return '';
+    }
+  };
+  const handleSubmit = async () => {
+    try {
+      const finalRole =
+        activeTab === 'driver' ? 'driver' : form.role;
 
-      setEditingId(null);
-    } else {
-      const newMember: Member = {
-        id: Date.now().toString(),
-        type: activeTab,
-        name: form.name,
-        email: form.email,
+      if (!form.firstName || !form.lastName || !form.mobile) {
+        Alert.alert('Error', 'Name and mobile are required');
+        return;
+      }
+
+      if (!editingId) {
+        if (!form.email || !form.password || !finalRole) {
+          Alert.alert('Error', 'Please fill all fields');
+          return;
+        }
+      }
+
+      const payload = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email.trim().toLowerCase(),
         mobile: form.mobile,
         password: form.password,
-        role: finalRole,
+        role: mapRoleToApi(finalRole),
+        locationId: locationId,
       };
 
-      setMembers(prev => [
-        ...prev,
-        newMember,
-      ]);
-    }
+      if (editingId) {
+        await charityService.updateUser(Number(editingId), {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          mobile: form.mobile,
+        });
 
-    setForm({
-      name: '',
-      email: '',
-      mobile: '',
-      password: '',
-      role: '',
-    });
-  };
+        Alert.alert('Success', 'User updated');
+      } else {
+        await charityService.addMember(payload);
+        Alert.alert('Success', 'User added');
+      }
 
-  const handleEdit = (member: Member) => {
-    setActiveTab(member.type);
-    setForm({
-      name: member.name,
-      email: member.email,
-      mobile: member.mobile,
-      password: member.password,
-      role: member.role,
-    });
-    setEditingId(member.id);
-  };
+      fetchMembers();
 
-  const handleDelete = (id: string, role: string) => {
-    if (role === 'site_admin') {
-      Alert.alert('Not allowed', 'Site admin cannot be removed');
-      return;
-    }
-
-    setMembers(prev => prev.filter(m => m.id !== id));
-    if (editingId === id) {
       setEditingId(null);
       setForm({
-        name: '',
+        firstName: '',
+        lastName: '',
         email: '',
         mobile: '',
         password: '',
         role: '',
       });
+
+    } catch (e: any) {
+      Alert.alert(
+        'Error',
+        e?.response?.data?.message || 'Something went wrong'
+      );
     }
   };
 
-  const prettyRole = (role: string) => {
-    return role
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
+  const handleEdit = (member: any) => {
+    setActiveTab(
+      member.role === CharityMemberRole.DRIVER ? 'driver' : 'user'
+    );
+
+    setForm({
+      firstName: member.firstName,
+      lastName: member.lastName,
+      email: member.email,
+      mobile: member.mobile,
+      password: '123',
+      role: mapApiRoleToUI(member.role),
+    });
+
+    setEditingId(member.id.toString());
   };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await charityService.deleteUser(Number(id));
+      fetchMembers();
+    } catch {
+      Alert.alert('Error', 'Delete failed');
+    }
+  };
+
+  const prettyRole = (role?: string) => {
+    if (!role) return 'Unknown';
+    return role.replace(/_/g, ' ');
+  };
+
 
   return (
     <Screen backgroundColor={palette.creme}>
@@ -219,7 +267,8 @@ export default function CharityManageAccessScreen() {
               setActiveTab('user');
               setEditingId(null);
               setForm({
-                name: '',
+                firstName: '',
+                lastName: '',
                 email: '',
                 mobile: '',
                 password: '',
@@ -250,7 +299,8 @@ export default function CharityManageAccessScreen() {
               setActiveTab('driver');
               setEditingId(null);
               setForm({
-                name: '',
+                firstName: '',
+                lastName: '',
                 email: '',
                 mobile: '',
                 password: '',
@@ -282,14 +332,16 @@ export default function CharityManageAccessScreen() {
           </AppText>
 
           <TextInput
-            placeholder="Full Name"
-            value={form.name}
-            onChangeText={v =>
-              setForm({
-                ...form,
-                name: v,
-              })
-            }
+            placeholder="First Name"
+            value={form.firstName}
+            onChangeText={v => setForm({ ...form, firstName: v })}
+            style={styles.input}
+          />
+
+          <TextInput
+            placeholder="Last Name"
+            value={form.lastName}
+            onChangeText={v => setForm({ ...form, lastName: v })}
             style={styles.input}
           />
 
@@ -342,34 +394,36 @@ export default function CharityManageAccessScreen() {
             </View>
           )}
 
-          <View style={styles.passwordContainer} >
-            <TextInput
-              placeholder="Password"
-              value={form.password}
-              onChangeText={v =>
-                setForm({
-                  ...form,
-                  password: v,
-                })
-              }
-              secureTextEntry={!showPassword}
-              style={{ flex: 1, }}
-            />
-
-            <Pressable
-              onPress={() =>
-                setShowPassword(
-                  !showPassword
-                )
-              }
-            >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color="#555"
+          {!editingId && (
+            <View style={styles.passwordContainer}>
+              <TextInput
+                placeholder="Password"
+                value={form.password}
+                onChangeText={v =>
+                  setForm({
+                    ...form,
+                    password: v,
+                  })
+                }
+                secureTextEntry={!showPassword}
+                style={{ flex: 1, }}
               />
-            </Pressable>
-          </View>
+
+              <Pressable
+                onPress={() =>
+                  setShowPassword(
+                    !showPassword
+                  )
+                }
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color="#555"
+                />
+              </Pressable>
+            </View>
+          )}
 
           <Pressable
             style={styles.addBtn}
@@ -399,10 +453,10 @@ export default function CharityManageAccessScreen() {
               style={styles.memberRow}
             >
               <View style={{ flex: 1, }} >
-                <AppText variant="bodyBold"> {member.name} </AppText>
-                <AppText variant="bodySmall"> {member.email} </AppText>
-                <AppText variant="bodySmall"> {member.mobile} </AppText>
-                <AppText variant="bodySmall"> Role:{' '} {prettyRole(member.role)} </AppText>
+                <AppText variant="bodyBold"> Name: {member.firstName} {member.lastName} </AppText>
+                <AppText variant="bodySmall"> Email: {member.email} </AppText>
+                <AppText variant="bodySmall"> Phone: {member.mobile} </AppText>
+                <AppText variant="bodySmall"> Role: {' '} {prettyRole(member.role)} </AppText>
               </View>
 
               <View style={styles.actions} >
@@ -418,12 +472,7 @@ export default function CharityManageAccessScreen() {
                       </Pressable>
 
                       <Pressable
-                        onPress={() =>
-                          handleDelete(
-                            member.id,
-                            member.role
-                          )
-                        }
+                        onPress={() => handleDelete(member.id.toString())}
                       >
                         <Ionicons name="trash-outline" size={22} color={palette.chilli} />
                       </Pressable>
@@ -540,7 +589,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderRadius: 8,
     padding: 14,
-    backgroundColor:'#F4F4F5',
+    backgroundColor: '#F4F4F5',
   },
 
   addBtn: {
@@ -563,7 +612,7 @@ const styles = StyleSheet.create({
   },
 
   actions: {
-    flexDirection:  'row',
+    flexDirection: 'row',
     gap: spacing.sm,
   },
 });

@@ -23,16 +23,19 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/AppNavigator';
 import { palette } from '@/theme/colors';
+import { charityService } from '@/services/charity.service';
 
 export function ProfileScreen() {
-  const { currentProfile } = useAppContext();
+  const { currentProfile, authUser, setAuthUser } = useAppContext();
   type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
   const navigation = useNavigation<NavigationProp>();
 
   const [openSection, setOpenSection] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
   const [logo, setLogo] = useState<string | null>(null);
+
+  const selectedSiteId = authUser?.profile?.sites?.[0]?.id;
+ console.log('Selected Site ID:', selectedSiteId);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -43,12 +46,49 @@ export function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
     });
 
     if (!result.canceled) {
       setLogo(result.assets[0].uri);
+    }
+  };
+
+  const handleUpdateContact = async () => {
+    try {
+      if (!authUser?.id) {
+        Alert.alert('Error', 'User not found');
+        return;
+      }
+      await charityService.updateUser(authUser.id, { mobile: formData.mobile, });
+
+      Alert.alert('Success', 'Contact updated');
+    } catch (err) {
+      console.log(err);
+      Alert.alert('Error', 'Failed to update contact');
+    }
+  };
+
+  const handleUpdateLocation = async () => {
+    try {
+      const locationId = authUser?.profile?.sites?.[0]?.id;
+      if (!locationId) {
+        Alert.alert('Error', 'Location not found');
+        return;
+      }
+
+      await charityService.updateLocation(locationId, {
+        address: formData.address,
+        postcode: '',
+        radiusKm: Number(formData.radius),
+      });
+
+      Alert.alert('Success', 'Details updated');
+    } catch (err) {
+      console.log(err);
+      Alert.alert('Error', 'Failed to update');
     }
   };
 
@@ -73,18 +113,19 @@ export function ProfileScreen() {
     );
   };
 
+  const site = authUser?.profile?.sites?.[0];
+
   const [formData, setFormData] = useState<any>({
-    firstName: currentProfile.name.split(' ')[0],
-    lastName: currentProfile.name.split(' ')[1] || '',
-    email: 'user@email.com',
-    mobile: currentProfile.phone,
-    password: '',
-    businessName: currentProfile.organization,
-    address: currentProfile.address,
-    registration: 'REG123',
-    venueType: 'Bakery',
-    branding: 'Saveful Brand',
-    radius: '5',
+    firstName: authUser?.profile?.user?.firstName || '',
+    lastName: authUser?.profile?.user?.lastName || '',
+    email: authUser?.profile?.user?.email || '',
+    mobile: authUser?.profile?.user?.phoneNumber || '',
+    businessName: authUser?.profile?.organisation?.name || '',
+    address: site?.address || '',
+    registration: authUser?.profile?.organisation?.registrationNumber || '',
+    venueType: authUser?.profile?.organisation?.venueType || '',
+    branding: authUser?.profile?.organisation?.branding || '',
+    radius: site?.radiusKm ? String(site.radiusKm) : '',
   });
 
   const updateField = (key: string, value: string) => {
@@ -122,7 +163,7 @@ export function ProfileScreen() {
       key: 'contact',
       title: 'Contact Details',
       fields: [
-        { label: 'Email', value: 'user@email.com', editable: false },
+        { label: 'Email', value: currentProfile.email || '', editable: false },
         { label: 'Mobile', value: currentProfile.phone, editable: true },
         { label: 'Password', value: '********', editable: true },
       ],
@@ -134,12 +175,12 @@ export function ProfileScreen() {
         ? [
           { label: 'Name', value: currentProfile.organization, editable: false },
           { label: 'Address', value: currentProfile.address, editable: true },
-          { label: 'Registration No.', value: 'REG123', editable: true },
+          { label: 'Registration No.', value: formData.registration, editable: true },
         ]
         : [
           { label: 'Name', value: currentProfile.organization, editable: false },
           { label: 'Address', value: currentProfile.address, editable: true },
-          { label: 'Registration No.', value: 'REG123', editable: true },
+          { label: 'Registration No.', value: formData.registration, editable: true },
           { label: 'Venue Type', value: 'Bakery', editable: true },
         ],
     },
@@ -253,31 +294,21 @@ export function ProfileScreen() {
                         onChangeText={(v) => updateField('mobile', v)}
                       />
 
-                      <View style={styles.passwordWrapper}>
-                        <InputField
-                          label="Password"
-                          value={formData.password}
-                          editable={true}
-                          onChangeText={(v) => updateField('password', v)}
-                          secureTextEntry={!showPassword}
-                        />
+                      <View style={{ marginTop: spacing.sm }}>
+                        <AppText variant="label">Password</AppText>
 
-                        {true && (
-                          <Pressable
-                            style={styles.eyeIcon}
-                            onPress={() => setShowPassword(prev => !prev)}
-                          >
-                            <Ionicons
-                              name={
-                                showPassword
-                                  ? 'eye-off-outline'
-                                  : 'eye-outline'
-                              }
-                              size={18}
-                              color="#666"
-                            />
-                          </Pressable>
-                        )}
+                        <Pressable
+                          style={styles.passwordLink}
+                          onPress={() =>
+                            navigation.navigate('ForgotPassword')
+                          }
+                        >
+                          <AppText variant="body" style={styles.linkText}>
+                            Change Password
+                          </AppText>
+
+                          <Ionicons name="chevron-forward" size={16} color={palette.primary} />
+                        </Pressable>
                       </View>
                     </>
                   )}
@@ -373,9 +404,19 @@ export function ProfileScreen() {
                     (section.key === 'pickup' && isCharity) ? (
                     <Pressable
                       style={styles.saveBtn}
-                      onPress={() =>
-                        console.log('Saving:', section.key, formData)
-                      }
+                      onPress={() => {
+                        if (section.key === 'contact') {
+                          handleUpdateContact();
+                        }
+
+                        if (section.key === 'business' || section.key === 'pickup') {
+                          handleUpdateLocation();
+                        }
+
+                        if (section.key === 'extra') {
+                          Alert.alert('Info', 'Logo upload API not integrated yet');
+                        }
+                      }}
                     >
                       <AppText
                         variant="label"
@@ -406,7 +447,13 @@ export function ProfileScreen() {
             <Pressable
               style={styles.linkRow}
               onPress={() =>
-                navigation.navigate(isCharity ? 'CharityManageAccess' : 'ManageAccess')
+                navigation.navigate(
+                  isCharity ? 'CharityManageAccess' : 'ManageAccess',
+                  {
+                    locationId: selectedSiteId,
+                    orgType: isCharity ? 'charity' : 'restaurant',
+                  }
+                )
               }
             >
               <AppText variant="body">
@@ -564,6 +611,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 0.5,
     borderColor: palette.white,
+  },
+
+  passwordLink: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+  },
+
+  linkText: {
+    color: palette.primary,
   },
 
   actionBtn: {

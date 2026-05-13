@@ -8,7 +8,6 @@ import { AuthStackParamList } from './types';
 import { EmailVerificationScreen } from '@/screens/auth/EmailVerificationScreen';
 import { TeamInviteScreen } from '@/screens/auth/TeamInviteScreen';
 import { SignInScreen } from '@/screens/auth/SignInScreen';
-import ForgotPasswordScreen from '@/screens/shared/ForgotPasswordScreen';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -21,7 +20,6 @@ export function AuthStack() {
       <Stack.Screen component={EmailVerificationScreen} name="EmailVerification" />
       <Stack.Screen component={TeamInviteScreen} name="TeamInvite" />
       <Stack.Screen component={SignInScreen} name="SignIn" />
-      <Stack.Screen component={ForgotPasswordScreen} name="ForgotPassword"/>
     </Stack.Navigator>
   );
 }
