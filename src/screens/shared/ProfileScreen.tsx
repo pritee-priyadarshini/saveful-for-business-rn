@@ -6,7 +6,8 @@ import {
   Pressable,
   Image,
   Linking,
-  Alert
+  Alert,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,6 +26,14 @@ import { RootStackParamList } from '@/navigation/AppNavigator';
 import { palette } from '@/theme/colors';
 import { charityService } from '@/services/charity.service';
 
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
+
 export function ProfileScreen() {
   const { currentProfile, authUser, setAuthUser } = useAppContext();
   type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -32,10 +41,9 @@ export function ProfileScreen() {
   const navigation = useNavigation<NavigationProp>();
 
   const [openSection, setOpenSection] = useState<string | null>(null);
-  const [logo, setLogo] = useState<string | null>(null);
+  const [logo, setLogo] = useState<string | null>(authUser?.profile?.organisation?.logo || null);
 
   const selectedSiteId = authUser?.profile?.sites?.[0]?.id;
- console.log('Selected Site ID:', selectedSiteId);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -482,16 +490,6 @@ export function ProfileScreen() {
             </Pressable>
           ))}
 
-          {/* UNITED NATIONS */}
-          <Card style={styles.card}>
-            <Pressable onPress={() => openLink('https://wedocs.unep.org/items/dbe2cd4c-8384-4636-8359-5847f42b9711')}>
-              <AppText variant="bodySmall">
-                🌍 ^United Nations Environment Programs's Food Waste Index Report
-                2024: Think, Eat, Save, Tracking Food Waste to Halve Global Food Waste.
-              </AppText>
-            </Pressable>
-          </Card>
-
           {/* ACTIONS */}
           <Pressable style={styles.actionBtn} onPress={handleLogout}>
             <AppText variant='label'>Log out</AppText>
@@ -513,7 +511,7 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    height: 200,
+    height: hp(25),
     position: 'absolute',
     top: 0,
     left: 0,
@@ -530,19 +528,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.lg,
-    marginTop: -195,
+    marginTop: -(hp(25) - 5),
     zIndex: 1,
   },
 
   scroll: {
-    paddingTop: 80,
+    paddingTop: hp(10),
     paddingBottom: spacing.xl,
   },
 
   card: {
     padding: spacing.md,
     marginBottom: spacing.lg,
-    borderRadius: 8,
+    borderRadius: normalize(8),
     backgroundColor: palette.creme,
     elevation: 4,
   },
@@ -558,9 +556,9 @@ const styles = StyleSheet.create({
   },
 
   profileCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: wp(11),
+    height: hp(5.5),
+    borderRadius: normalize(22),
     backgroundColor: '#A8E6CF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -568,14 +566,14 @@ const styles = StyleSheet.create({
 
   supportBtn: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: normalize(12),
     padding: spacing.sm,
     alignItems: 'center',
   },
   logoPreview: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
+    width: wp(20),
+    height: hp(10),
+    borderRadius: normalize(8),
   },
 
   accordionHeader: {
@@ -592,14 +590,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     backgroundColor: palette.white,
-    borderRadius: 10,
+    borderRadius: normalize(10),
   },
 
   uploadBox: {
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: '#ccc',
-    borderRadius: 12,
+    borderRadius: normalize(12),
     padding: spacing.md,
     alignItems: 'center',
   },
@@ -630,7 +628,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
     padding: spacing.md,
-    borderRadius: 6,
+    borderRadius: normalize(6),
     borderWidth: 1,
     alignItems: 'center',
   },
@@ -638,16 +636,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  eyeIcon: {
-    position: 'absolute',
-    right: 12,
-    top: 38,
-  },
-
   saveBtn: {
     backgroundColor: palette.primary,
     padding: spacing.md,
-    borderRadius: 12,
+    borderRadius: normalize(12),
     alignItems: 'center',
     marginTop: spacing.xs,
   },
@@ -665,7 +657,7 @@ const styles = StyleSheet.create({
 
   dropdown: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: normalize(12),
     overflow: 'hidden',
   },
 });

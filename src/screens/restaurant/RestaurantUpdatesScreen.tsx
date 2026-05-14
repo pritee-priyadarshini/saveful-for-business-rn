@@ -119,6 +119,9 @@ export function RestaurantUpdatesScreen() {
           ? palette.radish
           : palette.mint;
 
+    const textColor = item.type === 'full' ? palette.white : palette.black;
+    const subTextColor = item.type === 'full' ? palette.creme : palette.black;
+
     if (item.type === 'completed') {
       return (
         <View style={[styles.cardBase, { backgroundColor: bgColor }]}>
@@ -149,7 +152,7 @@ export function RestaurantUpdatesScreen() {
     return (
       <View style={[styles.cardBase, { backgroundColor: bgColor }]}>
         {/* TITLE */}
-        <AppText variant="h7">
+        <AppText variant="h7" color={textColor}>
           {item.type === 'full' ? 'Surplus Claimed!' : 'Partially Claimed'}
         </AppText>
 
@@ -157,14 +160,14 @@ export function RestaurantUpdatesScreen() {
         <View style={styles.topInfoRow}>
           {/* LEFT */}
           <View style={{ flex: 1 }}>
-            <AppText style={{ fontSize: normalize(14) }} variant="bodySmall">
-              <AppText variant="label"> {item.charity} </AppText>{' '}
+            <AppText style={{ fontSize: normalize(15) }} variant="bodySmall" color={textColor}>
+              <AppText variant="label" color={textColor}> {item.charity} </AppText>{' '}
               {item.type === 'full' ? 'is on the way' : `claimed ${item.quantity} kg`}
             </AppText>
 
-            <AppText variant="bodySmall" style={styles.locationText} > 📍 {item.location} </AppText>
+            <AppText variant="bodySmall" style={[styles.locationText, { color: subTextColor }]} > 📍 {item.location} </AppText>
 
-            <AppText variant="label" style={styles.driverName} >
+            <AppText variant="label" style={[styles.driverName, { color: textColor }]} >
               Driver: {item.driverName || 'Driver will be assigned soon'}
             </AppText>
           </View>
@@ -209,7 +212,7 @@ export function RestaurantUpdatesScreen() {
 
         {/* ACTIONS */}
         <View style={styles.contactRow}>
-          <AppText variant="label"> Contact Charity </AppText>
+          <AppText variant="label" color={textColor}> Contact Charity </AppText>
 
           <View style={styles.actionRow}>
             <Pressable
@@ -240,7 +243,7 @@ export function RestaurantUpdatesScreen() {
 
 
         <View style={styles.contactRow}>
-          <AppText variant="label"> Contact Driver </AppText>
+          <AppText variant="label" color={textColor}> Contact Driver </AppText>
 
           <View style={styles.actionRow}>
             <Pressable
@@ -419,7 +422,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     backgroundColor: palette.white,
-    paddingVertical: hp(1),
+    paddingVertical: hp(1.2),
     paddingHorizontal: wp(1),
     borderRadius: normalize(12),
     alignItems: 'center',
@@ -536,9 +539,10 @@ const styles = StyleSheet.create({
 
   locationText: {
     marginTop: 4,
-    opacity: 0.8,
-    fontSize: normalize(12),
+    opacity: 0.9,
+    fontSize: normalize(13),
     lineHeight: 18,
+    fontFamily: 'Saveful-Bold',
   },
 
   contactRow: {
@@ -547,19 +551,20 @@ const styles = StyleSheet.create({
   },
 
   metaTextLabel: {
-    fontSize: normalize(10),
+    fontSize: normalize(12),
     color: palette.stone,
     textAlign: 'center',
     marginBottom: 2,
   },
 
   metaTextValue: {
-    fontSize: normalize(12),
+    fontSize: normalize(13),
     textAlign: 'center',
     color: palette.black,
   },
   driverName:{
     marginTop: hp(0.5),
-    fontSize: normalize(12),
+    fontSize: normalize(13),
+    fontFamily: 'Saveful-Bold',
   }
 });

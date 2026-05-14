@@ -9,6 +9,7 @@ import {
     Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { AppText } from '@/components/AppText';
 import { palette } from '@/theme/colors';
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Props) {
+    const navigation = useNavigation<any>();
     const [step, setStep] = useState(1);
     const [isPartial, setIsPartial] = useState(false);
 
@@ -67,10 +69,14 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
         setIsPartial(false);
     };
 
+    const handleGoHome = () => {
+        handleClose();
+        navigation.navigate('Home');
+    };
     const handleClose = () => {
         reset();
         onClose();
-    };
+    }
 
     const reasons = [
         'Pickup expired',
@@ -236,8 +242,8 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                                     You helped reduce food waste and supported your community today.
                                 </AppText>
 
-                                <Pressable style={styles.primaryBtn} onPress={handleClose}>
-                                    <AppText variant='label' style={styles.primaryText}>Go Home</AppText>
+                                <Pressable style={styles.primaryBtn} onPress={handleGoHome}>
+                                    <AppText variant='label' style={styles.primaryText}>Go To Home Screen</AppText>
                                 </Pressable>
                             </>
                         )}
@@ -296,8 +302,8 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                                     Keep looking for new listings and continue making an impact.
                                 </AppText>
 
-                                <Pressable style={styles.primaryBtn} onPress={handleClose}>
-                                    <AppText variant='label' style={styles.primaryText}>Go Home</AppText>
+                                <Pressable style={styles.primaryBtn} onPress={handleGoHome}>
+                                    <AppText variant='label' style={styles.primaryText}>Go To Home Screen</AppText>
                                 </Pressable>
                             </>
                         )}

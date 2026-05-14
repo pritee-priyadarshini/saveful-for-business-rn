@@ -216,15 +216,15 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 <View style={styles.topRow}>
                   {/* LEFT */}
                   <View style={styles.charityBlock}>
-                    <AppText variant="bodyBold">
+                    <AppText variant="bodyLarge" style={{ fontFamily: 'Saveful-Bold' }} >
                       {detail.claimedByOrganisation?.name || 'Surplus still available'}
                     </AppText>
 
-                    <AppText variant="caption">
+                    <AppText variant="label" style={{lineHeight: normalize(21)}} >
                       📍 {detail.claimedByOrganisation?.address || 'Nearby charities have been notified'}
                     </AppText>
 
-                    <AppText variant="caption" style={styles.driverText}
+                    <AppText variant="label" style={styles.driverText}
                     >
                       {prettyStatus(detail.status) === 'Available'
                         ? 'Driver will be assigned once surplus is accepted'
@@ -290,12 +290,12 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
                   <View style={styles.metaCard} >
                     <AppText variant="label"> Pickup Date </AppText>
-                    <AppText variant="bodySmall"> {new Date(item.pickupFromTime || item.createdAt).toLocaleDateString()}</AppText>
+                    <AppText variant="bodySmall" style={{textAlign: 'center'}}> {new Date(item.pickupFromTime || item.createdAt).toLocaleDateString()}</AppText>
                   </View>
 
                   <View style={styles.metaCard} >
                     <AppText variant="label"> Pickup Time </AppText>
-                    <AppText variant="bodySmall"> {`${new Date(item.pickupFromTime).toLocaleTimeString([], {
+                    <AppText variant="bodySmall" style={{textAlign: 'center'}}> {`${new Date(item.pickupFromTime).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })} - ${new Date(item.pickupByTime).toLocaleTimeString([], {

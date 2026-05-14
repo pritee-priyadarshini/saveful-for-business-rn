@@ -8,6 +8,7 @@ import {
     TextInput,
     ScrollView,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { AppText } from '@/components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
@@ -37,6 +38,7 @@ export function PostPickupSurveyModal({
         { id: '2', name: 'Bread Packs', quantity: 3 },
     ],
 }: Props) {
+    const navigation = useNavigation<any>();
     const [step, setStep] = useState(1);
     const [isPartial, setIsPartial] = useState(false);
     const [updatedItems, setUpdatedItems] = useState(items);
@@ -66,6 +68,11 @@ export function PostPickupSurveyModal({
     const handleClose = () => {
         reset();
         onClose();
+    };
+
+    const handleGoHome = () => {
+        handleClose();
+        navigation.navigate('Home');
     };
 
     const reasons = [
@@ -190,7 +197,7 @@ export function PostPickupSurveyModal({
                                     style={styles.primaryBtn}
                                     onPress={() => {
                                         onComplete?.(selectedId!, 'completed');
-                                        handleClose();
+                                        handleGoHome();
                                     }}
                                 >
                                     <AppText style={styles.primaryText}>Go Home</AppText>
@@ -258,7 +265,7 @@ export function PostPickupSurveyModal({
                                     style={styles.primaryBtn}
                                     onPress={() => {
                                         onComplete?.(selectedId!, 'cancelled');
-                                        handleClose();
+                                        handleGoHome();
                                     }}
                                 >
                                     <AppText style={styles.primaryText}>Go to Home</AppText>

@@ -5,6 +5,8 @@ import {
   ScrollView,
   Pressable,
   ImageBackground,
+  Linking,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -12,6 +14,9 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { spacing } from '../../theme/spacing';
 import { palette } from '../../theme/colors';
+
+const { width } = Dimensions.get('window');
+const normalize = (size: number) => Math.round(size * (width / 375));
 
 export function CalculationScreen({ navigation }: any) {
   return (
@@ -28,67 +33,80 @@ export function CalculationScreen({ navigation }: any) {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-          <Ionicons name="arrow-back" size={22} color="#FFF" />
+            <Ionicons name="arrow-back" size={22} color="#FFF" />
           </Pressable>
 
-          <AppText variant="heading" color="#FFF" style={styles.headerTitle}>
-            How are your results calculated?
+          <AppText variant="heading" style={styles.headerTitle}>
+            HOW ARE YOUR{`\n`}RESULTS CALCULATED?
           </AppText>
         </ImageBackground>
 
-        {/* CONTENT */}
-        <View style={styles.content}>
-
+        {/* INTRO */}
+        <View style={styles.section}>
           <AppText variant="h5" style={styles.sectionTitle}>
-            Reducing food waste is a team sport
+            SAVING FOOD IS A TEAM SPORT
           </AppText>
 
-          <AppText variant="bodyLarge" style={styles.text}>
-            And we’re so glad you’re in the club to save more food together. Without doing bin audits, food waste can be tricky to measure.
+          <AppText variant="bodyLarge" style={styles.bodyText}>
+            And we're so glad you're in the club to help save more food together.
           </AppText>
 
-          <AppText variant="bodyLarge" style={styles.text}>
-            Every time you cook a Saveful meal, we assume you’re using up food you already have – and saving it from the bin.
+          <AppText variant="bodyLarge" style={styles.bodyText}>
+            Without doing bin audits, it's always tricky to measure (even the experts agree).
+            That's why we've made our tracking tools as fast, simple and easy to use as possible.
           </AppText>
-
-          <AppText variant="bodyLarge" style={styles.text}>
-            Here’s how we estimate your potential savings using assumptions and averages.
-          </AppText>
-
         </View>
 
-        {/* SECOND SECTION */}
-        <View style={styles.section}>
-
-          <AppText variant="h6" style={styles.sectionTitle}>
-            Pre-make survey & overall results
+        {/* FORMULAS */}
+        <View style={[styles.section, styles.borderTop]}>
+          <AppText variant="h6" style={styles.subheading}>
+            HOW WE CALCULATE
           </AppText>
 
-          <AppText style={styles.text}>
-            Your potential food savings in kg is based on average ingredient weights used across meals.
-          </AppText>
+          <View style={styles.formulaRow}>
+            <AppText variant="bodyBold" style={styles.formulaLabel}>Food saved</AppText>
+            <AppText variant="body" style={styles.formulaText}>
+              {' '}= total amount of food estimated that is collected by charities.
+            </AppText>
+          </View>
 
-          <AppText style={styles.text}>
-            Savings in dollars are calculated using average food price per kg.
-          </AppText>
+          <View style={styles.formulaRow}>
+            <AppText variant="bodyBold" style={styles.formulaLabel}>Money saved</AppText>
+            <AppText variant="body" style={styles.formulaText}>
+              {' '}= weight of food saved × the average price of food per kg in your country.
+            </AppText>
+          </View>
 
+          <View style={styles.formulaRow}>
+            <AppText variant="bodyBold" style={styles.formulaLabel}>Meals created</AppText>
+            <AppText variant="body" style={styles.formulaText}>
+              {' '}= weight of food saved ÷ 420g (WRAP recommends 420g as an "average" meal size).
+            </AppText>
+          </View>
+
+          <View style={styles.formulaRow}>
+            <AppText variant="bodyBold" style={styles.formulaLabel}>CO₂ avoided</AppText>
+            <AppText variant="body" style={styles.formulaText}>
+              {' '}= CO₂ emissions avoided based on a conversion ratio sourced from{
+              // TODO: Update name & URL once confirmed — also update the Saveful consumer app
+              }
+              <AppText
+                variant="bodyBold"
+                style={styles.link}
+                onPress={() => Linking.openURL('https://www.carboncalculator.co.uk')}
+              >
+                {' '}The Carbon Calculator
+              </AppText>
+              .
+            </AppText>
+          </View>
         </View>
 
-        {/* WEEKLY */}
-        <View style={styles.section}>
-
-          <AppText variant="h6" style={styles.sectionTitle}>
-            Weekly results
+        {/* DISCLAIMER */}
+        <View style={[styles.section, styles.borderTop]}>
+          <AppText variant="caption" style={styles.disclaimer}>
+            These figures are estimates based on widely used averages. Actual results may vary.
           </AppText>
-
-          <AppText style={styles.text}>
-            Weekly results are calculated based on your most recent activity and reported food usage.
-          </AppText>
-
-          <AppText style={styles.text}>
-            CO2 impact is estimated using standard conversion metrics.
-          </AppText>
-
         </View>
 
       </ScrollView>
@@ -103,11 +121,10 @@ const styles = StyleSheet.create({
 
   headerBg: {
     width: '100%',
-    height: 160,
+    height: normalize(170),
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   backButton: {
     position: 'absolute',
     left: spacing.md,
@@ -115,30 +132,59 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
+    color: '#FFF',
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
   },
 
-  content: {
-    backgroundColor: palette.creme,
-    padding: spacing.lg,
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     gap: spacing.md,
   },
 
-  section: {
-    backgroundColor: palette.creme,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
+  borderTop: {
     borderTopWidth: 1,
-    borderColor: palette.border,
+    borderColor: palette.strokecream,
   },
 
   sectionTitle: {
-    color: palette.primary,
+    color: palette.eggplant,
   },
 
-  text: {
-    opacity: 0.8,
+  subheading: {
+    color: palette.kale,
   },
-});
+
+  bodyText: {
+    color: palette.text,
+    opacity: 0.75,
+    lineHeight: normalize(22),
+  },
+
+  formulaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+
+  formulaLabel: {
+    color: palette.eggplant,
+  },
+
+  formulaText: {
+    color: palette.midgray,
+    flex: 1,
+    lineHeight: normalize(20),
+  },
+
+  link: {
+    color: palette.blueberry,
+    textDecorationLine: 'underline',
+  },
+
+  disclaimer: {
+    color: palette.stone,
+    lineHeight: normalize(18),
+    opacity: 0.7,
+  },
+});                                                                          

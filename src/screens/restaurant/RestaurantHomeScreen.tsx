@@ -50,7 +50,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
     },
     {
       label: 'Charity',
-      icon: require('../../../assets/placeholder/community-icon.png'),
+      icon: require('../../../assets/track/Charities.png'),
       title: 'You have potentially helped',
       value: `${impact.charitiesSupported} Charities`,
     },
