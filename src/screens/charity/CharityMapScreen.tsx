@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -6,22 +6,91 @@ import {
   View,
   ImageBackground,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
-
-import { charityListings } from '../../data/mockData';
-
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { foodListingService } from '@/services/foodListing.service';
 
 type ClaimState = Record<string, number>; // key = listingId-itemName
 
 export function CharityMapScreen({ navigation }: any) {
   const [claimState, setClaimState] = useState<ClaimState>({});
   const [activeFilter, setActiveFilter] = useState<'distance' | 'surplus' | null>(null);
+  const [listings, setListings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchListings();
+  }, []);
+
+  const fetchListings = async () => {
+    try {
+      setLoading(true);
+
+      const res = await foodListingService.getListings({
+        status: 'ACTIVE',
+      });
+
+      const data = res?.data?.listings || res?.data || [];
+
+      if (!Array.isArray(data)) {
+        console.log('Invalid response', res.data);
+        setListings([]);
+        return;
+      }
+
+      const mapped = data.map((item: any) => {
+        return {
+          id: String(item.id),
+
+          businessName:
+            item?.site?.locationName ||
+            item?.organisation?.name ||
+            'Food Provider',
+
+          suburb: item?.pickupAddress || 'Unknown',
+          type: 'Surplus',
+
+          distance: item.distance || '—',
+
+          quantityKg:
+            item.foodItems?.reduce(
+              (sum: number, f: any) => sum + (f.remainingQtyKg || 0),
+              0
+            ) || 0,
+
+          pickupDate: item.bestBefore,
+          pickupTime:
+            item.pickupFromTime && item.pickupByTime
+              ? `${item.pickupFromTime} - ${item.pickupByTime}`
+              : 'Flexible',
+
+          storage: item.needsRefrigeration
+            ? 'Keep Refrigerated'
+            : 'Room Temp',
+
+          items:
+            item.foodItems?.map((f: any) => ({
+              name: f.category,
+              quantityKg: f.remainingQtyKg,
+            })) || [],
+        };
+      });
+
+      setListings(mapped);
+    } catch (err) {
+      console.log('FETCH ERROR', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const getKey = (listingId: string, itemName: string) =>
     `${listingId}-${itemName}`;
@@ -97,7 +166,7 @@ export function CharityMapScreen({ navigation }: any) {
 
         <View style={styles.activeBadge}>
           <AppText variant='h7' color='white'>
-            {charityListings.length}
+            {listings.length}
           </AppText>
         </View>
       </View>
@@ -244,12 +313,14 @@ export function CharityMapScreen({ navigation }: any) {
             label={`Claim ${totalSelected} kg`}
             disabled={!hasSelection}
             style={styles.flexBtn}
-            onPress={() =>
+            onPress={() => {
+              const payload = buildPayload(item);
+
               navigation.navigate('ClaimConfirm', {
                 listing: item,
-                payload: buildPayload(item),
-              })
-            }
+                payload,
+              });
+            }}
           />
 
           <Button
@@ -267,28 +338,67 @@ export function CharityMapScreen({ navigation }: any) {
     );
   };
 
+  const sortedListings = useMemo(() => {
+    let data = [...listings];
+
+    if (activeFilter === 'distance') {
+      data.sort(
+        (a, b) =>
+          parseFloat(a.distance || '0') -
+          parseFloat(b.distance || '0')
+      );
+    }
+
+    if (activeFilter === 'surplus') {
+      data.sort(
+        (a, b) => (b.quantityKg || 0) - (a.quantityKg || 0)
+      );
+    }
+
+    return data;
+  }, [listings, activeFilter]);
+
+  if (loading) {
+    return (
+      <Screen backgroundColor={palette.creme}>
+        <AppText style={{ textAlign: 'center', marginTop: 50 }}>
+          Loading listings...
+        </AppText>
+      </Screen>
+    );
+  }
+
   return (
     <Screen backgroundColor={palette.creme} scrollable={false}>
       <FlatList
-        data={useMemo(() => {
-          let data = [...charityListings];
-
-          if (activeFilter === 'distance') {
-            data.sort((a, b) =>
-              parseFloat(a.distance) - parseFloat(b.distance)
-            );
-          }
-
-          if (activeFilter === 'surplus') {
-            data.sort((a, b) => b.quantityKg - a.quantityKg);
-          }
-
-          return data;
-        }, [activeFilter])}
+        data={sortedListings}
         keyExtractor={(item) => item.id}
         renderItem={renderListing}
         ListHeaderComponent={ListHeader}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          listings.length === 0 && { flex: 1 },
+        ]}
+
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+            <AppText variant="h7">No surplus available</AppText>
+            <AppText variant="bodySmall" style={{ marginTop: 6 }}>
+              No surplus available. Check again later.
+            </AppText>
+          </View>
+        }
+
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchListings();
+            }}
+          />
+        }
+
         showsVerticalScrollIndicator={false}
       />
     </Screen>
