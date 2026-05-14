@@ -365,7 +365,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
                 });
               }}
             >
-              <AppText variant="label" style={styles.modalBtnText} > Go To Home </AppText>
+              <AppText variant="label" style={styles.modalBtnText} > Go To Home Screen</AppText>
             </Pressable>
           </View>
         </View>

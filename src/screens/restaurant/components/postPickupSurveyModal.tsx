@@ -72,7 +72,10 @@ export function PostPickupSurveyModal({
 
     const handleGoHome = () => {
         handleClose();
-        navigation.navigate('Home');
+        navigation.reset({
+            index: 0,
+            routes: [{ name: 'Tabs' }],
+        });
     };
 
     const reasons = [
@@ -200,7 +203,7 @@ export function PostPickupSurveyModal({
                                         handleGoHome();
                                     }}
                                 >
-                                    <AppText style={styles.primaryText}>Go Home</AppText>
+                                    <AppText style={styles.primaryText}>Go To Home Screen</AppText>
                                 </Pressable>
                             </>
                         )}
@@ -268,7 +271,7 @@ export function PostPickupSurveyModal({
                                         handleGoHome();
                                     }}
                                 >
-                                    <AppText style={styles.primaryText}>Go to Home</AppText>
+                                    <AppText style={styles.primaryText}>Go to Home Screen</AppText>
                                 </Pressable>
                             </>
                         )}

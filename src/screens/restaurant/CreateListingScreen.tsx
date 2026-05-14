@@ -661,7 +661,7 @@ export function CreateListingScreen({ navigation }: any) {
                     <DateTimePicker
                         value={tempDate}
                         mode={pickerMode}
-                        is24Hour={true}
+                        is24Hour={false}
                         display="default"
                         onChange={handlePickerChange}
                     />

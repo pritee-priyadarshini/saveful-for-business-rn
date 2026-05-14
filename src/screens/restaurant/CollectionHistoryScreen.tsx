@@ -1,91 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, FlatList, Pressable, ImageBackground, Modal } from 'react-native';
+import { View, StyleSheet, FlatList, Pressable, ImageBackground, Modal, Dimensions } from 'react-native';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
-import { spacing } from '../../theme/spacing';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '@/services/foodListing.service';
 
-// const DATA = [
-//     {
-//         id: '1',
-//         collected_by: 'Food Rescue Org',
-//         location: 'Patia, Bhubaneswar',
-//         driverName: 'Rakesh Sahu',
-//         date: new Date('2026-04-07'),
-//         time: '2:30 PM',
-//         status: 'claimed',
-//         items: [
-//             { name: 'Baked Goods', qty: 3 },
-//             { name: 'Fruits', qty: 2 },
-//         ],
-//     },
-//     {
-//         id: '2',
-//         collected_by: null,
-//         location: null,
-//         driverName: null,
-//         date: new Date('2026-04-06'),
-//         time: '1:00 PM',
-//         status: 'expired',
-//         items: [
-//             { name: 'Meat', qty: 4 },
-//         ],
-//     },
-//     {
-//         id: '3',
-//         collected_by: 'Food Rescue Org',
-//         location: 'Khandagiri, Bhubaneswar',
-//         driverName: 'Amit Das',
-//         date: new Date('2025-08-10'),
-//         time: '2:30 PM',
-//         status: 'partial claimed',
-//         items: [
-//             { name: 'Baked Goods', qty: 3, claimed: 2, left: 1 },
-//             { name: 'Fruits', qty: 2, claimed: 1, left: 1 },
-//         ],
-//     },
-//     {
-//         id: '4',
-//         collected_by: 'Food Rescue Org',
-//         location: 'Saheed Nagar, Bhubaneswar',
-//         driverName: 'Suman Nayak',
-//         date: new Date('2025-12-07'),
-//         time: '5:30 PM',
-//         status: 'claimed',
-//         items: [
-//             { name: 'Baked Goods', qty: 3 },
-//             { name: 'Fruits', qty: 2 },
-//         ],
-//     },
-//     {
-//         id: '5',
-//         collected_by: null,
-//         location: null,
-//         driverName: null,
-//         date: new Date('2026-04-07'),
-//         time: '2:30 PM',
-//         status: 'expired',
-//         items: [
-//             { name: 'Baked Goods', qty: 3 },
-//             { name: 'Fruits', qty: 2 },
-//         ],
-//     },
-//     {
-//         id: '6',
-//         collected_by: 'Food Rescue Org',
-//         location: 'Jaydev Vihar, Bhubaneswar',
-//         driverName: 'Prakash Rout',
-//         date: new Date('2026-02-03'),
-//         time: '2:30 PM',
-//         status: 'claimed',
-//         items: [
-//             { name: 'Baked Goods', qty: 3 },
-//             { name: 'Fruits', qty: 2 },
-//         ],
-//     },
-// ];
+const { width, height } = Dimensions.get('window');
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH_INDEX = new Date().getMonth(); // 0-based
@@ -209,13 +136,13 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                         <Pressable
                             style={styles.backButton}
                             onPress={() => navigation.goBack()}>
-                            <Ionicons name="arrow-back" size={22} color={palette.white} />
+                            <Ionicons name="arrow-back" size={normalize(22)} color={palette.white} />
                         </Pressable>
 
                         <AppText variant="h5" style={styles.headerTitle}>
                             Collection History
                         </AppText>
-                        <View style={{ width: 22 }} />
+                        <View style={{ width: normalize(22) }} />
                     </>
                 </ImageBackground>
 
@@ -232,7 +159,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                                 onPress={() => setShowYearDropdown(!showYearDropdown)}
                             >
                                 <AppText variant="bodyBold" >{selectedYear}</AppText>
-                                <Ionicons name="chevron-down" size={16} />
+                                <Ionicons name="chevron-down" size={normalize(16)} />
                             </Pressable>
 
                             {showYearDropdown && (
@@ -265,7 +192,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                                 onPress={() => setShowMonthDropdown(!showMonthDropdown)}
                             >
                                 <AppText variant="bodyBold" >{selectedMonth}</AppText>
-                                <Ionicons name="chevron-down" size={16} />
+                                <Ionicons name="chevron-down" size={normalize(16)} />
                             </Pressable>
 
                             {showMonthDropdown && (
@@ -293,7 +220,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                 <FlatList
                     data={filteredData}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ paddingBottom: 40 }}
+                    contentContainerStyle={{ paddingBottom: hp(5) }}
                     ListEmptyComponent={
                         <View style={styles.empty}>
                             <AppText variant="body">No Collection Found </AppText>
@@ -304,32 +231,26 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                             {/* TOP */}
                             <View style={styles.topRow}>
                                 <View style={{ flex: 1 }}>
-                                    <AppText variant="bodyBold">
+                                    <AppText variant="bodyLarge" style={{ lineHeight: normalize(22) }}>
                                         {item.foodClaims?.[0]?.charityName || 'No charity accepted it'}
                                     </AppText>
 
-                                    <AppText variant="caption">
+                                    <AppText variant="caption" style={{ lineHeight: normalize(18) }}>
                                         {item.pickupAddress || 'Nearby charities were notified'}
                                     </AppText>
 
                                     {item.foodClaims?.[0]?.driverName && (
                                         <AppText
                                             variant="caption"
-                                            style={styles.driverText}
+                                            style={[styles.driverText, { lineHeight: normalize(18) }]}
                                         >
                                             Driver: {item.driverName}
                                         </AppText>
                                     )}
                                 </View>
 
-                                <View
-                                    style={[
-                                        styles.statusPill,
-                                        item.status === 'expired' &&
-                                        styles.expiredPill,
-                                    ]}
-                                >
-                                    <AppText
+                                <View>
+                                    <AppText variant='label'
                                         style={[
                                             styles.statusText,
                                             item.status === 'expired' &&
@@ -361,26 +282,27 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                                 </View>
 
                                 <View style={styles.metaCard}>
-                                    <AppText variant="caption">
+                                    <AppText variant="caption" style={{ textAlign: 'center' }}>
                                         Pickup Date
                                     </AppText>
 
-                                    <AppText variant="bodyBold">
-                                        {item.date.toLocaleDateString('en-US', {
-                                            month: 'long',
+                                    <AppText variant="bodyBold" style={{ textAlign: 'center' }}>
+                                        {new Date(item.pickupFromTime || item.createdAt).toLocaleDateString('en-US', {
                                             day: '2-digit',
-                                            year: 'numeric',
+                                            month: 'long',
                                         })}
                                     </AppText>
                                 </View>
 
                                 <View style={styles.metaCard}>
-                                    <AppText variant="caption">
+                                    <AppText variant="caption" style={{ textAlign: 'center' }}>
                                         Pickup Time
                                     </AppText>
 
-                                    <AppText variant="bodyBold">
-                                        {item.time}
+                                    <AppText variant="bodyBold" style={{ textAlign: 'center' }}>
+                                        {item.pickupFromTime
+                                            ? `${new Date(item.pickupFromTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(item.pickupByTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                            : '—'}
                                     </AppText>
                                 </View>
                             </View>
@@ -411,7 +333,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
                             >
                                 <Ionicons
                                     name="close"
-                                    size={20}
+                                    size={normalize(20)}
                                     color={palette.black}
                                 />
                             </Pressable>
@@ -474,32 +396,33 @@ const styles = StyleSheet.create({
 
     headerBg: {
         width: '100%',
-        height: 140,
+        height: hp(18),
         justifyContent: 'center',
     },
 
     backButton: {
         position: 'absolute',
-        left: spacing.lg,
-        top: spacing.lg,
+        left: wp(5),
+        top: hp(2.5),
         zIndex: 10,
     },
 
     headerTitle: {
         color: palette.white,
         textAlign: 'center',
+        fontSize: normalize(22),
     },
 
     filterContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        margin: spacing.md,
-        gap: spacing.sm,
+        marginHorizontal: wp(4),
+        marginVertical: hp(1.6),
+        gap: wp(2.5),
     },
 
     filterBlock: {
         flex: 1,
-        marginRight: spacing.sm,
     },
 
     dropdownWrapper: {
@@ -511,35 +434,37 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: palette.white,
-        padding: spacing.sm,
-        borderRadius: 10,
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1.2),
+        borderRadius: normalize(10),
     },
 
     dropdownList: {
         position: 'absolute',
-        top: 48,
+        top: hp(6),
         left: 0,
         right: 0,
         backgroundColor: palette.white,
-        borderRadius: 10,
+        borderRadius: normalize(10),
         elevation: 5,
         zIndex: 1000,
     },
 
     dropdownItem: {
-        padding: spacing.sm,
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1.2),
         borderBottomWidth: 0.5,
         borderColor: '#eee',
     },
 
     card: {
         backgroundColor: palette.white,
-        padding: spacing.md,
-        borderRadius: 16,
-        marginHorizontal: spacing.md,
-        marginVertical: spacing.sm,
+        padding: hp(1.6),
+        borderRadius: normalize(16),
+        marginHorizontal: wp(4),
+        marginVertical: hp(0.8),
         elevation: 2,
-        gap: spacing.sm,
+        gap: hp(1),
     },
 
     row: {
@@ -548,63 +473,52 @@ const styles = StyleSheet.create({
     },
 
     status: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 10,
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.5),
+        borderRadius: normalize(10),
         backgroundColor: '#EEE7FF',
     },
 
     empty: {
         alignItems: 'center',
-        marginTop: 50,
+        marginTop: hp(6),
     },
 
     statusRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: wp(1.5),
     },
 
     itemsContainer: {
-        marginTop: spacing.xs,
-        gap: 2,
+        marginTop: hp(0.5),
+        gap: hp(0.3),
     },
 
     newCard: {
         backgroundColor: palette.white,
-        marginHorizontal: spacing.md,
-        marginBottom: spacing.md,
-        padding: spacing.md,
-        borderRadius: 20,
-        gap: spacing.md,
-
+        marginHorizontal: wp(4),
+        marginBottom: hp(1.6),
+        padding: hp(1.6),
+        borderRadius: normalize(20),
+        gap: hp(1.4),
         borderWidth: 1,
-        borderColor: palette.black,
+        borderColor: palette.border,
     },
 
     topRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        gap: spacing.md,
+        gap: wp(2.5),
     },
 
     driverText: {
-        marginTop: 4,
+        marginTop: hp(0.5),
         color: palette.textMuted,
     },
-
-    statusPill: {
-        minWidth: 90,
-        minHeight: 38,
-        borderRadius: 999,
-        paddingHorizontal: 12,
-        backgroundColor: palette.middlegreen,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
     statusText: {
-        color: palette.white,
+        color: palette.middlegreen,
+        fontSize: normalize(16),
     },
 
     expiredPill: {
@@ -613,27 +527,27 @@ const styles = StyleSheet.create({
 
     metaRow: {
         flexDirection: 'row',
-        gap: spacing.sm,
-        marginTop: spacing.xs,
+        gap: wp(2.2),
+        marginTop: hp(0.4),
     },
 
     metaCard: {
         flex: 1,
         backgroundColor: palette.radish,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.sm,
-        borderRadius: 16,
+        paddingVertical: hp(1),
+        paddingHorizontal: wp(1.5),
+        borderRadius: normalize(12),
         alignItems: 'center',
         justifyContent: 'center',
-        gap: spacing.sm,
+        gap: hp(0.8),
         borderWidth: 1,
         borderColor: palette.border,
     },
 
     viewBtn: {
         backgroundColor: palette.middlegreen,
-        paddingHorizontal: 18,
-        paddingVertical: 8,
+        paddingHorizontal: wp(4.5),
+        paddingVertical: hp(0.9),
         borderRadius: 999,
     },
 
@@ -645,41 +559,42 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.35)',
         justifyContent: 'center',
-        padding: spacing.lg,
+        padding: wp(5),
     },
 
     modalCard: {
         backgroundColor: palette.white,
-        borderRadius: 20,
-        padding: spacing.md,
+        borderRadius: normalize(20),
+        padding: wp(5),
     },
 
     modalTopBar: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: hp(1),
     },
 
     closeIconBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: palette.creme,
+        width: normalize(36),
+        height: normalize(36),
+        borderRadius: normalize(18),
+        backgroundColor: '#dadbdd',
         justifyContent: 'center',
         alignItems: 'center',
     },
 
     modalHeaderRow: {
         flexDirection: 'row',
-        marginTop: spacing.md,
-        paddingBottom: spacing.sm,
+        marginTop: hp(1.6),
+        paddingBottom: hp(1),
         borderBottomWidth: 1,
         borderColor: '#eee',
     },
 
     modalItemRow: {
         flexDirection: 'row',
-        paddingVertical: spacing.sm,
+        paddingVertical: hp(0.8),
     },
 
     modalCol: {
