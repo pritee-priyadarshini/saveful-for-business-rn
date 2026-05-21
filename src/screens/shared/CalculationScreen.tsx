@@ -64,36 +64,36 @@ export function CalculationScreen({ navigation }: any) {
           </AppText>
 
           <View style={styles.formulaRow}>
-            <AppText variant="bodyBold" style={styles.formulaLabel}>Food saved</AppText>
-            <AppText variant="body" style={styles.formulaText}>
-              {' '}= total amount of food estimated that is collected by charities.
+            <AppText variant="body" style={{ color: palette.midgray }}>
+              <AppText variant="bodyBold" style={styles.formulaLabel}>Food saved</AppText>
+              {' '} = total amount of food estimated that is collected by charities.
             </AppText>
           </View>
 
           <View style={styles.formulaRow}>
-            <AppText variant="bodyBold" style={styles.formulaLabel}>Money saved</AppText>
-            <AppText variant="body" style={styles.formulaText}>
-              {' '}= weight of food saved × the average price of food per kg in your country.
+            <AppText variant="body" style={{ color: palette.midgray }}>
+              <AppText variant="bodyBold" style={styles.formulaLabel}>Money saved</AppText>
+              {' '} = weight of food saved × the average price of food per kg in your country.
             </AppText>
           </View>
 
           <View style={styles.formulaRow}>
-            <AppText variant="bodyBold" style={styles.formulaLabel}>Meals created</AppText>
-            <AppText variant="body" style={styles.formulaText}>
-              {' '}= weight of food saved ÷ 420g (WRAP recommends 420g as an "average" meal size).
+            <AppText variant="body" style={{ color: palette.midgray }}>
+              <AppText variant="bodyBold" style={styles.formulaLabel}>Meals created</AppText>
+              {' '} = weight of food saved ÷ 420g (WRAP recommends 420g as an "average" meal size).
             </AppText>
           </View>
 
           <View style={styles.formulaRow}>
-            <AppText variant="bodyBold" style={styles.formulaLabel}>CO₂ avoided</AppText>
-            <AppText variant="body" style={styles.formulaText}>
-              {' '}= CO₂ emissions avoided based on a conversion ratio sourced from{
+            <AppText variant="body" style={{ color: palette.midgray }}>
+              <AppText variant="bodyBold" style={styles.formulaLabel}>CO₂ avoided</AppText>
+              {' '} = CO₂ emissions avoided based on a conversion ratio sourced from{
               // TODO: Update name & URL once confirmed — also update the Saveful consumer app
               }
               <AppText
                 variant="bodyBold"
                 style={styles.link}
-                onPress={() => Linking.openURL('https://www.carboncalculator.co.uk')}
+                onPress={() => Linking.openURL('https://carbonneutral.com.au/carbon-calculator/?srsltid=AfmBOorrpP0piQUKFgc5kkxPa5gT2uBO5LvF05cdl9Ynh2RJiFGyN0VE')}
               >
                 {' '}The Carbon Calculator
               </AppText>
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: normalize(170),
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   backButton: {
     position: 'absolute',
@@ -133,8 +133,9 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     color: '#FFF',
-    textAlign: 'center',
+    textAlign: 'left',
     paddingHorizontal: spacing.lg,
+    marginTop: spacing.md,
   },
 
   section: {
@@ -169,12 +170,7 @@ const styles = StyleSheet.create({
 
   formulaLabel: {
     color: palette.eggplant,
-  },
-
-  formulaText: {
-    color: palette.midgray,
-    flex: 1,
-    lineHeight: normalize(20),
+    lineHeight: normalize(22),
   },
 
   link: {

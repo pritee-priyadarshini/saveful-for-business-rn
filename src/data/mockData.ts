@@ -9,6 +9,7 @@ import {
 } from '../types';
 
 export const restaurantProfile: UserProfile = {
+  email: 'arjun.mehta@annapurnafoods.in',
   name: 'Arjun Mehta',
   organization: 'Annapurna Foods Pvt Ltd',
   address: 'Bapuji Nagar, Bhubaneswar, Odisha',
@@ -17,6 +18,7 @@ export const restaurantProfile: UserProfile = {
 };
 
 export const charityProfile: UserProfile = {
+  email: 'ritika.das@sevabhojantrust.in',
   name: 'Ritika Das',
   organization: 'Seva Bhojan Trust',
   address: 'Saheed Nagar, Bhubaneswar, Odisha',
@@ -396,5 +398,4 @@ export const demoRoleUsers: Record<UserRole, string> = {
   restaurant_multi: 'u2',
   charity_single: 'u4',
   charity_multi: 'u5',
-  driver: 'u6',
 };

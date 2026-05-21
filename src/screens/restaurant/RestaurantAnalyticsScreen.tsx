@@ -139,9 +139,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
         <Pressable
           style={styles.createBtn}
           onPress={() =>
-            navigation.navigate('Listings', {
-              screen: 'RestaurantListings',
-            })
+            navigation.navigate('Listings', { screen: 'CreateListing' })
           }
         >
           <AppText variant='bodyBold' style={styles.createText}>+ Create New Listing</AppText>
@@ -175,7 +173,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
           </Card>
 
           <Card style={styles.trendCard}>
-            <AppText variant="caption">Kg Saveds</AppText>
+            <AppText variant="caption">KGS SAVED</AppText>
             <View style={styles.pill}>
               <AppText variant="h6" style={styles.pillText}>
                 450
@@ -281,7 +279,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
                   {item.value}
                 </AppText>
               </View>
-              <AppText variant="caption">{item.label}</AppText>
+              <AppText variant="caption" style={{ textAlign: 'center' }}>{item.label}</AppText>
             </Card>
           ))}
         </View>
@@ -311,9 +309,9 @@ const styles = StyleSheet.create({
   },
 
   heroContainer: {
-    height: hp(25),
+    minHeight: hp(25),
     width: '100%',
-    paddingTop: hp(2),
+    paddingTop: hp(4),
     overflow: 'hidden',
     position: 'relative',
   },
@@ -442,6 +440,7 @@ const styles = StyleSheet.create({
     borderRadius: normalize(16),
     marginHorizontal: wp(8),
     alignItems: 'center',
+    marginTop: -hp(3),
   },
 
   createText: {

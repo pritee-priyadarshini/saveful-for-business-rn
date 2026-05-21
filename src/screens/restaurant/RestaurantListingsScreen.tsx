@@ -11,6 +11,7 @@ import {
   Linking,
   Dimensions
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
@@ -31,6 +32,7 @@ const normalize = (size: number) => {
 };
 
 function prettyStatus(status: string) {
+  if (!status) return '';
   return status
     .replace(/_/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase());
@@ -45,10 +47,6 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [listings, setListings] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
-  React.useEffect(() => {
-    fetchListings();
-  }, []);
-
   const fetchListings = async () => {
     try {
       setLoading(true);
@@ -56,13 +54,19 @@ export function RestaurantListingsScreen({ navigation }: any) {
       const res = await foodListingService.getListings();
 
       const all: any[] = res.data?.listings || [];
-      setListings(all.filter(l => l.status !== 'CANCELLED'));
+      setListings(all.filter((l: any) => l.status !== 'CANCELLED'));
     } catch (err) {
       Alert.alert('Error', 'Failed to load listings');
     } finally {
       setLoading(false);
     }
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchListings();
+    }, [])
+  );
 
   const handleCancelListing = (id: number) => {
     Alert.alert(
@@ -393,11 +397,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 )}
 
                 {/* EDIT / CANCEL ACTIONS */}
-                {(detail.status === 'ACTIVE' || detail.status === 'PARTIAL') && (
+                {(['ACTIVE', 'PARTIAL', 'AVAILABLE'].includes(detail.status?.toUpperCase())) && (
                   <View style={styles.actionRow}>
                     <Pressable
                       style={styles.editBtn}
-                      onPress={() => navigation.navigate('EditListing', { listingId: item.id })}
+                      onPress={() => navigation.navigate('EditListing', { listingId: Number(item.id) })}
                     >
                       <Ionicons name="create-outline" size={normalize(16)} color={palette.white} />
                       <AppText variant="label" style={styles.actionBtnText}>Edit</AppText>

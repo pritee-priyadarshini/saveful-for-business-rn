@@ -18,6 +18,7 @@ export default {
       bundleIdentifier: "com.priteepriyadarshini.savefulbusiness",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        NSPhotoLibraryUsageDescription: "Allow Saveful for Business to access your photo library to upload a logo.",
       },
       config: {
         googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
@@ -33,6 +34,8 @@ export default {
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
       ],
       config: {
         googleMaps: {

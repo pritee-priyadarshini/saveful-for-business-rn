@@ -7,6 +7,7 @@ import { Screen } from '../../components/Screen';
 
 import { palette } from '../../theme/colors';
 import { PostPickupSurveyModal } from './components/postPickupSurveyModal';
+import { LineChart } from 'react-native-chart-kit';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -125,24 +126,24 @@ export function RestaurantUpdatesScreen() {
     if (item.type === 'completed') {
       return (
         <View style={[styles.cardBase, { backgroundColor: bgColor }]}>
-          <AppText variant="h7" numberOfLines={1}> Surplus Collected 🎉 </AppText>
+          <AppText variant="h7" numberOfLines={1}> Surplus Collected </AppText>
 
           <AppText variant="bodySmall" numberOfLines={1}> You’ve successfully shared food with a charity </AppText>
 
           <View style={styles.metaRow}>
             <View style={styles.metaCard}>
-              <AppText style={styles.metaTextLabel} variant='label'>Date</AppText>
-              <AppText style={styles.metaTextValue} variant='bodySmall'>14/04/2026</AppText>
+              <AppText variant='label'>Date</AppText>
+              <AppText variant='bodySmall' style={{marginTop: hp(1)}}>14/04/2026</AppText>
             </View>
 
             <View style={styles.metaCard}>
-              <AppText style={styles.metaTextLabel} variant='label'> Food Saved (Kgs)</AppText>
-              <AppText style={styles.metaTextValue} variant='bodySmall'>8 kg</AppText>
+              <AppText variant='label' style={{textAlign: 'center'}}> Food Saved (Kgs)</AppText>
+              <AppText variant='bodySmall' style={{marginTop: hp(1)}}>8 kg</AppText>
             </View>
 
             <View style={styles.metaCard}>
-              <AppText style={styles.metaTextLabel} variant='label'>Meals Created</AppText>
-              <AppText style={styles.metaTextValue} variant='bodySmall'>20</AppText>
+              <AppText variant='label' style={{textAlign: 'center'}}>Meals Created</AppText>
+              <AppText variant='bodySmall' style={{marginTop: hp(1)}}>20</AppText>
             </View>
           </View>
         </View>
@@ -185,18 +186,18 @@ export function RestaurantUpdatesScreen() {
         {/* META ROW */}
         <View style={styles.metaRow}>
           <View style={styles.metaCard}>
-            <AppText style={styles.metaTextLabel} variant='label'>Qty</AppText>
-            <AppText style={styles.metaTextValue} variant='bodySmall'>{item.quantity}kg</AppText>
+            <AppText variant='label'>Qty</AppText>
+            <AppText variant='bodySmall' style={{marginTop: hp(1)}}>{item.quantity}kg</AppText>
           </View>
 
           <View style={styles.metaCard}>
-            <AppText style={styles.metaTextLabel} variant='label'>Date</AppText>
-            <AppText style={styles.metaTextValue} variant='bodySmall'>{item.date}</AppText>
+            <AppText variant='label'>Date</AppText>
+            <AppText  variant='bodySmall' style={{marginTop: hp(1)}}>{item.date}</AppText>
           </View>
 
           <View style={styles.metaCard}>
-            <AppText style={styles.metaTextLabel} variant='label'>Time</AppText>
-            <AppText style={styles.metaTextValue} variant='bodySmall'>{item.time}</AppText>
+            <AppText variant='label'>Time</AppText>
+            <AppText variant='bodySmall' style={{marginTop: hp(1)}}>{item.time}</AppText>
           </View>
 
           <Pressable
@@ -206,7 +207,9 @@ export function RestaurantUpdatesScreen() {
               setDetailsModalVisible(true);
             }}
           >
-            <AppText style={styles.metaTextValue} variant='bodySmall'>Click Here For Details</AppText>
+            <View style={styles.viewBtn}>
+              <AppText variant='label' style={styles.viewText}> View Details </AppText>
+            </View>
           </Pressable>
         </View>
 
@@ -411,7 +414,16 @@ const styles = StyleSheet.create({
     borderRadius: normalize(18),
     gap: hp(1),
   },
-
+    viewBtn: {
+    backgroundColor: palette.middlegreen,
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(0.7),
+    borderRadius: 999,
+  },
+  viewText: {
+    color: palette.white,
+    fontSize: normalize(12),
+  },
   metaRow: {
     flexDirection: 'row',
     marginTop: hp(0.5),

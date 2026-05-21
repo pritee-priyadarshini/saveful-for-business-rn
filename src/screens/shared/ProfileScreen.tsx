@@ -46,21 +46,19 @@ export function ProfileScreen() {
   const selectedSiteId = authUser?.profile?.sites?.[0]?.id;
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!permission.granted) {
-      Alert.alert('Permission required', 'Allow access to gallery');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setLogo(result.assets[0].uri);
+      if (!result.canceled) {
+        setLogo(result.assets[0].uri);
+      }
+    } catch (error: any) {
+      Alert.alert('Image selection failed', 'Please try again.');
     }
   };
 
@@ -477,7 +475,7 @@ export function ProfileScreen() {
 
           {[
             { label: 'Privacy Policy', url: 'https://www.saveful.com/privacy-policy' },
-            { label: 'Terms of Service', url: 'https://www.saveful.com/app-terms-conditions' },
+            { label: 'Terms of Service', url: 'https://www.saveful.com/saveful-for-business-terms-conditions' },
             { label: 'FAQ', url: 'https://www.saveful.com/faq#saveful-for-business-faq' },
           ].map((item, index) => (
             <Pressable

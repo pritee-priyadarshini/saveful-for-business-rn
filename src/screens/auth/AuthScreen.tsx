@@ -454,6 +454,9 @@ export function AuthScreen() {
 
             <View style={{ gap: spacing.xs }}>
               <AppText variant="label">Logo</AppText>
+              <AppText variant="bodySmall" style={{ color: palette.textMuted }}>
+                Centre your subject — the logo displays as a circle in the app
+              </AppText>
 
               {!currentLogo ? (
                 <Pressable style={styles.upload} onPress={pickImage}>
@@ -588,7 +591,7 @@ export function AuthScreen() {
               <AppText
                 variant="label"
                 style={styles.disclaimerLink}
-                onPress={() => Linking.openURL('https://www.saveful.com/app-terms-conditions')}
+                onPress={() => Linking.openURL('https://www.saveful.com/saveful-for-business-terms-conditions')}
               >
                 Terms & Conditions
               </AppText>

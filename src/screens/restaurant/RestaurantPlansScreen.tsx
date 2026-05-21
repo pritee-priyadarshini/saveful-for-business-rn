@@ -105,11 +105,18 @@ export function RestaurantPlansScreen({ navigation }: any) {
                 {plan.tagline}
               </AppText>
 
-              {/* PRICE (SINGLE LINE) */}
-              <AppText style={styles.priceText}>
-                {plan.monthlyPrice} or {plan.annualPrice}
-                {plan.annualLabel ? ` (${plan.annualLabel})` : ''}
-              </AppText>
+              {/* PRICE (2 LINES) */}
+              <View>
+                <AppText style={styles.priceText}>
+                  {plan.monthlyPrice.toUpperCase()}
+                </AppText>
+                {plan.annualPrice && (
+                  <AppText style={styles.priceText}>
+                    {plan.id !== 'enterprise' ? 'OR ' : ''}{plan.annualPrice.toUpperCase()}
+                    {plan.annualLabel ? ` (${plan.annualLabel.toUpperCase()})` : ''}
+                  </AppText>
+                )}
+              </View>
 
               {/* DESCRIPTION */}
               <AppText variant="bodySmall" style={styles.description}>
