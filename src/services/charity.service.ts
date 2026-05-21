@@ -29,6 +29,8 @@ export type UpdateCharityLocationPayload = {
     contactEmail?: string;
     contactMobile?: string;
     radiusKm?: number;
+    latitude?: number;
+    longitude?: number;
 };
 
 export type AddCharityMemberPayload = {
@@ -62,12 +64,12 @@ export const charityService = {
         return api.get('/charity/locations');
     },
 
-    getLocation(locationId: number) {
+    getLocation(locationId: number | string) {
         return api.get(`/charity/locations/${locationId}`);
     },
 
-    updateLocation(locationId: number, data: UpdateCharityLocationPayload,) {
-        return api.patch(`/charity/locations/${locationId}`, data,);
+    updateLocation(locationId: number | string, data: UpdateCharityLocationPayload) {
+        return api.patch(`/charity/locations/${locationId}`, data);
     },
 
     deactivateLocation(locationId: number) {
@@ -105,5 +107,4 @@ export const charityService = {
     resendInvite(userId: number, data: ResendInvitePayload,) {
         return api.post(`/charity/users/${userId}/resend-invite`, data,);
     },
-    
 };

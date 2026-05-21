@@ -4,6 +4,8 @@ import {
   Image,
   View,
   TouchableOpacity,
+  Pressable,
+  Alert,
   Dimensions,
   ImageBackground,
   RefreshControl,
@@ -11,6 +13,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
@@ -22,6 +25,8 @@ import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useNavigation } from '@react-navigation/native';
 import { foodListingService } from '@/services/foodListing.service';
+import { charityService } from '@/services/charity.service';
+import { authService } from '@/services/auth.service';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -31,15 +36,35 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
+
 export function CharityDiscoverScreen() {
   const navigation = useNavigation<any>();
-  const { currentProfile } = useAppContext();
+  const { currentProfile, authUser, setAuthUser } = useAppContext();
   const listRef = useRef<FlatList>(null);
 
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [locationBannerClosed, setLocationBannerClosed] = useState(false);
+  const [capturingLocation, setCapturingLocation] = useState(false);
+  const [capturedLocationText, setCapturedLocationText] = useState('');
+
+  const profileLatitude =
+    authUser?.profile?.sites?.[0]?.latitude ??
+    authUser?.profile?.organisation?.latitude;
+  const profileLongitude =
+    authUser?.profile?.sites?.[0]?.longitude ??
+    authUser?.profile?.organisation?.longitude;
+
+  const hasBackendLocation =
+    profileLatitude !== null &&
+    profileLatitude !== undefined &&
+    profileLongitude !== null &&
+    profileLongitude !== undefined;
+
+  const showLocationBanner =
+    !hasBackendLocation && !locationBannerClosed;
 
   const fetchListings = async () => {
     try {
@@ -130,6 +155,95 @@ export function CharityDiscoverScreen() {
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   }, []);
+
+  const handleShareCurrentLocation = async () => {
+    try {
+      setCapturingLocation(true);
+
+      let permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        permission = await Location.requestForegroundPermissionsAsync();
+      }
+
+      if (permission.status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Please allow location access to continue.',
+        );
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
+      const places = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      const place = places[0];
+      const label = place
+        ? [
+            place.name,
+            place.street,
+            place.city,
+            place.region,
+            place.postalCode,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+
+      const explicitSiteId = authUser?.profile?.sites?.[0]?.id;
+      let locationId: number | string | null = explicitSiteId || null;
+
+      if (!locationId) {
+        const locationsRes = await charityService.listLocations();
+        const locations = Array.isArray(locationsRes.data)
+          ? locationsRes.data
+          : locationsRes.data?.locations || [];
+
+        if (locations.length > 0) {
+          locationId = locations[0].id;
+        }
+      }
+
+      if (!locationId) {
+        Alert.alert('Unable to Save', 'Could not find a charity location to update.');
+        return;
+      }
+
+      await charityService.updateLocation(locationId, { latitude, longitude });
+
+      try {
+        const profileRes = await authService.profile();
+        const profile = profileRes.data;
+
+        setAuthUser({
+          ...profile.user,
+          accessToken: authUser?.accessToken || '',
+          orgType: profile.organisation?.type,
+          orgRole: profile.role?.orgRole,
+          siteRole: profile.role?.siteRole,
+          profile,
+        });
+      } catch {
+        // Saving location already succeeded; profile refresh can be retried later.
+      }
+
+      setCapturedLocationText(label);
+      setLocationBannerClosed(true);
+      Alert.alert('Location Shared', 'Your location has been saved successfully.');
+    } catch (error: any) {
+      Alert.alert('Location Error', error?.response?.data?.message ?? error?.message ?? 'Unable to save your location. Please try again.');
+    } finally {
+      setCapturingLocation(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -225,6 +339,37 @@ export function CharityDiscoverScreen() {
           We are helping good food go further, together
         </AppText>
       </ImageBackground>
+
+      {showLocationBanner && (
+        <View style={styles.locationBanner}>
+          <View style={styles.locationBannerTopRow}>
+            <AppText variant="bodyBold">Share your location to get started</AppText>
+            <Pressable onPress={() => setLocationBannerClosed(true)}>
+              <AppText variant="bodyLarge">×</AppText>
+            </Pressable>
+          </View>
+
+          <AppText variant="bodySmall" style={styles.locationBannerText}>
+            Are you currently at your charity location? Share your location for better pickup matching.
+          </AppText>
+
+          <Pressable
+            style={styles.locationBannerBtn}
+            onPress={handleShareCurrentLocation}
+            disabled={capturingLocation}
+          >
+            <AppText variant="label" style={styles.locationBannerBtnText}>
+              {capturingLocation ? 'Getting location...' : 'Share Your Location'}
+            </AppText>
+          </Pressable>
+        </View>
+      )}
+
+      {!!capturedLocationText && !showLocationBanner && (
+        <View style={styles.locationCapturedPill}>
+          <AppText variant="caption">Location captured: {capturedLocationText}</AppText>
+        </View>
+      )}
 
       <View style={styles.headingContainer}>
         <Image
@@ -411,6 +556,46 @@ const styles = StyleSheet.create({
 
   headingText: {
     textAlign: 'center',
+  },
+
+  locationBanner: {
+    marginHorizontal: wp(4),
+    marginTop: hp(1.5),
+    borderRadius: normalize(16),
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.white,
+    padding: wp(3.5),
+    gap: hp(1),
+  },
+
+  locationBannerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  locationBannerText: {
+    opacity: 0.8,
+  },
+
+  locationBannerBtn: {
+    backgroundColor: palette.middlegreen,
+    borderRadius: normalize(12),
+    paddingVertical: hp(1.2),
+    alignItems: 'center',
+  },
+
+  locationBannerBtnText: {
+    color: palette.white,
+  },
+
+  locationCapturedPill: {
+    marginHorizontal: wp(4),
+    marginTop: hp(1),
+    borderRadius: normalize(10),
+    backgroundColor: '#ECF8F1',
+    padding: wp(2.5),
   },
 
   toggleWrapper: {

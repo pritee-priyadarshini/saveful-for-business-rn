@@ -12,8 +12,10 @@ import {
   Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
@@ -56,6 +58,9 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(['personal']);
   const [isChecked, setIsChecked] = useState(false);
+  const [isAtCharityNow, setIsAtCharityNow] = useState<boolean | null>(null);
+  const [capturingLocation, setCapturingLocation] = useState(false);
+  const [capturedLocationLabel, setCapturedLocationLabel] = useState('');
 
   const toggle = (section: string) => {
     setOpenSections((prev) =>
@@ -102,6 +107,68 @@ export function AuthScreen() {
       updateRestaurantField('logo', '');
     } else {
       updateCharityField('logo' as any, '');
+    }
+  };
+
+  const captureCharityLocation = async () => {
+    try {
+      setCapturingLocation(true);
+
+      let permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        permission = await Location.requestForegroundPermissionsAsync();
+      }
+
+      if (permission.status !== 'granted') {
+        Alert.alert(
+          'Location Permission Required',
+          'Please allow location permission to continue charity onboarding.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
+      updateCharityField('latitude', String(latitude));
+      updateCharityField('longitude', String(longitude));
+
+      const places = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      const place = places[0];
+      const formattedAddress = place
+        ? [
+            place.name,
+            place.street,
+            place.city,
+            place.region,
+            place.postalCode,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+
+      if (!charityForm.charityAddress && formattedAddress) {
+        updateCharityField('charityAddress', formattedAddress);
+      }
+
+      setCapturedLocationLabel(formattedAddress);
+      Alert.alert('Location Captured', 'Your charity location has been added.');
+    } catch (error) {
+      Alert.alert('Location Error', 'Unable to capture current location. Please try again.');
+    } finally {
+      setCapturingLocation(false);
     }
   };
 
@@ -160,8 +227,11 @@ export function AuthScreen() {
         form.append('pickupPostCode', charityForm.postcodes);
         form.append('pickupRadiusKm', charityForm.pickupRadius || '5');
         form.append('region', 'IN');
-        form.append('latitude', '20.2961');
-        form.append('longitude', '85.8245');
+
+        if (charityForm.latitude && charityForm.longitude) {
+          form.append('latitude', charityForm.latitude);
+          form.append('longitude', charityForm.longitude);
+        }
 
         if (charityForm.logo) {
           form.append('logo', {
@@ -434,6 +504,77 @@ export function AuthScreen() {
             </Section>
           )}
 
+          {!isRestaurant && (
+            <Section
+              title="Location Verification (Recommended)"
+              active={openSections.includes('location')}
+              onPress={() => toggle('location')}
+            >
+              <View style={styles.locationCard}>
+                <AppText variant="bodySmall">
+                  Are you currently at your charity location?
+                </AppText>
+
+                <View style={styles.locationChoiceRow}>
+                  <Pressable
+                    style={[
+                      styles.locationChoiceBtn,
+                      isAtCharityNow === true && styles.locationChoiceBtnActive,
+                    ]}
+                    onPress={() => setIsAtCharityNow(true)}
+                  >
+                    <AppText style={isAtCharityNow === true ? styles.locationChoiceTextActive : undefined}>
+                      Yes, I am here
+                    </AppText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.locationChoiceBtn,
+                      isAtCharityNow === false && styles.locationChoiceBtnActive,
+                    ]}
+                    onPress={() => {
+                      setIsAtCharityNow(false);
+                      updateCharityField('latitude', '');
+                      updateCharityField('longitude', '');
+                      setCapturedLocationLabel('');
+                    }}
+                  >
+                    <AppText style={isAtCharityNow === false ? styles.locationChoiceTextActive : undefined}>
+                      Not right now
+                    </AppText>
+                  </Pressable>
+                </View>
+
+                <AppText variant="caption" style={styles.locationHelpText}>
+                  You can skip this for now and still register. We will ask again on home screen for better pickup matching.
+                </AppText>
+
+                <Pressable
+                  style={[
+                    styles.captureLocationBtn,
+                    (isAtCharityNow !== true || capturingLocation) && styles.captureLocationBtnDisabled,
+                  ]}
+                  disabled={isAtCharityNow !== true || capturingLocation}
+                  onPress={captureCharityLocation}
+                >
+                  <AppText variant="label" style={styles.captureLocationBtnText}>
+                    {capturingLocation ? 'Capturing location...' : 'Share Current Location'}
+                  </AppText>
+                </Pressable>
+
+                {!!capturedLocationLabel && (
+                  <View style={styles.locationSuccessBox}>
+                    <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
+                    <AppText variant="caption" style={styles.locationSuccessText}>
+                      {capturedLocationLabel}
+                    </AppText>
+                  </View>
+                )}
+              </View>
+            </Section>
+          )}
+
           <View style={styles.checkboxRow}>
             <Pressable
               style={[styles.checkbox, isChecked && styles.checkboxChecked]}
@@ -661,6 +802,71 @@ const styles = StyleSheet.create({
 
   checkboxChecked: {
     backgroundColor: palette.primary,
+  },
+
+  locationCard: {
+    gap: hp(1),
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: normalize(14),
+    padding: wp(3.5),
+    backgroundColor: palette.white,
+  },
+
+  locationChoiceRow: {
+    flexDirection: 'row',
+    gap: wp(2),
+  },
+
+  locationChoiceBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: normalize(12),
+    paddingVertical: hp(1),
+    alignItems: 'center',
+    backgroundColor: palette.creme,
+  },
+
+  locationChoiceBtnActive: {
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
+  },
+
+  locationChoiceTextActive: {
+    color: palette.white,
+  },
+
+  locationHelpText: {
+    opacity: 0.7,
+  },
+
+  captureLocationBtn: {
+    backgroundColor: palette.middlegreen,
+    borderRadius: normalize(12),
+    paddingVertical: hp(1.2),
+    alignItems: 'center',
+  },
+
+  captureLocationBtnDisabled: {
+    opacity: 0.5,
+  },
+
+  captureLocationBtnText: {
+    color: palette.white,
+  },
+
+  locationSuccessBox: {
+    flexDirection: 'row',
+    gap: wp(1.5),
+    alignItems: 'center',
+    backgroundColor: '#ECF8F1',
+    borderRadius: normalize(10),
+    padding: wp(2.5),
+  },
+
+  locationSuccessText: {
+    flex: 1,
   },
 
   tick: {

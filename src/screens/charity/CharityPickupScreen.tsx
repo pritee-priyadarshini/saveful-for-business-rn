@@ -526,8 +526,9 @@ const styles = StyleSheet.create({
     },
 
     statusPill: {
-        width: wp(30),
+        minWidth: wp(30),
         paddingVertical: hp(0.7),
+        paddingHorizontal: wp(2.5),
         borderRadius: normalize(999),
         alignItems: 'center',
     },
@@ -564,8 +565,9 @@ const styles = StyleSheet.create({
 
     driverStatusPill: {
         backgroundColor: palette.orange,
-        width: wp(30),
+        minWidth: wp(30),
         paddingVertical: hp(0.7),
+        paddingHorizontal: wp(2.5),
         borderRadius: normalize(999),
         alignItems: 'center',
     },
@@ -577,7 +579,8 @@ const styles = StyleSheet.create({
         backgroundColor: palette.primary,
         paddingVertical: hp(0.7),
         borderRadius: normalize(999),
-        width: wp(30),
+        minWidth: wp(30),
+        paddingHorizontal: wp(2.5),
     },
 
     trackText: {
@@ -663,15 +666,15 @@ const styles = StyleSheet.create({
 
     iconRow: {
         flexDirection: 'row',
-        gap: wp(2.5),
+        gap: wp(1),
     },
 
     iconPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(1.5),
+        gap: wp(1),
         backgroundColor: palette.middlegreen,
-        paddingHorizontal: wp(3),
+        paddingHorizontal: wp(2),
         paddingVertical: hp(0.9),
         borderRadius: normalize(999),
     },
