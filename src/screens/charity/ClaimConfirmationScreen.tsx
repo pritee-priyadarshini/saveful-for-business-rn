@@ -7,6 +7,7 @@ import {
   ImageBackground,
   Pressable,
   Modal,
+  Dimensions,
 } from 'react-native';
 import { Linking } from 'react-native';
 
@@ -17,6 +18,14 @@ import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export function ClaimConfirmationScreen({ route, navigation }: any) {
   const [note, setNote] = useState('');
@@ -99,7 +108,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
             onPress={() => navigation.goBack()}
             style={styles.backBtn}
           >
-            <Ionicons name="arrow-back" size={24} color={palette.white} />
+            <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
           </TouchableOpacity>
 
           <AppText variant='h5' style={styles.headerTitle}>
@@ -273,7 +282,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
                     ? 'checkmark-circle'
                     : 'close-circle'
                 }
-                size={22}
+                size={normalize(22)}
                 color={
                   drivers.find(
                     d => d.id === selectedDriver
@@ -308,7 +317,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
         >
           <View style={[styles.checkbox, accepted && styles.checkboxActive]}>
             {accepted && (
-              <Ionicons name="checkmark" size={16} color={palette.white} />
+              <Ionicons name="checkmark" size={normalize(16)} color={palette.white} />
             )}
           </View>
 
@@ -341,7 +350,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
             <View style={styles.modalIconWrap}>
               <Ionicons
                 name="checkmark"
-                size={34}
+                size={normalize(34)}
                 color={palette.white}
               />
             </View>
@@ -376,21 +385,20 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.md,
+    gap: hp(1.5),
   },
   headerBg: {
-    height: 160,
+    height: hp(20),
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: -spacing.md,
-    paddingTop: spacing.lg,
+    marginHorizontal: -wp(4),
+    paddingTop: hp(2),
   },
 
   backBtn: {
     position: 'absolute',
-    top: spacing.lg,
-    left: spacing.md,
-    marginLeft: spacing.md,
+    top: hp(2.2),
+    left: wp(4),
   },
 
   headerTitle: {
@@ -400,10 +408,10 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: palette.white,
-    marginHorizontal: spacing.md,
-    padding: spacing.md,
-    borderRadius: 18,
-    gap: spacing.sm,
+    marginHorizontal: wp(4),
+    padding: wp(4),
+    borderRadius: normalize(18),
+    gap: hp(1),
     borderWidth: 1,
     borderColor: palette.border,
   },
@@ -414,9 +422,9 @@ const styles = StyleSheet.create({
   },
 
   divider: {
-    height: 1,
+    height: normalize(1),
     backgroundColor: palette.border,
-    marginVertical: spacing.sm,
+    marginVertical: hp(1),
   },
 
   locationRow: {
@@ -426,43 +434,43 @@ const styles = StyleSheet.create({
 
   mapBtn: {
     backgroundColor: palette.middlegreen,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    borderRadius: normalize(10),
   },
 
   timeRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: wp(2.5),
+    marginTop: hp(1),
   },
 
   timeCard: {
     flex: 1,
     backgroundColor: palette.radish,
-    padding: spacing.sm,
-    borderRadius: 12,
+    padding: wp(2.5),
+    borderRadius: normalize(12),
   },
 
   contactRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: wp(2.5),
+    marginTop: hp(1),
   },
 
   contactBtn: {
     flex: 1,
-    padding: spacing.sm,
-    borderRadius: 12,
+    padding: wp(2.5),
+    borderRadius: normalize(12),
     backgroundColor: palette.radish,
     alignItems: 'center',
   },
 
   input: {
     backgroundColor: '#F7F7F9',
-    borderRadius: 12,
-    padding: spacing.sm,
-    minHeight: 60,
+    borderRadius: normalize(12),
+    padding: wp(2.5),
+    minHeight: hp(7.5),
     textAlignVertical: 'top',
   },
 
@@ -473,7 +481,7 @@ const styles = StyleSheet.create({
   driverDropdown: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 12,
+    borderRadius: normalize(12),
     overflow: 'hidden',
     backgroundColor: palette.white,
   },
@@ -482,27 +490,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: hp(1),
   },
 
   driverAssignedText: {
-    lineHeight: 26,
+    lineHeight: normalize(26),
     includeFontPadding: true,
   },
 
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: wp(2.5),
+    marginTop: hp(1),
   },
 
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+    width: normalize(22),
+    height: normalize(22),
+    borderRadius: normalize(6),
     borderWidth: 2,
-    marginLeft: spacing.md,
+    marginLeft: wp(4),
     borderColor: '#ccc',
     alignItems: 'center',
     justifyContent: 'center',
@@ -514,8 +522,8 @@ const styles = StyleSheet.create({
   },
 
   confirmBtn: {
-    marginTop: spacing.md,
-    marginHorizontal: spacing.md,
+    marginTop: hp(1.5),
+    marginHorizontal: wp(4),
     backgroundColor: palette.middlegreen,
   },
 
@@ -524,22 +532,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: wp(4),
   },
 
   modalCard: {
     width: '100%',
     backgroundColor: palette.white,
-    borderRadius: 24,
-    padding: spacing.xl,
+    borderRadius: normalize(24),
+    padding: wp(6),
     alignItems: 'center',
-    gap: spacing.md,
+    gap: hp(1.5),
   },
 
   modalIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: normalize(72),
+    height: normalize(72),
+    borderRadius: normalize(36),
     backgroundColor: palette.middlegreen,
     alignItems: 'center',
     justifyContent: 'center',
@@ -552,16 +560,16 @@ const styles = StyleSheet.create({
   modalText: {
     textAlign: 'center',
     opacity: 0.8,
-    lineHeight: 24,
+    lineHeight: normalize(24),
   },
 
   modalBtn: {
     width: '100%',
     backgroundColor: palette.middlegreen,
-    paddingVertical: spacing.md,
-    borderRadius: 14,
+    paddingVertical: hp(1.5),
+    borderRadius: normalize(14),
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: hp(1),
   },
 
   modalBtnText: {

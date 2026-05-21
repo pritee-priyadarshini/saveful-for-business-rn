@@ -374,6 +374,7 @@ const styles = StyleSheet.create({
         padding: wp(6),
         gap: hp(2),
         marginBottom: hp(15),
+        marginTop: hp(6),
     },
     title: {
         textAlign: 'center',

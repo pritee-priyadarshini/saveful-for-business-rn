@@ -7,6 +7,7 @@ import {
   ImageBackground,
   Pressable,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
 
 import { AppText } from '../../components/AppText';
@@ -15,6 +16,14 @@ import { Screen } from '../../components/Screen';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { foodListingService } from '@/services/foodListing.service';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type ClaimState = Record<string, number>; // key = listingId-itemName
 
@@ -182,7 +191,7 @@ export function CharityMapScreen({ navigation }: any) {
             setActiveFilter(activeFilter === 'distance' ? null : 'distance')
           }
         >
-          <AppText variant='label'
+          <AppText variant='caption'
             style={
               activeFilter === 'distance'
                 ? styles.filterTextActive
@@ -202,14 +211,14 @@ export function CharityMapScreen({ navigation }: any) {
             setActiveFilter(activeFilter === 'surplus' ? null : 'surplus')
           }
         >
-          <AppText variant='label'
+          <AppText variant='caption'
             style={
               activeFilter === 'surplus'
                 ? styles.filterTextActive
                 : styles.filterText
             }
           >
-            Sort by Surplus Available
+          by Surplus Available
           </AppText>
         </TouchableOpacity>
       </View>
@@ -361,7 +370,7 @@ export function CharityMapScreen({ navigation }: any) {
   if (loading) {
     return (
       <Screen backgroundColor={palette.creme}>
-        <AppText style={{ textAlign: 'center', marginTop: 50 }}>
+        <AppText style={{ textAlign: 'center', marginTop: hp(6) }}>
           Loading listings...
         </AppText>
       </Screen>
@@ -383,7 +392,7 @@ export function CharityMapScreen({ navigation }: any) {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
             <AppText variant="h7">No surplus available</AppText>
-            <AppText variant="bodySmall" style={{ marginTop: 6 }}>
+            <AppText variant="bodySmall" style={{ marginTop: hp(0.7) }}>
               No surplus available. Check again later.
             </AppText>
           </View>
@@ -407,27 +416,27 @@ export function CharityMapScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: spacing.xl,
+    paddingBottom: hp(4),
   },
 
   headerWrapper: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: wp(4),
   },
 
   headerBg: {
-    height: 160,
+    height: hp(20),
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: -spacing.md,
+    marginHorizontal: -wp(4),
   },
 
   pickupBtn: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+    marginHorizontal: wp(4),
+    marginTop: hp(1.5),
+    marginBottom: hp(1.5),
     backgroundColor: palette.primary,
-    paddingVertical: spacing.md,
-    borderRadius: 14,
+    paddingVertical: hp(1.4),
+    borderRadius: normalize(14),
     alignItems: 'center',
   },
 
@@ -444,27 +453,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginTop: hp(1.5),
   },
 
   activeBadge: {
     backgroundColor: palette.middlegreen,
-    paddingHorizontal: 30,
-    paddingVertical: 8,
-    borderRadius: 10,
+    minWidth: wp(18),
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(0.9),
+    borderRadius: normalize(10),
+    alignItems: 'center',
   },
 
   filterRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    gap: wp(2.5),
+    marginTop: hp(1.5),
   },
 
   filterPill: {
     flex: 1,
     backgroundColor: palette.radish,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingVertical: hp(1.2),
+    borderRadius: normalize(20),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -482,10 +493,10 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: palette.white,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: 20,
+    marginHorizontal: wp(4),
+    marginTop: hp(1.5),
+    padding: wp(4),
+    borderRadius: normalize(20),
     borderWidth: 1,
     borderColor: palette.border,
   },
@@ -493,77 +504,77 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: hp(1),
   },
 
   distanceChip: {
     backgroundColor: palette.radish,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.1),
+    borderRadius: normalize(8),
   },
 
   infoRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginVertical: spacing.sm,
+    gap: wp(2.5),
+    marginVertical: hp(1),
   },
 
   infoCard: {
     flex: 1,
     backgroundColor: palette.radish,
-    padding: spacing.sm,
-    gap: 8,
-    borderRadius: 14,
+    padding: wp(2.5),
+    gap: hp(0.8),
+    borderRadius: normalize(14),
   },
 
   storageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xs,
+    marginTop: hp(0.6),
   },
 
   section: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
   },
 
   sectionTitle: {
-    marginBottom: spacing.sm,
+    marginBottom: hp(1),
   },
 
   itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FAFAFB',
-    padding: spacing.sm,
-    borderRadius: 14,
-    marginBottom: spacing.sm,
+    padding: wp(2.5),
+    borderRadius: normalize(14),
+    marginBottom: hp(1),
   },
 
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F1F1F4',
-    borderRadius: 20,
-    paddingHorizontal: 6,
+    borderRadius: normalize(20),
+    paddingHorizontal: wp(1.5),
   },
 
   stepBtn: {
-    padding: 6,
+    padding: normalize(6),
   },
 
   qtyPill: {
     backgroundColor: palette.white,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginHorizontal: 4,
+    borderRadius: normalize(12),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.5),
+    marginHorizontal: wp(1),
   },
 
   ctaRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    gap: wp(2.5),
+    marginTop: hp(1.5),
   },
 
   flexBtn: {

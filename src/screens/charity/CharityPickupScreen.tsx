@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     View,
     StyleSheet,
@@ -8,6 +8,7 @@ import {
     Modal,
     Alert,
     Linking,
+    Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
@@ -19,6 +20,14 @@ import { AppText } from '../../components/AppText';
 import { spacing } from '../../theme/spacing';
 import { palette } from '../../theme/colors';
 import { ListingStatus, OrderStatus } from '@/types';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type Driver = {
     id: string;
@@ -71,7 +80,7 @@ const initialPickups: Pickup[] = [
         restaurantAddress: 'Patia Main Road, Bhubaneswar',
         distance: '1.8 km away',
         restaurantPhone: '+91 9876543210',
-        listingStatus: 'Claimed',
+        listingStatus: 'CLAIMED',
         orderStatus: 'enroute',
         driverName: 'Rahul Das',
         driverPhone: '+91 9876512345',
@@ -90,7 +99,7 @@ const initialPickups: Pickup[] = [
         restaurantAddress: 'Saheed Nagar, Bhubaneswar',
         distance: '3.2 km away',
         restaurantPhone: '+91 9876500000',
-        listingStatus: 'Partial claimed',
+        listingStatus: 'PARTIAL',
         orderStatus: 'driver_assigned',
         driverName: null,
         driverPhone: null,
@@ -111,12 +120,22 @@ function prettyStatus(status: string) {
         .replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function prettyListingStatus(status: ListingStatus) {
+    if (status === 'PARTIAL') return 'Partial Claimed';
+    return status.charAt(0) + status.slice(1).toLowerCase();
+}
+
 export default function CharityPickupScreen({ navigation, }: any) {
     const [pickups, setPickups] = useState(initialPickups);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedItems, setSelectedItems] = useState<any[]>([]);
     const [expandedDriverId, setExpandedDriverId] = useState<string | null>(null);
     const [selectedDriver, setSelectedDriver] = useState<Record<string, string>>({});
+    const modalTotals = useMemo(() => {
+        const totalAvailable = selectedItems.reduce((sum, i) => sum + (i.available || 0), 0);
+        const totalClaimed = selectedItems.reduce((sum, i) => sum + (i.claimed || 0), 0);
+        return { totalAvailable, totalClaimed };
+    }, [selectedItems]);
 
     const makeCall = async (phone?: string | null) => {
         if (!phone) {
@@ -176,18 +195,6 @@ export default function CharityPickupScreen({ navigation, }: any) {
                 </ImageBackground>
 
                 {pickups.map(item => {
-                    const totalAvailable =
-                        item.items.reduce(
-                            (sum, i) => sum + i.available,
-                            0
-                        );
-
-                    const totalClaimed =
-                        item.items.reduce(
-                            (sum, i) => sum + i.claimed,
-                            0
-                        );
-
                     return (
                         <Card key={item.id} style={styles.card}>
                             {/* TOP */}
@@ -210,11 +217,11 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                     <View
                                         style={[
                                             styles.statusPill,
-                                            item.listingStatus === 'Partial claimed' ? styles.partialPill : styles.claimedPill,
+                                            item.listingStatus === 'PARTIAL' ? styles.partialPill : styles.claimedPill,
                                         ]}
                                     >
                                         <AppText variant="caption" style={styles.statusText} >
-                                            {item.listingStatus}
+                                            {prettyListingStatus(item.listingStatus)}
                                         </AppText>
                                     </View>
 
@@ -225,7 +232,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                     </View>
 
                                     <View>
-                                        {item.listingStatus !== 'Available' ? (
+                                        {item.listingStatus !== 'ACTIVE' ? (
                                             <Pressable
                                                 style={styles.trackBtn}
                                                 onPress={() =>
@@ -339,7 +346,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                                             d => d.id === selectedDriver[item.id]
                                                         )?.online ? 'checkmark-circle' : 'close-circle'
                                                     }
-                                                    size={22}
+                                                    size={normalize(22)}
                                                     color={
                                                         drivers.find(
                                                             d => d.id === selectedDriver[item.id]
@@ -368,7 +375,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                         style={styles.iconPill}
                                         onPress={() => makeCall(item.restaurantPhone)}
                                     >
-                                        <Ionicons name="call-outline" size={18} color={palette.white} />
+                                        <Ionicons name="call-outline" size={normalize(18)} color={palette.white} />
                                         <AppText variant="label" style={styles.iconText} > Call </AppText>
                                     </Pressable>
 
@@ -376,7 +383,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                         style={styles.iconPill}
                                         onPress={() => sendMessage(item.restaurantPhone)}
                                     >
-                                        <Ionicons name="chatbubble-outline" size={18} color={palette.white} />
+                                        <Ionicons name="chatbubble-outline" size={normalize(18)} color={palette.white} />
                                         <AppText variant="label" style={styles.iconText} > Message </AppText>
                                     </Pressable>
                                 </View>
@@ -392,7 +399,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                                 style={styles.iconPill}
                                                 onPress={() => makeCall(item.driverPhone)}
                                             >
-                                                <Ionicons name="call-outline" size={18} color={palette.white} />
+                                                <Ionicons name="call-outline" size={normalize(18)} color={palette.white} />
                                                 <AppText variant="label" style={styles.iconText} > Call </AppText>
                                             </Pressable>
 
@@ -400,93 +407,92 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                                 style={styles.iconPill}
                                                 onPress={() => sendMessage(item.driverPhone)}
                                             >
-                                                <Ionicons name="chatbubble-outline" size={18} color={palette.white} />
+                                                <Ionicons name="chatbubble-outline" size={normalize(18)} color={palette.white} />
                                                 <AppText variant="label" style={styles.iconText} > Message </AppText>
                                             </Pressable>
                                         </View>
                                     </View>
                                 )
                             }
-
-                            {/* MODAL */}
-                            <Modal
-                                visible={modalVisible}
-                                transparent
-                                animationType="slide"
-                            >
-                                <View style={styles.modalWrap} >
-                                    <View style={styles.modalCard} >
-                                        <View style={styles.modalTopBar}>
-                                            <AppText variant="h6"> Items </AppText>
-
-                                            <Pressable
-                                                style={styles.closeIconBtn}
-                                                onPress={() => setModalVisible(false)}
-                                            >
-                                                <Ionicons name="close" size={20} color={palette.black} />
-                                            </Pressable>
-                                        </View>
-
-                                        <View style={styles.modalHeaderRow} >
-                                            <AppText variant="bodyBold" style={{ flex: 2, }}> Item Name </AppText>
-
-                                            <AppText variant="bodyBold" style={styles.modalCol} >
-                                                Available
-                                            </AppText>
-
-                                            <AppText variant="bodyBold" style={styles.modalCol} >
-                                                Claimed
-                                            </AppText>
-                                        </View>
-
-                                        {selectedItems.map(
-                                            (item, idx) => (
-                                                <View
-                                                    key={idx}
-                                                    style={styles.modalItemRow}
-                                                >
-                                                    <AppText variant="label" style={{ flex: 2, }} >
-                                                        {item.name}
-                                                    </AppText>
-
-                                                    <AppText variant="bodySmall" style={styles.modalCol} >
-                                                        {item.available} kg
-                                                    </AppText>
-
-                                                    <AppText variant="bodySmall" style={styles.modalCol} >
-                                                        {item.claimed} kg
-                                                    </AppText>
-                                                </View>
-                                            )
-                                        )}
-
-                                        <AppText variant="bodyBold">
-                                            Total Quantity:{' '}{totalAvailable}{' '} kg
-                                        </AppText>
-
-                                        <AppText variant="bodyBold">
-                                            Total Claimed:{' '} {totalClaimed}{' '} kg
-                                        </AppText>
-                                    </View>
-                                </View>
-                            </Modal>
                         </Card>
                     );
                 })}
             </ScrollView>
+
+            <Modal
+                visible={modalVisible}
+                transparent
+                animationType="slide"
+            >
+                <View style={styles.modalWrap} >
+                    <View style={styles.modalCard} >
+                        <View style={styles.modalTopBar}>
+                            <AppText variant="h6"> Items </AppText>
+
+                            <Pressable
+                                style={styles.closeIconBtn}
+                                onPress={() => setModalVisible(false)}
+                            >
+                                <Ionicons name="close" size={normalize(20)} color={palette.black} />
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.modalHeaderRow} >
+                            <AppText variant="bodyBold" style={{ flex: 2, }}> Item Name </AppText>
+
+                            <AppText variant="bodyBold" style={styles.modalCol} >
+                                Available
+                            </AppText>
+
+                            <AppText variant="bodyBold" style={styles.modalCol} >
+                                Claimed
+                            </AppText>
+                        </View>
+
+                        {selectedItems.map(
+                            (item, idx) => (
+                                <View
+                                    key={idx}
+                                    style={styles.modalItemRow}
+                                >
+                                    <AppText variant="label" style={{ flex: 2, }} >
+                                        {item.name}
+                                    </AppText>
+
+                                    <AppText variant="bodySmall" style={styles.modalCol} >
+                                        {item.available} kg
+                                    </AppText>
+
+                                    <AppText variant="bodySmall" style={styles.modalCol} >
+                                        {item.claimed} kg
+                                    </AppText>
+                                </View>
+                            )
+                        )}
+
+                        <AppText variant="bodyBold">
+                            Total Quantity:{' '}{modalTotals.totalAvailable}{' '} kg
+                        </AppText>
+
+                        <AppText variant="bodyBold">
+                            Total Claimed:{' '} {modalTotals.totalClaimed}{' '} kg
+                        </AppText>
+                    </View>
+                </View>
+            </Modal>
         </Screen >
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        gap: spacing.lg,
-        paddingBottom: spacing.xl,
+        gap: hp(2),
+        paddingBottom: hp(4),
     },
 
     headerBg: {
         width: '100%',
-        height: 140,
+        height: hp(18),
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -496,10 +502,10 @@ const styles = StyleSheet.create({
     },
 
     card: {
-        padding: spacing.md,
-        marginHorizontal: spacing.lg,
-        borderRadius: 16,
-        gap: spacing.md,
+        padding: wp(4),
+        marginHorizontal: wp(4),
+        borderRadius: normalize(16),
+        gap: hp(1.2),
         backgroundColor: palette.radish,
     },
 
@@ -511,18 +517,18 @@ const styles = StyleSheet.create({
 
     leftBlock: {
         flex: 1,
-        gap: 4,
+        gap: hp(0.5),
     },
 
     statusWrap: {
         alignItems: 'flex-end',
-        gap: 8,
+        gap: hp(0.8),
     },
 
     statusPill: {
-        width: 120,
-        paddingVertical: spacing.xs,
-        borderRadius: 999,
+        width: wp(30),
+        paddingVertical: hp(0.7),
+        borderRadius: normalize(999),
         alignItems: 'center',
     },
 
@@ -543,7 +549,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '100%',
-        marginTop: spacing.xs,
+        marginTop: hp(0.5),
     },
 
     driverLabel: {
@@ -552,15 +558,15 @@ const styles = StyleSheet.create({
 
     driverInline: {
         flex: 1,
-        lineHeight: 22,
-        paddingRight: spacing.sm,
+        lineHeight: normalize(22),
+        paddingRight: wp(2.5),
     },
 
     driverStatusPill: {
         backgroundColor: palette.orange,
-        width: 120,
-        paddingVertical: spacing.xs,
-        borderRadius: 999,
+        width: wp(30),
+        paddingVertical: hp(0.7),
+        borderRadius: normalize(999),
         alignItems: 'center',
     },
 
@@ -569,9 +575,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignSelf: 'flex-end',
         backgroundColor: palette.primary,
-        paddingVertical: spacing.xs,
-        borderRadius: 999,
-        width: 120,
+        paddingVertical: hp(0.7),
+        borderRadius: normalize(999),
+        width: wp(30),
     },
 
     trackText: {
@@ -580,23 +586,23 @@ const styles = StyleSheet.create({
 
     metaRow: {
         flexDirection: 'row',
-        gap: spacing.sm,
+        gap: wp(2.5),
     },
 
     metaCard: {
         flex: 1,
         backgroundColor: palette.creme,
-        padding: spacing.sm,
-        borderRadius: 12,
-        gap: 8,
+        padding: wp(2.5),
+        borderRadius: normalize(12),
+        gap: hp(0.8),
         alignItems: 'center',
     },
 
     viewBtn: {
         backgroundColor: palette.middlegreen,
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderRadius: 999,
+        paddingHorizontal: wp(4),
+        paddingVertical: hp(0.7),
+        borderRadius: normalize(999),
     },
 
     viewText: {
@@ -605,14 +611,14 @@ const styles = StyleSheet.create({
 
     infoBlock: {
         backgroundColor: palette.white,
-        padding: spacing.sm,
-        borderRadius: 10,
+        padding: wp(2.5),
+        borderRadius: normalize(10),
     },
 
     modifyBtn: {
         backgroundColor: palette.primary,
-        paddingVertical: spacing.md,
-        borderRadius: 14,
+        paddingVertical: hp(1.3),
+        borderRadius: normalize(14),
         alignItems: 'center',
     },
 
@@ -621,13 +627,13 @@ const styles = StyleSheet.create({
     },
 
     assignBox: {
-        gap: spacing.md,
+        gap: hp(1.2),
     },
 
     driverDropdown: {
         borderWidth: 1,
         borderColor: palette.border,
-        borderRadius: 12,
+        borderRadius: normalize(12),
         overflow: 'hidden',
         backgroundColor: palette.white,
     },
@@ -640,8 +646,8 @@ const styles = StyleSheet.create({
 
     saveBtn: {
         backgroundColor: palette.middlegreen,
-        paddingVertical: spacing.md,
-        borderRadius: 14,
+        paddingVertical: hp(1.3),
+        borderRadius: normalize(14),
         alignItems: 'center',
     },
 
@@ -657,17 +663,17 @@ const styles = StyleSheet.create({
 
     iconRow: {
         flexDirection: 'row',
-        gap: 10,
+        gap: wp(2.5),
     },
 
     iconPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: wp(1.5),
         backgroundColor: palette.middlegreen,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 999,
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.9),
+        borderRadius: normalize(999),
     },
 
     iconText: {
@@ -681,10 +687,10 @@ const styles = StyleSheet.create({
 
     modalCard: {
         backgroundColor: palette.white,
-        padding: spacing.lg,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        gap: spacing.md,
+        padding: wp(4),
+        borderTopLeftRadius: normalize(24),
+        borderTopRightRadius: normalize(24),
+        gap: hp(1.2),
     },
 
     modalTopBar: {
@@ -694,9 +700,9 @@ const styles = StyleSheet.create({
     },
 
     closeIconBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: normalize(36),
+        height: normalize(36),
+        borderRadius: normalize(18),
         backgroundColor: '#dadbdd',
         justifyContent: 'center',
         alignItems: 'center',
@@ -704,14 +710,14 @@ const styles = StyleSheet.create({
 
     modalHeaderRow: {
         flexDirection: 'row',
-        paddingBottom: 10,
+        paddingBottom: hp(1.2),
         borderBottomWidth: 1,
         borderColor: palette.border,
     },
 
     modalItemRow: {
         flexDirection: 'row',
-        paddingVertical: spacing.xs,
+        paddingVertical: hp(0.5),
     },
 
     modalCol: {

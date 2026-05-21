@@ -10,6 +10,7 @@ import {
     Alert,
     TextInput,
     RefreshControl,
+    Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,6 +23,14 @@ import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
 import { charityService } from '@/services/charity.service';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'MultiCharityManageSites'>;
 
@@ -191,7 +200,7 @@ export default function MultiCharityManageSitesScreen() {
                 </AppText>
 
                 {sites.length === 0 && (
-                    <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
+                    <View style={{ paddingHorizontal: wp(5), marginTop: hp(1.2) }}>
                         <AppText variant="bodyLarge">
                             No charity locations added yet
                         </AppText>
@@ -230,7 +239,7 @@ export default function MultiCharityManageSitesScreen() {
                                 </View>
                             </View>
 
-                            <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                            <View style={{ alignItems: 'flex-end', gap: hp(0.7) }}>
 
                                 {/* VIEW */}
                                 <Pressable
@@ -313,7 +322,7 @@ export default function MultiCharityManageSitesScreen() {
                                         ].map((field: any) => (
                                             <View
                                                 key={field.key}
-                                                style={{ marginBottom: 10 }}
+                                                style={{ marginBottom: hp(1.2) }}
                                             >
                                                 <AppText variant="label">
                                                     {field.label}
@@ -381,7 +390,7 @@ export default function MultiCharityManageSitesScreen() {
                                                 styles.saveBtn,
                                                 {
                                                     backgroundColor: '#D9534F',
-                                                    marginTop: 10,
+                                                    marginTop: hp(1.2),
                                                 },
                                             ]}
                                             onPress={() => {
@@ -440,7 +449,7 @@ export default function MultiCharityManageSitesScreen() {
                                             </AppText>
                                         )}
 
-                                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 15, }}>
+                                        <View style={{ flexDirection: 'row', gap: wp(2.5), marginTop: hp(1.8), }}>
                                             {/* ASSIGN MANAGER */}
                                             <Pressable
                                                 style={[styles.saveBtn, {
@@ -590,44 +599,44 @@ export default function MultiCharityManageSitesScreen() {
 
 const styles = StyleSheet.create({
     heroBg: {
-        height: 140,
+        height: hp(18),
         justifyContent: 'center',
-        marginBottom: 20,
+        marginBottom: hp(2.5),
     },
     logoTopRight: {
-        width: 120,
-        height: 80,
+        width: wp(30),
+        height: hp(10),
         resizeMode: 'contain',
         position: 'absolute',
-        right: 20,
+        right: wp(5),
     },
     heroContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 16,
+        padding: wp(4),
     },
     businessName: {
         color: 'white',
     },
     sectionTitle: {
-        marginHorizontal: spacing.xl,
-        marginBottom: spacing.xl,
+        marginHorizontal: wp(6),
+        marginBottom: hp(2),
         textAlign: 'center',
     },
     actionGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        marginBottom: 20,
+        paddingHorizontal: wp(4),
+        marginBottom: hp(2.5),
     },
     actionCard: {
         backgroundColor: 'white',
         width: '48%',
-        paddingVertical: 20,
-        borderRadius: 14,
-        marginBottom: 12,
+        paddingVertical: hp(2.3),
+        borderRadius: normalize(14),
+        marginBottom: hp(1.4),
         alignItems: 'center',
         elevation: 2,
     },
@@ -635,25 +644,25 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     bottomActions: {
-        marginTop: spacing.lg,
-        paddingHorizontal: spacing.lg,
-        gap: spacing.sm,
+        marginTop: hp(2),
+        paddingHorizontal: wp(4),
+        gap: hp(1),
     },
     logoutBtn: {
         backgroundColor: palette.creme,
-        paddingVertical: spacing.md,
-        marginHorizontal: spacing.md,
-        borderRadius: 12,
+        paddingVertical: hp(1.5),
+        marginHorizontal: wp(4),
+        borderRadius: normalize(12),
         alignItems: 'center',
         borderWidth: 1,
         borderColor: palette.border,
     },
     siteCard: {
         backgroundColor: 'white',
-        marginHorizontal: 16,
-        marginBottom: 12,
-        padding: 16,
-        borderRadius: 12,
+        marginHorizontal: wp(4),
+        marginBottom: hp(1.4),
+        padding: wp(4),
+        borderRadius: normalize(12),
     },
     siteHeader: {
         flexDirection: 'row',
@@ -666,14 +675,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     siteLogo: {
-        width: 40,
-        height: 40,
-        marginRight: 10,
+        width: normalize(40),
+        height: normalize(40),
+        marginRight: wp(2.5),
         resizeMode: 'contain',
     },
     siteIndex: {
         color: palette.primary,
-        marginBottom: 6,
+        marginBottom: hp(0.7),
     },
     siteName: {
         flexShrink: 1,
@@ -683,9 +692,9 @@ const styles = StyleSheet.create({
     },
     viewBtn: {
         backgroundColor: palette.middlegreen,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.7),
+        borderRadius: normalize(8),
     },
     viewText: {
         color: 'white',
@@ -693,15 +702,15 @@ const styles = StyleSheet.create({
 
     editBtn: {
         backgroundColor: '#3b82f6',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.7),
+        borderRadius: normalize(8),
     },
 
     input: {
         backgroundColor: '#FAFAFA',
-        padding: 10,
-        borderRadius: 8,
+        padding: normalize(10),
+        borderRadius: normalize(8),
         borderWidth: 1,
         borderColor: '#eee',
     },
@@ -713,20 +722,20 @@ const styles = StyleSheet.create({
 
     eyeIcon: {
         position: 'absolute',
-        right: 12,
+        right: wp(3),
     },
 
     saveBtn: {
-        marginTop: 10,
+        marginTop: hp(1.2),
         backgroundColor: palette.middlegreen,
-        padding: 12,
-        borderRadius: 8,
+        padding: normalize(12),
+        borderRadius: normalize(8),
         alignItems: 'center',
     },
     details: {
-        marginTop: 10,
+        marginTop: hp(1.2),
         borderTopWidth: 1,
         borderTopColor: '#eee',
-        paddingTop: 10,
+        paddingTop: hp(1.2),
     },
 });

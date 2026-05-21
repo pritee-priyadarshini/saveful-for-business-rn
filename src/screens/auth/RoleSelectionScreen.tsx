@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
 
   headerBg: {
     width: '100%',
-    height: hp(25),
+    height: hp(18),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -157,32 +157,32 @@ const styles = StyleSheet.create({
   headerTitle: {
     textAlign: 'center',
     paddingHorizontal: wp(5),
-    fontSize: normalize(24),
+    fontSize: normalize(20),
   },
 
   content: {
     flexGrow: 1,
     backgroundColor: palette.white,
     paddingHorizontal: wp(5),
-    paddingTop: hp(2),
-    paddingBottom: hp(4),
+    paddingTop: hp(1.5),
+    paddingBottom: hp(2),
   },
 
   subtitle: {
     textAlign: 'center',
     opacity: 0.7,
-    marginBottom: hp(2),
-    fontSize: normalize(16),
+    marginBottom: hp(1),
+    fontSize: normalize(14),
   },
 
   rolesContainer: {
-    gap: hp(1.5),
+    gap: hp(0.8),
   },
 
   card: {
     alignItems: 'center',
     paddingHorizontal: wp(5),
-    paddingVertical: hp(2),
+    paddingVertical: hp(1.8),
     borderRadius: normalize(20),
     backgroundColor: palette.white,
     borderWidth: 1,
@@ -195,14 +195,14 @@ const styles = StyleSheet.create({
   },
 
   icon: {
-    fontSize: normalize(36),
-    marginBottom: hp(1),
-    lineHeight: hp(5),
+    fontSize: normalize(26),
+    marginBottom: hp(0.4),
+    lineHeight: hp(3.5),
   },
 
   textContainer: {
     alignItems: 'center',
-    gap: hp(0.8),
+    gap: hp(0.3),
   },
 
   titleText: {
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   },
 
   ctaButton: {
-    marginTop: hp(3),
+    marginTop: hp(1.5),
     width: '100%',
     paddingVertical: hp(1.8),
     borderRadius: normalize(30),

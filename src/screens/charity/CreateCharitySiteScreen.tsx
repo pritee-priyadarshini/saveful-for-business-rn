@@ -12,6 +12,7 @@ import {
     TouchableWithoutFeedback,
     Keyboard,
     Linking,
+    Dimensions,
 } from 'react-native';
 
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -29,6 +30,14 @@ import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 
 import { CharityMemberRole, charityService } from '@/services/charity.service';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export default function CreateCharitySiteScreen() {
     const navigation = useNavigation();
@@ -332,13 +341,13 @@ export default function CreateCharitySiteScreen() {
         <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={20}
+            keyboardVerticalOffset={normalize(20)}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss} >
                 <Screen backgroundColor={palette.creme}>
                     <ScrollView
                         keyboardShouldPersistTaps="handled"
-                        contentContainerStyle={{ paddingBottom: 120, }}
+                        contentContainerStyle={{ paddingBottom: hp(14), }}
                     >
 
                         {/* HEADER */}
@@ -350,7 +359,7 @@ export default function CreateCharitySiteScreen() {
                                 onPress={() => navigation.goBack()}
                                 style={styles.backBtn}
                             >
-                                <Ionicons name="arrow-back" size={24} color={palette.white} />
+                                <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
                             </Pressable>
 
                             <AppText variant='h5' style={styles.headerTitle} >
@@ -362,8 +371,8 @@ export default function CreateCharitySiteScreen() {
                         <View
                             style={{
                                 flexDirection: 'row',
-                                margin: 15,
-                                gap: 10,
+                                margin: wp(4),
+                                gap: wp(2.5),
                             }}
                         >
                             {[
@@ -388,8 +397,8 @@ export default function CreateCharitySiteScreen() {
                                     }}
                                     style={{
                                         flex: 1,
-                                        padding: 10,
-                                        borderRadius: 20,
+                                        padding: normalize(10),
+                                        borderRadius: normalize(20),
                                         backgroundColor: activeTab === tab.key ? palette.primary : '#eee',
                                         alignItems: 'center',
                                     }}
@@ -480,7 +489,7 @@ export default function CreateCharitySiteScreen() {
                                                     >
                                                         <Ionicons
                                                             name={showPassword ? 'eye-off' : 'eye'}
-                                                            size={20}
+                                                            size={normalize(20)}
                                                             color="#777"
                                                         />
                                                     </Pressable>
@@ -490,12 +499,12 @@ export default function CreateCharitySiteScreen() {
                                 ))}
 
                                 {/* MAP */}
-                                <AppText style={{ textAlign: 'center', marginTop: 20, }}>
+                                <AppText style={{ textAlign: 'center', marginTop: hp(2.4), }}>
                                     Tap map to select location *
                                 </AppText>
 
                                 <View
-                                    style={{ height: 250, margin: 15, position: 'relative', }}>
+                                    style={{ height: hp(30), margin: wp(4), position: 'relative', }}>
                                     {region && (
                                         <MapView
                                             style={{ flex: 1, }}
@@ -552,12 +561,12 @@ export default function CreateCharitySiteScreen() {
                                         onPress={goToCurrentLocation}
                                         style={{
                                             position: 'absolute',
-                                            bottom: 15,
-                                            right: 15,
+                                            bottom: hp(1.8),
+                                            right: wp(4),
                                             backgroundColor: palette.white,
-                                            width: 50,
-                                            height: 50,
-                                            borderRadius: 25,
+                                            width: normalize(50),
+                                            height: normalize(50),
+                                            borderRadius: normalize(25),
                                             justifyContent: 'center',
                                             alignItems: 'center',
                                             elevation: 4,
@@ -565,7 +574,7 @@ export default function CreateCharitySiteScreen() {
                                     >
                                         <Ionicons
                                             name="locate"
-                                            size={24}
+                                            size={normalize(24)}
                                             color={palette.primary}
                                         />
                                     </Pressable>
@@ -588,8 +597,8 @@ export default function CreateCharitySiteScreen() {
                             <>
                                 <View
                                     style={{
-                                        marginHorizontal: 15,
-                                        marginBottom: 15,
+                                        marginHorizontal: wp(4),
+                                        marginBottom: hp(1.8),
                                     }}
                                 >
                                     <AppText variant="label">
@@ -604,11 +613,11 @@ export default function CreateCharitySiteScreen() {
                                         }
                                         style={{
                                             backgroundColor: palette.white,
-                                            borderRadius: 10,
+                                            borderRadius: normalize(10),
                                             borderWidth: 1,
                                             borderColor: palette.border,
-                                            padding: 12,
-                                            marginTop: 5,
+                                            padding: normalize(12),
+                                            marginTop: hp(0.6),
                                             flexDirection: 'row',
                                             justifyContent: 'space-between',
                                             alignItems: 'center',
@@ -626,7 +635,7 @@ export default function CreateCharitySiteScreen() {
                                                     : 'Select a location'}
                                         </AppText>
 
-                                        <Ionicons name="chevron-down" size={18} />
+                                        <Ionicons name="chevron-down" size={normalize(18)} />
                                     </Pressable>
 
                                     {/* DROPDOWN */}
@@ -636,14 +645,14 @@ export default function CreateCharitySiteScreen() {
                                                 backgroundColor: palette.white,
                                                 borderWidth: 1,
                                                 borderColor: palette.border,
-                                                borderRadius: 10,
-                                                marginTop: 5,
+                                                borderRadius: normalize(10),
+                                                marginTop: hp(0.6),
                                             }}
                                         >
                                             {locations.length === 0 ? (
                                                 <AppText
                                                     style={{
-                                                        padding: 12,
+                                                        padding: normalize(12),
                                                         color: '#888',
                                                     }}
                                                 >
@@ -657,7 +666,7 @@ export default function CreateCharitySiteScreen() {
                                                             setSelectedLocationId(site.id);
                                                             setOpenLocationDropdown(false);
                                                         }}
-                                                        style={{ padding: 12, }}
+                                                        style={{ padding: normalize(12), }}
                                                     >
                                                         <AppText variant='bodySmall'>
                                                             {site.locationName}{' '}-{' '}{site.address}
@@ -744,16 +753,16 @@ export default function CreateCharitySiteScreen() {
 
 const styles = StyleSheet.create({
     headerBg: {
-        height: 160,
+        height: hp(20),
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: hp(2.5),
     },
 
     backBtn: {
         position: 'absolute',
-        left: 15,
-        top: 20,
+        left: wp(4),
+        top: hp(2.2),
     },
 
     headerTitle: {
@@ -761,12 +770,12 @@ const styles = StyleSheet.create({
     },
 
     fieldWrapper: {
-        marginVertical: spacing.sm,
-        marginHorizontal: spacing.lg,
+        marginVertical: hp(1),
+        marginHorizontal: wp(4),
     },
 
     label: {
-        marginBottom: spacing.sm,
+        marginBottom: hp(1),
         color: '#555',
     },
 
@@ -774,10 +783,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'white',
-        borderRadius: 10,
+        borderRadius: normalize(10),
         borderWidth: 1,
         borderColor: palette.border,
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: wp(2.5),
     },
 
     inputFlex: {
@@ -786,11 +795,11 @@ const styles = StyleSheet.create({
 
     createBtn: {
         backgroundColor: palette.middlegreen,
-        padding: 14,
-        marginHorizontal: spacing.xxl,
-        borderRadius: 10,
+        padding: normalize(14),
+        marginHorizontal: wp(6),
+        borderRadius: normalize(10),
         alignItems: 'center',
-        margin: spacing.md,
+        margin: hp(1.5),
     },
 
     btnText: {

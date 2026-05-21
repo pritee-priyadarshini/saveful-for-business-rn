@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Image,
+  Dimensions,
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
@@ -12,6 +13,14 @@ import { AppText } from '../../components/AppText';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export default function CharitySiteAnalyticsScreen() {
   const navigation = useNavigation();
@@ -67,7 +76,7 @@ export default function CharitySiteAnalyticsScreen() {
             onPress={() => navigation.goBack()}
             style={styles.backBtn}
           >
-            <Ionicons name="arrow-back" size={24} color={palette.white} />
+            <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
           </Pressable>
 
           <AppText variant='h5' style={styles.headerTitle}> CHARITY SITE ANALYTICS </AppText>
@@ -82,7 +91,7 @@ export default function CharitySiteAnalyticsScreen() {
             {selectedSite ? selectedSite.name : 'Select Site'}
           </AppText>
 
-          <Ionicons name="chevron-down" size={18} />
+          <Ionicons name="chevron-down" size={normalize(18)} />
         </Pressable>
 
         {showDropdown && (
@@ -130,11 +139,11 @@ export default function CharitySiteAnalyticsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 20,
+    paddingBottom: hp(3),
   },
 
   headerBg: {
-    height: 160,
+    height: hp(20),
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
@@ -152,15 +161,15 @@ const styles = StyleSheet.create({
 
   backBtn: {
     position: 'absolute',
-    top: 20,
-    left: 20,
+    top: hp(2.2),
+    left: wp(4),
   },
 
   dropdown: {
     backgroundColor: palette.white,
-    margin: 16,
-    padding: 14,
-    borderRadius: 10,
+    margin: wp(4),
+    padding: wp(3.5),
+    borderRadius: normalize(10),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -168,23 +177,23 @@ const styles = StyleSheet.create({
 
   dropdownList: {
     backgroundColor: palette.white,
-    borderRadius: 10,
-    marginHorizontal: 16,
-    marginBottom: 20,
+    borderRadius: normalize(10),
+    marginHorizontal: wp(4),
+    marginBottom: hp(2.5),
   },
 
   dropdownItem: {
-    padding: 12,
+    padding: normalize(12),
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
 
   analyticsContainer: {
-    marginHorizontal: 16,
+    marginHorizontal: wp(4),
   },
 
   sectionTitle: {
-    marginBottom: 10,
+    marginBottom: hp(1.2),
     textAlign: 'center',
   },
 
@@ -197,18 +206,18 @@ const styles = StyleSheet.create({
   card: {
     width: '48%',
     backgroundColor: palette.radish,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    padding: wp(4),
+    borderRadius: normalize(12),
+    marginBottom: hp(1.5),
     alignItems: 'center',
   },
 
   pill: {
     backgroundColor: palette.middlegreen,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    marginBottom: 14,
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(1.4),
+    borderRadius: normalize(20),
+    marginBottom: hp(1.6),
   },
 
   metricValue: {

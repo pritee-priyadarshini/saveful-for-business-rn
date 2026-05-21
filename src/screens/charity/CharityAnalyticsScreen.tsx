@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   FlatList,
-  Pressable,
   Dimensions,
   Image,
   TouchableOpacity,
@@ -22,7 +21,13 @@ import { charityImpact, charityProfile } from '../../data/mockData';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
-const screenWidth = Dimensions.get('window').width;
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 const historyData = [
   {
@@ -116,11 +121,11 @@ function HistoryItem({ item, isLast }: { item: (typeof historyData)[0]; isLast: 
 
         <View style={styles.historyFooter}>
           <View style={styles.chip}>
-            <Ionicons name="scale-outline" size={13} color={palette.primary} />
+            <Ionicons name="scale-outline" size={normalize(13)} color={palette.primary} />
             <AppText variant='body' style={styles.chipText}>{item.qty}</AppText>
           </View>
           <View style={styles.chip}>
-            <Ionicons name="restaurant-outline" size={13} color={palette.primary} />
+            <Ionicons name="restaurant-outline" size={normalize(13)} color={palette.primary} />
             <AppText variant='body' style={styles.chipText}>{item.meals} meals</AppText>
           </View>
         </View>
@@ -137,6 +142,7 @@ export function CharityAnalyticsScreen() {
   const filtered = chartDataByRange[range];
   const mealsTrend = calcTrend(filtered.meals);
   const co2Trend = calcTrend(filtered.co2);
+  const chartWidth = wp(84);
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false}>
@@ -164,7 +170,7 @@ export function CharityAnalyticsScreen() {
                   </AppText>
 
                   <View style={styles.locationRow}>
-                    <Ionicons name="location-outline" size={16} color="white" />
+                    <Ionicons name="location-outline" size={normalize(16)} color="white" />
                     <AppText variant='body' style={styles.location}>
                       {charityProfile.address}
                     </AppText>
@@ -219,7 +225,7 @@ export function CharityAnalyticsScreen() {
             {/* TREND CARDS */}
             <View style={styles.trendRow}>
               <Card style={styles.trendCard}>
-                <Ionicons name="restaurant-outline" size={18} color={palette.primary} />
+                <Ionicons name="restaurant-outline" size={normalize(18)} color={palette.primary} />
                 <AppText variant='body'>Meals this week</AppText>
                 <AppText variant='label'>{filtered.meals[filtered.meals.length - 1]}</AppText>
                 <AppText variant='bodyBold' style={mealsTrend >= 0 ? styles.trendUp : styles.trendDown}>
@@ -228,7 +234,7 @@ export function CharityAnalyticsScreen() {
               </Card>
 
               <Card style={styles.trendCard}>
-                <Ionicons name="leaf-outline" size={18} color={palette.primary} />
+                <Ionicons name="leaf-outline" size={normalize(18)} color={palette.primary} />
                 <AppText variant='body'>CO₂ avoided</AppText>
                 <AppText variant='label'>{filtered.co2[filtered.co2.length - 1]}kg</AppText>
                 <AppText variant='bodyBold' style={co2Trend >= 0 ? styles.trendUp : styles.trendDown}>
@@ -270,8 +276,8 @@ export function CharityAnalyticsScreen() {
               <AppText variant='h7' style={{ marginTop: spacing.md }}>Meals Created</AppText>
               <LineChart
                 data={{ labels: filtered.labels, datasets: [{ data: filtered.meals }] }}
-                width={screenWidth - spacing.md * 2 - spacing.md * 2}
-                height={170}
+                width={chartWidth}
+                height={hp(22)}
                 chartConfig={chartConfig}
                 bezier
                 style={styles.chart}
@@ -280,8 +286,8 @@ export function CharityAnalyticsScreen() {
               <AppText variant='h7' style={{ marginTop: spacing.md }}>CO₂ Avoided (kg)</AppText>
               <LineChart
                 data={{ labels: filtered.labels, datasets: [{ data: filtered.co2 }] }}
-                width={screenWidth - spacing.md * 2 - spacing.md * 2}
-                height={170}
+                width={chartWidth}
+                height={hp(22)}
                 yAxisSuffix="kg"
                 chartConfig={chartConfig}
                 bezier
@@ -316,14 +322,14 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 40,
-    marginBottom: spacing.xxl,
+    marginTop: hp(4.5),
+    marginBottom: hp(4),
   },
 
   headingBg: {
     position: 'absolute',
     width: '100%',
-    height: 80,
+    height: hp(10),
     resizeMode: 'contain',
   },
 
@@ -332,17 +338,17 @@ const styles = StyleSheet.create({
   },
 
   heroBanner: {
-    margin: spacing.sm,
+    margin: wp(3.5),
     backgroundColor: palette.primary,
-    borderRadius: 24,
-    padding: spacing.lg,
+    borderRadius: normalize(24),
+    padding: wp(4.5),
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: hp(0.5),
   },
 
   heroValue: {
     color: palette.white,
-    lineHeight: 50,
+    lineHeight: normalize(50),
   },
 
   heroLabel: {
@@ -350,10 +356,10 @@ const styles = StyleSheet.create({
   },
 
   heroContainer: {
-    height: 160,
+    height: hp(20),
     width: '100%',
-    paddingTop: spacing.lg,
-    paddingRight: spacing.lg,
+    paddingTop: hp(2.2),
+    paddingRight: wp(4),
     overflow: 'hidden',
     backgroundColor: palette.primary,
   },
@@ -364,15 +370,15 @@ const styles = StyleSheet.create({
 
   topBar: {
     flexDirection: 'row',
-    paddingLeft: spacing.md,
+    paddingLeft: wp(4),
     justifyContent: 'space-between',
   },
 
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xs,
-    gap: 6,
+    marginTop: hp(0.5),
+    gap: wp(1.5),
   },
 
   whiteText: {
@@ -384,9 +390,9 @@ const styles = StyleSheet.create({
   },
 
   logoCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: normalize(44),
+    height: normalize(44),
+    borderRadius: normalize(22),
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
@@ -397,7 +403,7 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    marginTop: spacing.lg,
+    marginTop: hp(2),
     alignItems: 'center',
   },
 
@@ -408,15 +414,16 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    margin: spacing.lg,
-    gap: spacing.sm,
+    marginHorizontal: wp(4),
+    marginVertical: hp(1.8),
+    gap: wp(2.5),
   },
 
   statCard: {
     width: '48%',
-    padding: spacing.md,
-    borderRadius: 18,
-    gap: 4,
+    padding: wp(3.5),
+    borderRadius: normalize(18),
+    gap: hp(0.4),
   },
 
   statHighlight: {
@@ -433,15 +440,15 @@ const styles = StyleSheet.create({
 
   trendRow: {
     flexDirection: 'row',
-    marginHorizontal: spacing.md,
-    gap: spacing.sm,
+    marginHorizontal: wp(4),
+    gap: wp(2.5),
   },
 
   trendCard: {
     flex: 1,
-    padding: spacing.md,
-    borderRadius: 18,
-    gap: 4,
+    padding: wp(3.5),
+    borderRadius: normalize(18),
+    gap: hp(0.5),
   },
 
   trendCardLabel: {
@@ -457,15 +464,16 @@ const styles = StyleSheet.create({
   },
 
   chartSection: {
-    margin: spacing.md,
+    marginHorizontal: wp(4),
+    marginVertical: hp(1.2),
     backgroundColor: palette.white,
-    borderRadius: 20,
-    padding: spacing.md,
-    gap: spacing.sm,
+    borderRadius: normalize(20),
+    padding: wp(3.5),
+    gap: hp(0.8),
   },
 
   chartTitleRow: {
-    marginHorizontal: spacing.sm,
+    marginHorizontal: wp(2),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -473,13 +481,13 @@ const styles = StyleSheet.create({
 
   filterRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: wp(2),
   },
 
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.7),
+    borderRadius: normalize(20),
     backgroundColor: '#F0F0F0',
   },
 
@@ -496,48 +504,49 @@ const styles = StyleSheet.create({
   },
 
   chart: {
-    borderRadius: 12,
-    marginLeft: -spacing.sm,
+    borderRadius: normalize(12),
+    marginLeft: -wp(2),
   },
 
   sectionHeader: {
-    margin: spacing.lg,
+    marginHorizontal: wp(4),
+    marginVertical: hp(2),
   },
 
   timelineRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: wp(2.5),
   },
 
   timeline: {
-    marginLeft: spacing.lg,
-    width: 20,
+    marginLeft: wp(4),
+    width: wp(5),
     alignItems: 'center',
-    paddingTop: 6,
+    paddingTop: hp(0.7),
   },
 
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: normalize(10),
+    height: normalize(10),
+    borderRadius: normalize(5),
     backgroundColor: palette.primary,
   },
 
   line: {
-    width: 2,
+    width: normalize(2),
     flex: 1,
     backgroundColor: '#E0E0E0',
-    marginTop: 4,
+    marginTop: hp(0.4),
   },
 
   historyCard: {
     flex: 1,
     backgroundColor: palette.white,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    borderRadius: 16,
-    marginBottom: spacing.sm,
-    gap: spacing.sm,
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(16),
+    marginBottom: hp(1.2),
+    gap: hp(0.8),
   },
 
   historyHeader: {
@@ -550,36 +559,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#E6F6EC',
-    paddingHorizontal: 10,
-    borderRadius: 10,
+    paddingHorizontal: wp(2.5),
+    borderRadius: normalize(10),
   },
 
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: normalize(6),
+    height: normalize(6),
+    borderRadius: normalize(3),
     backgroundColor: palette.mint,
-    marginTop: 1,
+    marginTop: hp(0.1),
   },
 
   statusText: {
     color: palette.mint,
-    marginLeft: 6,
+    marginLeft: wp(1.5),
   },
 
   historyFooter: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: wp(2),
   },
 
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: wp(1),
     backgroundColor: '#F4F0FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.6),
+    borderRadius: normalize(10),
   },
 
   chipText: {
@@ -587,7 +596,7 @@ const styles = StyleSheet.create({
   },
 
   cta: {
-    margin: spacing.md,
+    margin: wp(4),
     backgroundColor: palette.middlegreen,
   },
 });

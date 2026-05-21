@@ -7,6 +7,7 @@ import {
   Alert,
   StyleSheet,
   ImageBackground,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,6 +18,14 @@ import { AppText } from '../../components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { CharityMemberRole, charityService } from '@/services/charity.service';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type AccessType = 'user' | 'driver';
 
@@ -240,7 +249,7 @@ export default function CharityManageAccessScreen() {
           >
             <Ionicons
               name="arrow-back"
-              size={24}
+              size={normalize(24)}
               color={palette.white}
             />
           </Pressable>
@@ -248,7 +257,7 @@ export default function CharityManageAccessScreen() {
           <View style={styles.headerContent} >
             <AppText variant="h3" style={styles.white} > Manage Access </AppText>
 
-            <View style={{ height: 6 }} />
+            <View style={{ height: hp(0.7) }} />
             <AppText variant="bodyBold" style={styles.white} > Add and manage users & drivers </AppText>
 
           </View>
@@ -418,7 +427,7 @@ export default function CharityManageAccessScreen() {
               >
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
+                  size={normalize(20)}
                   color="#555"
                 />
               </Pressable>
@@ -468,13 +477,13 @@ export default function CharityManageAccessScreen() {
                           handleEdit(member)
                         }
                       >
-                        <Ionicons name="create-outline" size={22} />
+                        <Ionicons name="create-outline" size={normalize(22)} />
                       </Pressable>
 
                       <Pressable
                         onPress={() => handleDelete(member.id.toString())}
                       >
-                        <Ionicons name="trash-outline" size={22} color={palette.chilli} />
+                        <Ionicons name="trash-outline" size={normalize(22)} color={palette.chilli} />
                       </Pressable>
                     </>
                   )}
@@ -489,20 +498,20 @@ export default function CharityManageAccessScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.md,
-    paddingBottom: spacing.xl,
+    gap: hp(2),
+    paddingBottom: hp(4),
   },
 
   headerBg: {
-    height: 160,
+    height: hp(20),
     justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: wp(4),
   },
 
   backIcon: {
     position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
+    top: hp(2.2),
+    left: wp(4),
     zIndex: 5,
   },
 
@@ -517,14 +526,14 @@ const styles = StyleSheet.create({
 
   tabRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginHorizontal: spacing.md,
+    gap: wp(2.5),
+    marginHorizontal: wp(4),
   },
 
   tabPill: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
+    paddingVertical: hp(1.2),
+    borderRadius: normalize(999),
     alignItems: 'center',
     backgroundColor: palette.white,
     borderWidth: 1,
@@ -546,23 +555,23 @@ const styles = StyleSheet.create({
 
   sectionBox: {
     backgroundColor: palette.white,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
-    borderRadius: 12,
+    padding: wp(4),
+    marginHorizontal: wp(4),
+    borderRadius: normalize(12),
     borderWidth: 1,
     borderColor: palette.border,
-    gap: spacing.sm,
+    gap: hp(1),
   },
 
   sectionTitleBox: {
-    marginHorizontal: spacing.md,
+    marginHorizontal: wp(4),
   },
 
   input: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: normalize(8),
+    padding: normalize(12),
     backgroundColor: palette.white,
   },
 
@@ -571,15 +580,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: normalize(8),
+    paddingHorizontal: wp(3),
     backgroundColor: palette.white,
   },
 
   dropdown: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 8,
+    borderRadius: normalize(8),
     overflow: 'hidden',
     backgroundColor: palette.white,
   },
@@ -587,23 +596,23 @@ const styles = StyleSheet.create({
   roleLocked: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 8,
-    padding: 14,
+    borderRadius: normalize(8),
+    padding: normalize(14),
     backgroundColor: '#F4F4F5',
   },
 
   addBtn: {
     backgroundColor: palette.primary,
-    padding: spacing.sm,
-    borderRadius: 8,
+    paddingVertical: hp(1.3),
+    borderRadius: normalize(8),
     alignItems: 'center',
   },
 
   memberRow: {
     backgroundColor: palette.white,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
-    borderRadius: 10,
+    padding: wp(4),
+    marginHorizontal: wp(4),
+    borderRadius: normalize(10),
     borderWidth: 1,
     borderColor: palette.border,
     flexDirection: 'row',
@@ -613,6 +622,6 @@ const styles = StyleSheet.create({
 
   actions: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: wp(3),
   },
 });

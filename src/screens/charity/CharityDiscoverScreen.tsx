@@ -23,7 +23,13 @@ import { spacing } from '../../theme/spacing';
 import { useNavigation } from '@react-navigation/native';
 import { foodListingService } from '@/services/foodListing.service';
 
-const { height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export function CharityDiscoverScreen() {
   const navigation = useNavigation<any>();
@@ -93,7 +99,6 @@ export function CharityDiscoverScreen() {
           distance: '—',
         };
       });
-      console.log('availableListings:', availableListings);
 
       setListings(mapped);
     } catch (err) {
@@ -118,14 +123,6 @@ export function CharityDiscoverScreen() {
         : [],
     [listings]
   );
-
-  const listingIndexMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    availableListings.forEach((item, index) => {
-      map[item.id] = index;
-    });
-    return map;
-  }, [availableListings]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -206,7 +203,7 @@ export function CharityDiscoverScreen() {
 
   /* HEADER */
   const Header = () => (
-    <View style={{ marginTop: -spacing.md }}>
+    <View style={{ marginTop: -hp(1.8) }}>
       {/* TOP ROW */}
       <ImageBackground
         source={require('../../../assets/placeholder/kale-header.png')}
@@ -216,13 +213,13 @@ export function CharityDiscoverScreen() {
           {currentProfile.organization || 'Your Organisation'}
         </AppText>
 
-        <View style={{ height: 30 }} />
+        <View style={{ height: hp(3.5) }} />
 
         <AppText variant="heading" style={styles.white}>
           {greeting}, {currentProfile.name.split(' ')[0] || 'User'}
         </AppText>
 
-        <View style={{ height: 6 }} />
+        <View style={{ height: hp(0.7) }} />
 
         <AppText variant="bodySmall" style={styles.white}>
           We are helping good food go further, together
@@ -303,7 +300,7 @@ export function CharityDiscoverScreen() {
     }
 
     return (
-      <View style={[styles.mapContainer, { marginTop: spacing.md }]}>
+      <View style={[styles.mapContainer, { marginTop: hp(1.8) }]}>
         <MapView
           style={styles.map}
           liteMode
@@ -387,7 +384,7 @@ const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   headerBg: {
-    height: 180,
+    height: hp(22),
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 0,
@@ -401,14 +398,14 @@ const styles = StyleSheet.create({
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 40,
-    marginBottom: spacing.xxl,
+    marginTop: hp(4.5),
+    marginBottom: hp(4),
   },
 
   headingBg: {
     position: 'absolute',
     width: '100%',
-    height: 80,
+    height: hp(10),
     resizeMode: 'contain',
   },
 
@@ -419,16 +416,16 @@ const styles = StyleSheet.create({
   toggleWrapper: {
     flexDirection: 'row',
     backgroundColor: '#EDEDED',
-    borderRadius: 30,
-    marginTop: spacing.md,
-    marginHorizontal: spacing.md,
-    padding: 4,
+    borderRadius: normalize(30),
+    marginTop: hp(1.8),
+    marginHorizontal: wp(4),
+    padding: normalize(4),
   },
 
   toggleBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 30,
+    paddingVertical: hp(1.2),
+    borderRadius: normalize(30),
     alignItems: 'center',
   },
 
@@ -448,27 +445,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.md,
-    marginHorizontal: spacing.md,
+    marginTop: hp(1.8),
+    marginHorizontal: wp(4),
   },
 
   activeBadge: {
     backgroundColor: palette.middlegreen,
     color: palette.white,
-    height: 35,
-    width: 60,
+    height: hp(4.2),
+    width: wp(16),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.5),
+    borderRadius: normalize(12),
   },
 
   card: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: 20,
+    marginHorizontal: wp(4),
+    marginTop: hp(1.5),
+    padding: wp(4),
+    borderRadius: normalize(20),
     backgroundColor: palette.creme,
     borderWidth: 1,
     borderColor: palette.border,
@@ -481,40 +478,40 @@ const styles = StyleSheet.create({
 
   business: {
     opacity: 0.6,
-    marginTop: 2,
+    marginTop: hp(0.2),
   },
 
   distancePill: {
     backgroundColor: '#EFEAFE',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.8),
+    borderRadius: normalize(12),
   },
 
   infoRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
+    gap: wp(2.5),
+    marginTop: hp(1.5),
   },
 
   infoBox: {
     flex: 1,
     backgroundColor: palette.radish,
-    padding: spacing.sm,
-    borderRadius: 14,
+    padding: wp(2.5),
+    borderRadius: normalize(14),
     alignItems: 'center'
   },
 
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.md,
+    marginTop: hp(1.5),
     alignItems: 'center',
   },
 
   claimBtn: {
     backgroundColor: palette.middlegreen,
-    minWidth: 120,
+    minWidth: wp(30),
   },
 
   mapContainer: {
@@ -522,15 +519,15 @@ const styles = StyleSheet.create({
   },
 
   map: {
-    height: height * 0.4,
+    height: hp(40),
   },
 
   cardListWrapper: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
   },
 
   emptyContainer: {
-    marginTop: 40,
+    marginTop: hp(5),
     alignItems: 'center',
     justifyContent: 'center',
   },

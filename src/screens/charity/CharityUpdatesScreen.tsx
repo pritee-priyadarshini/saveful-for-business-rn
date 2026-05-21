@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, View, ImageBackground } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View, ImageBackground, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
@@ -8,6 +8,14 @@ import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { PostCollectSurveyModal } from './components/postCollectSurveyModal';
 import { useNavigation } from '@react-navigation/native';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 export function CharityUpdatesScreen() {
 
@@ -84,13 +92,13 @@ export function CharityUpdatesScreen() {
   const renderActions = () => (
     <View style={styles.actionRow}>
       <Pressable style={styles.iconBtn}>
-        <Ionicons name="call-outline" size={16} />
+        <Ionicons name="call-outline" size={normalize(16)} />
       </Pressable>
       <Pressable style={styles.iconBtn}>
-        <Ionicons name="chatbubble-outline" size={16} />
+        <Ionicons name="chatbubble-outline" size={normalize(16)} />
       </Pressable>
       <Pressable style={styles.iconBtn}>
-        <Ionicons name="location-outline" size={16} />
+        <Ionicons name="location-outline" size={normalize(16)} />
       </Pressable>
     </View>
   );
@@ -453,11 +461,11 @@ export function CharityUpdatesScreen() {
 const styles = StyleSheet.create({
 
   headerBg: {
-    height: 160,
+    height: hp(20),
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: -spacing.lg,
-    marginBottom: spacing.md,
+    marginHorizontal: -wp(6),
+    marginBottom: hp(1.5),
   },
 
   headerTitle: {
@@ -465,23 +473,23 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    marginTop: spacing.md,
-    marginHorizontal: spacing.xxl,
+    marginTop: hp(1.5),
+    marginHorizontal: wp(4),
   },
 
   sectionCard: {
-    gap: spacing.sm,
+    gap: hp(1),
   },
 
   card: {
-    borderRadius: 16,
-    padding: spacing.md,
-    marginVertical: spacing.sm,
+    borderRadius: normalize(16),
+    padding: wp(4),
+    marginVertical: hp(1),
     backgroundColor: palette.white,
   },
 
   pickupBox: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -489,27 +497,27 @@ const styles = StyleSheet.create({
 
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: wp(2.5),
   },
 
   iconBtn: {
-    padding: 6,
-    borderRadius: 8,
+    padding: normalize(6),
+    borderRadius: normalize(8),
     backgroundColor: '#F1F1F1',
   },
 
   addressBox: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     backgroundColor: '#F7F7F9',
-    padding: spacing.sm,
-    borderRadius: 10,
+    padding: wp(2.5),
+    borderRadius: normalize(10),
   },
 
   cancelBtn: {
-    marginTop: 10,
+    marginTop: hp(1.2),
     backgroundColor: '#FFEAEA',
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: hp(0.9),
+    borderRadius: normalize(10),
     alignItems: 'center',
   },
 
@@ -518,40 +526,40 @@ const styles = StyleSheet.create({
   },
 
   actionBtn: {
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: hp(1.2),
+    borderRadius: normalize(10),
     alignItems: 'center',
   },
 
   infoRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: wp(2.5),
+    marginTop: hp(1),
   },
 
   infoCard: {
     flex: 1,
     backgroundColor: '#F7F7F9',
-    padding: spacing.sm,
-    borderRadius: 10,
+    padding: wp(2.5),
+    borderRadius: normalize(10),
   },
 
   cancelledText: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     color: palette.chilli ,
   },
 
   divider: {
-    height: 1,
+    height: normalize(1),
     backgroundColor: '#eee',
-    marginVertical: spacing.sm,
+    marginVertical: hp(1),
   },
 
   closeBtn: {
-    marginTop: spacing.md,
+    marginTop: hp(1.5),
     backgroundColor: palette.primary,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: hp(1.2),
+    borderRadius: normalize(10),
     alignItems: 'center',
   },
   rowBetween: {
@@ -560,7 +568,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   surveyStatus: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     textAlign: 'center',
   },
 
@@ -572,11 +580,11 @@ const styles = StyleSheet.create({
   },
 
   modalBox: {
-    width: '80%',
+    width: wp(82),
     backgroundColor: palette.white,
-    padding: 20,
-    borderRadius: 16,
-    gap: 16,
+    padding: wp(5),
+    borderRadius: normalize(16),
+    gap: hp(1.8),
   },
 
   modalTitle: {
@@ -591,25 +599,25 @@ const styles = StyleSheet.create({
   yesBtn: {
     flex: 1,
     backgroundColor: '#E74C3C',
-    padding: 10,
-    borderRadius: 10,
+    padding: normalize(10),
+    borderRadius: normalize(10),
     alignItems: 'center',
-    marginLeft: 6,
+    marginLeft: wp(1.5),
   },
 
   noBtn: {
     flex: 1,
     backgroundColor: palette.white,
-    padding: 10,
-    borderRadius: 10,
+    padding: normalize(10),
+    borderRadius: normalize(10),
     alignItems: 'center',
-    marginRight: 6,
+    marginRight: wp(1.5),
   },
 
   actions: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: wp(2.5),
+    marginTop: hp(1),
   },
 
   yesText: {
@@ -621,9 +629,9 @@ const styles = StyleSheet.create({
   },
 
   impactBox: {
-    marginTop: spacing.sm,
+    marginTop: hp(1),
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: wp(2.5),
   },
 
 });

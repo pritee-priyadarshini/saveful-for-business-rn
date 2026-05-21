@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
 
   headerTop: {
     alignItems: 'center',
-    marginTop: hp(4),
+    marginTop: hp(3),
     gap: hp(0.5),
   },
 

@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,14 @@ import { spacing } from '@/theme/spacing';
 
 import { useAppContext } from '@/store/AppContext';
 import { charityService } from '@/services/charity.service';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 type CharityUser = {
   id: number;
@@ -185,7 +194,7 @@ export default function CharityAdminProfileScreen() {
             >
               <Ionicons
                 name="arrow-back"
-                size={24}
+                size={normalize(24)}
                 color={palette.white}
               />
             </Pressable>
@@ -206,7 +215,7 @@ export default function CharityAdminProfileScreen() {
             <View style={styles.placeholderLogo}>
               <Ionicons
                 name="image-outline"
-                size={40}
+                size={normalize(40)}
                 color="#999"
               />
             </View>
@@ -241,7 +250,7 @@ export default function CharityAdminProfileScreen() {
                 <View style={styles.iconContainer}>
                   <Ionicons
                     name={field.icon as any}
-                    size={18}
+                    size={normalize(18)}
                     color={palette.middlegreen}
                   />
                 </View>
@@ -272,7 +281,7 @@ export default function CharityAdminProfileScreen() {
               <View style={styles.iconContainer}>
                 <Ionicons
                   name="business-outline"
-                  size={18}
+                  size={normalize(18)}
                   color={palette.middlegreen}
                 />
               </View>
@@ -296,7 +305,7 @@ export default function CharityAdminProfileScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: spacing.xl,
+    paddingBottom: hp(4),
   },
 
   loaderContainer: {
@@ -306,7 +315,7 @@ const styles = StyleSheet.create({
   },
 
   headerBg: {
-    height: 160,
+    height: hp(20),
     position: 'relative',
   },
 
@@ -320,7 +329,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: wp(4),
   },
 
   headerTitle: {
@@ -330,17 +339,17 @@ const styles = StyleSheet.create({
 
   backBtn: {
     position: 'absolute',
-    top: 20,
-    left: 20,
+    top: hp(2.2),
+    left: wp(4),
     zIndex: 10,
   },
 
   profileCard: {
     backgroundColor: palette.white,
-    marginHorizontal: spacing.lg,
-    marginTop: -50,
-    padding: spacing.xl,
-    borderRadius: 16,
+    marginHorizontal: wp(4),
+    marginTop: -hp(6),
+    padding: wp(5),
+    borderRadius: normalize(16),
     alignItems: 'center',
 
     elevation: 3,
@@ -355,21 +364,21 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    width: 120,
-    height: 90,
+    width: wp(30),
+    height: hp(11),
     resizeMode: 'cover',
-    borderRadius: 12,
-    marginBottom: spacing.md,
+    borderRadius: normalize(12),
+    marginBottom: hp(1.5),
   },
 
   placeholderLogo: {
-    width: 120,
-    height: 90,
-    borderRadius: 12,
+    width: wp(30),
+    height: hp(11),
+    borderRadius: normalize(12),
     backgroundColor: '#F3F3F3',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: hp(1.5),
   },
 
   charityName: {
@@ -377,16 +386,16 @@ const styles = StyleSheet.create({
   },
 
   charityId: {
-    marginTop: spacing.sm,
+    marginTop: hp(0.8),
     color: '#666',
   },
 
   form: {
     backgroundColor: palette.white,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: 16,
+    marginHorizontal: wp(4),
+    marginTop: hp(2),
+    padding: wp(4),
+    borderRadius: normalize(16),
 
     elevation: 2,
 
@@ -400,12 +409,12 @@ const styles = StyleSheet.create({
   },
 
   formHeader: {
-    marginBottom: spacing.md,
+    marginBottom: hp(1.2),
   },
 
 
   infoRow: {
-    paddingVertical: spacing.md,
+    paddingVertical: hp(1.3),
   },
 
   infoBorder: {
@@ -419,13 +428,13 @@ const styles = StyleSheet.create({
   },
 
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
     backgroundColor: '#F4F7F4',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: wp(3),
   },
 
   textContainer: {
@@ -434,11 +443,11 @@ const styles = StyleSheet.create({
 
   label: {
     color: '#777',
-    marginBottom: 2,
+    marginBottom: hp(0.2),
   },
 
   value: {
     color: '#111',
-    lineHeight: 22,
+    lineHeight: normalize(22),
   },
 });

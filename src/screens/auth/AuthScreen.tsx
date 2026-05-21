@@ -317,6 +317,7 @@ export function AuthScreen() {
                   <Picker.Item label="Select venue type" value="" />
                   <Picker.Item label="Cafe/Restaurant" value="CAFE_RESTAURANT" />
                   <Picker.Item label="Bakery" value="BAKERY" />
+                  <Picker.Item label="Event Venue" value="EVENT_VENUE" />
                   <Picker.Item label="Grocery Store" value="GROCERY_STORE" />
                   <Picker.Item label="Food Truck" value="FOOD_TRUCK" />
                   <Picker.Item label="Caterers" value="CATERING_SERVICE" />
@@ -332,7 +333,7 @@ export function AuthScreen() {
               title="Charity / Non Profit Details"
               active={openSections.includes('charity')}
               onPress={() => toggle('charity')}
-            >yyy
+            >
               <InputField
                 label="Charity / Non Profit Name"
                 placeholder="Enter name"
@@ -458,7 +459,7 @@ export function AuthScreen() {
               >
                 Privacy Policy
               </AppText>
-              . We’ll send me important updates - I can opt out anytime.
+              . We’ll send you important updates - you can opt out anytime.
             </AppText>
           </View>
 

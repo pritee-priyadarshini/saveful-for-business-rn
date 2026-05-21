@@ -5,6 +5,7 @@ import {
   View,
   Pressable,
   ImageBackground,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,14 @@ import { Screen } from '../../components/Screen';
 
 import { spacing } from '../../theme/spacing';
 import { palette } from '../../theme/colors';
+
+const { width, height } = Dimensions.get("window");
+const wp = (p: number) => (width * p) / 100;
+const hp = (p: number) => (height * p) / 100;
+const normalize = (size: number) => {
+  const scale = width / 375;
+  return Math.round(size * scale);
+};
 
 // DEMO DATA
 const historyData = [
@@ -157,7 +166,7 @@ export function CharityHistoryScreen() {
         style={styles.headerBg}
       >
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={palette.white} />
+          <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
         </Pressable>
 
         <AppText variant='h5' style={styles.headerTitle}>
@@ -178,14 +187,14 @@ export function CharityHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: spacing.md,
+    padding: wp(4),
   },
 
   headerBg: {
-    height: 140,
+    height: hp(18),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: hp(1.5),
   },
 
   headerTitle: {
@@ -194,9 +203,9 @@ const styles = StyleSheet.create({
 
   backBtn: {
     position: 'absolute',
-    top: spacing.lg,
-    left: spacing.md,
-    padding: 6,
+    top: hp(2.2),
+    left: wp(4),
+    padding: normalize(6),
   },
 
   row: {
@@ -204,49 +213,49 @@ const styles = StyleSheet.create({
   },
 
   timeline: {
-    width: 30,
+    width: wp(8),
     alignItems: 'center',
   },
 
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: normalize(10),
+    height: normalize(10),
+    borderRadius: normalize(5),
     backgroundColor: palette.primary,
-    marginTop: 6,
+    marginTop: hp(0.8),
   },
 
   line: {
-    width: 2,
+    width: normalize(2),
     flex: 1,
     backgroundColor: '#E0E0E0',
-    marginTop: 2,
+    marginTop: hp(0.3),
   },
 
   card: {
     flex: 1,
     backgroundColor: palette.radish,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    borderRadius: 16,
-    gap: spacing.xs,
+    marginBottom: hp(2.2),
+    padding: wp(4),
+    borderRadius: normalize(16),
+    gap: hp(0.8),
   },
 
   itemsContainer: {
-    marginTop: spacing.sm,
-    gap: 4,
+    marginTop: hp(1),
+    gap: hp(0.6),
   },
 
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.xs,
+    marginTop: hp(0.6),
   },
 
   status: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.5),
+    borderRadius: normalize(10),
   },
 
   success: {
