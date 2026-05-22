@@ -72,6 +72,10 @@ export const charityService = {
         return api.patch(`/charity/locations/${locationId}`, data);
     },
 
+    updateOrganizationCoordinates(organizationId: number | string, data: { latitude: number; longitude: number }) {
+        return api.patch(`/organization/ccordinates/${organizationId}`, data);
+    },
+
     deactivateLocation(locationId: number) {
         return api.delete(`/charity/locations/${locationId}`);
     },

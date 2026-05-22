@@ -22,7 +22,6 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 
 import { palette } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { useNavigation } from '@react-navigation/native';
 import { foodListingService } from '@/services/foodListing.service';
 import { charityService } from '@/services/charity.service';
@@ -65,6 +64,14 @@ export function CharityDiscoverScreen() {
 
   const showLocationBanner =
     !hasBackendLocation && !locationBannerClosed;
+
+  useEffect(() => {
+    console.log('[Banner] profileLatitude =', profileLatitude);
+    console.log('[Banner] profileLongitude =', profileLongitude);
+    console.log('[Banner] hasBackendLocation =', hasBackendLocation);
+    console.log('[Banner] locationBannerClosed =', locationBannerClosed);
+    console.log('[Banner] showLocationBanner =', showLocationBanner);
+  }, [profileLatitude, profileLongitude, hasBackendLocation, locationBannerClosed]);
 
   const fetchListings = async () => {
     try {
@@ -198,30 +205,26 @@ export function CharityDiscoverScreen() {
             .join(', ')
         : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 
-      const explicitSiteId = authUser?.profile?.sites?.[0]?.id;
-      let locationId: number | string | null = explicitSiteId || null;
+      const organizationId = authUser?.profile?.organisation?.id;
 
-      if (!locationId) {
-        const locationsRes = await charityService.listLocations();
-        const locations = Array.isArray(locationsRes.data)
-          ? locationsRes.data
-          : locationsRes.data?.locations || [];
+      console.log('[Location] profile.organisation =', JSON.stringify(authUser?.profile?.organisation));
+      console.log('[Location] organizationId =', organizationId);
+      console.log('[Location] calling PATCH /organization/ccordinates/' + organizationId);
 
-        if (locations.length > 0) {
-          locationId = locations[0].id;
-        }
-      }
-
-      if (!locationId) {
-        Alert.alert('Unable to Save', 'Could not find a charity location to update.');
+      if (!organizationId) {
+        Alert.alert('Unable to Save', 'Could not find your organisation to update.');
         return;
       }
 
-      await charityService.updateLocation(locationId, { latitude, longitude });
+      await charityService.updateOrganizationCoordinates(organizationId, { latitude, longitude });
 
       try {
         const profileRes = await authService.profile();
         const profile = profileRes.data;
+
+        console.log('[Location] refreshed organisation.latitude =', profile?.organisation?.latitude);
+        console.log('[Location] refreshed organisation.longitude =', profile?.organisation?.longitude);
+        console.log('[Location] refreshed sites[0].latitude =', profile?.sites?.[0]?.latitude);
 
         setAuthUser({
           ...profile.user,
@@ -239,7 +242,13 @@ export function CharityDiscoverScreen() {
       setLocationBannerClosed(true);
       Alert.alert('Location Shared', 'Your location has been saved successfully.');
     } catch (error: any) {
-      Alert.alert('Location Error', error?.response?.data?.message ?? error?.message ?? 'Unable to save your location. Please try again.');
+      console.log('[Location] ERROR full response:', JSON.stringify(error?.response?.data));
+      console.log('[Location] ERROR status:', error?.response?.status);
+      console.log('[Location] ERROR url:', error?.config?.url);
+      Alert.alert(
+        'Location Error',
+        `Status: ${error?.response?.status}\nURL: ${error?.config?.url}\n${error?.response?.data?.message ?? error?.message ?? 'Unable to save your location.'}`
+      );
     } finally {
       setCapturingLocation(false);
     }
