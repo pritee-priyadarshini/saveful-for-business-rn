@@ -3,6 +3,7 @@ import {
   View,
   StyleSheet,
   FlatList,
+  ScrollView,
   Dimensions,
   Image,
   TouchableOpacity,
@@ -13,6 +14,7 @@ import { LineChart } from 'react-native-chart-kit';
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { Skeleton } from '../../components/Skeleton';
 import { Card } from '../../components/Card';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -138,6 +140,44 @@ function HistoryItem({ item, isLast }: { item: (typeof historyData)[0]; isLast: 
 export function CharityAnalyticsScreen() {
   const navigation = useNavigation<any>();
   const [range, setRange] = React.useState<'week' | 'month' | 'year'>('week');
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 900);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const renderSkeleton = () => (
+    <ScrollView contentContainerStyle={styles.skeletonWrap} showsVerticalScrollIndicator={false}>
+      <Skeleton width="100%" height={hp(20)} borderRadius={0} />
+      <View style={styles.skeletonBannerWrap}>
+        <Skeleton width="100%" height={hp(12)} borderRadius={normalize(24)} />
+      </View>
+      <View style={styles.skeletonGrid}>
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} width="48%" height={hp(10)} borderRadius={normalize(18)} />
+        ))}
+      </View>
+      <View style={styles.skeletonTrendRow}>
+        <Skeleton width="48%" height={hp(12)} borderRadius={normalize(18)} />
+        <Skeleton width="48%" height={hp(12)} borderRadius={normalize(18)} />
+      </View>
+      <View style={styles.skeletonChartWrap}>
+        <Skeleton width="100%" height={hp(32)} borderRadius={normalize(20)} />
+      </View>
+      <View style={styles.skeletonActivityHeader}>
+        <Skeleton width={wp(40)} height={normalize(20)} borderRadius={normalize(8)} />
+      </View>
+      {[1, 2].map((i) => (
+        <View key={i} style={styles.skeletonActivityRow}>
+          <View style={styles.skeletonDotCol}>
+            <Skeleton width={normalize(10)} height={normalize(10)} borderRadius={normalize(5)} />
+          </View>
+          <Skeleton width="85%" height={hp(9)} borderRadius={normalize(16)} />
+        </View>
+      ))}
+    </ScrollView>
+  );
 
   const filtered = chartDataByRange[range];
   const mealsTrend = calcTrend(filtered.meals);
@@ -146,6 +186,7 @@ export function CharityAnalyticsScreen() {
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false}>
+      {loading ? renderSkeleton() : (
       <FlatList
         data={historyData}
         keyExtractor={(item) => item.id}
@@ -313,6 +354,7 @@ export function CharityAnalyticsScreen() {
           />
         }
       />
+      )}
     </Screen>
   );
 }
@@ -456,7 +498,7 @@ const styles = StyleSheet.create({
   },
 
   trendUp: {
-    color: palette.mint,
+    color: palette.middlegreen,
   },
 
   trendDown: {
@@ -598,5 +640,48 @@ const styles = StyleSheet.create({
   cta: {
     margin: wp(4),
     backgroundColor: palette.middlegreen,
+  },
+
+  skeletonWrap: {
+    gap: hp(2),
+    paddingBottom: hp(4),
+  },
+
+  skeletonBannerWrap: {
+    marginHorizontal: wp(3.5),
+  },
+
+  skeletonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: wp(4),
+    gap: wp(2.5),
+  },
+
+  skeletonTrendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: wp(4),
+    gap: wp(2.5),
+  },
+
+  skeletonChartWrap: {
+    marginHorizontal: wp(4),
+  },
+
+  skeletonActivityHeader: {
+    marginHorizontal: wp(4),
+  },
+
+  skeletonActivityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+    marginHorizontal: wp(4),
+  },
+
+  skeletonDotCol: {
+    width: wp(5),
+    alignItems: 'center',
   },
 });

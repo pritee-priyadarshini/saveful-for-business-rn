@@ -91,14 +91,17 @@ export function CharityUpdatesScreen() {
 
   const renderActions = () => (
     <View style={styles.actionRow}>
-      <Pressable style={styles.iconBtn}>
-        <Ionicons name="call-outline" size={normalize(16)} />
+      <Pressable style={styles.iconPill}>
+        <Ionicons name="call-outline" size={normalize(16)} color={palette.white} />
+        <AppText variant="label" style={styles.iconText}>Call</AppText>
       </Pressable>
-      <Pressable style={styles.iconBtn}>
-        <Ionicons name="chatbubble-outline" size={normalize(16)} />
+      <Pressable style={styles.iconPill}>
+        <Ionicons name="chatbubble-outline" size={normalize(16)} color={palette.white} />
+        <AppText variant="label" style={styles.iconText}>Message</AppText>
       </Pressable>
-      <Pressable style={styles.iconBtn}>
-        <Ionicons name="location-outline" size={normalize(16)} />
+      <Pressable style={styles.iconPill}>
+        <Ionicons name="location-outline" size={normalize(16)} color={palette.white} />
+        <AppText variant="label" style={styles.iconText}>Location</AppText>
       </Pressable>
     </View>
   );
@@ -107,7 +110,7 @@ export function CharityUpdatesScreen() {
     const getStyles = () => {
       switch (item.type) {
         case 'new':
-          return { color: palette.orange };
+          return { color: palette.eggplantVibrant };
         case 'pickup':
           return { color: palette.middlegreen };
         case 'survey':
@@ -123,12 +126,17 @@ export function CharityUpdatesScreen() {
 
     if (item.type === 'new') {
       return (
-        <View style={[styles.card, { borderWidth: 1, borderColor: color }]}>
-          <AppText variant='subheading' style={{ color, marginBottom: 6 }}>
-            New Surplus Available
-          </AppText>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <AppText variant='subheading' style={{ color }}>
+              New Surplus Available
+            </AppText>
+            <View style={[styles.typeBadge, { backgroundColor: color }]}>
+              <AppText variant='caption' style={{ color: palette.white }}>NEW</AppText>
+            </View>
+          </View>
 
-          <AppText variant='bodySmall' style={{ marginBottom: spacing.sm }}>
+          <AppText variant='bodySmall'>
             <AppText variant="label">{item.restaurant}</AppText> has listed fresh surplus near you
           </AppText>
 
@@ -146,16 +154,21 @@ export function CharityUpdatesScreen() {
 
     if (item.type === 'pickup') {
       return (
-        <View style={[styles.card, { borderWidth: 1, borderColor: color }]}>
-          <AppText variant='subheading' style={{ color, marginBottom: 6 }}>
-            Pick Up Confirmed
-          </AppText>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <AppText variant='subheading' style={{ color }}>
+              Pick Up Confirmed
+            </AppText>
+            <View style={[styles.typeBadge, { backgroundColor: color }]}>
+              <AppText variant='caption' style={{ color: palette.white }}>PICKUP</AppText>
+            </View>
+          </View>
 
-          <AppText variant='bodySmall' style={{ marginBottom: spacing.sm }}>
+          <AppText variant='bodySmall'>
             Collect from <AppText variant="label">{item.restaurant}</AppText>
           </AppText>
 
-          {/* LOCATION (same as before) */}
+          {/* LOCATION */}
           <View style={styles.addressBox}>
             <AppText variant='label'>📍 {item.address}</AppText>
           </View>
@@ -176,7 +189,6 @@ export function CharityUpdatesScreen() {
               disabled={cancelledIds.includes(item.id)}
               style={[
                 styles.infoCard,
-                { justifyContent: 'center', alignItems: 'center' },
                 cancelledIds.includes(item.id) && { opacity: 0.4 },
               ]}
               onPress={() => {
@@ -185,13 +197,10 @@ export function CharityUpdatesScreen() {
                 setItemsModalVisible(true);
               }}
             >
-              <AppText
-                style={{
-                  color: cancelledIds.includes(item.id) ? '#999' : color,
-                }}
-              >
-                View Details
-              </AppText>
+              <AppText variant="label">Items</AppText>
+              <View style={styles.viewBtn}>
+                <AppText variant="label" style={styles.viewText}>View</AppText>
+              </View>
             </Pressable>
           </View>
 
@@ -224,12 +233,17 @@ export function CharityUpdatesScreen() {
 
     if (item.type === 'survey') {
       return (
-        <View style={[styles.card, { borderWidth: 1, borderColor: color }]}>
-          <AppText variant='subheading' style={{ color, marginBottom: 6 }}>
-            Pickup Feedback
-          </AppText>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <AppText variant='subheading' style={{ color }}>
+              Pickup Feedback
+            </AppText>
+            <View style={[styles.typeBadge, { backgroundColor: color }]}>
+              <AppText variant='caption' style={{ color: palette.white }}>SURVEY</AppText>
+            </View>
+          </View>
 
-          <AppText variant='bodySmall' style={{ marginBottom: spacing.sm }}>
+          <AppText variant='bodySmall'>
             Did you collect from <AppText variant="label">{item.restaurant}</AppText>?
           </AppText>
 
@@ -281,15 +295,20 @@ export function CharityUpdatesScreen() {
 
     if (item.type === 'completed') {
       return (
-        <View style={[styles.card, { borderWidth: 1, borderColor: color }]}>
-          <AppText variant='subheading' style={{ color, marginBottom: 6 }}>
-            Pickup Completed 🎉
-          </AppText>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <AppText variant='subheading' style={{ color }}>
+              Pickup Completed 🎉
+            </AppText>
+            <View style={[styles.typeBadge, { backgroundColor: color }]}>
+              <AppText variant='caption' style={{ color: palette.white }}>DONE</AppText>
+            </View>
+          </View>
 
-          <AppText variant='label'>{item.restaurant}</AppText>
-          <AppText variant='bodySmall' style={{ marginBottom: spacing.sm }}>
-            📍 {item.address}
-          </AppText>
+          <View style={styles.addressBox}>
+            <AppText variant='label'>{item.restaurant}</AppText>
+            <AppText variant='bodySmall'>📍 {item.address}</AppText>
+          </View>
 
           {/* STATS */}
           <View style={styles.infoRow}>
@@ -332,7 +351,9 @@ export function CharityUpdatesScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.section}>
-            <AppText variant='subheading'>{item.title}</AppText>
+            <View style={styles.sectionTitleRow}>
+              <AppText variant='subheading' style={styles.sectionTitle}>{item.title}</AppText>
+            </View>
 
             <View style={styles.sectionCard}>
               {item.data.map((d: any) => (
@@ -483,9 +504,10 @@ const styles = StyleSheet.create({
 
   card: {
     borderRadius: normalize(16),
-    padding: wp(4),
+    padding: hp(1.6),
     marginVertical: hp(1),
-    backgroundColor: palette.white,
+    backgroundColor: palette.radish,
+    gap: hp(1.4),
   },
 
   pickupBox: {
@@ -500,29 +522,24 @@ const styles = StyleSheet.create({
     gap: wp(2.5),
   },
 
-  iconBtn: {
-    padding: normalize(6),
-    borderRadius: normalize(8),
-    backgroundColor: '#F1F1F1',
-  },
-
   addressBox: {
-    marginTop: hp(1),
-    backgroundColor: '#F7F7F9',
+    backgroundColor: palette.white,
     padding: wp(2.5),
     borderRadius: normalize(10),
   },
 
   cancelBtn: {
-    marginTop: hp(1.2),
-    backgroundColor: '#FFEAEA',
-    paddingVertical: hp(0.9),
-    borderRadius: normalize(10),
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1.5),
+    backgroundColor: palette.danger,
+    paddingVertical: hp(1),
+    borderRadius: normalize(10),
   },
 
   cancelText: {
-    color: palette.danger,
+    color: palette.white,
   },
 
   actionBtn: {
@@ -539,9 +556,37 @@ const styles = StyleSheet.create({
 
   infoCard: {
     flex: 1,
-    backgroundColor: '#F7F7F9',
-    padding: wp(2.5),
-    borderRadius: normalize(10),
+    backgroundColor: palette.creme,
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(12),
+    gap: hp(0.8),
+    alignItems: 'center',
+  },
+
+  viewBtn: {
+    backgroundColor: palette.middlegreen,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.6),
+    borderRadius: 999,
+  },
+
+  viewText: {
+    color: palette.white,
+  },
+
+  iconPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.2),
+    backgroundColor: palette.middlegreen,
+    paddingHorizontal: wp(2.8),
+    paddingVertical: hp(0.9),
+    borderRadius: 999,
+  },
+
+  iconText: {
+    color: palette.white,
   },
 
   cancelledText: {
@@ -557,7 +602,7 @@ const styles = StyleSheet.create({
 
   closeBtn: {
     marginTop: hp(1.5),
-    backgroundColor: palette.primary,
+    backgroundColor: palette.middlegreen,
     paddingVertical: hp(1.2),
     borderRadius: normalize(10),
     alignItems: 'center',
@@ -570,11 +615,38 @@ const styles = StyleSheet.create({
   surveyStatus: {
     marginTop: hp(1),
     textAlign: 'center',
+    color: palette.success,
+  },
+
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  typeBadge: {
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.4),
+    borderRadius: 999,
+  },
+
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: hp(0.8),
+    borderBottomWidth: 1,
+    borderBottomColor: palette.strokecream,
+    marginBottom: hp(0.4),
+  },
+
+  sectionTitle: {
+    color: palette.midgray,
+    letterSpacing: 0.5,
   },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: palette.black,
+    backgroundColor: 'rgba(26, 26, 27, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -598,7 +670,7 @@ const styles = StyleSheet.create({
 
   yesBtn: {
     flex: 1,
-    backgroundColor: '#E74C3C',
+    backgroundColor: palette.danger,
     padding: normalize(10),
     borderRadius: normalize(10),
     alignItems: 'center',
@@ -608,6 +680,8 @@ const styles = StyleSheet.create({
   noBtn: {
     flex: 1,
     backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: palette.strokecream,
     padding: normalize(10),
     borderRadius: normalize(10),
     alignItems: 'center',
