@@ -201,7 +201,7 @@ export function EditListingScreen({ navigation, route }: any) {
             return;
         }
         if (!bestBefore) {
-            Alert.alert('Error', 'Select best before time');
+            Alert.alert('Error', 'Select best before date');
             return;
         }
         if (!pickupFrom || !pickupTo) {
@@ -433,7 +433,7 @@ export function EditListingScreen({ navigation, route }: any) {
                     <Pressable style={styles.timeInputFull} onPress={() => openDateTimePicker('bestBefore')}>
                         <Ionicons name="time-outline" size={20} color={palette.middlegreen} style={{ marginRight: wp(2) }} />
                         <AppText variant="bodyLarge">
-                            {bestBefore ? formatDateTime(bestBefore) : 'Select best before date & time'}
+                            {bestBefore ? formatDateTime(bestBefore) : 'Select best before date'}
                         </AppText>
                     </Pressable>
                 </View>

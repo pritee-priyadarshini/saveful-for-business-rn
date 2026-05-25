@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     },
     top: {
         alignItems: 'center',
-        marginBottom: hp(8),
+        marginBottom: hp(23),
     },
     logo: {
         width: wp(50),
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
         padding: wp(6),
         gap: hp(2),
         marginBottom: hp(15),
-        marginTop: hp(6),
+        marginTop: -hp(8),
     },
     title: {
         textAlign: 'center',

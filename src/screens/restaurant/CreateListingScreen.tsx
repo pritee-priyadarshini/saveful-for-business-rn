@@ -187,7 +187,7 @@ export function CreateListingScreen({ navigation }: any) {
             }
 
             if (!bestBefore) {
-                Alert.alert('Error', 'Select best before time');
+                Alert.alert('Error', 'Select best before date');
                 return;
             }
 
@@ -469,7 +469,7 @@ export function CreateListingScreen({ navigation }: any) {
                     >
                         <Ionicons name="time-outline" size={20} color={palette.middlegreen} style={{ marginRight: wp(2) }} />
                         <AppText variant='bodyLarge'>
-                            {bestBefore ? formatDateTime(bestBefore) : 'Select best before date & time'}
+                            {bestBefore ? formatDateTime(bestBefore) : 'Select best before date'}
                         </AppText>
                     </Pressable>
                 </View>
