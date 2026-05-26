@@ -638,19 +638,16 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.strokecream,
     marginBottom: hp(0.4),
   },
-
   sectionTitle: {
     color: palette.midgray,
     letterSpacing: 0.5,
   },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(26, 26, 27, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   modalBox: {
     width: wp(82),
     backgroundColor: palette.white,
@@ -658,16 +655,13 @@ const styles = StyleSheet.create({
     borderRadius: normalize(16),
     gap: hp(1.8),
   },
-
   modalTitle: {
     textAlign: 'center',
   },
-
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-
   yesBtn: {
     flex: 1,
     backgroundColor: palette.danger,
@@ -676,7 +670,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: wp(1.5),
   },
-
   noBtn: {
     flex: 1,
     backgroundColor: palette.white,
@@ -687,25 +680,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: wp(1.5),
   },
-
   actions: {
     flexDirection: 'row',
     gap: wp(2.5),
     marginTop: hp(1),
   },
-
   yesText: {
     color: palette.white,
   },
-
   noText: {
     color: '#555',
   },
-
   impactBox: {
     marginTop: hp(1),
     flexDirection: 'row',
     gap: wp(2.5),
   },
-
 });

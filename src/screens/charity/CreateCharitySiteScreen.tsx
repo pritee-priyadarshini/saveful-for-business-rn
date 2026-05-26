@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     ScrollView,
@@ -13,6 +13,9 @@ import {
     Keyboard,
     Linking,
     Dimensions,
+    Modal,
+    Animated,
+    PanResponder,
 } from 'react-native';
 
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -20,6 +23,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
 
 import MapView, { Marker } from 'react-native-maps';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
@@ -59,6 +63,41 @@ export default function CreateCharitySiteScreen() {
     const [region, setRegion] = useState<any>(null);
     const [marker, setMarker] = useState<any>(null);
     const [selectedAddress, setSelectedAddress] = useState('');
+    const [showPlacesSearch, setShowPlacesSearch] = useState(false);
+
+    const MODAL_HEIGHT = height * 0.72;
+    const slideAnim = useRef(new Animated.Value(height * 0.72)).current;
+
+    const openModal = () => {
+        slideAnim.setValue(MODAL_HEIGHT);
+        setShowPlacesSearch(true);
+        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+    };
+
+    const closeModal = () => {
+        Keyboard.dismiss();
+        Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
+            .start(() => setShowPlacesSearch(false));
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: (_, gs) => gs.dy > 5,
+            onPanResponderMove: (_, gs) => {
+                if (gs.dy > 0) slideAnim.setValue(gs.dy);
+            },
+            onPanResponderRelease: (_, gs) => {
+                if (gs.dy > 80 || gs.vy > 0.5) {
+                    Keyboard.dismiss();
+                    Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
+                        .start(() => setShowPlacesSearch(false));
+                } else {
+                    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
+                }
+            },
+        })
+    ).current;
+
     const goToCurrentLocation = async () => {
         try {
 
@@ -340,13 +379,123 @@ export default function CreateCharitySiteScreen() {
     return (
         <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={normalize(20)}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss} >
                 <Screen backgroundColor={palette.creme}>
+
+                    {/* LOCATION BOTTOM SHEET MODAL */}
+                    <Modal
+                        visible={showPlacesSearch}
+                        transparent
+                        animationType="none"
+                        statusBarTranslucent
+                        onRequestClose={closeModal}
+                    >
+                        <TouchableWithoutFeedback onPress={closeModal}>
+                            <View style={styles.modalOverlay}>
+                                <TouchableWithoutFeedback>
+                                    <Animated.View
+                                        style={[styles.modalSheet, { transform: [{ translateY: slideAnim }] }]}
+                                    >
+                                        {/* DRAG HANDLE */}
+                                        <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                                            <View style={styles.dragHandle} />
+                                        </View>
+
+                                        {/* MODAL HEADER */}
+                                        <View style={styles.modalHeader}>
+                                            <AppText style={styles.modalTitle}>Set Location</AppText>
+                                            <Pressable onPress={closeModal} style={styles.modalCloseBtn}>
+                                                <Ionicons name="close" size={normalize(22)} color={palette.text} />
+                                            </Pressable>
+                                        </View>
+
+                                        {/* SEARCH */}
+                                        <View style={styles.modalSearchContainer}>
+                                            <GooglePlacesAutocomplete
+                                                placeholder="Search charity address or place..."
+                                                fetchDetails
+                                                textInputProps={{ autoFocus: true }}
+                                                onPress={(data, details = null) => {
+                                                    const lat = details?.geometry?.location?.lat;
+                                                    const lng = details?.geometry?.location?.lng;
+                                                    if (lat && lng) {
+                                                        const newRegion = { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+                                                        setRegion(newRegion);
+                                                        setMarker({ latitude: lat, longitude: lng });
+                                                        setSiteForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+                                                    }
+                                                    const addr = details?.formatted_address || data.description;
+                                                    const postcode = details?.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name || '';
+                                                    setSelectedAddress(addr);
+                                                    setSiteForm((prev) => ({ ...prev, address: addr, postcode }));
+                                                    Keyboard.dismiss();
+                                                }}
+                                                query={{ key: 'AIzaSyD4uO4sAx4xgzOmpJFrxUK4VU8-hv58cLg', language: 'en' }}
+                                                styles={{
+                                                    container: { flex: 0 },
+                                                    textInputContainer: { borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border },
+                                                    textInput: { height: normalize(46), color: palette.text, fontSize: normalize(14), marginBottom: 0, backgroundColor: palette.white },
+                                                    listView: { backgroundColor: palette.white, borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border, marginTop: normalize(4) },
+                                                    row: { padding: normalize(12), backgroundColor: palette.white },
+                                                    description: { fontSize: normalize(13), color: palette.text },
+                                                }}
+                                                enablePoweredByContainer={false}
+                                                debounce={300}
+                                                keepResultsAfterBlur
+                                            />
+                                        </View>
+
+                                        {/* MAP PREVIEW */}
+                                        <View style={styles.modalMapContainer}>
+                                            {region ? (
+                                                <MapView
+                                                    style={styles.mapView}
+                                                    region={region}
+                                                    showsUserLocation
+                                                    onPress={async (e) => {
+                                                        const { latitude, longitude } = e.nativeEvent.coordinate;
+                                                        setMarker({ latitude, longitude });
+                                                        setSiteForm((prev) => ({ ...prev, latitude, longitude }));
+                                                        const res = await Location.reverseGeocodeAsync({ latitude, longitude });
+                                                        if (res.length > 0) {
+                                                            const place = res[0];
+                                                            const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
+                                                            setSelectedAddress(addr);
+                                                            setSiteForm((prev) => ({ ...prev, address: addr, postcode: place.postalCode || '' }));
+                                                        }
+                                                    }}
+                                                >
+                                                    {marker && <Marker coordinate={marker} />}
+                                                </MapView>
+                                            ) : (
+                                                <View style={styles.mapPlaceholder}>
+                                                    <Ionicons name="map-outline" size={normalize(36)} color="#ccc" />
+                                                    <AppText style={styles.mapPlaceholderText}>Search or tap to select a location</AppText>
+                                                </View>
+                                            )}
+                                        </View>
+
+                                        {/* CONFIRM BUTTON */}
+                                        <Pressable
+                                            style={[styles.confirmBtn, !marker && styles.confirmBtnDisabled]}
+                                            onPress={closeModal}
+                                            disabled={!marker}
+                                        >
+                                            <AppText style={styles.confirmBtnText}>
+                                                {marker ? 'Confirm Location' : 'Select a location on the map'}
+                                            </AppText>
+                                        </Pressable>
+                                    </Animated.View>
+                                </TouchableWithoutFeedback>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </Modal>
+
                     <ScrollView
-                        keyboardShouldPersistTaps="handled"
+                        keyboardShouldPersistTaps="always"
                         contentContainerStyle={{ paddingBottom: hp(14), }}
                     >
 
@@ -498,86 +647,61 @@ export default function CreateCharitySiteScreen() {
                                     </View>
                                 ))}
 
-                                {/* MAP */}
-                                <AppText style={{ textAlign: 'center', marginTop: hp(2.4), }}>
-                                    Tap map to select location *
-                                </AppText>
+                                {/* LOCATION PICKER */}
+                                <View style={styles.locationPickerRow}>
+                                    <Pressable style={styles.locationPickerBtn} onPress={goToCurrentLocation}>
+                                        <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
+                                        <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
+                                    </Pressable>
+                                    <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
+                                        <Ionicons name="search" size={normalize(16)} color={palette.white} />
+                                        <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
+                                    </Pressable>
+                                </View>
+                                {selectedAddress ? (
+                                    <View style={styles.selectedAddressBox}>
+                                        <Ionicons name="location" size={normalize(16)} color={palette.primary} />
+                                        <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
+                                        <Pressable onPress={() => {
+                                            setSelectedAddress('');
+                                            setMarker(null);
+                                            setSiteForm(prev => ({ ...prev, latitude: null, longitude: null, address: '', postcode: '' }));
+                                        }}>
+                                            <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
+                                        </Pressable>
+                                    </View>
+                                ) : null}
 
-                                <View
-                                    style={{ height: hp(30), margin: wp(4), position: 'relative', }}>
-                                    {region && (
+                                {/* MAP */}
+                                <AppText style={styles.mapHintText}>Tap on map to fine-tune the pin</AppText>
+
+                                <View style={styles.mapContainer}>
+                                    {region ? (
                                         <MapView
-                                            style={{ flex: 1, }}
+                                            style={styles.mapView}
                                             region={region}
                                             showsUserLocation
-                                            showsMyLocationButton={false}
                                             onPress={async (e) => {
-                                                const { latitude, longitude, } = e.nativeEvent.coordinate;
-                                                setMarker({ latitude, longitude, });
-
-                                                setSiteForm((prev) => ({
-                                                    ...prev,
-                                                    latitude,
-                                                    longitude,
-                                                })
-                                                );
-
-                                                const res = await Location.reverseGeocodeAsync({ latitude, longitude, });
-
+                                                const { latitude, longitude } = e.nativeEvent.coordinate;
+                                                setMarker({ latitude, longitude });
+                                                setSiteForm((prev) => ({ ...prev, latitude, longitude }));
+                                                const res = await Location.reverseGeocodeAsync({ latitude, longitude });
                                                 if (res.length > 0) {
                                                     const place = res[0];
-                                                    const addr =
-                                                        [
-                                                            place.name,
-                                                            place.street,
-                                                            place.city,
-                                                            place.region,
-                                                            place.postalCode,
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(', ');
+                                                    const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
                                                     setSelectedAddress(addr);
-
-                                                    setSiteForm((prev) => ({
-                                                        ...prev,
-                                                        address: addr,
-                                                        postcode: place.postalCode || '',
-                                                    })
-                                                    );
+                                                    setSiteForm((prev) => ({ ...prev, address: addr, postcode: place.postalCode || '' }));
                                                 }
                                             }}
                                         >
-                                            {marker && (
-                                                <Marker
-                                                    coordinate={
-                                                        marker
-                                                    }
-                                                />
-                                            )}
+                                            {marker && <Marker coordinate={marker} />}
                                         </MapView>
+                                    ) : (
+                                        <View style={styles.mapPlaceholder}>
+                                            <Ionicons name="map-outline" size={normalize(32)} color="#ccc" />
+                                            <AppText style={styles.mapPlaceholderText}>Select a location to preview map</AppText>
+                                        </View>
                                     )}
-
-                                    <Pressable
-                                        onPress={goToCurrentLocation}
-                                        style={{
-                                            position: 'absolute',
-                                            bottom: hp(1.8),
-                                            right: wp(4),
-                                            backgroundColor: palette.white,
-                                            width: normalize(50),
-                                            height: normalize(50),
-                                            borderRadius: normalize(25),
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            elevation: 4,
-                                        }}
-                                    >
-                                        <Ionicons
-                                            name="locate"
-                                            size={normalize(24)}
-                                            color={palette.primary}
-                                        />
-                                    </Pressable>
                                 </View>
 
                                 <Pressable
@@ -804,5 +928,174 @@ const styles = StyleSheet.create({
 
     btnText: {
         color: 'white',
+    },
+
+    // ─── Location Picker ───────────────────────────────────────────
+    locationPickerRow: {
+        flexDirection: 'row',
+        marginHorizontal: wp(4),
+        marginTop: hp(2.5),
+        gap: wp(2.5),
+    },
+
+    locationPickerBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: normalize(6),
+        padding: normalize(12),
+        borderRadius: normalize(10),
+        borderWidth: 1,
+        borderColor: palette.primary,
+        backgroundColor: palette.primary + '15',
+    },
+
+    locationPickerBtnSearch: {
+        backgroundColor: palette.primary,
+        borderColor: palette.primary,
+    },
+
+    locationPickerBtnText: {
+        fontSize: normalize(13),
+        color: palette.primary,
+        fontWeight: '500',
+    },
+
+    locationPickerBtnTextWhite: {
+        color: palette.white,
+    },
+
+    selectedAddressBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: normalize(8),
+        marginHorizontal: wp(4),
+        marginTop: hp(1.5),
+        padding: normalize(12),
+        borderRadius: normalize(10),
+        backgroundColor: palette.white,
+        borderWidth: 1,
+        borderColor: palette.border,
+    },
+
+    selectedAddressText: {
+        flex: 1,
+        fontSize: normalize(13),
+        color: palette.text,
+    },
+
+    // ─── Map ────────────────────────────────────────────────────────
+    mapHintText: {
+        textAlign: 'center',
+        marginTop: hp(1.5),
+        marginBottom: hp(0.5),
+        color: '#999',
+        fontSize: normalize(12),
+    },
+
+    mapContainer: {
+        height: hp(28),
+        marginHorizontal: wp(4),
+        marginVertical: hp(1),
+        borderRadius: normalize(12),
+        overflow: 'hidden',
+    },
+
+    mapView: {
+        flex: 1,
+    },
+
+    mapPlaceholder: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: normalize(8),
+    },
+
+    mapPlaceholderText: {
+        color: '#aaa',
+        fontSize: normalize(12),
+    },
+
+    // ─── Bottom Sheet Modal ─────────────────────────────────────────
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'flex-end',
+    },
+
+    modalSheet: {
+        height: height * 0.72,
+        backgroundColor: palette.white,
+        borderTopLeftRadius: normalize(20),
+        borderTopRightRadius: normalize(20),
+        overflow: 'hidden',
+    },
+
+    dragHandleArea: {
+        alignItems: 'center',
+        paddingVertical: normalize(10),
+        backgroundColor: palette.white,
+    },
+
+    dragHandle: {
+        width: normalize(40),
+        height: normalize(4),
+        borderRadius: normalize(2),
+        backgroundColor: '#ddd',
+    },
+
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: wp(4),
+        paddingBottom: normalize(10),
+    },
+
+    modalTitle: {
+        flex: 1,
+        fontSize: normalize(16),
+        fontWeight: '600',
+        color: palette.text,
+    },
+
+    modalCloseBtn: {
+        padding: normalize(4),
+    },
+
+    modalSearchContainer: {
+        paddingHorizontal: wp(4),
+        paddingBottom: normalize(8),
+        zIndex: 10,
+    },
+
+    modalMapContainer: {
+        flex: 1,
+        marginHorizontal: wp(4),
+        marginBottom: normalize(4),
+        borderRadius: normalize(12),
+        overflow: 'hidden',
+    },
+
+    confirmBtn: {
+        backgroundColor: palette.middlegreen,
+        padding: normalize(14),
+        marginHorizontal: wp(6),
+        marginTop: normalize(8),
+        marginBottom: normalize(16),
+        borderRadius: normalize(10),
+        alignItems: 'center',
+    },
+
+    confirmBtnDisabled: {
+        backgroundColor: '#bbb',
+    },
+
+    confirmBtnText: {
+        color: palette.white,
+        fontSize: normalize(15),
+        fontWeight: '600',
     },
 });
