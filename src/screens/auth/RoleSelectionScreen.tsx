@@ -30,7 +30,7 @@ const roles = [
   },
   {
     id: 'restaurant_multi' as const,
-    title: 'Food Business (Multi-Site)',
+    title: 'Food Business (Multiple Sites)',
     icon: '🍽️🍽️🍽️',
     lines: [
       'Manage surplus across multiple locations',
@@ -48,7 +48,7 @@ const roles = [
   },
   {
     id: 'charity_multi' as const,
-    title: 'Charity / Non-Profit (Multiple Location)',
+    title: 'Charity / Non-Profit (Multiple Locations)',
     icon: '💜💜💜',
     lines: [
       'Find and collect food from nearby businesses for charity with multiple locations',

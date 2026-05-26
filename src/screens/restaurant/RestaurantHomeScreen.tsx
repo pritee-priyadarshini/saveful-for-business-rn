@@ -262,7 +262,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
           onPress={() => navigation.navigate('Calculation')}
         >
           <AppText variant="bodyLarge">
-            About our calculation
+            About our calculations
           </AppText>
 
           <Ionicons name="chevron-forward" size={normalize(20)} color="black" />
