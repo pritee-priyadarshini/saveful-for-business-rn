@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { GOOGLE_PLACES_API_KEY } from '@/config';
 import {
     View,
     ScrollView,
@@ -357,7 +358,7 @@ export default function CreateSiteScreen() {
                                                     setSiteForm((prev) => ({ ...prev, address: addr, postcode }));
                                                     Keyboard.dismiss();
                                                 }}
-                                                query={{ key: 'AIzaSyD4uO4sAx4xgzOmpJFrxUK4VU8-hv58cLg', language: 'en' }}
+                                                query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
                                                 styles={{
                                                     container: { flex: 0 },
                                                     textInputContainer: { borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border },

@@ -65,7 +65,8 @@ export default {
      "extra": {
       "eas": {
         "projectId": "6863db47-e894-4b7e-944c-c0c66152e71d"
-      }
+      },
+      "googlePlacesApiKey": process.env.GOOGLE_MAPS_API_KEY
     }
   },
 };
