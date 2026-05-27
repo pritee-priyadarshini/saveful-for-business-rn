@@ -618,6 +618,7 @@ const styles = StyleSheet.create({
     },
     businessName: {
         color: 'white',
+        textAlign: 'center',
     },
     sectionTitle: {
         marginHorizontal: wp(6),

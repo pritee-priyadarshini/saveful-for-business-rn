@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,6 +10,11 @@ import {
   Dimensions,
   Platform,
   Linking,
+  Modal,
+  Animated,
+  PanResponder,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -29,6 +34,9 @@ import { AuthStackParamList } from '../../navigation/types';
 import { authService } from '@/services/auth.service';
 import { mapRole } from '@/utils/roleMapper';
 import { spacing } from '@/theme/spacing';
+import MapView, { Marker } from 'react-native-maps';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { GOOGLE_PLACES_API_KEY } from '@/config';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -58,9 +66,43 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(['personal']);
   const [isChecked, setIsChecked] = useState(false);
-  const [isAtCharityNow, setIsAtCharityNow] = useState<boolean | null>(null);
-  const [capturingLocation, setCapturingLocation] = useState(false);
-  const [capturedLocationLabel, setCapturedLocationLabel] = useState('');
+  const [showPlacesSearch, setShowPlacesSearch] = useState(false);
+  const [region, setRegion] = useState<any>(null);
+  const [marker, setMarker] = useState<any>(null);
+  const [selectedAddress, setSelectedAddress] = useState('');
+
+  const MODAL_HEIGHT = height * 0.72;
+  const slideAnim = useRef(new Animated.Value(height * 0.72)).current;
+
+  const openModal = () => {
+    slideAnim.setValue(MODAL_HEIGHT);
+    setShowPlacesSearch(true);
+    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+  };
+
+  const closeModal = () => {
+    Keyboard.dismiss();
+    Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
+      .start(() => setShowPlacesSearch(false));
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 5,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) slideAnim.setValue(gs.dy);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 80 || gs.vy > 0.5) {
+          Keyboard.dismiss();
+          Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
+            .start(() => setShowPlacesSearch(false));
+        } else {
+          Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   const toggle = (section: string) => {
     setOpenSections((prev) =>
@@ -110,10 +152,8 @@ export function AuthScreen() {
     }
   };
 
-  const captureCharityLocation = async () => {
+  const handleGpsLocation = async () => {
     try {
-      setCapturingLocation(true);
-
       let permission = await Location.getForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
         permission = await Location.requestForegroundPermissionsAsync();
@@ -122,7 +162,7 @@ export function AuthScreen() {
       if (permission.status !== 'granted') {
         Alert.alert(
           'Location Permission Required',
-          'Please allow location permission to continue charity onboarding.',
+          'Please enable location permission from app settings.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => Linking.openSettings() },
@@ -131,44 +171,27 @@ export function AuthScreen() {
         return;
       }
 
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
-
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const { latitude, longitude } = location.coords;
+      const newRegion = { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+      setRegion(newRegion);
+      setMarker({ latitude, longitude });
       updateCharityField('latitude', String(latitude));
       updateCharityField('longitude', String(longitude));
 
-      const places = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
-
-      const place = places[0];
-      const formattedAddress = place
-        ? [
-            place.name,
-            place.street,
-            place.city,
-            place.region,
-            place.postalCode,
-          ]
-            .filter(Boolean)
-            .join(', ')
-        : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-
-      if (!charityForm.charityAddress && formattedAddress) {
-        updateCharityField('charityAddress', formattedAddress);
+      const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (addresses.length > 0) {
+        const place = addresses[0];
+        const addr = [place.name, place.street, place.city, place.region, place.postalCode]
+          .filter(Boolean)
+          .join(', ');
+        setSelectedAddress(addr);
+        if (!charityForm.charityAddress) updateCharityField('charityAddress', addr);
       }
 
-      setCapturedLocationLabel(formattedAddress);
-      Alert.alert('Location Captured', 'Your charity location has been added.');
-    } catch (error) {
-      Alert.alert('Location Error', 'Unable to capture current location. Please try again.');
-    } finally {
-      setCapturingLocation(false);
+      openModal();
+    } catch {
+      Alert.alert('Error', 'Failed to get current location');
     }
   };
 
@@ -254,6 +277,111 @@ export function AuthScreen() {
 
   return (
     <Screen backgroundColor={palette.creme}>
+      {/* LOCATION BOTTOM SHEET MODAL */}
+      <Modal
+        visible={showPlacesSearch}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={closeModal}
+      >
+        <TouchableWithoutFeedback onPress={closeModal}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <Animated.View
+                style={[styles.modalSheet, { transform: [{ translateY: slideAnim }] }]}
+              >
+                <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                  <View style={styles.dragHandle} />
+                </View>
+
+                <View style={styles.modalHeader}>
+                  <AppText style={styles.modalTitle}>Set Location</AppText>
+                  <Pressable onPress={closeModal} style={styles.modalCloseBtn}>
+                    <Ionicons name="close" size={normalize(22)} color={palette.text} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalSearchContainer}>
+                  <GooglePlacesAutocomplete
+                    placeholder="Search charity address or place..."
+                    fetchDetails
+                    textInputProps={{ autoFocus: true }}
+                    onPress={(data, details = null) => {
+                      const lat = details?.geometry?.location?.lat;
+                      const lng = details?.geometry?.location?.lng;
+                      if (lat && lng) {
+                        const newRegion = { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+                        setRegion(newRegion);
+                        setMarker({ latitude: lat, longitude: lng });
+                        updateCharityField('latitude', String(lat));
+                        updateCharityField('longitude', String(lng));
+                      }
+                      const addr = details?.formatted_address || data.description;
+                      setSelectedAddress(addr);
+                      updateCharityField('charityAddress', addr);
+                      Keyboard.dismiss();
+                    }}
+                    query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
+                    styles={{
+                      container: { flex: 0 },
+                      textInputContainer: { borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border },
+                      textInput: { height: normalize(46), color: palette.text, fontSize: normalize(14), marginBottom: 0, backgroundColor: palette.white },
+                      listView: { backgroundColor: palette.white, borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border, marginTop: normalize(4) },
+                      row: { padding: normalize(12), backgroundColor: palette.white },
+                      description: { fontSize: normalize(13), color: palette.text },
+                    }}
+                    enablePoweredByContainer={false}
+                    debounce={300}
+                    keepResultsAfterBlur
+                  />
+                </View>
+
+                <View style={styles.modalMapContainer}>
+                  {region ? (
+                    <MapView
+                      style={styles.mapView}
+                      region={region}
+                      showsUserLocation
+                      onPress={async (e) => {
+                        const { latitude, longitude } = e.nativeEvent.coordinate;
+                        setMarker({ latitude, longitude });
+                        updateCharityField('latitude', String(latitude));
+                        updateCharityField('longitude', String(longitude));
+                        const res = await Location.reverseGeocodeAsync({ latitude, longitude });
+                        if (res.length > 0) {
+                          const place = res[0];
+                          const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
+                          setSelectedAddress(addr);
+                          updateCharityField('charityAddress', addr);
+                        }
+                      }}
+                    >
+                      {marker && <Marker coordinate={marker} />}
+                    </MapView>
+                  ) : (
+                    <View style={styles.mapPlaceholder}>
+                      <Ionicons name="map-outline" size={normalize(36)} color="#ccc" />
+                      <AppText style={styles.mapPlaceholderText}>Search or tap to select a location</AppText>
+                    </View>
+                  )}
+                </View>
+
+                <Pressable
+                  style={[styles.confirmBtn, !marker && styles.confirmBtnDisabled]}
+                  onPress={closeModal}
+                  disabled={!marker}
+                >
+                  <AppText style={styles.confirmBtnText}>
+                    {marker ? 'Confirm Location' : 'Select a location on the map'}
+                  </AppText>
+                </Pressable>
+              </Animated.View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -509,72 +637,38 @@ export function AuthScreen() {
 
           {!isRestaurant && (
             <Section
-              title="Location Verification (Recommended)"
+              title="Location (Recommended)"
               active={openSections.includes('location')}
               onPress={() => toggle('location')}
             >
-              <View style={styles.locationCard}>
-                <AppText variant="bodySmall">
-                  Are you currently at your charity location?
-                </AppText>
-
-                <View style={styles.locationChoiceRow}>
-                  <Pressable
-                    style={[
-                      styles.locationChoiceBtn,
-                      isAtCharityNow === true && styles.locationChoiceBtnActive,
-                    ]}
-                    onPress={() => setIsAtCharityNow(true)}
-                  >
-                    <AppText style={isAtCharityNow === true ? styles.locationChoiceTextActive : undefined}>
-                      Yes, I am here
-                    </AppText>
-                  </Pressable>
-
-                  <Pressable
-                    style={[
-                      styles.locationChoiceBtn,
-                      isAtCharityNow === false && styles.locationChoiceBtnActive,
-                    ]}
-                    onPress={() => {
-                      setIsAtCharityNow(false);
-                      updateCharityField('latitude', '');
-                      updateCharityField('longitude', '');
-                      setCapturedLocationLabel('');
-                    }}
-                  >
-                    <AppText style={isAtCharityNow === false ? styles.locationChoiceTextActive : undefined}>
-                      Not right now
-                    </AppText>
+              <AppText variant="caption" style={styles.locationHelpText}>
+                Set your charity's location for better pickup matching. You can skip this and add it later from your dashboard.
+              </AppText>
+              <View style={styles.locationPickerRow}>
+                <Pressable style={styles.locationPickerBtn} onPress={handleGpsLocation}>
+                  <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
+                  <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
+                </Pressable>
+                <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
+                  <Ionicons name="search" size={normalize(16)} color={palette.white} />
+                  <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
+                </Pressable>
+              </View>
+              {!!selectedAddress && (
+                <View style={styles.selectedAddressBox}>
+                  <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
+                  <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
+                  <Pressable onPress={() => {
+                    setSelectedAddress('');
+                    setMarker(null);
+                    setRegion(null);
+                    updateCharityField('latitude', '');
+                    updateCharityField('longitude', '');
+                  }}>
+                    <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
                   </Pressable>
                 </View>
-
-                <AppText variant="caption" style={styles.locationHelpText}>
-                  You can skip this for now and still register. We will ask again on home screen for better pickup matching.
-                </AppText>
-
-                <Pressable
-                  style={[
-                    styles.captureLocationBtn,
-                    (isAtCharityNow !== true || capturingLocation) && styles.captureLocationBtnDisabled,
-                  ]}
-                  disabled={isAtCharityNow !== true || capturingLocation}
-                  onPress={captureCharityLocation}
-                >
-                  <AppText variant="label" style={styles.captureLocationBtnText}>
-                    {capturingLocation ? 'Capturing location...' : 'Share Current Location'}
-                  </AppText>
-                </Pressable>
-
-                {!!capturedLocationLabel && (
-                  <View style={styles.locationSuccessBox}>
-                    <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
-                    <AppText variant="caption" style={styles.locationSuccessText}>
-                      {capturedLocationLabel}
-                    </AppText>
-                  </View>
-                )}
-              </View>
+              )}
             </Section>
           )}
 
@@ -807,69 +901,158 @@ const styles = StyleSheet.create({
     backgroundColor: palette.primary,
   },
 
-  locationCard: {
-    gap: hp(1),
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: normalize(14),
-    padding: wp(3.5),
-    backgroundColor: palette.white,
+  locationHelpText: {
+    opacity: 0.7,
+    marginBottom: hp(1),
   },
 
-  locationChoiceRow: {
+  locationPickerRow: {
     flexDirection: 'row',
-    gap: wp(2),
+    gap: wp(2.5),
+    marginTop: hp(0.5),
   },
 
-  locationChoiceBtn: {
+  locationPickerBtn: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: normalize(12),
-    paddingVertical: hp(1),
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: palette.creme,
+    justifyContent: 'center',
+    gap: normalize(6),
+    padding: normalize(12),
+    borderRadius: normalize(10),
+    borderWidth: 1,
+    borderColor: palette.primary,
+    backgroundColor: palette.primary + '15',
   },
 
-  locationChoiceBtnActive: {
+  locationPickerBtnSearch: {
     backgroundColor: palette.primary,
     borderColor: palette.primary,
   },
 
-  locationChoiceTextActive: {
+  locationPickerBtnText: {
+    fontSize: normalize(13),
+    color: palette.primary,
+    fontWeight: '500',
+  },
+
+  locationPickerBtnTextWhite: {
     color: palette.white,
   },
 
-  locationHelpText: {
-    opacity: 0.7,
-  },
-
-  captureLocationBtn: {
-    backgroundColor: palette.middlegreen,
-    borderRadius: normalize(12),
-    paddingVertical: hp(1.2),
-    alignItems: 'center',
-  },
-
-  captureLocationBtnDisabled: {
-    opacity: 0.5,
-  },
-
-  captureLocationBtnText: {
-    color: palette.white,
-  },
-
-  locationSuccessBox: {
+  selectedAddressBox: {
     flexDirection: 'row',
-    gap: wp(1.5),
     alignItems: 'center',
-    backgroundColor: '#ECF8F1',
+    gap: normalize(8),
+    marginTop: hp(1.5),
+    padding: normalize(12),
     borderRadius: normalize(10),
-    padding: wp(2.5),
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: palette.border,
   },
 
-  locationSuccessText: {
+  selectedAddressText: {
     flex: 1,
+    fontSize: normalize(13),
+    color: palette.text,
+  },
+
+  // ─── Bottom Sheet Modal ────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+
+  modalSheet: {
+    height: height * 0.72,
+    backgroundColor: palette.white,
+    borderTopLeftRadius: normalize(20),
+    borderTopRightRadius: normalize(20),
+    overflow: 'hidden',
+  },
+
+  dragHandleArea: {
+    alignItems: 'center',
+    paddingVertical: normalize(10),
+    backgroundColor: palette.white,
+  },
+
+  dragHandle: {
+    width: normalize(40),
+    height: normalize(4),
+    borderRadius: normalize(2),
+    backgroundColor: '#ddd',
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: wp(4),
+    paddingBottom: normalize(10),
+  },
+
+  modalTitle: {
+    flex: 1,
+    fontSize: normalize(16),
+    fontWeight: '600',
+    color: palette.text,
+  },
+
+  modalCloseBtn: {
+    padding: normalize(4),
+  },
+
+  modalSearchContainer: {
+    paddingHorizontal: wp(4),
+    paddingBottom: normalize(8),
+    zIndex: 10,
+  },
+
+  modalMapContainer: {
+    flex: 1,
+    marginHorizontal: wp(4),
+    marginBottom: normalize(4),
+    borderRadius: normalize(12),
+    overflow: 'hidden',
+  },
+
+  mapView: {
+    flex: 1,
+  },
+
+  mapPlaceholder: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: normalize(8),
+  },
+
+  mapPlaceholderText: {
+    color: '#aaa',
+    fontSize: normalize(12),
+  },
+
+  confirmBtn: {
+    backgroundColor: palette.middlegreen,
+    padding: normalize(14),
+    marginHorizontal: wp(6),
+    marginTop: normalize(8),
+    marginBottom: normalize(16),
+    borderRadius: normalize(10),
+    alignItems: 'center',
+  },
+
+  confirmBtnDisabled: {
+    backgroundColor: '#bbb',
+  },
+
+  confirmBtnText: {
+    color: palette.white,
+    fontSize: normalize(15),
+    fontWeight: '600',
   },
 
   tick: {
