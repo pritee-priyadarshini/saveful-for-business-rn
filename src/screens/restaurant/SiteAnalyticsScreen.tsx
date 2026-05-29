@@ -25,12 +25,12 @@ export default function SiteAnalyticsScreen() {
   const [showDropdown, setShowDropdown] = useState(false);
 
   const analytics = [
-    { label: 'Kgs Saved', value: '120 kg' },
+    { label: 'Kgs Saved', value: '120' },
     { label: 'Meals Created', value: '300' },
     { label: 'Charities Supported', value: '12' },
-    { label: 'CO2 Emissions', value: '300 kg' },
+    { label: 'CO2 Reduced(in Kg)', value: '300 kg' },
     { label: 'Total Collection', value: '45' },
-    { label: 'Rating', value: '4.5 ⭐' },
+    { label: 'Rating', value: '4.5/5' },
   ];
 
   return (
@@ -186,11 +186,13 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    width: '48%',
-    backgroundColor: palette.radish,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    width: '49%',
+    backgroundColor: palette.white,
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 10,
     alignItems: 'center',
   },
 

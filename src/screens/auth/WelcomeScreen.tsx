@@ -20,7 +20,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 export function WelcomeScreen({ navigation }: Props) {
   return (
     <ImageBackground
-      source={require('../../../assets/intro/splash.png')}
+      source={require('../../../assets/intro/splash_logo.png')}
       style={styles.background}
       resizeMode="cover"
     >
@@ -28,13 +28,13 @@ export function WelcomeScreen({ navigation }: Props) {
 
         <View style={styles.topSection}>
 
-          <View style={styles.headerTop}>
+          {/* <View style={styles.headerTop}>
             <Image
               source={require('../../../assets/intro/logo.png')}
               style={styles.logo}
               resizeMode="contain"
             />
-          </View>
+          </View> */}
 
           <View style={styles.centerText}>
             <AppText variant="heading" color={palette.primary} style={styles.heading}>

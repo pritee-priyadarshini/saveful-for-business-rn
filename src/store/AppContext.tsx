@@ -162,6 +162,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         verificationStatus: 'Verified',
         phone: authUser.profile.user.phoneNumber || '',
         logo: authUser.profile.organisation?.logoUrl || '',
+        memberSince: authUser.profile.user.createdAt,
         email: authUser.profile.user.email || '',
       }
       : {

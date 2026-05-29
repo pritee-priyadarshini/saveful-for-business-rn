@@ -136,6 +136,7 @@ export type UserProfile = {
   verificationStatus: VerificationStatus;
   phone: string;
   logo?: string;
+  memberSince?: string;
   email: string;
 };
 

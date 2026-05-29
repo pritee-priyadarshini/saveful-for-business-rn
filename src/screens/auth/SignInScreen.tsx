@@ -176,7 +176,7 @@ export function SignInScreen() {
 
     return (
         <ImageBackground
-            source={require('../../../assets/intro/splash.png')}
+            source={require('../../../assets/intro/splash_logo.png')}
             style={styles.background}
             resizeMode="cover"
         >
@@ -193,13 +193,14 @@ export function SignInScreen() {
                         <View style={styles.container}>
 
                             {/* LOGO */}
-                            <View style={styles.top}>
+                            {/* <View style={styles.top}>
                                 <Image
                                     source={require('../../../assets/intro/logo.png')}
                                     style={styles.logo}
                                     resizeMode="contain"
                                 />
-                            </View>
+                            </View> */}
+
 
                             {/* FORM */}
                             <View style={styles.form}>
@@ -352,6 +353,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
+        justifyContent: 'center',
     },
     container: {
         flex: 1,
@@ -373,8 +375,8 @@ const styles = StyleSheet.create({
         borderRadius: normalize(20),
         padding: wp(6),
         gap: hp(2),
-        marginBottom: hp(15),
-        marginTop: -hp(8),
+        marginBottom: -hp(20),
+        marginTop: -hp(10),
     },
     title: {
         textAlign: 'center',

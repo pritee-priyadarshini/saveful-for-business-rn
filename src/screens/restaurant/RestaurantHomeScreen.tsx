@@ -375,8 +375,8 @@ const styles = StyleSheet.create({
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(1),
-    marginBottom: hp(1),
+    marginTop: hp(4),
+    marginBottom: hp(4),
     paddingHorizontal: wp(5),
   },
 

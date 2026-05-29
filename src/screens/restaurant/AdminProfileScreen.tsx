@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   ScrollView,
-  TextInput,
   Pressable,
   StyleSheet,
   Image,
@@ -12,31 +11,37 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import { RootStackParamList } from '@/navigation/AppNavigator';
+import { useAppContext } from '@/store/AppContext';
+
 import { palette } from '@/theme/colors';
+import { spacing } from '@/theme/spacing';
 
 export default function AdminProfileScreen() {
-  const navigation = useNavigation();
+  type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const navigation = useNavigation<NavigationProp>();
 
-  const [form, setForm] = useState({
-    adminName: 'John Doe',
-    email: 'john@demo.com',
-    mobile: '+91 9876543210',
-    password: '',
-  });
+  const { authUser, currentProfile } = useAppContext();
 
-  const handleSave = () => {
-    setIsEditing(false);
-    console.log('Saved:', form);
-  };
+  const organisation = authUser?.profile?.organisation;
+  const user = authUser?.profile?.user;
+  const adminName =  `${user?.firstName ?? ''} ${user?.lastName ?? ''}`;
+  const email = user?.email ?? '';
+  const phone = user?.phoneNumber ?? '';
+  const organisationName = organisation?.name ?? '';
+  const organisationId = organisation?.id ?? '';
+  const logoUrl = organisation?.logoUrl ?? '';
 
   return (
     <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container}>
-
-        {/* TOP HEADER BG */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* HEADER */}
         <View style={styles.headerBg}>
           <Image
             source={require('../../../assets/placeholder/feed-bg.png')}
@@ -60,89 +65,90 @@ export default function AdminProfileScreen() {
 
         {/* BUSINESS CARD */}
         <View style={styles.profileCard}>
-          <Image
-            source={require('../../../assets/intro/burger_king_logo.png')}
-            style={styles.logo}
-          />
+          {logoUrl ? (
+            <Image
+              source={{ uri: logoUrl }}
+              style={styles.logo}
+            />
+          ) : (
+            <View style={styles.emptyLogo}>
+              <Ionicons
+                name="image-outline"
+                size={40}
+                color="#999"
+              />
+            </View>
+          )}
 
-          <AppText variant='h7'>
-            Burger King India
-          </AppText>
-
-          <AppText variant='bodySmall'>
-            ID: IND1234abc
-          </AppText>
+          <AppText variant="h7"> {organisationName}</AppText>
+          <AppText variant="bodySmall"> ID: {organisationId}</AppText>
         </View>
 
-        {/* FORM */}
-        <View style={styles.form}>
+        {/* ADMIN DETAILS CARD */}
+        <View style={styles.detailsCard}>
+          <AppText variant="bodyBold" style={styles.sectionTitle} >
+            Super Admin Details
+          </AppText>
 
-          <View style={styles.formHeader}>
-            <AppText variant='bodyLarge'>
-              Super Admin Details
+          <View style={styles.fieldBlock}>
+            <AppText variant="label"style={styles.label}>
+              Name
             </AppText>
 
-            <Pressable onPress={() => setIsEditing(!isEditing)}>
-              <Ionicons name="pencil" size={18} />
-            </Pressable>
+            <View style={styles.readOnlyField}>
+              <AppText variant="bodySmall"> {adminName} </AppText>
+            </View>
           </View>
 
-          {[
-            { key: 'adminName', label: 'Name' },
-            { key: 'email', label: 'Email' },
-            { key: 'mobile', label: 'Contact' },
-            { key: 'password', label: 'Password' },
-          ].map((field: any) => {
-            const isPassword = field.key === 'password';
+          <View style={styles.fieldBlock}>
+            <AppText variant="label"style={styles.label}>
+              Email Address
+            </AppText>
 
-            return (
-              <View key={field.key} style={styles.inputBlock}>
-                <AppText variant="label" style={styles.label}>
-                  {field.label}
-                </AppText>
+            <View style={styles.readOnlyField}>
+              <AppText variant="bodySmall"> {email} </AppText>
+            </View>
+          </View>
 
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    value={(form as any)[field.key]}
-                    secureTextEntry={isPassword && !showPassword}
-                    editable={isEditing}
-                    onChangeText={(v) =>
-                      setForm({ ...form, [field.key]: v })
-                    }
-                    style={[
-                      styles.input,
-                      isPassword && { paddingRight: 40 },
-                      !isEditing && styles.disabledInput,
-                    ]}
-                  />
+          <View style={styles.fieldBlock}>
+            <AppText variant="label"style={styles.label}>
+              Contact Number
+            </AppText>
 
-                  {isPassword && (
-                    <Pressable
-                      style={styles.eyeIcon}
-                      onPress={() => setShowPassword(!showPassword)}
-                    >
-                      <Ionicons
-                        name={showPassword ? 'eye-off' : 'eye'}
-                        size={18}
-                        color="#777"
-                      />
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-            );
-          })}
+            <View style={styles.readOnlyField}>
+              <AppText variant="bodySmall"> {phone} </AppText>
+            </View>
+          </View>
 
         </View>
 
-        {isEditing && (
-          <Pressable style={styles.saveBtn} onPress={handleSave}>
-            <AppText variant='label' style={{ color: palette.white }}>
-              Save Changes
+        {/* CHANGE PASSWORD */}
+        <View style={styles.actionCard}>
+          <AppText variant="bodyBold" style={styles.sectionTitle} >
+            Password
+          </AppText>
+
+          <Pressable
+            style={styles.passwordBtn}
+            onPress={() =>
+              navigation.navigate('ForgotPassword')
+            }
+          >
+            <Ionicons
+              name="lock-closed-outline"
+              size={18}
+              color={palette.white}
+            />
+
+            <AppText variant="label" style={styles.passwordBtnText} >
+              Change Password
             </AppText>
           </Pressable>
-        )}
 
+          <AppText variant="caption" style={styles.helperText}>
+            A verification code will be sent to your registered email address.
+          </AppText>
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -150,7 +156,7 @@ export default function AdminProfileScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 20,
+    paddingBottom: spacing.xl,
   },
 
   headerBg: {
@@ -165,7 +171,7 @@ const styles = StyleSheet.create({
   },
 
   headerContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
     height: '100%',
@@ -182,11 +188,11 @@ const styles = StyleSheet.create({
   },
 
   profileCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
+    backgroundColor: palette.white,
+    marginHorizontal: spacing.md,
     marginTop: -50,
-    padding: 20,
-    borderRadius: 14,
+    padding: spacing.lg,
+    borderRadius: 16,
     alignItems: 'center',
     elevation: 3,
   },
@@ -194,61 +200,74 @@ const styles = StyleSheet.create({
   logo: {
     width: 120,
     height: 90,
-    resizeMode: 'cover',
-    marginBottom: 10,
+    resizeMode: 'contain',
+    marginBottom: spacing.sm,
   },
 
-  form: {
-    backgroundColor: 'white',
-    margin: 16,
-    padding: 16,
-    borderRadius: 16,
-  },
-
-  formHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyLogo: {
+    width: 120,
+    height: 90,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
 
-  inputBlock: {
-    marginBottom: 12,
+  detailsCard: {
+    backgroundColor: palette.white,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: 16,
+    padding: spacing.md,
+  },
+
+  actionCard: {
+    backgroundColor: palette.white,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: 16,
+    padding: spacing.md,
+  },
+
+  sectionTitle: {
+    marginBottom: spacing.md,
+  },
+
+  fieldBlock: {
+    marginBottom: spacing.md,
   },
 
   label: {
-    marginBottom: 4,
-    color: '#555',
+    marginBottom: spacing.xs,
+    color: palette.black,
   },
 
-  input: {
-    backgroundColor: '#FAFAFA',
-    padding: 12,
-    borderRadius: 10,
+  readOnlyField: {
+    backgroundColor: palette.white,
     borderWidth: 1,
-    borderColor: '#eee',
-  },
-
-  disabledInput: {
-    opacity: 0.6,
-  },
-
-  inputWrapper: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-
-  eyeIcon: {
-    position: 'absolute',
-    right: 12,
-  },
-
-  saveBtn: {
-    backgroundColor: palette.middlegreen,
-    marginHorizontal: 16,
-    padding: 16,
+    borderColor: palette.stone,
     borderRadius: 12,
-    alignItems: 'center',
+    padding: 12,
   },
 
+  passwordBtn: {
+    backgroundColor: palette.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+
+  passwordBtnText: {
+    color: palette.white,
+    marginLeft: 8,
+  },
+
+  helperText: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    opacity: 0.7,
+  },
 });
