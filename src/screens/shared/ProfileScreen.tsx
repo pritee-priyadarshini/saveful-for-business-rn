@@ -41,7 +41,18 @@ export function ProfileScreen() {
   const navigation = useNavigation<NavigationProp>();
 
   const [openSection, setOpenSection] = useState<string | null>(null);
-  const [logo, setLogo] = useState<string | null>(authUser?.profile?.organisation?.logo || null);
+  const [logo, setLogo] = useState<string | null>(
+    authUser?.profile?.organisation?.logoUrl ||
+    authUser?.profile?.organisation?.logo ||
+    null
+  );
+
+  const rawCreatedAt =
+    authUser?.profile?.organisation?.createdAt ||
+    authUser?.profile?.user?.createdAt;
+  const sinceDate = rawCreatedAt
+    ? new Date(rawCreatedAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+    : '';
 
   const selectedSiteId = authUser?.profile?.sites?.[0]?.id;
 
@@ -60,6 +71,15 @@ export function ProfileScreen() {
     } catch (error: any) {
       Alert.alert('Image selection failed', 'Please try again.');
     }
+  };
+
+  const editLogo = async () => {
+    if (!logo) return;
+    await pickImage();
+  };
+
+  const removeLogo = () => {
+    setLogo(null);
   };
 
   const handleUpdateContact = async () => {
@@ -95,6 +115,33 @@ export function ProfileScreen() {
     } catch (err) {
       console.log(err);
       Alert.alert('Error', 'Failed to update');
+    }
+  };
+
+  const handleUpdateExtra = async () => {
+    try {
+      const orgId = authUser?.profile?.organisation?.id;
+      if (!orgId) {
+        Alert.alert('Error', 'Organisation not found');
+        return;
+      }
+
+      const form = new FormData();
+      form.append('brandName', formData.branding);
+
+      if (logo && (logo.startsWith('file') || logo.startsWith('content'))) {
+        form.append('logo', {
+          uri: logo,
+          name: 'logo.jpg',
+          type: 'image/jpeg',
+        } as any);
+      }
+
+      await charityService.updateOrganisation(orgId, form);
+      Alert.alert('Success', 'Branding updated');
+    } catch (err) {
+      console.log(err);
+      Alert.alert('Error', 'Failed to update branding');
     }
   };
 
@@ -229,7 +276,7 @@ export function ProfileScreen() {
               </AppText>
 
               <AppText variant="caption" style={styles.white}>
-                Saveful for Business since Sep 2025
+                {sinceDate ? `Saveful for Business since ${sinceDate}` : 'Saveful for Business'}
               </AppText>
             </View>
 
@@ -379,18 +426,43 @@ export function ProfileScreen() {
                         onChangeText={(v) => updateField('branding', v)}
                       />
 
-                      <AppText variant="label">Upload Logo</AppText>
-                      <Pressable style={[styles.uploadBox,]} onPress={pickImage}
-                      >
-                        {logo ? (
-                          <Image
-                            source={{ uri: logo }}
-                            style={styles.logoPreview}
-                          />
+                      <View style={{ gap: spacing.xs, marginTop: spacing.sm }}>
+                        <AppText variant="label">Logo</AppText>
+                        <AppText variant="bodySmall" style={{ color: palette.textMuted }}>
+                          Centre your subject — the logo displays as a circle in the app
+                        </AppText>
+
+                        {!logo ? (
+                          <Pressable style={styles.uploadBox} onPress={pickImage}>
+                            <AppText variant="bodySmall">Select from gallery</AppText>
+                          </Pressable>
                         ) : (
-                          <AppText variant="bodySmall"> Select from gallery </AppText>
+                          <View style={styles.logoActions}>
+                            <Pressable style={styles.logoPreviewWrap} onPress={editLogo}>
+                              <Image
+                                source={{ uri: logo }}
+                                style={styles.logoPreviewImg}
+                                resizeMode="cover"
+                              />
+                              <View style={styles.editBadge}>
+                                <AppText variant="label" style={styles.editBadgeText}>Edit</AppText>
+                              </View>
+                            </Pressable>
+
+                            <View style={styles.logoButtons}>
+                              <Pressable style={styles.logoActionBtn} onPress={editLogo}>
+                                <AppText variant="label">Crop / Zoom</AppText>
+                              </Pressable>
+                              <Pressable style={styles.logoActionBtn} onPress={removeLogo}>
+                                <AppText variant="label">Remove</AppText>
+                              </Pressable>
+                              <Pressable style={[styles.logoActionBtn, styles.logoActionBtnPrimary]} onPress={pickImage}>
+                                <AppText variant="label" style={{ color: palette.white }}>Replace</AppText>
+                              </Pressable>
+                            </View>
+                          </View>
                         )}
-                      </Pressable>
+                      </View>
                     </>
                   )}
 
@@ -420,7 +492,7 @@ export function ProfileScreen() {
                         }
 
                         if (section.key === 'extra') {
-                          Alert.alert('Info', 'Logo upload API not integrated yet');
+                          handleUpdateExtra();
                         }
                       }}
                     >
@@ -572,6 +644,60 @@ const styles = StyleSheet.create({
     width: wp(20),
     height: hp(10),
     borderRadius: normalize(8),
+  },
+
+  logoActions: {
+    gap: hp(1.2),
+  },
+
+  logoPreviewWrap: {
+    alignSelf: 'flex-start',
+    width: normalize(120),
+    height: normalize(120),
+    borderRadius: normalize(60),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginTop: hp(1),
+  },
+
+  logoPreviewImg: {
+    width: '100%',
+    height: '100%',
+  },
+
+  editBadge: {
+    position: 'absolute',
+    right: -wp(2),
+    bottom: -hp(0.6),
+    backgroundColor: palette.primary,
+    paddingHorizontal: wp(2.2),
+    paddingVertical: hp(0.4),
+    borderRadius: normalize(999),
+  },
+
+  editBadgeText: {
+    color: palette.white,
+    fontSize: normalize(11),
+  },
+
+  logoButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+  },
+
+  logoActionBtn: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: normalize(12),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+  },
+
+  logoActionBtnPrimary: {
+    backgroundColor: palette.middlegreen,
+    borderWidth: 0,
   },
 
   accordionHeader: {

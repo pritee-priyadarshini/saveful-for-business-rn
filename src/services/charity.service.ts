@@ -111,4 +111,10 @@ export const charityService = {
     resendInvite(userId: number, data: ResendInvitePayload,) {
         return api.post(`/charity/users/${userId}/resend-invite`, data,);
     },
+
+    updateOrganisation(orgId: number | string, data: FormData) {
+        return api.patch(`/organization/${orgId}`, data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
 };

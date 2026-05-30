@@ -208,7 +208,7 @@ export function RestaurantUpdatesScreen() {
             }}
           >
             <View style={styles.viewBtn}>
-              <AppText variant='label' style={styles.viewText}> View Details </AppText>
+              <AppText variant='label' style={styles.viewText}> View </AppText>
             </View>
           </Pressable>
         </View>
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     borderRadius: normalize(18),
     gap: hp(1),
   },
-    viewBtn: {
+  viewBtn: {
     backgroundColor: palette.middlegreen,
     paddingHorizontal: wp(3.2),
     paddingVertical: hp(0.7),
@@ -422,7 +422,6 @@ const styles = StyleSheet.create({
   },
   viewText: {
     color: palette.white,
-    fontSize: normalize(12),
   },
   metaRow: {
     flexDirection: 'row',
