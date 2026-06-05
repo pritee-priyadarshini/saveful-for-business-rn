@@ -53,7 +53,7 @@ export function WelcomeScreen({ navigation }: Props) {
           <View style={styles.buttonContainer}>
 
             <Pressable
-              onPress={() => navigation.navigate('RoleSelection')}
+              onPress={() => navigation.navigate('RoleSelectionMain')}
               style={styles.primaryButton}
             >
               <AppText variant="h7" style={styles.primaryButtonText}>

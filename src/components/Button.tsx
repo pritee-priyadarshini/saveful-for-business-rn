@@ -56,7 +56,7 @@ export function Button({
       ) : null}
 
       <AppText
-        variant="label"
+        variant="bodyBold"
         color={
           disabled
             ? '#9E9E9E'

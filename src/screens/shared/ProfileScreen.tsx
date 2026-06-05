@@ -348,7 +348,7 @@ export function ProfileScreen() {
                       />
 
                       <View style={{ marginTop: spacing.sm }}>
-                        <AppText variant="label">Password</AppText>
+                        <AppText variant="bodyBold">Password</AppText>
 
                         <Pressable
                           style={styles.passwordLink}
@@ -390,7 +390,7 @@ export function ProfileScreen() {
 
                       {!isCharity && (
                         <>
-                          <AppText variant="label">Venue Type</AppText>
+                          <AppText variant="bodyBold">Venue Type</AppText>
 
                           <View style={[styles.dropdown,]} >
                             <Picker
@@ -427,7 +427,7 @@ export function ProfileScreen() {
                       />
 
                       <View style={{ gap: spacing.xs, marginTop: spacing.sm }}>
-                        <AppText variant="label">Logo</AppText>
+                        <AppText variant="bodyBold">Logo</AppText>
                         <AppText variant="bodySmall" style={{ color: palette.textMuted }}>
                           Centre your subject — the logo displays as a circle in the app
                         </AppText>
@@ -445,19 +445,19 @@ export function ProfileScreen() {
                                 resizeMode="cover"
                               />
                               <View style={styles.editBadge}>
-                                <AppText variant="label" style={styles.editBadgeText}>Edit</AppText>
+                                <AppText variant="bodyBold" style={styles.editBadgeText}>Edit</AppText>
                               </View>
                             </Pressable>
 
                             <View style={styles.logoButtons}>
                               <Pressable style={styles.logoActionBtn} onPress={editLogo}>
-                                <AppText variant="label">Crop / Zoom</AppText>
+                                <AppText variant="bodyBold">Crop / Zoom</AppText>
                               </Pressable>
                               <Pressable style={styles.logoActionBtn} onPress={removeLogo}>
-                                <AppText variant="label">Remove</AppText>
+                                <AppText variant="bodyBold">Remove</AppText>
                               </Pressable>
                               <Pressable style={[styles.logoActionBtn, styles.logoActionBtnPrimary]} onPress={pickImage}>
-                                <AppText variant="label" style={{ color: palette.white }}>Replace</AppText>
+                                <AppText variant="bodyBold" style={{ color: palette.white }}>Replace</AppText>
                               </Pressable>
                             </View>
                           </View>
@@ -497,7 +497,7 @@ export function ProfileScreen() {
                       }}
                     >
                       <AppText
-                        variant="label"
+                        variant="bodyBold"
                         style={{ color: 'white' }}
                       >
                         Save Changes

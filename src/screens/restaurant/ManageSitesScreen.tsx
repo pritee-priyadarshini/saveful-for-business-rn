@@ -239,7 +239,7 @@ export default function ManageSitesScreen() {
                     else item.action?.();
                   }}
                 >
-                  <AppText variant="label" style={styles.actionText}>
+                  <AppText variant="bodyBold" style={styles.actionText}>
                     {item.label}
                   </AppText>
                 </Pressable>
@@ -272,7 +272,7 @@ export default function ManageSitesScreen() {
                     />
 
                     <View style={{ flex: 1 }}>
-                      <AppText variant="label" style={styles.siteName}>
+                      <AppText variant="bodyBold" style={styles.siteName}>
                         {site.tradingName}
                       </AppText>
 
@@ -294,22 +294,22 @@ export default function ManageSitesScreen() {
                       )
                     }
                   >
-                    <AppText variant="label" style={{ color: palette.white }}>View</AppText>
+                    <AppText variant="bodyBold" style={{ color: palette.white }}>View</AppText>
                   </Pressable>
                 </View>
 
                 {expandedSite === site.id && (
                   <View style={styles.details}>
 
-                    <AppText variant="label">
+                    <AppText variant="bodyBold">
                       Manager: {site.contactName}
                     </AppText>
 
-                    <AppText variant="label">
+                    <AppText variant="bodyBold">
                       Email: {site.email}
                     </AppText>
 
-                    <AppText variant="label">
+                    <AppText variant="bodyBold">
                       Mobile: {site.mobile}
                     </AppText>
 
@@ -321,7 +321,7 @@ export default function ManageSitesScreen() {
                         style={styles.viewBtn}
                         onPress={() => handleAssignManager(site.id)}
                       >
-                        <AppText variant="label" style={{ color: palette.white }}>
+                        <AppText variant="bodyBold" style={{ color: palette.white }}>
                           {site.managerId ? 'Replace Manager' : 'Add Manager'}
                         </AppText>
                       </Pressable>
@@ -334,7 +334,7 @@ export default function ManageSitesScreen() {
                             handleRemoveManager(site.id, site.managerId)
                           }
                         >
-                          <AppText variant="label" style={{ color: palette.white }}>Remove Manager</AppText>
+                          <AppText variant="bodyBold" style={{ color: palette.white }}>Remove Manager</AppText>
                         </Pressable>
                       )}
 
@@ -345,7 +345,7 @@ export default function ManageSitesScreen() {
                       style={[styles.logoutBtn, { marginTop: 10 }]}
                       onPress={() => handleDeleteSite(site.id)}
                     >
-                      <AppText variant="label">Delete Site</AppText>
+                      <AppText variant="bodyBold">Delete Site</AppText>
                     </Pressable>
 
                   </View>
@@ -356,7 +356,7 @@ export default function ManageSitesScreen() {
             {/* FOOTER */}
             <View style={styles.bottomActions}>
               <Pressable style={styles.logoutBtn} onPress={logout}>
-                <AppText variant="label">Logout</AppText>
+                <AppText variant="bodyBold">Logout</AppText>
               </Pressable>
 
               <Pressable
@@ -365,7 +365,7 @@ export default function ManageSitesScreen() {
                   Alert.alert('Delete Account', 'API to be added soon')
                 }
               >
-                <AppText variant="label">Delete My Account</AppText>
+                <AppText variant="bodyBold">Delete My Account</AppText>
               </Pressable>
             </View>
           </>

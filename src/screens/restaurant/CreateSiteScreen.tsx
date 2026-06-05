@@ -564,7 +564,7 @@ export default function CreateSiteScreen() {
                         {activeTab === 'manager' && (
                             <>
                                 <View style={{ marginHorizontal: 15, marginBottom: 15 }}>
-                                    <AppText variant="label">Select Site *</AppText>
+                                    <AppText variant="bodyBold">Select Site *</AppText>
 
                                     <Pressable
                                         onPress={() => setOpenSiteDropdown(!openSiteDropdown)}

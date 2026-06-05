@@ -125,7 +125,7 @@ export function RestaurantPlansScreen({ navigation }: any) {
 
               {/* FEATURES */}
               <View style={styles.featuresBox}>
-                <AppText variant="label">Includes</AppText>
+                <AppText variant="bodyBold">Includes</AppText>
 
                 {plan.features.map((feature) => (
                   <AppText key={feature} variant='label'>

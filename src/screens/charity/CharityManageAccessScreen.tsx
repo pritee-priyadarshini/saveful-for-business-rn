@@ -286,7 +286,7 @@ export default function CharityManageAccessScreen() {
             }}
           >
             <AppText
-              variant="label"
+              variant="bodyBold"
               style={[
                 styles.tabText,
                 activeTab === 'user' &&
@@ -318,7 +318,7 @@ export default function CharityManageAccessScreen() {
             }}
           >
             <AppText
-              variant="label"
+              variant="bodyBold"
               style={[
                 styles.tabText,
                 activeTab ===
@@ -333,7 +333,7 @@ export default function CharityManageAccessScreen() {
 
         {/* FORM */}
         <View style={styles.sectionBox}>
-          <AppText variant="label">
+          <AppText variant="bodyBold">
             {editingId
               ? `Edit ${activeTab === 'user' ? 'User' : 'Driver'}`
               : `Add ${activeTab === 'user' ? 'User' : 'Driver'}`
@@ -399,7 +399,7 @@ export default function CharityManageAccessScreen() {
             </View>
           ) : (
             <View style={styles.roleLocked} >
-              <AppText variant="label"> Driver </AppText>
+              <AppText variant="bodyBold"> Driver </AppText>
             </View>
           )}
 
@@ -438,7 +438,7 @@ export default function CharityManageAccessScreen() {
             style={styles.addBtn}
             onPress={handleSubmit}
           >
-            <AppText variant="label" style={styles.white}>
+            <AppText variant="bodyBold" style={styles.white}>
               {editingId
                 ? 'Update'
                 : `+ Add ${activeTab === 'user' ? 'User' : 'Driver'}`
@@ -449,7 +449,7 @@ export default function CharityManageAccessScreen() {
 
         {/* LIST TITLE */}
         <View style={styles.sectionTitleBox} >
-          <AppText variant="label">
+          <AppText variant="bodyBold">
             {activeTab === 'user' ? 'Users' : 'Drivers'}
           </AppText>
         </View>

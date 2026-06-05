@@ -179,7 +179,7 @@ export default function ManageAccessScreen() {
 
         {/* CURRENT PLAN CARD */}
         <View style={styles.sectionBox}>
-          <AppText variant="label">
+          <AppText variant="bodyBold">
             Current Plan
           </AppText>
 
@@ -194,7 +194,7 @@ export default function ManageAccessScreen() {
 
         {/* FORM CARD */}
         <View style={styles.sectionBox}>
-          <AppText variant="label">
+          <AppText variant="bodyBold">
             Add Team Member
           </AppText>
 
@@ -259,7 +259,7 @@ export default function ManageAccessScreen() {
               isLimitReached && { backgroundColor: '#ccc' },
             ]}
           >
-            <AppText variant="label" style={styles.white}>
+            <AppText variant="bodyBold" style={styles.white}>
               + Add User
             </AppText>
           </Pressable>
@@ -267,7 +267,7 @@ export default function ManageAccessScreen() {
 
         {/* TEAM MEMBERS */}
         <View style={styles.sectionTitleBox}>
-          <AppText variant="label">Team Members</AppText>
+          <AppText variant="bodyBold">Team Members</AppText>
         </View>
 
         {members.map((member) => (

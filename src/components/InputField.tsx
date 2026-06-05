@@ -34,7 +34,7 @@ export function InputField({
   return (
     <View style={styles.container}>
       {/* Label */}
-      <AppText variant="label" color={palette.textMuted}>
+      <AppText variant="bodyBold" color={palette.textMuted}>
         {label}
       </AppText>
 

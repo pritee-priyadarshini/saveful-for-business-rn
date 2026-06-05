@@ -23,7 +23,7 @@ const normalize = (size: number) => {
 	return Math.round(size * scale);
 };
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelection'>;
+type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelectionMain'>;
 
 const roleCards = [
 	{
@@ -63,7 +63,7 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 
 	const onContinue = (role: (typeof roleCards)[number]['role']) => {
 		setRole(role);
-		navigation.navigate('Auth');
+		navigation.navigate('RoleSelection');
 	};
 
 	return (
@@ -117,10 +117,10 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 							onPress={() => onContinue(card.role)}
 							style={[styles.continueButton, { backgroundColor: card.buttonColor }]}
 						>
-							<AppText variant="label" color={palette.white}>
+							<AppText variant="bodyBold" color={palette.white}>
 								CONTINUE
 							</AppText>
-							<AppText variant="label" color={palette.white} style={styles.arrowText}>
+							<AppText variant="bodyBold" color={palette.white} style={styles.arrowText}>
 								<Ionicons name="arrow-forward" size={normalize(20)} color={palette.white} />
 							</AppText>
 						</Pressable>
@@ -192,14 +192,13 @@ const styles = StyleSheet.create({
 	},
 	cardTitle: {
 		marginTop: hp(0.9),
-
 	},
 	cardSubTitle: {
 		marginTop: hp(1),
+		lineHeight: normalize(20),
 	},
 	cardDescription: {
 		marginTop: hp(0.5),
-    lineHeight: normalize(17),
 	},
 	continueButton: {
 		marginTop: hp(1.3),

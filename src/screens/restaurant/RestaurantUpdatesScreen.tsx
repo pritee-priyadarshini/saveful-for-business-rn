@@ -162,13 +162,13 @@ export function RestaurantUpdatesScreen() {
           {/* LEFT */}
           <View style={{ flex: 1 }}>
             <AppText style={{ fontSize: normalize(15) }} variant="bodySmall" color={textColor}>
-              <AppText variant="label" color={textColor}> {item.charity} </AppText>{' '}
+              <AppText variant="bodyBold" color={textColor}> {item.charity} </AppText>{' '}
               {item.type === 'full' ? 'is on the way' : `claimed ${item.quantity} kg`}
             </AppText>
 
             <AppText variant="bodySmall" style={[styles.locationText, { color: subTextColor }]} > 📍 {item.location} </AppText>
 
-            <AppText variant="label" style={[styles.driverName, { color: textColor }]} >
+            <AppText variant="bodyBold" style={[styles.driverName, { color: textColor }]} >
               Driver: {item.driverName || 'Driver will be assigned soon'}
             </AppText>
           </View>
@@ -215,7 +215,7 @@ export function RestaurantUpdatesScreen() {
 
         {/* ACTIONS */}
         <View style={styles.contactRow}>
-          <AppText variant="label" color={textColor}> Contact Charity </AppText>
+          <AppText variant="bodyBold" color={textColor}> Contact Charity </AppText>
 
           <View style={styles.actionRow}>
             <Pressable
@@ -246,7 +246,7 @@ export function RestaurantUpdatesScreen() {
 
 
         <View style={styles.contactRow}>
-          <AppText variant="label" color={textColor}> Contact Driver </AppText>
+          <AppText variant="bodyBold" color={textColor}> Contact Driver </AppText>
 
           <View style={styles.actionRow}>
             <Pressable
@@ -322,7 +322,7 @@ export function RestaurantUpdatesScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.section}>
-            <AppText variant="label" >{item.title}</AppText>
+            <AppText variant="bodyBold" >{item.title}</AppText>
 
             <View style={styles.sectionCard}>
               {item.data.map((d: any) => (

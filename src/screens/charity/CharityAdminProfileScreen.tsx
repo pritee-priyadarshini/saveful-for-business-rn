@@ -256,7 +256,7 @@ export default function CharityAdminProfileScreen() {
                 </View>
 
                 <View style={styles.textContainer}>
-                  <AppText variant="label" style={styles.label}>
+                  <AppText variant="bodyBold" style={styles.label}>
                     {field.label}
                   </AppText>
 
@@ -287,7 +287,7 @@ export default function CharityAdminProfileScreen() {
               </View>
 
               <View style={styles.textContainer}>
-                <AppText variant="label" style={styles.label}>
+                <AppText variant="bodyBold" style={styles.label}>
                   Address
                 </AppText>
 

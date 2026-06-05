@@ -726,7 +726,7 @@ export default function CreateCharitySiteScreen() {
                                         marginBottom: hp(1.8),
                                     }}
                                 >
-                                    <AppText variant="label">
+                                    <AppText variant="bodyBold">
                                         Select Site *
                                     </AppText>
 

@@ -220,7 +220,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   ]}
                 >
                   <AppText
-                    variant="label"
+                    variant="bodyBold"
                     style={[
                       styles.pillText,
                       activeIndex === index && styles.activePillText,

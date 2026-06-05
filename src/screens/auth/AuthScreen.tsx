@@ -506,7 +506,7 @@ export function AuthScreen() {
                 onChangeText={(v) => updateRestaurantField('registrationNumber', v)}
               />
 
-              <AppText variant="label">Venue Type</AppText>
+              <AppText variant="bodyBold">Venue Type</AppText>
               <View style={styles.dropdown}>
                 <Picker
                   selectedValue={restaurantForm.venueType}
@@ -581,7 +581,7 @@ export function AuthScreen() {
             />
 
             <View style={{ gap: spacing.xs }}>
-              <AppText variant="label">Logo</AppText>
+              <AppText variant="bodyBold">Logo</AppText>
               <AppText variant="bodySmall" style={{ color: palette.textMuted }}>
                 Centre your subject — the logo displays as a circle in the app
               </AppText>
@@ -599,19 +599,19 @@ export function AuthScreen() {
                       resizeMode="cover"
                     />
                     <View style={styles.editBadge}>
-                      <AppText variant="label" style={styles.editBadgeText}>Edit</AppText>
+                      <AppText variant="bodyBold" style={styles.editBadgeText}>Edit</AppText>
                     </View>
                   </Pressable>
 
                   <View style={styles.logoButtons}>
                     <Pressable style={styles.secondaryButton} onPress={editLogo}>
-                      <AppText variant="label">Crop / Zoom</AppText>
+                      <AppText variant="bodyBold">Crop / Zoom</AppText>
                     </Pressable>
                     <Pressable style={styles.secondaryButton} onPress={removeLogo}>
-                      <AppText variant="label">Remove</AppText>
+                      <AppText variant="bodyBold">Remove</AppText>
                     </Pressable>
                     <Pressable style={styles.primaryButton} onPress={pickImage}>
-                      <AppText variant="label" style={{ color: palette.white }}>Replace</AppText>
+                      <AppText variant="bodyBold" style={{ color: palette.white }}>Replace</AppText>
                     </Pressable>
                   </View>
                 </View>
@@ -677,13 +677,13 @@ export function AuthScreen() {
               style={[styles.checkbox, isChecked && styles.checkboxChecked]}
               onPress={() => setIsChecked(!isChecked)}
             >
-              {isChecked && <AppText variant="label" style={styles.tick}>✓</AppText>}
+              {isChecked && <AppText variant="bodyBold" style={styles.tick}>✓</AppText>}
             </Pressable>
 
-            <AppText variant="label" style={styles.disclaimer}>
+            <AppText variant="bodyBold" style={styles.disclaimer}>
               By continuing, I agree to the Saveful for Business{' '}
               <AppText
-                variant="label"
+                variant="bodyBold"
                 style={styles.disclaimerLink}
                 onPress={() => Linking.openURL('https://www.saveful.com/saveful-for-business-terms-conditions')}
               >
@@ -691,7 +691,7 @@ export function AuthScreen() {
               </AppText>
               {' '}and{' '}
               <AppText
-                variant="label"
+                variant="bodyBold"
                 style={styles.disclaimerLink}
                 onPress={() => Linking.openURL('https://www.saveful.com/privacy-policy')}
               >
@@ -710,9 +710,9 @@ export function AuthScreen() {
               style={{ backgroundColor: palette.middlegreen }}
             />
 
-            <AppText variant="label" style={styles.tip}>
+            <AppText variant="bodyBold" style={styles.tip}>
               {isRestaurant && (
-                <AppText variant="label" style={styles.tip}>
+                <AppText variant="bodyBold" style={styles.tip}>
                   No payment required to get started
                 </AppText>
               )}

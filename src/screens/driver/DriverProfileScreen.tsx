@@ -111,7 +111,7 @@ export function DriverProfileScreen() {
                                 style={styles.supportBtn}
                                 onPress={() => openLink('https://www.saveful.com/contact')}
                             >
-                                <AppText variant="label">Contact Support </AppText>
+                                <AppText variant="bodyBold">Contact Support </AppText>
                             </Pressable>
                         </Card>
                     </View>
@@ -182,7 +182,7 @@ export function DriverProfileScreen() {
                                             <InputField label="License" value={formData.license} onChangeText={(v) => updateField('license', v)} />
                                             {/* VEHICLE */}
                                             <View style={{ marginTop: spacing.sm }}>
-                                                <AppText variant="label">Vehicle</AppText>
+                                                <AppText variant="bodyBold">Vehicle</AppText>
                                                 <Pressable
                                                     style={[
                                                         styles.dropdownTrigger,
@@ -222,7 +222,7 @@ export function DriverProfileScreen() {
 
                                     {key !== 'personal' && (
                                         <Pressable style={styles.saveBtn} onPress={handleSave}>
-                                            <AppText variant="label" style={{ color: palette.white }}>Save Changes</AppText>
+                                            <AppText variant="bodyBold" style={{ color: palette.white }}>Save Changes</AppText>
                                         </Pressable>
                                     )}
 
@@ -259,11 +259,11 @@ export function DriverProfileScreen() {
 
                     {/* ACTIONS */}
                     <Pressable style={styles.actionBtn} onPress={handleLogout}>
-                        <AppText variant="label">Log out</AppText>
+                        <AppText variant="bodyBold">Log out</AppText>
                     </Pressable>
 
                     <Pressable style={styles.actionBtn} onPress={handleDelete}>
-                        <AppText variant="label">Delete my account</AppText>
+                        <AppText variant="bodyBold">Delete my account</AppText>
                     </Pressable>
 
                 </View>

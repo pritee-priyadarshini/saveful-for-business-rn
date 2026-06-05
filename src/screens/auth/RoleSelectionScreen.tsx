@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, View, ImageBackground, Dimensions, Platform, StatusBar } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { Pressable, StyleSheet, View, Dimensions,Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
@@ -17,43 +18,47 @@ const normalize = (size: number) => {
 };
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelection'>;
+type IconName = keyof typeof Ionicons.glyphMap;
 
-const roles = [
+const businessOptions = [
   {
     id: 'restaurant_single' as const,
-    title: 'Food Business (Single Site)',
-    icon: '🍽️',
-    lines: [
-      'List surplus and connect with local charities',
-      'Perfect for cafes, restaurants & small venues',
-    ],
+    title: 'I have a Business with a Single Site',
+    description: 'One location, a cafe, restaurant, supermarket or farm',
+    iconName: require('../../../assets/placeholder/single_site.png'),
   },
   {
     id: 'restaurant_multi' as const,
-    title: 'Food Business (Multiple Sites)',
-    icon: '🍽️🍽️🍽️',
-    lines: [
-      'Manage surplus across multiple locations',
-      'Ideal for groups, franchises & operators',
-    ],
+    title: 'I have a Business with Multiple Sites',
+    description: 'Manage surplus across multiple locations - for groups, franchises & operators',
+    iconName: require('../../../assets/placeholder/multi_site.png'),
   },
   {
+    id: 'farm_business' as const,
+    title: 'Farm/Producer',
+    description: 'Farms or producers with surplus',
+    iconName: require('../../../assets/placeholder/tractor_farm.png'),
+  },
+];
+
+const charityOptions = [
+  {
     id: 'charity_single' as const,
-    title: 'Charity / Non-Profit (Single Location)',
-    icon: '💜',
-    lines: [
-      'Find and collect food from nearby businesses',
-      'Support your community with ease',
-    ],
+    title: 'Charity/Non Profit (Single Site)',
+    description: 'One location, supporting your local community',
+    iconName: require('../../../assets/placeholder/single_charity.png'),
   },
   {
     id: 'charity_multi' as const,
-    title: 'Charity / Non-Profit (Multiple Locations)',
-    icon: '💜💜💜',
-    lines: [
-      'Find and collect food from nearby businesses for charity with multiple locations',
-      'Support your community groups',
-    ],
+    title: 'Charity/Non Profit Business (Multiple Sites)',
+    description: 'Manage collections across multiple locations',
+    iconName: require('../../../assets/placeholder/multi_charity.png'),
+  },
+  {
+    id: 'farmer' as const,
+    title: 'Farmer',
+    description: 'Collect food not suitable for human consumption to feed farm livestock',
+    iconName: require('../../../assets/placeholder/cow.png'),
   },
 ];
 
@@ -64,164 +69,163 @@ export function RoleSelectionScreen({ navigation }: Props) {
     if (!selectedRole) {
       setRole('restaurant_single');
     }
-  }, []);
+  }, [selectedRole, setRole]);
 
-  return (<Screen backgroundColor={palette.creme} scrollable contentStyle={{ flexGrow: 1 }}>
-    {/* HEADER */}
-    <ImageBackground
-      source={require('../../../assets/placeholder/kale-header.png')}
-      style={styles.headerBg}
-      resizeMode="cover"
-    >
-      <AppText variant="h3" color={palette.white} style={styles.headerTitle}>
-        HOW WILL YOU USE SAVEFUL FOR BUSINESS?
-      </AppText>
-    </ImageBackground>
+  const isCharity = selectedRole.includes('charity');
 
-    {/* CONTENT */}
-    <View style={styles.content}>
+  const viewModel = useMemo(() => {
+    if (isCharity) {
+      return {
+        bg: '#fdf5ff',
+        accent: palette.eggplant,
+        iconColor: palette.eggplant,
+        options: charityOptions,
+      };
+    }
 
-      <AppText
-        variant="bodyLarge"
-        color={palette.primary}
-        style={styles.subtitle}
-      >
-        Choose the option that best describes your organisation
-      </AppText>
+    return {
+      bg: palette.creme,
+      accent: palette.kale,
+      iconColor: palette.kale,
+      options: businessOptions,
+    };
+  }, [isCharity]);
 
-      <View style={styles.rolesContainer}>
-        {roles.map((role) => {
-          const active = selectedRole === role.id;
+  const onSelect = (id: string) => {
+    if (id === 'restaurant_single' || id === 'restaurant_multi' || id === 'charity_single' || id === 'charity_multi') {
+      setRole(id);
+      navigation.navigate('Auth');
+      return;
+    }
 
-          return (
-            <Pressable
-              key={role.id}
-              onPress={() => setRole(role.id)}
-              style={[styles.card, active && styles.cardActive]}
-            >
-              <AppText style={styles.icon}>{role.icon}</AppText>
+    if (id === 'farm_business') {
+      setRole('restaurant_single');
+      navigation.navigate('Auth');
+      return;
+    }
 
-              <View style={styles.textContainer}>
-                <AppText
-                  variant="bodyBold"
-                  color={palette.primary}
-                  style={styles.titleText}
-                >
-                  {role.title}
-                </AppText>
+    setRole('charity_single');
+    navigation.navigate('Auth');
+  };
 
-                {role.lines.map((line) => (
-                  <AppText
-                    key={line}
-                    variant="bodyLarge"
-                    color={palette.primary}
-                    style={styles.cardText}
-                  >
-                    {line}
-                  </AppText>
-                ))}
-              </View>
-            </Pressable>
-          );
-        })}
+  return (
+    <Screen backgroundColor={viewModel.bg} scrollable contentStyle={styles.screenContent}>
+      <View style={[styles.topAccent, { backgroundColor: viewModel.accent }]} />
+
+      <View style={styles.headerWrap}>
+        <AppText variant="h3" color={palette.black} style={styles.title}>
+          Tell us about your organisation
+        </AppText>
+        <AppText variant="bodyBold" color={palette.black} style={styles.subtitle}>
+          This helps us tailor your dashboard and recommendations.
+        </AppText>
       </View>
 
-      {/* CTA */}
-      <Pressable
-        onPress={() => navigation.navigate('Auth')}
-        style={styles.ctaButton}
-      >
-        <AppText variant="label" color={palette.white}>
-          Continue
-        </AppText>
-      </Pressable>
+      <View style={styles.listWrap}>
+        {viewModel.options.map((item) => (
+          <Pressable key={item.id} onPress={() => onSelect(item.id)} style={styles.optionCard}>
+            <View style={styles.optionLeft}>
+              <View style={styles.iconBox}>
+                <Image
+                  source={item.iconName}
+                  style={styles.roundIcon}
+                  resizeMode="contain"
+                />
+              </View>
 
-    </View>
-  </Screen>
+              <View style={styles.textWrap}>
+                <AppText variant="h8" color={palette.black} style={styles.optionTitle}>
+                  {item.title}
+                </AppText>
+                <AppText variant="body" color={palette.black} style={styles.optionDescription}>
+                  {item.description}
+                </AppText>
+              </View>
+            </View>
 
+            <Ionicons name="chevron-forward" size={normalize(22)} color="#6A6A6A" />
+          </Pressable>
+        ))}
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  headerBg: {
-    width: '100%',
-    height: hp(18),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  headerTitle: {
-    textAlign: 'center',
-    paddingHorizontal: wp(5),
-    fontSize: normalize(20),
-  },
-
-  content: {
+  screenContent: {
     flexGrow: 1,
-    backgroundColor: palette.white,
-    paddingHorizontal: wp(5),
-    paddingTop: hp(1.5),
-    paddingBottom: hp(2),
+    paddingBottom: hp(3),
+  },
+
+  topAccent: {
+    width: '100%',
+    height: hp(0.35),
+  },
+
+  headerWrap: {
+    alignItems: 'center',
+    paddingHorizontal: wp(8),
+    paddingTop: hp(4.2),
+  },
+
+  title: {
+    textAlign: 'center',
+    textTransform: 'none',
   },
 
   subtitle: {
+    marginTop: hp(1.1),
     textAlign: 'center',
-    opacity: 0.7,
-    marginBottom: hp(1),
-    fontSize: normalize(14),
+    textTransform: 'none',
   },
 
-  rolesContainer: {
-    gap: hp(0.8),
+  listWrap: {
+    marginTop: hp(4),
+    paddingHorizontal: wp(4),
+    gap: hp(2),
   },
-
-  card: {
-    alignItems: 'center',
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(1.8),
-    borderRadius: normalize(20),
+  roundIcon: { 
+    width: wp(12), 
+    height: wp(12),
+  },
+  optionCard: {
+    minHeight: hp(12),
+    borderRadius: normalize(8),
     backgroundColor: palette.white,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-
-  cardActive: {
-    backgroundColor: palette.lemon,
-    borderColor: palette.border,
-  },
-
-  icon: {
-    fontSize: normalize(26),
-    marginBottom: hp(0.4),
-    lineHeight: hp(3.5),
-  },
-
-  textContainer: {
+    borderColor: '#D9D9D9',
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(1.3),
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: hp(0.3),
+    justifyContent: 'space-between',
   },
 
-  titleText: {
-    textAlign: 'center',
-    fontSize: normalize(16),
-  },
-
-  cardText: {
-    opacity: 0.7,
-    textAlign: 'center',
-    fontSize: normalize(14),
-  },
-
-  ctaButton: {
-    marginTop: hp(1.5),
-    width: '100%',
-    paddingVertical: hp(1.8),
-    borderRadius: normalize(30),
-    backgroundColor: palette.primary,
+  optionLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: wp(3.2),
+    flex: 1,
+  },
+
+  iconBox: {
+    width: wp(12),
+    height: wp(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  textWrap: {
+    flex: 1,
+    paddingRight: wp(2),
+  },
+
+  optionTitle: {
+    textTransform: 'none',
+  },
+
+  optionDescription: {
+    marginTop: hp(0.35),
+    textTransform: 'none',
   },
 });

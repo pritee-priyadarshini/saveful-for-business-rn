@@ -98,8 +98,8 @@ export const typography = {
   },
   label: {
     fontFamily: 'Saveful-SemiBold',
-    fontSize: 16,
-    lineHeight: 18,
+    fontSize: 18,
+    lineHeight: 20,
   },
   caption: {
     fontFamily: 'Saveful-SemiBold',

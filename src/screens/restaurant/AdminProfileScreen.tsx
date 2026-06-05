@@ -91,7 +91,7 @@ export default function AdminProfileScreen() {
           </AppText>
 
           <View style={styles.fieldBlock}>
-            <AppText variant="label"style={styles.label}>
+            <AppText variant="bodyBold"style={styles.label}>
               Name
             </AppText>
 
@@ -101,7 +101,7 @@ export default function AdminProfileScreen() {
           </View>
 
           <View style={styles.fieldBlock}>
-            <AppText variant="label"style={styles.label}>
+            <AppText variant="bodyBold"style={styles.label}>
               Email Address
             </AppText>
 
@@ -111,7 +111,7 @@ export default function AdminProfileScreen() {
           </View>
 
           <View style={styles.fieldBlock}>
-            <AppText variant="label"style={styles.label}>
+            <AppText variant="bodyBold"style={styles.label}>
               Contact Number
             </AppText>
 
@@ -140,7 +140,7 @@ export default function AdminProfileScreen() {
               color={palette.white}
             />
 
-            <AppText variant="label" style={styles.passwordBtnText} >
+            <AppText variant="bodyBold" style={styles.passwordBtnText} >
               Change Password
             </AppText>
           </Pressable>
