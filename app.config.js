@@ -1,6 +1,6 @@
 export default {
   expo: {
-    name: "SavefulBusiness",
+    name: "Saveful For Business",
     slug: "saveful-business",
     version: "1.0.0",
     orientation: "portrait",

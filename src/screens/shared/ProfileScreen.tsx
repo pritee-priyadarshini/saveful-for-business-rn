@@ -265,7 +265,7 @@ export function ProfileScreen() {
         {/* HEADER */}
         <View style={styles.header}>
           <Image
-            source={require('../../../assets/placeholder/feed-bg.png')}
+            source={require('../../../assets/placeholder/modal-head-backgrounda.png')}
             style={styles.headerBg}
             resizeMode='cover'
           />
