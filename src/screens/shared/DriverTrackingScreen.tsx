@@ -331,11 +331,11 @@ export default function DriverTrackingScreen() {
                             <AppText variant="bodySmall">
                                 📍{' '} {source === 'restaurant' ? data.charityAddress : data.restaurantAddress}
                             </AppText>
-                            <AppText variant="label">{data.distance}</AppText>
+                            <AppText variant="bodyBold">{data.distance}</AppText>
                         </View>
 
                         <View style={styles.claimPill}>
-                            <AppText variant="label" style={styles.claimText}>
+                            <AppText variant="bodyBold" style={styles.claimText}>
                                 {data.listingStatus}
                             </AppText>
                         </View>
@@ -356,7 +356,7 @@ export default function DriverTrackingScreen() {
                                         onPress={() => makeCall(data.driverPhone)}
                                     >
                                         <Ionicons name="call-outline" size={18} color={palette.white} />
-                                        <AppText variant="label" style={styles.iconText}> Call </AppText>
+                                        <AppText variant="bodyBold" style={styles.iconText}> Call </AppText>
                                     </Pressable>
 
                                     <Pressable
@@ -364,7 +364,7 @@ export default function DriverTrackingScreen() {
                                         onPress={() => sendMessage(data.driverPhone)}
                                     >
                                         <Ionicons name="chatbubble-outline" size={18} color={palette.white} />
-                                        <AppText variant="label" style={styles.iconText}>  Message </AppText>
+                                        <AppText variant="bodyBold" style={styles.iconText}>  Message </AppText>
                                     </Pressable>
                                 </>
                             )}
@@ -377,19 +377,19 @@ export default function DriverTrackingScreen() {
                             style={styles.metaCard}
                             onPress={() => setModalVisible(true)}
                         >
-                            <AppText variant="label">Items</AppText>
+                            <AppText variant="bodyBold">Items</AppText>
                             <View style={styles.viewBtn}>
-                                <AppText variant="label" style={styles.viewText}> View </AppText>
+                                <AppText variant="bodyBold" style={styles.viewText}> View </AppText>
                             </View>
                         </Pressable>
 
                         <View style={styles.metaCard}>
-                            <AppText variant="label">Pickup Date</AppText>
+                            <AppText variant="bodyBold">Pickup Date</AppText>
                             <AppText variant="bodySmall">{data.pickupDate}</AppText>
                         </View>
 
                         <View style={styles.metaCard}>
-                            <AppText variant="label">Pickup Time</AppText>
+                            <AppText variant="bodyBold">Pickup Time</AppText>
                             <AppText variant="bodySmall">{data.pickupTime}</AppText>
                         </View>
                     </View>
@@ -424,7 +424,7 @@ export default function DriverTrackingScreen() {
 
                         {data.items.map((item, idx) => (
                             <View key={idx} style={styles.modalRow}>
-                                <AppText variant="label" style={{ flex: 2 }}> {item.name} </AppText>
+                                <AppText variant="bodyBold" style={{ flex: 2 }}> {item.name} </AppText>
                                 <AppText variant="bodySmall" style={styles.modalCol}> {item.available}kg </AppText>
                                 <AppText variant="bodySmall" style={styles.modalCol}> {item.claimed}kg </AppText>
                             </View>

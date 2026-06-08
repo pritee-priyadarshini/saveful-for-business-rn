@@ -1,5 +1,6 @@
 export type AuthStackParamList = {
   Welcome: undefined;
+  RoleSelectionMain: undefined;
   RoleSelection: undefined;
   Auth: undefined;
   EmailVerification: { email?: string; autoResend?: boolean; } | undefined;

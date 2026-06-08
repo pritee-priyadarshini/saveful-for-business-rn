@@ -177,7 +177,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
         <Pressable
           style={styles.createBtn}
           onPress={() =>
-            navigation.navigate('CreateListing')
+            navigation.navigate('Surplus')
           }
         >
           <AppText variant='bodyBold' style={styles.createText}>
@@ -224,11 +224,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       {detail.claimedByOrganisation?.name || 'Surplus still available'}
                     </AppText>
 
-                    <AppText variant="label" style={{lineHeight: normalize(21)}} >
+                    <AppText variant="bodyBold" style={{lineHeight: normalize(21)}} >
                       📍 {detail.claimedByOrganisation?.address || 'Nearby charities have been notified'}
                     </AppText>
 
-                    <AppText variant="label" style={styles.driverText}
+                    <AppText variant="bodyBold" style={styles.driverText}
                     >
                       {prettyStatus(detail.status) === 'Available'
                         ? 'Driver will be assigned once surplus is accepted'
@@ -246,7 +246,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                   {/* RIGHT */}
                   <View style={styles.statusWrap}>
                     <View>
-                      <AppText variant="label" style={styles.statusText} >
+                      <AppText variant="bodyBold" style={styles.statusText} >
                         {prettyStatus(detail.status)}
                       </AppText>
                     </View>
@@ -262,7 +262,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                         }
                       >
                         <AppText
-                          variant="label"
+                          variant="bodyBold"
                           style={styles.trackText}
                         >
                           Track
@@ -285,7 +285,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       setModalVisible(true);
                     }}
                   >
-                    <AppText variant="label"> Items </AppText>
+                    <AppText variant="bodyBold"> Items </AppText>
 
                     <View style={styles.viewBtn}>
                       <AppText variant='label' style={styles.viewText}> View </AppText>
@@ -293,12 +293,12 @@ export function RestaurantListingsScreen({ navigation }: any) {
                   </Pressable>
 
                   <View style={styles.metaCard} >
-                    <AppText variant="label"> Pickup Date </AppText>
+                    <AppText variant="bodyBold"> Pickup Date </AppText>
                     <AppText variant="bodySmall" style={{textAlign: 'center'}}> {new Date(item.pickupFromTime || item.createdAt).toLocaleDateString()}</AppText>
                   </View>
 
                   <View style={styles.metaCard} >
-                    <AppText variant="label"> Pickup Time </AppText>
+                    <AppText variant="bodyBold"> Pickup Time </AppText>
                     <AppText variant="bodySmall" style={{textAlign: 'center'}}> {`${new Date(item.pickupFromTime).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -339,7 +339,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                           size={normalize(18)}
                           color={palette.white}
                         />
-                        <AppText variant="label" style={styles.iconText} > Call </AppText>
+                        <AppText variant="bodyBold" style={styles.iconText} > Call </AppText>
                       </Pressable>
 
                       <Pressable
@@ -353,7 +353,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                           size={normalize(18)}
                           color={palette.white}
                         />
-                        <AppText variant="label" style={styles.iconText} > Message </AppText>
+                        <AppText variant="bodyBold" style={styles.iconText} > Message </AppText>
                       </Pressable>
                     </View>
 
@@ -376,7 +376,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                           size={normalize(18)}
                           color={palette.white}
                         />
-                        <AppText variant="label" style={styles.iconText} > Call </AppText>
+                        <AppText variant="bodyBold" style={styles.iconText} > Call </AppText>
                       </Pressable>
 
                       <Pressable
@@ -390,7 +390,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                           size={normalize(18)}
                           color={palette.white}
                         />
-                        <AppText variant="label" style={styles.iconText} > Message </AppText>
+                        <AppText variant="bodyBold" style={styles.iconText} > Message </AppText>
                       </Pressable>
                     </View>
                   </View>
@@ -404,7 +404,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       onPress={() => navigation.navigate('EditListing', { listingId: Number(item.id) })}
                     >
                       <Ionicons name="create-outline" size={normalize(16)} color={palette.white} />
-                      <AppText variant="label" style={styles.actionBtnText}>Edit</AppText>
+                      <AppText variant="bodyBold" style={styles.actionBtnText}>Edit</AppText>
                     </Pressable>
 
                     <Pressable
@@ -412,7 +412,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       onPress={() => handleCancelListing(item.id)}
                     >
                       <Ionicons name="close-circle-outline" size={normalize(16)} color={palette.white} />
-                      <AppText variant="label" style={styles.actionBtnText}>Cancel Listing</AppText>
+                      <AppText variant="bodyBold" style={styles.actionBtnText}>Cancel Listing</AppText>
                     </Pressable>
                   </View>
                 )}
@@ -469,7 +469,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
                 return (
                   <View key={`${item.category}-${idx}`} style={styles.modalItemRow}>
-                    <AppText variant="label"  style={{ flex: 2 }}  >
+                    <AppText variant="bodyBold"  style={{ flex: 2 }}  >
                       {item.category}
                     </AppText>
 

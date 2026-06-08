@@ -34,7 +34,7 @@ export function ListingCard({ listing, actionLabel }: Props) {
 
       <View style={styles.footer}>
         <View style={styles.copy}>
-          <AppText variant="label" color={palette.textMuted}>Organization</AppText>
+          <AppText variant="bodyBold" color={palette.textMuted}>Organization</AppText>
           <AppText>{listing.charityName ?? listing.restaurantName}</AppText>
         </View>
         {actionLabel ? <Button label={actionLabel} variant="secondary" /> : null}

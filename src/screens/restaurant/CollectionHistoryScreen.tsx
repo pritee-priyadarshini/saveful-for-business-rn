@@ -151,7 +151,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
                     {/* YEAR */}
                     <View style={styles.filterBlock}>
-                        <AppText variant="label">Year</AppText>
+                        <AppText variant="bodyBold">Year</AppText>
 
                         <View style={styles.dropdownWrapper}>
                             <Pressable
@@ -184,7 +184,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
                     {/* MONTH */}
                     <View style={styles.filterBlock}>
-                        <AppText variant="label" >Month</AppText>
+                        <AppText variant="bodyBold" >Month</AppText>
 
                         <View style={styles.dropdownWrapper}>
                             <Pressable

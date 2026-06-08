@@ -65,12 +65,12 @@ export function DriverHistoryScreen() {
         <AppText variant="bodySmall">📍 {item.address}</AppText>
 
         <View style={styles.rowBetween}>
-          <AppText variant="label">Date: {item.date}</AppText>
-          <AppText variant="label">Time: {item.time}</AppText>
+          <AppText variant="bodyBold">Date: {item.date}</AppText>
+          <AppText variant="bodyBold">Time: {item.time}</AppText>
         </View>
 
         <View>
-          <AppText variant="label">Items Collected</AppText>
+          <AppText variant="bodyBold">Items Collected</AppText>
 
           {item.items.map((i, index) => (
             <View key={index} style={styles.rowBetween}>
@@ -86,7 +86,7 @@ export function DriverHistoryScreen() {
         </View>
 
         <View>
-          <AppText variant="label">Your Rating</AppText>
+          <AppText variant="bodyBold">Your Rating</AppText>
 
           <View style={styles.ratingRow}>
             {[1, 2, 3, 4, 5].map((r) => (

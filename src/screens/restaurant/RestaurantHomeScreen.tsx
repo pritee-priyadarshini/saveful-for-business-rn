@@ -190,7 +190,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
           }
         >
           <AppText variant="bodyLarge" style={styles.ctaText}>
-            List Surplus
+            List Surplus Food
           </AppText>
         </Pressable>
 
@@ -220,7 +220,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   ]}
                 >
                   <AppText
-                    variant="label"
+                    variant="bodyBold"
                     style={[
                       styles.pillText,
                       activeIndex === index && styles.activePillText,

@@ -263,7 +263,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
               >
                 Driver to be assigned:{' '}
                 <AppText
-                  variant="label"
+                  variant="bodyBold"
                   style={styles.driverAssignedText}
                 >
                   {
@@ -374,7 +374,7 @@ export function ClaimConfirmationScreen({ route, navigation }: any) {
                 });
               }}
             >
-              <AppText variant="label" style={styles.modalBtnText} > Go To Home Screen</AppText>
+              <AppText variant="bodyBold" style={styles.modalBtnText} > Go To Home Screen</AppText>
             </Pressable>
           </View>
         </View>

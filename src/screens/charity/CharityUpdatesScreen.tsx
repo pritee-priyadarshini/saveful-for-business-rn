@@ -93,15 +93,15 @@ export function CharityUpdatesScreen() {
     <View style={styles.actionRow}>
       <Pressable style={styles.iconPill}>
         <Ionicons name="call-outline" size={normalize(16)} color={palette.white} />
-        <AppText variant="label" style={styles.iconText}>Call</AppText>
+        <AppText variant="bodyBold" style={styles.iconText}>Call</AppText>
       </Pressable>
       <Pressable style={styles.iconPill}>
         <Ionicons name="chatbubble-outline" size={normalize(16)} color={palette.white} />
-        <AppText variant="label" style={styles.iconText}>Message</AppText>
+        <AppText variant="bodyBold" style={styles.iconText}>Message</AppText>
       </Pressable>
       <Pressable style={styles.iconPill}>
         <Ionicons name="location-outline" size={normalize(16)} color={palette.white} />
-        <AppText variant="label" style={styles.iconText}>Location</AppText>
+        <AppText variant="bodyBold" style={styles.iconText}>Location</AppText>
       </Pressable>
     </View>
   );
@@ -137,7 +137,7 @@ export function CharityUpdatesScreen() {
           </View>
 
           <AppText variant='bodySmall'>
-            <AppText variant="label">{item.restaurant}</AppText> has listed fresh surplus near you
+            <AppText variant="bodyBold">{item.restaurant}</AppText> has listed fresh surplus near you
           </AppText>
 
           <Pressable
@@ -165,7 +165,7 @@ export function CharityUpdatesScreen() {
           </View>
 
           <AppText variant='bodySmall'>
-            Collect from <AppText variant="label">{item.restaurant}</AppText>
+            Collect from <AppText variant="bodyBold">{item.restaurant}</AppText>
           </AppText>
 
           {/* LOCATION */}
@@ -197,9 +197,9 @@ export function CharityUpdatesScreen() {
                 setItemsModalVisible(true);
               }}
             >
-              <AppText variant="label">Items</AppText>
+              <AppText variant="bodyBold">Items</AppText>
               <View style={styles.viewBtn}>
-                <AppText variant="label" style={styles.viewText}>View</AppText>
+                <AppText variant="bodyBold" style={styles.viewText}>View</AppText>
               </View>
             </Pressable>
           </View>
@@ -244,7 +244,7 @@ export function CharityUpdatesScreen() {
           </View>
 
           <AppText variant='bodySmall'>
-            Did you collect from <AppText variant="label">{item.restaurant}</AppText>?
+            Did you collect from <AppText variant="bodyBold">{item.restaurant}</AppText>?
           </AppText>
 
           <View style={styles.actions}>

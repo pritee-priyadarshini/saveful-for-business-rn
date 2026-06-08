@@ -43,6 +43,12 @@ export const typography = {
     lineHeight: 23,
     textTransform: 'uppercase' as const,
   },
+  h8: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 18,
+    lineHeight: 20,
+    textTransform: 'uppercase' as const,
+  },
   title: {
     fontFamily: 'Saveful-Bold',
     fontSize: 28,
@@ -66,6 +72,10 @@ export const typography = {
     lineHeight: 18,
      textTransform: 'uppercase' as const,
   },
+  body1: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: 16,
+    },
   bodyLarge: {
     fontFamily: 'Saveful-Regular',
     fontSize: 18,
@@ -76,6 +86,11 @@ export const typography = {
     fontSize: 16,
     lineHeight: 18,
   },
+  bodyBold1: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: 16,
+    lineHeight: 18,
+  },
   bodySmall: {
     fontFamily: 'Saveful-Regular',
     fontSize: 14,
@@ -83,8 +98,8 @@ export const typography = {
   },
   label: {
     fontFamily: 'Saveful-SemiBold',
-    fontSize: 16,
-    lineHeight: 18,
+    fontSize: 18,
+    lineHeight: 20,
   },
   caption: {
     fontFamily: 'Saveful-SemiBold',

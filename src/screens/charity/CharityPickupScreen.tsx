@@ -242,7 +242,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                                     })
                                                 }
                                             >
-                                                <AppText variant="label" style={styles.trackText} > Track </AppText>
+                                                <AppText variant="bodyBold" style={styles.trackText} > Track </AppText>
                                             </Pressable>
                                         ) : null}
                                     </View>
@@ -260,19 +260,19 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                         setModalVisible(true);
                                     }}
                                 >
-                                    <AppText variant="label"> Items </AppText>
+                                    <AppText variant="bodyBold"> Items </AppText>
                                     <View style={styles.viewBtn}>
-                                        <AppText variant="label" style={styles.viewText} > View </AppText>
+                                        <AppText variant="bodyBold" style={styles.viewText} > View </AppText>
                                     </View>
                                 </Pressable>
 
                                 <View style={styles.metaCard}>
-                                    <AppText variant="label"> Pickup Date </AppText>
+                                    <AppText variant="bodyBold"> Pickup Date </AppText>
                                     <AppText variant="bodySmall"> {item.pickupDate} </AppText>
                                 </View>
 
                                 <View style={styles.metaCard}>
-                                    <AppText variant="label"> Pickup Time </AppText>
+                                    <AppText variant="bodyBold"> Pickup Time </AppText>
                                     <AppText variant="bodySmall"> {item.pickupTime} </AppText>
                                 </View>
                             </View>
@@ -291,7 +291,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                     )
                                 }
                             >
-                                <AppText variant="label" style={styles.modifyText} >
+                                <AppText variant="bodyBold" style={styles.modifyText} >
                                     {item.driverName ? 'Modify Driver' : 'Add Driver'}
                                 </AppText>
                             </Pressable>
@@ -331,7 +331,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                             <View style={styles.driverAssignedRow} >
                                                 <AppText variant="bodySmall">
                                                     Driver to be assigned:{' '}
-                                                    <AppText variant="label">
+                                                    <AppText variant="bodyBold">
                                                         {
                                                             drivers.find(
                                                                 d => d.id === selectedDriver[item.id]
@@ -360,7 +360,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                             style={styles.saveBtn}
                                             onPress={() => assignDriver(item.id)}
                                         >
-                                            <AppText variant="label" style={styles.saveBtnText}> Save Driver </AppText>
+                                            <AppText variant="bodyBold" style={styles.saveBtnText}> Save Driver </AppText>
                                         </Pressable>
                                     </View>
                                 )
@@ -376,7 +376,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                         onPress={() => makeCall(item.restaurantPhone)}
                                     >
                                         <Ionicons name="call-outline" size={normalize(18)} color={palette.white} />
-                                        <AppText variant="label" style={styles.iconText} > Call </AppText>
+                                        <AppText variant="bodyBold" style={styles.iconText} > Call </AppText>
                                     </Pressable>
 
                                     <Pressable
@@ -384,7 +384,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                         onPress={() => sendMessage(item.restaurantPhone)}
                                     >
                                         <Ionicons name="chatbubble-outline" size={normalize(18)} color={palette.white} />
-                                        <AppText variant="label" style={styles.iconText} > Message </AppText>
+                                        <AppText variant="bodyBold" style={styles.iconText} > Message </AppText>
                                     </Pressable>
                                 </View>
                             </View>
@@ -400,7 +400,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                                 onPress={() => makeCall(item.driverPhone)}
                                             >
                                                 <Ionicons name="call-outline" size={normalize(18)} color={palette.white} />
-                                                <AppText variant="label" style={styles.iconText} > Call </AppText>
+                                                <AppText variant="bodyBold" style={styles.iconText} > Call </AppText>
                                             </Pressable>
 
                                             <Pressable
@@ -408,7 +408,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                                 onPress={() => sendMessage(item.driverPhone)}
                                             >
                                                 <Ionicons name="chatbubble-outline" size={normalize(18)} color={palette.white} />
-                                                <AppText variant="label" style={styles.iconText} > Message </AppText>
+                                                <AppText variant="bodyBold" style={styles.iconText} > Message </AppText>
                                             </Pressable>
                                         </View>
                                     </View>
@@ -455,7 +455,7 @@ export default function CharityPickupScreen({ navigation, }: any) {
                                     key={idx}
                                     style={styles.modalItemRow}
                                 >
-                                    <AppText variant="label" style={{ flex: 2, }} >
+                                    <AppText variant="bodyBold" style={{ flex: 2, }} >
                                         {item.name}
                                     </AppText>
 

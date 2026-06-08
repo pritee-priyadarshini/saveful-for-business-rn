@@ -205,14 +205,14 @@ export function DriverDeliveriesScreen() {
                 </View>
 
                 <View style={styles.distancePill}>
-                    <AppText variant="label">📍 {item.distance}</AppText>
+                    <AppText variant="bodyBold">📍 {item.distance}</AppText>
                 </View>
             </View>
 
             {/* INLINE */}
             <View style={styles.inlineRow}>
                 <View style={styles.inlineCard}>
-                    <AppText variant="label">Items</AppText>
+                    <AppText variant="bodyBold">Items</AppText>
                     <Button
                         label="View"
                         style={{
@@ -231,12 +231,12 @@ export function DriverDeliveriesScreen() {
                 </View>
 
                 <View style={styles.inlineCard}>
-                    <AppText variant="label">Date</AppText>
+                    <AppText variant="bodyBold">Date</AppText>
                     <AppText variant="bodySmall" style={{ marginTop: 10 }}>{item.date}</AppText>
                 </View>
 
                 <View style={styles.inlineCard}>
-                    <AppText variant="label">Time</AppText>
+                    <AppText variant="bodyBold">Time</AppText>
                     <AppText variant="bodySmall" style={{ marginTop: 6 }}>{item.time}</AppText>
                 </View>
             </View>

@@ -162,7 +162,7 @@ export function CharityMapScreen({ navigation }: any) {
         style={styles.pickupBtn}
         onPress={() => navigation.navigate('CharityPickup')}
       >
-        <AppText variant="label" style={styles.pickupBtnText} >
+        <AppText variant="bodyBold" style={styles.pickupBtnText} >
           View Your Pickups
         </AppText>
       </Pressable>

@@ -187,7 +187,7 @@ export default function MultiCharityManageSitesScreen() {
                                 }
                             }}
                         >
-                            <AppText variant="label" style={styles.actionText}>
+                            <AppText variant="bodyBold" style={styles.actionText}>
                                 {item.label}
                             </AppText>
                         </Pressable>
@@ -225,7 +225,7 @@ export default function MultiCharityManageSitesScreen() {
                                 />
 
                                 <View style={{ flex: 1 }}>
-                                    <AppText variant="label" style={styles.siteName}>
+                                    <AppText variant="bodyBold" style={styles.siteName}>
                                         {site.tradingName}
                                     </AppText>
 
@@ -249,7 +249,7 @@ export default function MultiCharityManageSitesScreen() {
                                         setExpandedSite(expandedSite === site.id ? null : site.id);
                                     }}
                                 >
-                                    <AppText variant="label" style={styles.viewText}>
+                                    <AppText variant="bodyBold" style={styles.viewText}>
                                         View
                                     </AppText>
                                 </Pressable>
@@ -290,7 +290,7 @@ export default function MultiCharityManageSitesScreen() {
                                         }
                                     }}
                                 >
-                                    <AppText variant="label" style={{ color: 'white' }} >
+                                    <AppText variant="bodyBold" style={{ color: 'white' }} >
                                         Edit
                                     </AppText>
                                 </Pressable>
@@ -324,7 +324,7 @@ export default function MultiCharityManageSitesScreen() {
                                                 key={field.key}
                                                 style={{ marginBottom: hp(1.2) }}
                                             >
-                                                <AppText variant="label">
+                                                <AppText variant="bodyBold">
                                                     {field.label}
                                                 </AppText>
 
@@ -379,7 +379,7 @@ export default function MultiCharityManageSitesScreen() {
                                                 }
                                             }}
                                         >
-                                            <AppText variant="label" style={{ color: 'white' }} >
+                                            <AppText variant="bodyBold" style={{ color: 'white' }} >
                                                 Save
                                             </AppText>
                                         </Pressable>
@@ -424,27 +424,27 @@ export default function MultiCharityManageSitesScreen() {
                                                 );
                                             }}
                                         >
-                                            <AppText variant="label" style={{ color: 'white' }} >
+                                            <AppText variant="bodyBold" style={{ color: 'white' }} >
                                                 Delete Location
                                             </AppText>
                                         </Pressable>
                                     </>
                                 ) : (
                                     <>
-                                        <AppText variant="label">
+                                        <AppText variant="bodyBold">
                                             Manager: {site.contactName}
                                         </AppText>
 
-                                        <AppText variant="label">
+                                        <AppText variant="bodyBold">
                                             Email: {site.email}
                                         </AppText>
 
-                                        <AppText variant="label">
+                                        <AppText variant="bodyBold">
                                             Mobile: {site.mobile}
                                         </AppText>
 
                                         {!!site.radiusKm && (
-                                            <AppText variant="label">
+                                            <AppText variant="bodyBold">
                                                 Pickup Radius: {site.radiusKm} km
                                             </AppText>
                                         )}
@@ -468,7 +468,7 @@ export default function MultiCharityManageSitesScreen() {
                                                     )
                                                 }
                                             >
-                                                <AppText variant="label" style={{ color: 'white' }} >
+                                                <AppText variant="bodyBold" style={{ color: 'white' }} >
                                                     Assign Manager
                                                 </AppText>
                                             </Pressable>
@@ -547,7 +547,7 @@ export default function MultiCharityManageSitesScreen() {
                                                     );
                                                 }}
                                             >
-                                                <AppText variant="label" style={{ color: 'white' }} >
+                                                <AppText variant="bodyBold" style={{ color: 'white' }} >
                                                     Remove Manager
                                                 </AppText>
                                             </Pressable>
@@ -565,7 +565,7 @@ export default function MultiCharityManageSitesScreen() {
                 <View style={styles.bottomActions}>
 
                     <Pressable style={styles.logoutBtn} onPress={logout}>
-                        <AppText variant="label" style={{ color: palette.black }}>
+                        <AppText variant="bodyBold" style={{ color: palette.black }}>
                             Logout
                         </AppText>
                     </Pressable>
@@ -587,7 +587,7 @@ export default function MultiCharityManageSitesScreen() {
                             )
                         }
                     >
-                        <AppText variant="label" style={{ color: palette.black }}>
+                        <AppText variant="bodyBold" style={{ color: palette.black }}>
                             Delete My Account
                         </AppText>
                     </Pressable>
