@@ -17,7 +17,6 @@ import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
 import SiteAnalyticsScreen from '@/screens/restaurant/SiteAnalyticsScreen';
 import AdminProfileScreen from '@/screens/restaurant/AdminProfileScreen';
 import { CalculationScreen } from '@/screens/shared/CalculationScreen';
-import { DriverTabs } from './DriverTabs';
 import MultiCharityManageSitesScreen from '@/screens/charity/MultiCharityManageSitesScreen';
 import CreateCharitySiteScreen from '@/screens/charity/CreateCharitySiteScreen';
 import CharitySiteAnalyticsScreen from '@/screens/charity/CharitySiteAnalyticsScreen';

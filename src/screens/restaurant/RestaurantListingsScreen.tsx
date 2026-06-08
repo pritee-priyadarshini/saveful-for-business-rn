@@ -177,7 +177,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
         <Pressable
           style={styles.createBtn}
           onPress={() =>
-            navigation.navigate('CreateListing')
+            navigation.navigate('Surplus')
           }
         >
           <AppText variant='bodyBold' style={styles.createText}>
