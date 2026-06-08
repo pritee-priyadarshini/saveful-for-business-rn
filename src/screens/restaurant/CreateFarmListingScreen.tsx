@@ -8,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -19,7 +20,6 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
-import { estimateMealsSaved, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -29,13 +29,36 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
+const STORAGE_COLS = 4;
+const CONTAMINANT_COLS = 3;
+const PAGE_H_PAD_PERCENT = 4.2;
+const GRID_GAP_PERCENT = 1.2;
+
+const getGridLayout = (winWidth: number) => {
+  const pagePad = (winWidth * PAGE_H_PAD_PERCENT) / 100 * 2;
+  const gap = Math.round((winWidth * GRID_GAP_PERCENT) / 100);
+  const border = Math.round((winWidth / 375) * 2);
+  const contentW = winWidth - pagePad;
+  const colWidth = (cols: number) =>
+    Math.floor((contentW - gap * (cols - 1)) / cols) - border;
+  return {
+    gap,
+    storageWidth: colWidth(STORAGE_COLS),
+    contaminantWidth: colWidth(CONTAMINANT_COLS),
+  };
+};
+
+// Farm accent colour – orange
+const FARM_ACCENT = palette.orange;
+const FARM_BG = palette.surface;
+
 type Step = 1 | 2 | 3;
 type PickerTarget = 'bestBefore' | 'from' | 'to' | null;
 
-type FoodItem = {
+type FarmItem = {
   name: string;
   qty: number;
-  iconKey: FoodIconKey;
+  icon: any;
 };
 
 const stepMeta = [
@@ -44,42 +67,33 @@ const stepMeta = [
   { id: 3 as Step, title: 'Confirm\nListing' },
 ];
 
-const seedItems: FoodItem[] = [
-  { name: 'Prepared meals', qty: 0, iconKey: 'preparedMeals' },
-  { name: 'Bread', qty: 0, iconKey: 'bread' },
-  { name: 'Baked Goods', qty: 0, iconKey: 'bakedGoods' },
-  { name: 'Fresh fruit & veg', qty: 0, iconKey: 'fruitVeg' },
-  { name: 'Meat', qty: 0, iconKey: 'meat' },
-  { name: 'Dairy', qty: 0, iconKey: 'dairy' },
+const seedItems: FarmItem[] = [
+  { name: 'Baked goods',              qty: 0, icon: require('../../../assets/placeholder/bread_icon.png') },
+  { name: 'Fruit & veg',              qty: 0, icon: require('../../../assets/placeholder/fruit&veg_icon.png') },
+  { name: 'Grain / cereal',           qty: 0, icon: require('../../../assets/placeholder/baked_goods_icon.png') },
+  { name: 'Dairy',                    qty: 0, icon: require('../../../assets/placeholder/milk_icon.png') },
+  { name: 'Food scraps – no meat',    qty: 0, icon: require('../../../assets/placeholder/veggie_basket.png') },
+  { name: 'Food scraps – with meat',  qty: 0, icon: require('../../../assets/placeholder/meat_icon.png') },
 ];
 
-const ALLERGEN_OPTIONS = [
-  'Gluten',
-  'Dairy',
-  'Eggs',
-  'Fish',
-  'Shellfish',
-  'Peanuts',
-  'Tree nuts',
-  'Soy',
-  'Sesame',
-  'Mustard',
-  'Celery',
-  'Lupin',
-  'Molluscs',
-  'Sulphites',
-];
+const STORAGE_OPTIONS = [
+  { label: 'Fridge',     icon: require('../../../assets/placeholder/fridge_icon.png'),        useImage: true },
+  { label: 'Freezer',    icon: require('../../../assets/placeholder/freezer_icon.png'),       useImage: true },
+  { label: 'Ambient',    icon: require('../../../assets/placeholder/ambient_temp_icon.png'), useImage: true },
+  { label: 'Dry storage', ionIcon: 'sunny-outline',    useImage: false },
+  { label: 'Boxed',       ionIcon: 'cube-outline',     useImage: false },
+  { label: 'Bulk Bin',    ionIcon: 'trash-outline',   useImage: false },
+  { label: 'Pallet',      ionIcon: 'layers-outline',   useImage: false },
+  { label: 'Other',       ionIcon: 'ellipsis-horizontal-outline', useImage: false },
+] as const;
 
-const storageOptions: ReadonlyArray<{ label: 'Fridge' | 'Freezer' | 'Ambient'; icon: any }> = [
-  { label: 'Fridge', icon: require('../../../assets/placeholder/fridge_icon.png') },
-  { label: 'Freezer', icon: require('../../../assets/placeholder/freezer_icon.png') },
-  { label: 'Ambient', icon: require('../../../assets/placeholder/ambient_temp_icon.png') },
-];
-
-const reheatingOptions: ReadonlyArray<{ label: 'Yes' | 'No' | 'Not sure'; icon?: any }> = [
-  { label: 'Yes', icon: require('../../../assets/placeholder/heating_icon.png') },
-  { label: 'No', icon: require('../../../assets/placeholder/no_heating_icon.png') },
-  { label: 'Not sure' },
+const CONTAMINANT_OPTIONS = [
+  'Contains Packaging',
+  'Contains meat/bone',
+  'Contains plastic risk',
+  'Mixed materials',
+  'Contains Dairy',
+  'Other (please specify)',
 ];
 
 const formatDate = (date: Date | null) => {
@@ -97,12 +111,15 @@ const formatTime = (date: Date | null) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
-export function CreateListingScreen({ navigation }: any) {
+export function CreateFarmListingScreen({ navigation }: any) {
+  const { width: winWidth } = useWindowDimensions();
+  const gridLayout = useMemo(() => getGridLayout(winWidth), [winWidth]);
+
   const { currentProfile, authUser } = useAppContext();
   const siteId = authUser?.profile?.sites?.[0]?.id || authUser?.profile?.site?.id || null;
 
   const [step, setStep] = useState<Step>(1);
-  const [items, setItems] = useState<FoodItem[]>(seedItems);
+  const [items, setItems] = useState<FarmItem[]>(seedItems);
   const [customItem, setCustomItem] = useState('');
   const [images, setImages] = useState<string[]>([]);
 
@@ -111,9 +128,8 @@ export function CreateListingScreen({ navigation }: any) {
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
   const [pickupToDate, setPickupToDate] = useState<Date | null>(null);
 
-  const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient'>('Freezer');
-  const [reheating, setReheating] = useState<'Yes' | 'No' | 'Not sure'>('No');
-  const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
+  const [selectedStorage, setSelectedStorage] = useState<string[]>([]);
+  const [selectedContaminants, setSelectedContaminants] = useState<string[]>([]);
   const [confirmedSafe, setConfirmedSafe] = useState(false);
 
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -123,9 +139,15 @@ export function CreateListingScreen({ navigation }: any) {
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
-  const estimatedMeals = estimateMealsSaved(totalQuantity);
   const estimatedCO2 = Math.max(0, Math.round(totalQuantity * 4));
-  const hasSelectedAllergens = selectedAllergens.length > 0;
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+
+  const handleBack = () => {
+    if (step === 3) { setStep(2); return; }
+    if (step === 2) { setStep(1); return; }
+    navigation.goBack();
+  };
 
   const updateQty = (index: number, delta: number) => {
     setItems((prev) => {
@@ -140,21 +162,23 @@ export function CreateListingScreen({ navigation }: any) {
 
   const addCustomItem = () => {
     if (!customItem.trim()) return;
-    setItems((prev) => [...prev, { name: customItem.trim(), qty: 0, iconKey: 'preparedMeals' }]);
+    setItems((prev) => [
+      ...prev,
+      { name: customItem.trim(), qty: 0, icon: require('../../../assets/placeholder/veggie_basket.png') },
+    ]);
     setCustomItem('');
   };
 
-  const toggleAllergen = (allergen: string) => {
-    setSelectedAllergens((prev) => (
-      prev.includes(allergen)
-        ? prev.filter((entry) => entry !== allergen)
-        : [...prev, allergen]
-    ));
-  };
+  const toggleStorage = (label: string) =>
+    setSelectedStorage((prev) =>
+      prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label],
+    );
 
-  const selectAllAllergens = () => setSelectedAllergens([...ALLERGEN_OPTIONS]);
+  const toggleContaminant = (label: string) =>
+    setSelectedContaminants((prev) =>
+      prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label],
+    );
 
-  const clearAllergens = () => setSelectedAllergens([]);
 
   const pickFromGallery = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -162,9 +186,8 @@ export function CreateListingScreen({ navigation }: any) {
       quality: 0.75,
       allowsMultipleSelection: true,
     });
-
     if (!res.canceled) {
-      setImages((prev) => [...prev, ...res.assets.map((item) => item.uri)]);
+      setImages((prev) => [...prev, ...res.assets.map((a) => a.uri)]);
     }
   };
 
@@ -179,13 +202,14 @@ export function CreateListingScreen({ navigation }: any) {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+
   const openDatePicker = (target: Exclude<PickerTarget, null>) => {
     const initial =
       target === 'bestBefore'
         ? bestBeforeDate || new Date()
         : target === 'from'
-          ? pickupFromDate || new Date()
-          : pickupToDate || new Date();
+        ? pickupFromDate || new Date()
+        : pickupToDate || new Date();
 
     setPickerTarget(target);
     setPickerValue(initial);
@@ -195,7 +219,6 @@ export function CreateListingScreen({ navigation }: any) {
       setPickerVisible(true);
       return;
     }
-
     setPickerMode('date');
     setPickerVisible(true);
   };
@@ -208,42 +231,34 @@ export function CreateListingScreen({ navigation }: any) {
 
   const onNativePickerChange = (event: any, selectedDate?: Date) => {
     if (!pickerTarget) return;
-
     if (Platform.OS === 'ios') {
       if (selectedDate) setPickerValue(selectedDate);
       return;
     }
-
     setPickerVisible(false);
-
     if (event.type === 'dismissed' || !selectedDate) {
       setPickerTarget(null);
       return;
     }
-
     if (pickerTarget === 'bestBefore') {
       applySelectedDate('bestBefore', selectedDate);
       setPickerTarget(null);
       return;
     }
-
     if (pickerMode === 'date') {
       const datePart = new Date(selectedDate);
-      const timePart = pickerTarget === 'from' ? pickupFromDate || new Date() : pickupToDate || new Date();
-
+      const timePart =
+        pickerTarget === 'from' ? pickupFromDate || new Date() : pickupToDate || new Date();
       datePart.setHours(timePart.getHours());
       datePart.setMinutes(timePart.getMinutes());
-
       setPickerValue(datePart);
       setPickerMode('time');
       setTimeout(() => setPickerVisible(true), 120);
       return;
     }
-
     const finalDate = new Date(pickerValue);
     finalDate.setHours(selectedDate.getHours());
     finalDate.setMinutes(selectedDate.getMinutes());
-
     applySelectedDate(pickerTarget, finalDate);
     setPickerMode('date');
     setPickerTarget(null);
@@ -251,7 +266,6 @@ export function CreateListingScreen({ navigation }: any) {
 
   const confirmIOSPicker = () => {
     if (!pickerTarget) return;
-
     applySelectedDate(pickerTarget, pickerValue);
     setPickerVisible(false);
     setPickerTarget(null);
@@ -265,51 +279,29 @@ export function CreateListingScreen({ navigation }: any) {
   };
 
   const handleContinue = () => {
-    if (step === 1) {
-      setStep(2);
-      return;
-    }
-
-    if (step === 2) setStep(3);
-  };
-
-  const handleBack = () => {
-    if (step === 3) {
-      setStep(2);
-      return;
-    }
-
-    if (step === 2) {
-      setStep(1);
-      return;
-    }
-
-    navigation.goBack();
+    if (step === 1) { setStep(2); return; }
+    if (step === 2) { setStep(3); }
   };
 
   const handleCreateListing = async () => {
     if (!confirmedSafe) {
-      Alert.alert('Confirmation required', 'Please confirm this food is safe for donation.');
+      Alert.alert('Confirmation required', 'Please confirm this material is for livestock/agricultural use.');
       return;
     }
-
     if (!siteId) {
       Alert.alert('Site not found', 'Please set up your site first.');
       return;
     }
-
     if (activeItems.length === 0) {
       Alert.alert('Food details missing', 'Add at least one food item quantity.');
       setStep(1);
       return;
     }
-
     if (!bestBeforeDate || !pickupFromDate || !pickupToDate) {
       Alert.alert('Missing dates', 'Please set best before and pickup window.');
       setStep(2);
       return;
     }
-
     if (pickupToDate <= pickupFromDate) {
       Alert.alert('Invalid window', 'Pickup end time must be after pickup start time.');
       setStep(2);
@@ -328,55 +320,60 @@ export function CreateListingScreen({ navigation }: any) {
         bestBefore: bestBeforeDate.toISOString(),
         pickupFromTime: pickupFromDate.toISOString(),
         pickupByTime: pickupToDate.toISOString(),
-        needsRefrigeration: storage === 'Fridge',
-        needsReheating: reheating === 'Yes',
-        containsAllergens: hasSelectedAllergens,
+        needsRefrigeration: selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
+        isSafeForDonation: false,
+        containsAllergens: selectedContaminants.length > 0,
       };
 
       const response = await foodListingService.createListing(payload);
-      navigation.navigate('ListingConfirmation', {
+      navigation.navigate('FarmListingConfirmation', {
         listing: {
           ...(response.data as any),
           foodItems: activeItems.map((item) => ({
             category: item.name,
             totalQtyKg: item.qty,
             remainingQtyKg: item.qty,
-            iconKey: item.iconKey,
           })),
-          allergens: selectedAllergens,
+          storage: selectedStorage,
+          contaminants: selectedContaminants,
+          totalQtyKg: totalQuantity,
         },
       });
     } catch (error: any) {
-      Alert.alert('Could not create listing', error?.response?.data?.message || 'Please try again.');
+      Alert.alert(
+        'Could not create listing',
+        error?.response?.data?.message || 'Please try again.',
+      );
     }
   };
 
   return (
-    <Screen backgroundColor="#F2F5E9" scrollable contentStyle={styles.screenContent}>
+    <Screen backgroundColor={FARM_BG} scrollable contentStyle={styles.screenContent}>
       <View style={styles.pageWrap}>
+
         <View style={styles.topPanel}>
           <Pressable onPress={handleBack} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={normalize(20)} color={palette.kale} />
+            <Ionicons name="arrow-back" size={normalize(20)} color={FARM_ACCENT} />
           </Pressable>
 
           <Image
-            source={require('../../../assets/placeholder/people_icon.png')}
-            style={styles.peopleIcon}
+            source={require('../../../assets/placeholder/livestock.png')}
+            style={styles.topIcon}
             resizeMode="contain"
           />
 
           <AppText variant="h5" color={palette.black} style={styles.topTitle}>
-            Surplus for people
+            Surplus for Livestock
           </AppText>
           <AppText variant="body1" color={palette.midgray} style={styles.topSubtitle}>
-            Helping good food go further
+            List food not suitable for humans to be used as animal feed
           </AppText>
 
+          {/* STEPPER */}
           <View style={styles.stepperRow}>
             {stepMeta.map((entry, index) => {
               const isActive = step === entry.id;
               const isDone = step > entry.id;
-
               return (
                 <React.Fragment key={entry.id}>
                   <Pressable
@@ -402,7 +399,12 @@ export function CreateListingScreen({ navigation }: any) {
 
           <View style={styles.stepTitlesRow}>
             {stepMeta.map((entry) => (
-              <AppText key={entry.id} variant="bodyBold" color={palette.black} style={styles.stepLabel}>
+              <AppText
+                key={entry.id}
+                variant="bodyBold"
+                color={palette.black}
+                style={styles.stepLabel}
+              >
                 {entry.title}
               </AppText>
             ))}
@@ -411,6 +413,7 @@ export function CreateListingScreen({ navigation }: any) {
 
         {step === 1 ? (
           <View style={styles.stepWrap}>
+            {/* Same as yesterday card */}
             <View style={styles.relistCard}>
               <AppText variant="bodyBold" color={palette.midgray}>
                 Same as yesterday?
@@ -423,13 +426,14 @@ export function CreateListingScreen({ navigation }: any) {
               </Pressable>
             </View>
 
+            {/* Food items */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               WHAT FOOD DO YOU HAVE?
             </AppText>
             <View style={styles.card}>
               <View style={styles.kgHeaderRow}>
                 <View style={styles.foodNameColumn} />
-                <AppText variant="body1" color={palette.stone} style={{marginRight: wp(8)}}>
+                <AppText variant="body1" color={palette.stone} style={{ marginRight: wp(8) }}>
                   KG
                 </AppText>
               </View>
@@ -437,27 +441,20 @@ export function CreateListingScreen({ navigation }: any) {
               {items.map((item, index) => (
                 <View key={`${item.name}-${index}`} style={styles.foodRow}>
                   <View style={styles.foodNameWrap}>
-                    <Image source={resolveFoodIconSource(item.iconKey)} style={styles.foodIcon} />
-                    <AppText variant="body1" color={palette.midgray} style={styles.foodLabel}>
+                    <Image source={item.icon} style={styles.foodIcon} />
+                    <AppText variant="body1" color={palette.midgray} style={styles.foodLabel} numberOfLines={2}>
                       {item.name}
                     </AppText>
                   </View>
-
                   <View style={styles.qtyWrap}>
                     <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, -0.5)}>
-                      <AppText variant="bodyBold" color={palette.stone}>
-                        -
-                      </AppText>
+                      <AppText variant="bodyBold" color={palette.stone}>-</AppText>
                     </Pressable>
-
                     <AppText variant="bodyBold" color={palette.midgray} style={styles.qtyValue}>
                       {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
                     </AppText>
-
                     <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, 0.5)}>
-                      <AppText variant="bodyBold" color={palette.stone}>
-                        +
-                      </AppText>
+                      <AppText variant="bodyBold" color={palette.stone}>+</AppText>
                     </Pressable>
                   </View>
                 </View>
@@ -472,36 +469,32 @@ export function CreateListingScreen({ navigation }: any) {
                   style={styles.addInput}
                 />
                 <Pressable style={styles.addBtn} onPress={addCustomItem}>
-                  <AppText variant="bodyBold" color={palette.white}>
-                    +
-                  </AppText>
+                  <AppText variant="bodyBold" color={palette.white}>+</AppText>
                 </Pressable>
               </View>
             </View>
 
+            {/* Total quantity */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               QUANTITY (KG)
             </AppText>
             <View style={styles.card}>
               <View style={styles.quantityPill}>
-                <AppText variant="h2" color={palette.black}>
-                  {totalQuantity} KG
-                </AppText>
+                <AppText variant="h2" color={palette.black}>{totalQuantity} KG</AppText>
               </View>
               <AppText variant="caption" color={palette.stone} style={styles.helperText}>
                 ESTIMATE TOTAL WEIGHT OF SURPLUS FOOD
               </AppText>
             </View>
 
+            {/* Photos */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               ADD PHOTO (OPTIONAL)
             </AppText>
             <View style={styles.card}>
               {images.length === 0 ? (
                 <Pressable style={styles.photoPlaceholder} onPress={pickFromGallery}>
-                  <AppText variant="h7" color={palette.stone}>
-                    +
-                  </AppText>
+                  <AppText variant="h7" color={palette.stone}>+</AppText>
                 </Pressable>
               ) : (
                 <View style={styles.photoGrid}>
@@ -515,29 +508,21 @@ export function CreateListingScreen({ navigation }: any) {
                   ))}
                 </View>
               )}
-
               <View style={styles.photoStatsWrap}>
                 <AppText variant="bodySmall" color={palette.stone}>
                   {images.length} photo(s) selected
                 </AppText>
               </View>
-
               <View style={styles.photoButtonRow}>
                 <Pressable style={styles.secondaryBtn} onPress={pickFromGallery}>
-                  <AppText variant="bodyBold" color={palette.stone}>
-                    Gallery
-                  </AppText>
+                  <AppText variant="bodyBold" color={palette.stone}>Gallery</AppText>
                 </Pressable>
-
                 <Pressable style={styles.primaryBtn} onPress={pickFromCamera}>
-                  <AppText variant="bodyBold" color={palette.white}>
-                    Camera
-                  </AppText>
+                  <AppText variant="bodyBold" color={palette.white}>Camera</AppText>
                 </Pressable>
               </View>
-
               <AppText variant="caption" color={palette.stone} style={styles.helperText}>
-                PHOTOS HELP CHARITIES PLAN COLLECTIONS
+                PHOTOS HELP FARMERS PLAN COLLECTIONS
               </AppText>
             </View>
           </View>
@@ -545,6 +530,7 @@ export function CreateListingScreen({ navigation }: any) {
 
         {step === 2 ? (
           <View style={styles.stepWrap}>
+            {/* Pickup location */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               PICKUP LOCATION
             </AppText>
@@ -560,162 +546,160 @@ export function CreateListingScreen({ navigation }: any) {
               </View>
             </View>
 
+            {/* Best before */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               FOOD BEST BEFORE
             </AppText>
             <Pressable style={styles.selectorRow} onPress={() => openDatePicker('bestBefore')}>
-              <Ionicons name="calendar-outline" size={normalize(20)} color={palette.kale} />
+              <Ionicons name="calendar-outline" size={normalize(20)} color={FARM_ACCENT} />
               <AppText variant="bodyBold" color={palette.midgray}>
                 {formatDate(bestBeforeDate)}
               </AppText>
             </Pressable>
 
+            {/* Pickup window */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               PICKUP WINDOW
             </AppText>
             <View style={styles.windowRow}>
               <Pressable style={styles.windowBox} onPress={() => openDatePicker('from')}>
-                <AppText variant="caption" color={palette.stone}>
-                  FROM
-                </AppText>
+                <AppText variant="caption" color={palette.stone}>FROM</AppText>
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.windowValue}>
-                  {formatDateShort(pickupFromDate)}{`\n`}{formatTime(pickupFromDate)}
+                  {formatDateShort(pickupFromDate)}{'\n'}{formatTime(pickupFromDate)}
                 </AppText>
               </Pressable>
-
               <Pressable style={styles.windowBox} onPress={() => openDatePicker('to')}>
-                <AppText variant="caption" color={palette.stone}>
-                  TO
-                </AppText>
+                <AppText variant="caption" color={palette.stone}>TO</AppText>
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.windowValue}>
-                  {formatDateShort(pickupToDate)}{`\n`}{formatTime(pickupToDate)}
+                  {formatDateShort(pickupToDate)}{'\n'}{formatTime(pickupToDate)}
                 </AppText>
               </Pressable>
             </View>
 
+            {/* Storage / Handling – multi-select */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
-              STORAGE REQUIREMENTS
+              STORAGE / HANDLING
             </AppText>
-            <View style={styles.chipRow}>
-              {storageOptions.map((option) => {
-                const active = storage === option.label;
+            <View style={styles.chipGrid}>
+              {STORAGE_OPTIONS.map((option, index) => {
+                const active = selectedStorage.includes(option.label);
+                const showIcon = option.useImage || option.label !== 'Other';
+                const isLastInRow = index % STORAGE_COLS === STORAGE_COLS - 1;
                 return (
                   <Pressable
                     key={option.label}
-                    onPress={() => setStorage(option.label)}
-                    style={[styles.choiceChip, active && styles.choiceChipActive]}
+                    onPress={() => toggleStorage(option.label)}
+                    style={[
+                      styles.gridChip,
+                      styles.storageChip,
+                      {
+                        width: gridLayout.storageWidth,
+                        marginRight: isLastInRow ? 0 : gridLayout.gap,
+                        marginBottom: gridLayout.gap,
+                        flexShrink: 0,
+                      },
+                      active && styles.gridChipActive,
+                    ]}
                   >
-                    <Image
-                      source={option.icon}
-                      style={{ width: normalize(18), height: normalize(18)}}
-                    />
-                    <AppText variant="bodyBold" color={active ? palette.kale : palette.stone}>
-                      {option.label}
-                    </AppText>
-                    {active ? <Ionicons name="checkmark-circle" size={normalize(15)} color={palette.kale} /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
-              REHEATING REQUIRED?
-            </AppText>
-            <View style={styles.chipRow}>
-              {reheatingOptions.map((option) => {
-                const active = reheating === option.label;
-                return (
-                  <Pressable
-                    key={option.label}
-                    onPress={() => setReheating(option.label)}
-                    style={[styles.choiceChip, active && styles.choiceChipActive]}
-                  >
-                    {option.icon ? (
-                      <Image
-                        source={option.icon}
-                        style={{ width: normalize(18), height: normalize(18) }}
+                    {active ? (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={normalize(12)}
+                        color={FARM_ACCENT}
+                        style={styles.gridChipCheck}
                       />
-                    ) : (
-                      <Ionicons name={option.icon} size={normalize(18)} color={active ? palette.kale : palette.stone} />
-                    )}
-                    <AppText variant="bodyBold" color={active ? palette.kale : palette.stone}>
+                    ) : null}
+                    {showIcon ? (
+                      option.useImage ? (
+                        <Image
+                          source={(option as any).icon}
+                          style={styles.storageChipIcon}
+                        />
+                      ) : (
+                        <Ionicons
+                          name={(option as any).ionIcon}
+                          size={normalize(18)}
+                          color={active ? FARM_ACCENT : palette.stone}
+                        />
+                      )
+                    ) : null}
+                    <AppText
+                      variant="bodySmall"
+                      color={active ? FARM_ACCENT : palette.stone}
+                      style={styles.storageChipText}
+                      numberOfLines={2}
+                    >
                       {option.label}
                     </AppText>
-                    {active ? <Ionicons name="checkmark-circle" size={normalize(15)} color={palette.kale} /> : null}
                   </Pressable>
                 );
               })}
             </View>
 
+            {/* Possible contaminants – multi-select */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
-              ALLERGENS (OPTIONAL)
+              POSSIBLE CONTAMINANTS - SELECT ALL THAT APPLY
             </AppText>
-            <View style={styles.allergenCard}>
-              <View style={styles.allergenActionsRow}>
-                <Pressable style={styles.allergenActionBtn} onPress={selectAllAllergens}>
-                  <AppText variant="bodyBold" color={palette.kale}>
-                    Select all
-                  </AppText>
-                </Pressable>
-
-                <Pressable style={styles.allergenActionBtn} onPress={clearAllergens}>
-                  <AppText variant="bodyBold" color={palette.stone}>
-                    Clear
-                  </AppText>
-                </Pressable>
-              </View>
-
-              <View style={styles.allergenChipWrap}>
-                {ALLERGEN_OPTIONS.map((allergen) => {
-                  const active = selectedAllergens.includes(allergen);
-
-                  return (
-                    <Pressable
-                      key={allergen}
-                      onPress={() => toggleAllergen(allergen)}
-                      style={[styles.allergenChip, active && styles.allergenChipActive]}
+            <View style={styles.chipGrid}>
+              {CONTAMINANT_OPTIONS.map((label, index) => {
+                const active = selectedContaminants.includes(label);
+                const isLastInRow = index % CONTAMINANT_COLS === CONTAMINANT_COLS - 1;
+                return (
+                  <Pressable
+                    key={label}
+                    onPress={() => toggleContaminant(label)}
+                    style={[
+                      styles.gridChip,
+                      styles.contaminantChip,
+                      {
+                        width: gridLayout.contaminantWidth,
+                        marginRight: isLastInRow ? 0 : gridLayout.gap,
+                        marginBottom: gridLayout.gap,
+                        flexShrink: 0,
+                      },
+                      active && styles.gridChipActive,
+                    ]}
+                  >
+                    {active ? (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={normalize(12)}
+                        color={FARM_ACCENT}
+                        style={styles.gridChipCheck}
+                      />
+                    ) : null}
+                    <AppText
+                      variant="bodyBold"
+                      color={active ? FARM_ACCENT : palette.stone}
+                      style={styles.contaminantChipText}
+                      numberOfLines={2}
                     >
-                      <AppText variant="bodySmall" color={active ? palette.kale : palette.stone}>
-                        {allergen}
-                      </AppText>
-                      {active ? <Ionicons name="checkmark-circle" size={normalize(14)} color={palette.kale} /> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <View style={styles.allergenSummaryRow}>
-                <Image
-                  source={require('../../../assets/placeholder/allergen_icon.png')}
-                  style={styles.allergenSummaryIcon}
-                />
-                <AppText variant="bodyBold" color={palette.midgray} style={styles.allergenSummaryText}>
-                  {hasSelectedAllergens ? selectedAllergens.join(', ') : 'No allergens selected'}
-                </AppText>
-              </View>
+                      {label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         ) : null}
 
+        {/* ── STEP 3: CONFIRM LISTING ───────────────────────────────────────── */}
         {step === 3 ? (
           <View style={styles.stepWrap}>
+            {/* Food summary */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               FOOD SUMMARY
             </AppText>
             <View style={styles.card}>
               <View style={styles.summaryHeadRow}>
-                <AppText variant="bodyBold" color={palette.stone}>
-                  ITEM NAME
-                </AppText>
-                <AppText variant="bodyBold" color={palette.stone}>
-                  AVAILABLE
-                </AppText>
+                <AppText variant="bodyBold" color={palette.stone}>ITEM NAME</AppText>
+                <AppText variant="bodyBold" color={palette.stone}>AVAILABLE</AppText>
               </View>
 
-              {(activeItems.length > 0 ? activeItems : items.slice(0, 4)).map((item, index) => (
+              {activeItems.map((item, index) => (
                 <View key={`${item.name}-${index}`} style={styles.summaryRow}>
                   <View style={styles.summaryItemNameWrap}>
-                    <Image source={resolveFoodIconSource(item.iconKey)} style={styles.summaryFoodIcon} />
+                    <Image source={item.icon} style={styles.summaryFoodIcon} />
                     <AppText variant="body1" color={palette.midgray} style={styles.summaryItemNameText}>
                       {item.name}
                     </AppText>
@@ -726,109 +710,132 @@ export function CreateListingScreen({ navigation }: any) {
                 </View>
               ))}
 
+              {activeItems.length === 0 ? (
+                <AppText variant="body1" color={palette.stone} style={{ textAlign: 'center', marginVertical: hp(1) }}>
+                  No items selected
+                </AppText>
+              ) : null}
+
               <AppText variant="bodyBold" color={palette.midgray} style={styles.totalQtyText}>
                 Total Quantity: {Math.max(totalQuantity, 0)} kg
               </AppText>
             </View>
 
+            {/* Collection summary */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               COLLECTION SUMMARY
             </AppText>
             <View style={styles.card}>
               <View style={styles.summaryInfoRow}>
-                <Ionicons name="location-outline" size={normalize(18)} color={palette.kale} />
+                <Ionicons name="location-outline" size={normalize(18)} color={FARM_ACCENT} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
                   {location || 'Address not provided'}
                 </AppText>
               </View>
 
               <View style={styles.summaryInfoRow}>
-                <Ionicons name="calendar-outline" size={normalize(18)} color={palette.kale} />
+                <Ionicons name="calendar-outline" size={normalize(18)} color={FARM_ACCENT} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
                   Best Before - {formatDate(bestBeforeDate)}
                 </AppText>
               </View>
 
               <View style={styles.summaryInfoRow}>
-                <Ionicons name="time-outline" size={normalize(18)} color={palette.kale} />
+                <Ionicons name="time-outline" size={normalize(18)} color={FARM_ACCENT} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  Pick up - {formatDateShort(pickupFromDate)} {formatTime(pickupFromDate)} to {formatDateShort(pickupToDate)} {formatTime(pickupToDate)}
+                  Pick up - {formatDateShort(pickupFromDate)} {formatTime(pickupFromDate)} to{' '}
+                  {formatDateShort(pickupToDate)} {formatTime(pickupToDate)}
                 </AppText>
               </View>
 
-              <View style={styles.summaryInfoRow}>
-                <Ionicons name="snow-outline" size={normalize(18)} color={palette.kale} />
-                <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  {storage}
-                </AppText>
-              </View>
+              {selectedStorage.length > 0 ? (
+                selectedStorage.map((s) => (
+                  <View key={s} style={styles.summaryInfoRow}>
+                    <Ionicons name="cube-outline" size={normalize(18)} color={FARM_ACCENT} />
+                    <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
+                      {s}
+                    </AppText>
+                  </View>
+                ))
+              ) : null}
 
-              <View style={styles.summaryInfoRow}>
-                <Ionicons name="flame-outline" size={normalize(18)} color={palette.kale} />
-                <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  Reheating - {reheating}
-                </AppText>
-              </View>
-
-              <View style={styles.summaryInfoRow}>
-                <Ionicons name="alert-circle-outline" size={normalize(18)} color={palette.kale} />
-                <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  Allergens - {hasSelectedAllergens ? selectedAllergens.join(', ') : 'None selected'}
-                </AppText>
-              </View>
+              {selectedContaminants.length > 0 ? (
+                <View style={styles.summaryInfoRow}>
+                  <Ionicons name="alert-circle-outline" size={normalize(18)} color={FARM_ACCENT} />
+                  <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
+                    {selectedContaminants.join(', ')}
+                  </AppText>
+                </View>
+              ) : null}
             </View>
 
+            {/* Confirmation checkbox */}
             <Pressable style={styles.confirmWrap} onPress={() => setConfirmedSafe((prev) => !prev)}>
               <View style={[styles.checkbox, confirmedSafe && styles.checkboxActive]}>
-                {confirmedSafe ? <Ionicons name="checkmark" size={normalize(15)} color={palette.white} /> : null}
+                {confirmedSafe ? (
+                  <Ionicons name="checkmark" size={normalize(15)} color={palette.white} />
+                ) : null}
               </View>
               <AppText variant="body1" color={palette.midgray} style={styles.confirmText}>
-                I confirm this food is safe for human consumption and suitable for charity donation. See Terms & Conditions
+                I confirm this material IS NOT suitable for human consumption and is only appropriate
+                for animal livestock feed or agricultural reuse. See Terms &amp; Conditions
               </AppText>
             </Pressable>
 
+            {/* Impact */}
             <View style={styles.impactCard}>
-              <AppText variant="h8" color={palette.success}>
+              <AppText variant="h8" color={FARM_ACCENT}>
                 Your Impact
               </AppText>
               <View style={styles.impactRow}>
                 <View style={styles.impactBlock}>
-                  <Ionicons name="restaurant-outline" size={normalize(18)} color={palette.success} />
-                  <AppText variant="h7" color={palette.success}>
-                    {Math.max(estimatedMeals, 0)}
-                  </AppText>
-                  <AppText variant="bodySmall" color={palette.success}>
-                    meals saved
-                  </AppText>
+                  <Ionicons name="leaf-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} />
+                  <View style={styles.impactBlockContent}>
+                    <AppText variant="h7" color={FARM_ACCENT} style={styles.impactValue}>
+                      {Math.max(totalQuantity, 0)}kg
+                    </AppText>
+                    <AppText variant="bodySmall" color={FARM_ACCENT} style={styles.impactLabel}>
+                      diverted from{'\n'}landfill
+                    </AppText>
+                  </View>
                 </View>
 
                 <View style={styles.impactBlock}>
-                  <Ionicons name="leaf-outline" size={normalize(18)} color={palette.success} />
-                  <AppText variant="h7" color={palette.success}>
-                    {Math.max(estimatedCO2, 0)}kg
-                  </AppText>
-                  <AppText variant="bodySmall" color={palette.success}>
-                    CO2 avoided
-                  </AppText>
+                  <Ionicons name="cloud-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} />
+                  <View style={styles.impactBlockContent}>
+                    <AppText variant="h7" color={FARM_ACCENT} style={styles.impactValue}>
+                      {Math.max(estimatedCO2, 0)}kg
+                    </AppText>
+                    <AppText variant="bodySmall" color={FARM_ACCENT} style={styles.impactLabel}>
+                      CO2 avoided
+                    </AppText>
+                  </View>
                 </View>
               </View>
-              <AppText variant="bodySmall" color={palette.success}>
-                42g = 1 meal
-              </AppText>
             </View>
           </View>
         ) : null}
 
-        <Pressable style={styles.bottomButton} onPress={step === 3 ? handleCreateListing : handleContinue}>
+        {/* BOTTOM BUTTON */}
+        <Pressable
+          style={styles.bottomButton}
+          onPress={step === 3 ? handleCreateListing : handleContinue}
+        >
           <AppText variant="bodyBold" color={palette.white}>
-            {step === 3 ? 'CREATE CHARITY LISTING' : 'CONTINUE'}
+            {step === 3 ? 'CREATE FARM LISTING' : 'CONTINUE'}
           </AppText>
           <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
         </Pressable>
       </View>
 
+      {/* iOS date picker modal */}
       {Platform.OS === 'ios' ? (
-        <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={closeIOSPicker}>
+        <Modal
+          visible={pickerVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={closeIOSPicker}
+        >
           <View style={styles.iosPickerOverlay}>
             <View style={styles.iosPickerCard}>
               <View style={styles.iosPickerActions}>
@@ -836,7 +843,7 @@ export function CreateListingScreen({ navigation }: any) {
                   <AppText variant="bodyBold" color={palette.stone}>Cancel</AppText>
                 </Pressable>
                 <Pressable onPress={confirmIOSPicker}>
-                  <AppText variant="bodyBold" color={palette.kale}>Done</AppText>
+                  <AppText variant="bodyBold" color={FARM_ACCENT}>Done</AppText>
                 </Pressable>
               </View>
               <DateTimePicker
@@ -851,6 +858,7 @@ export function CreateListingScreen({ navigation }: any) {
         </Modal>
       ) : null}
 
+      {/* Android date picker */}
       {Platform.OS === 'android' && pickerVisible ? (
         <DateTimePicker
           value={pickerValue}
@@ -868,7 +876,7 @@ const styles = StyleSheet.create({
   screenContent: {
     flexGrow: 1,
     paddingBottom: hp(2.2),
-    backgroundColor: '#F2F5E9',
+    backgroundColor: FARM_BG,
   },
   pageWrap: {
     alignSelf: 'center',
@@ -886,15 +894,17 @@ const styles = StyleSheet.create({
     height: normalize(34),
     borderRadius: normalize(17),
     borderWidth: normalize(1.5),
-    borderColor: '#B8C6B1',
-    backgroundColor: '#F8FBF3',
+    borderColor: '#F0C89A',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: hp(1),
     marginBottom: hp(0.3),
   },
-  peopleIcon: {
-    width: wp(20),
-    height: hp(10),
+  topIcon: {
+    width: wp(30),
+    height: hp(12),
+		marginTop: -hp(2),
+    marginBottom: -hp(1.5),
   },
   topTitle: {
     textAlign: 'center',
@@ -920,8 +930,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepDotActive: {
-    backgroundColor: palette.kale,
-    borderColor: palette.kale,
+    backgroundColor: FARM_ACCENT,
+    borderColor: FARM_ACCENT,
   },
   stepDotText: {
     fontSize: normalize(12),
@@ -934,7 +944,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8D8D8D',
   },
   stepLineActive: {
-    backgroundColor: palette.kale,
+    backgroundColor: FARM_ACCENT,
   },
   stepTitlesRow: {
     marginTop: hp(0.5),
@@ -952,10 +962,29 @@ const styles = StyleSheet.create({
     marginTop: hp(1.2),
     gap: hp(0.9),
   },
+  sectionTitle: {
+    marginTop: hp(0.2),
+  },
+  fieldLabel: {
+    marginTop: hp(0.4),
+    textTransform: 'none',
+  },
+  fieldSubLabel: {
+    marginTop: -hp(0.4),
+  },
+  card: {
+    borderWidth: normalize(1),
+    borderColor: FARM_ACCENT,
+    borderRadius: normalize(14),
+    backgroundColor: palette.surface,
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(3),
+    gap: hp(0.8),
+  },
   relistCard: {
-    borderWidth: normalize(2),
-    borderColor: palette.kale,
-    backgroundColor: '#F0F5E8',
+    borderWidth: normalize(1),
+    borderColor: FARM_ACCENT,
+    backgroundColor: palette.surface,
     borderRadius: normalize(12),
     paddingVertical: hp(1),
     paddingHorizontal: wp(3),
@@ -966,23 +995,11 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: hp(4.4),
     borderRadius: normalize(8),
-    backgroundColor: palette.kale,
+    backgroundColor: FARM_ACCENT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
-  },
-  sectionTitle: {
-    marginTop: hp(0.2),
-  },
-  card: {
-    borderWidth: normalize(2),
-    borderColor: '#D9D9D9',
-    borderRadius: normalize(14),
-    backgroundColor: '#F8F8F6',
-    paddingVertical: hp(1),
-    paddingHorizontal: wp(3),
-    gap: hp(0.8),
   },
   kgHeaderRow: {
     flexDirection: 'row',
@@ -1000,8 +1017,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
+  },
+  foodIcon: {
+    width: normalize(22),
+    height: normalize(22),
+    flexShrink: 0,
   },
   foodLabel: {
+    flex: 1,
+    flexShrink: 1,
     marginLeft: wp(2),
     textTransform: 'none',
   },
@@ -1009,16 +1034,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.8),
-  },
-  foodIcon: {
-    width: normalize(22),
-    height: normalize(22),
+    flexShrink: 0,
+    marginLeft: wp(1.5),
   },
   qtyBtn: {
     width: wp(6.5),
     height: wp(6.5),
     borderRadius: normalize(8),
-    backgroundColor: '#E6E2F1',
+    backgroundColor: '#F9E0C0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1035,7 +1058,7 @@ const styles = StyleSheet.create({
   addInput: {
     flex: 1,
     borderWidth: normalize(1.5),
-    borderColor: '#9FA7A0',
+    borderColor: '#D9BFA0',
     borderRadius: normalize(8),
     backgroundColor: palette.white,
     minHeight: hp(4.4),
@@ -1048,7 +1071,7 @@ const styles = StyleSheet.create({
     width: wp(8),
     height: wp(8),
     borderRadius: normalize(7),
-    backgroundColor: palette.kale,
+    backgroundColor: FARM_ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1067,7 +1090,7 @@ const styles = StyleSheet.create({
     borderRadius: normalize(10),
     borderWidth: normalize(1.5),
     borderStyle: 'dashed',
-    borderColor: '#9FA7A0',
+    borderColor: '#D9BFA0',
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
@@ -1120,19 +1143,15 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: hp(4.3),
     borderRadius: normalize(10),
-    backgroundColor: palette.kale,
+    backgroundColor: FARM_ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  fieldLabel: {
-    marginTop: hp(0.5),
-    textTransform: 'none',
   },
   locationBox: {
     borderRadius: normalize(12),
     borderWidth: normalize(1),
     borderColor: '#D9D9D9',
-    backgroundColor: palette.creme,
+    backgroundColor: palette.white,
     minHeight: hp(6),
     justifyContent: 'center',
   },
@@ -1146,8 +1165,8 @@ const styles = StyleSheet.create({
     minHeight: hp(5.2),
     borderRadius: normalize(10),
     borderWidth: normalize(1),
-    borderColor: '#DADCD0',
-    backgroundColor: palette.white,
+    borderColor: FARM_ACCENT,
+    backgroundColor: palette.surface,
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2.2),
@@ -1162,8 +1181,8 @@ const styles = StyleSheet.create({
     minHeight: hp(6.8),
     borderRadius: normalize(10),
     borderWidth: normalize(1),
-    borderColor: '#DADCD0',
-    backgroundColor: '#ECEDEA',
+    borderColor: FARM_ACCENT,
+    backgroundColor: palette.surface,
     paddingHorizontal: wp(3),
     justifyContent: 'center',
   },
@@ -1171,83 +1190,58 @@ const styles = StyleSheet.create({
     marginTop: hp(0.3),
     textTransform: 'none',
   },
-  chipRow: {
-    flexDirection: 'row',
-    gap: wp(2.2),
-  },
-  allergenCard: {
-    borderWidth: normalize(1),
-    borderColor: '#DADCD0',
-    borderRadius: normalize(12),
-    backgroundColor: palette.white,
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1),
-    gap: hp(0.8),
-  },
-  allergenActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: wp(2),
-  },
-  allergenActionBtn: {
-    paddingVertical: hp(0.4),
-    paddingHorizontal: wp(2.5),
-    borderRadius: normalize(999),
-    backgroundColor: '#F4F4EE',
-  },
-  allergenChipWrap: {
+  chipGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: wp(2),
   },
-  allergenChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.4),
-    paddingHorizontal: wp(2.8),
-    paddingVertical: hp(0.6),
-    borderRadius: normalize(999),
-    backgroundColor: '#F4F4EE',
-    borderWidth: normalize(1),
-    borderColor: '#C7CDBF',
-  },
-  allergenChipActive: {
-    borderColor: '#8CBD97',
-    backgroundColor: '#ECF5E9',
-  },
-  allergenSummaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2),
-  },
-  allergenSummaryIcon: {
-    width: normalize(20),
-    height: normalize(20),
-  },
-  allergenSummaryText: {
-    flex: 1,
-    textTransform: 'none',
-  },
-  choiceChip: {
-    flex: 1,
-    minHeight: hp(6.2),
+  gridChip: {
     borderRadius: normalize(10),
     borderWidth: normalize(1),
-    borderColor: '#C7CDBF',
-    backgroundColor: '#F4F4EE',
+    borderColor: '#F0C89A',
+    backgroundColor: '#FFFAF4',
+    position: 'relative',
+  },
+  storageChip: {
+    minHeight: hp(7),
     alignItems: 'center',
     justifyContent: 'center',
-    gap: hp(0.3),
+    paddingHorizontal: wp(0.8),
+    paddingVertical: hp(0.7),
+    gap: hp(0.4),
   },
-  choiceChipActive: {
-    borderColor: '#8CBD97',
-    backgroundColor: '#ECF5E9',
+  storageChipIcon: {
+    width: normalize(24),
+    height: normalize(24),
+  },
+  storageChipText: {
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  contaminantChip: {
+    minHeight: hp(7.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(1.2),
+    paddingVertical: hp(0.8),
+  },
+  contaminantChipText: {
+    textAlign: 'center',
+  },
+  gridChipCheck: {
+    position: 'absolute',
+    top: hp(0.35),
+    right: wp(0.6),
+    zIndex: 1,
+  },
+  gridChipActive: {
+    borderColor: FARM_ACCENT,
+    backgroundColor: '#FFF0D9',
   },
   summaryHeadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: normalize(1),
-    borderBottomColor: '#D6D9CE',
+    borderBottomColor: '#F0C89A',
     paddingBottom: hp(0.4),
   },
   summaryRow: {
@@ -1268,13 +1262,15 @@ const styles = StyleSheet.create({
     textTransform: 'none',
   },
   summaryFoodIcon: {
-    width: normalize(16),
-    height: normalize(16),
+    width: normalize(18),
+    height: normalize(18),
+    flexShrink: 0,
   },
   summaryQtyText: {
     marginLeft: wp(2),
     minWidth: wp(16),
     textAlign: 'right',
+    flexShrink: 0,
   },
   totalQtyText: {
     marginTop: hp(0.6),
@@ -1291,10 +1287,10 @@ const styles = StyleSheet.create({
   confirmWrap: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    borderWidth: normalize(1.5),
-    borderColor: '#B2C4A9',
+    borderWidth: normalize(1),
+    borderColor: FARM_ACCENT,
     borderRadius: normalize(12),
-    backgroundColor: '#F3F5EE',
+    backgroundColor: palette.surface,
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     gap: wp(2.5),
@@ -1304,14 +1300,14 @@ const styles = StyleSheet.create({
     width: wp(6.3),
     height: wp(6.3),
     borderRadius: normalize(6),
-    borderWidth: normalize(2),
-    borderColor: '#6B8C66',
-    backgroundColor: '#F3F5EE',
+    borderWidth: normalize(1),
+    borderColor: FARM_ACCENT,
+    backgroundColor: palette.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxActive: {
-    backgroundColor: palette.kale,
+    backgroundColor: FARM_ACCENT,
   },
   confirmText: {
     flex: 1,
@@ -1320,34 +1316,53 @@ const styles = StyleSheet.create({
   },
   impactCard: {
     borderWidth: normalize(1.5),
-    borderColor: '#C1D5BF',
+    borderColor: FARM_ACCENT,
     borderRadius: normalize(14),
-    backgroundColor: '#E9F4E5',
+    backgroundColor: palette.surface,
     paddingHorizontal: wp(3),
     paddingVertical: hp(1.1),
     gap: hp(0.8),
   },
   impactRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: wp(4),
+    gap: wp(2),
   },
   impactBlock: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1.4),
+    gap: wp(1.2),
   },
+  impactIcon: {
+    flexShrink: 0,
+  },
+  impactBlockContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  impactValue: {
+    flexShrink: 0,
+  },
+  impactLabel: {
+    flexShrink: 1,
+    lineHeight: normalize(14),
+  },
+
+  // ── bottom button ─────────────────────────────────────────────────────────
   bottomButton: {
     marginTop: hp(1.6),
     minHeight: hp(5.2),
     borderRadius: normalize(10),
-    backgroundColor: palette.kale,
+    backgroundColor: FARM_ACCENT,
     paddingHorizontal: wp(4),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp(2.5),
   },
+
+  // ── iOS picker ────────────────────────────────────────────────────────────
   iosPickerOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

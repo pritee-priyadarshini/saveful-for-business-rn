@@ -51,7 +51,7 @@ const surplusCards = [
 export function SurplusScreen({ navigation }: any) {
 	const handleListSurplus = (type: (typeof surplusCards)[number]['id']) => {
 		if (type === 'livestock') {
-			navigation.navigate('Calculation');
+			navigation.navigate('CreateFarmListing');
 			return;
 		}
 
