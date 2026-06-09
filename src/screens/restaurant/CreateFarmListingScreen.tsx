@@ -82,7 +82,7 @@ const STORAGE_OPTIONS = [
   { label: 'Freezer', icon: require('../../../assets/placeholder/freezer_icon.png'), useImage: true },
   { label: 'Ambient', icon: require('../../../assets/placeholder/ambient_temp_icon.png'), useImage: true },
   { label: 'Dry storage', icon: require('../../../assets/placeholder/dry_storage.png'), useImage: true },
-  { label: 'Boxed', icon: require('../../../assets/placeholder/storage_box.png'), useImage: true },
+  { label: 'Boxed', icon: require('../../../assets/placeholder/storage_box_green.png'), useImage: true },
   { label: 'Bulk Bin', icon: require('../../../assets/placeholder/bin_icon.png'), useImage: true },
   { label: 'Pallet', icon: require('../../../assets/placeholder/pallets_icon.png'), useImage: true },
   { label: 'Other', ionIcon: 'ellipsis-horizontal-outline', useImage: false },
