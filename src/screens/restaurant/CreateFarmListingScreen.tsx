@@ -3,6 +3,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -68,23 +69,23 @@ const stepMeta = [
 ];
 
 const seedItems: FarmItem[] = [
-  { name: 'Baked goods',              qty: 0, icon: require('../../../assets/placeholder/bread_icon.png') },
-  { name: 'Fruit & veg',              qty: 0, icon: require('../../../assets/placeholder/fruit&veg_icon.png') },
-  { name: 'Grain / cereal',           qty: 0, icon: require('../../../assets/placeholder/baked_goods_icon.png') },
-  { name: 'Dairy',                    qty: 0, icon: require('../../../assets/placeholder/milk_icon.png') },
-  { name: 'Food scraps – no meat',    qty: 0, icon: require('../../../assets/placeholder/veggie_basket.png') },
-  { name: 'Food scraps – with meat',  qty: 0, icon: require('../../../assets/placeholder/meat_icon.png') },
+  { name: 'Baked goods', qty: 0, icon: require('../../../assets/placeholder/bread_icon.png') },
+  { name: 'Fruit & veg', qty: 0, icon: require('../../../assets/placeholder/fruit&veg_icon.png') },
+  { name: 'Grain / cereal', qty: 0, icon: require('../../../assets/placeholder/grain_icon.png') },
+  { name: 'Dairy', qty: 0, icon: require('../../../assets/placeholder/milk_icon.png') },
+  { name: 'Food scraps – no meat', qty: 0, icon: require('../../../assets/placeholder/food_scraps_icon.png') },
+  { name: 'Food scraps – with meat', qty: 0, icon: require('../../../assets/placeholder/meat_icon.png') },
 ];
 
 const STORAGE_OPTIONS = [
-  { label: 'Fridge',     icon: require('../../../assets/placeholder/fridge_icon.png'),        useImage: true },
-  { label: 'Freezer',    icon: require('../../../assets/placeholder/freezer_icon.png'),       useImage: true },
-  { label: 'Ambient',    icon: require('../../../assets/placeholder/ambient_temp_icon.png'), useImage: true },
-  { label: 'Dry storage', ionIcon: 'sunny-outline',    useImage: false },
-  { label: 'Boxed',       ionIcon: 'cube-outline',     useImage: false },
-  { label: 'Bulk Bin',    ionIcon: 'trash-outline',   useImage: false },
-  { label: 'Pallet',      ionIcon: 'layers-outline',   useImage: false },
-  { label: 'Other',       ionIcon: 'ellipsis-horizontal-outline', useImage: false },
+  { label: 'Fridge', icon: require('../../../assets/placeholder/fridge_icon.png'), useImage: true },
+  { label: 'Freezer', icon: require('../../../assets/placeholder/freezer_icon.png'), useImage: true },
+  { label: 'Ambient', icon: require('../../../assets/placeholder/ambient_temp_icon.png'), useImage: true },
+  { label: 'Dry storage', icon: require('../../../assets/placeholder/dry_storage.png'), useImage: true },
+  { label: 'Boxed', icon: require('../../../assets/placeholder/storage_box.png'), useImage: true },
+  { label: 'Bulk Bin', icon: require('../../../assets/placeholder/bin_icon.png'), useImage: true },
+  { label: 'Pallet', icon: require('../../../assets/placeholder/pallets_icon.png'), useImage: true },
+  { label: 'Other', ionIcon: 'ellipsis-horizontal-outline', useImage: false },
 ] as const;
 
 const CONTAMINANT_OPTIONS = [
@@ -208,8 +209,8 @@ export function CreateFarmListingScreen({ navigation }: any) {
       target === 'bestBefore'
         ? bestBeforeDate || new Date()
         : target === 'from'
-        ? pickupFromDate || new Date()
-        : pickupToDate || new Date();
+          ? pickupFromDate || new Date()
+          : pickupToDate || new Date();
 
     setPickerTarget(target);
     setPickerValue(initial);
@@ -778,35 +779,50 @@ export function CreateFarmListingScreen({ navigation }: any) {
               </View>
               <AppText variant="body1" color={palette.midgray} style={styles.confirmText}>
                 I confirm this material IS NOT suitable for human consumption and is only appropriate
-                for animal livestock feed or agricultural reuse. See Terms &amp; Conditions
+                for animal livestock feed or agricultural reuse. See{' '}
+                <AppText
+                  variant="body1"
+                  style={styles.termsLink}
+                  onPress={() => Linking.openURL('https://www.saveful.com/saveful-for-business-terms-conditions')}
+                >
+                  Terms & Conditions
+                </AppText>
               </AppText>
             </Pressable>
 
             {/* Impact */}
             <View style={styles.impactCard}>
-              <AppText variant="h8" color={FARM_ACCENT}>
+              <AppText variant="h8" color={palette.middlegreen}>
                 Your Impact
               </AppText>
               <View style={styles.impactRow}>
                 <View style={styles.impactBlock}>
-                  <Ionicons name="leaf-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} />
+                  {/* <Ionicons name="leaf-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} /> */}
+                  <Image
+                    source={require('../../../assets/placeholder/kg_icon.png')}
+                    style={styles.impactIcon}
+                  />
                   <View style={styles.impactBlockContent}>
-                    <AppText variant="h7" color={FARM_ACCENT} style={styles.impactValue}>
+                    <AppText variant="h7" color={palette.middlegreen} style={styles.impactValue}>
                       {Math.max(totalQuantity, 0)}kg
                     </AppText>
-                    <AppText variant="bodySmall" color={FARM_ACCENT} style={styles.impactLabel}>
+                    <AppText variant="bodySmall" color={palette.middlegreen} style={styles.impactLabel}>
                       diverted from{'\n'}landfill
                     </AppText>
                   </View>
                 </View>
 
                 <View style={styles.impactBlock}>
-                  <Ionicons name="cloud-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} />
+                  {/* <Ionicons name="cloud-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} /> */}
+                  <Image
+                    source={require('../../../assets/placeholder/co2_green_icon.png')}
+                    style={styles.impactIcon}
+                  />
                   <View style={styles.impactBlockContent}>
-                    <AppText variant="h7" color={FARM_ACCENT} style={styles.impactValue}>
+                    <AppText variant="h7" color={palette.middlegreen} style={styles.impactValue}>
                       {Math.max(estimatedCO2, 0)}kg
                     </AppText>
-                    <AppText variant="bodySmall" color={FARM_ACCENT} style={styles.impactLabel}>
+                    <AppText variant="bodySmall" color={palette.middlegreen} style={styles.impactLabel}>
                       CO2 avoided
                     </AppText>
                   </View>
@@ -882,8 +898,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
     maxWidth: normalize(560),
-    paddingHorizontal: wp(4.2),
-    paddingTop: hp(1.2),
+    paddingHorizontal: wp(4.4),
+    paddingTop: hp(1),
   },
   topPanel: {
     alignItems: 'center',
@@ -903,7 +919,7 @@ const styles = StyleSheet.create({
   topIcon: {
     width: wp(30),
     height: hp(12),
-		marginTop: -hp(2),
+    marginTop: -hp(2),
     marginBottom: -hp(1.5),
   },
   topTitle: {
@@ -938,7 +954,7 @@ const styles = StyleSheet.create({
     lineHeight: normalize(13),
   },
   stepLine: {
-    width: wp(17.5),
+    width: wp(23.2),
     height: normalize(3),
     borderRadius: normalize(2),
     backgroundColor: '#8D8D8D',
@@ -1240,15 +1256,15 @@ const styles = StyleSheet.create({
   summaryHeadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderBottomWidth: normalize(1),
+    borderBottomWidth: normalize(2),
     borderBottomColor: '#F0C89A',
-    paddingBottom: hp(0.4),
+    paddingBottom: hp(1),
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: hp(0.2),
+    marginTop: hp(0.6),
   },
   summaryItemNameWrap: {
     flexDirection: 'row',
@@ -1316,7 +1332,7 @@ const styles = StyleSheet.create({
   },
   impactCard: {
     borderWidth: normalize(1.5),
-    borderColor: FARM_ACCENT,
+    borderColor: palette.middlegreen,
     borderRadius: normalize(14),
     backgroundColor: palette.surface,
     paddingHorizontal: wp(3),
@@ -1335,8 +1351,11 @@ const styles = StyleSheet.create({
     gap: wp(1.2),
   },
   impactIcon: {
-    flexShrink: 0,
-  },
+  width: normalize(36),
+  height: normalize(36),
+  resizeMode: 'contain',
+  marginRight: wp(2), 
+},
   impactBlockContent: {
     flex: 1,
     minWidth: 0,
@@ -1381,5 +1400,9 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     borderBottomWidth: 1,
     borderBottomColor: '#ECECEC',
+  },
+  termsLink: {
+    color: palette.primary,
+    textDecorationLine: 'underline',
   },
 });

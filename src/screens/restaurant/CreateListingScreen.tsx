@@ -3,6 +3,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -429,7 +430,7 @@ export function CreateListingScreen({ navigation }: any) {
             <View style={styles.card}>
               <View style={styles.kgHeaderRow}>
                 <View style={styles.foodNameColumn} />
-                <AppText variant="body1" color={palette.stone} style={{marginRight: wp(8)}}>
+                <AppText variant="body1" color={palette.stone} style={{ marginRight: wp(8) }}>
                   KG
                 </AppText>
               </View>
@@ -607,7 +608,7 @@ export function CreateListingScreen({ navigation }: any) {
                   >
                     <Image
                       source={option.icon}
-                      style={{ width: normalize(18), height: normalize(18)}}
+                      style={{ width: normalize(18), height: normalize(18) }}
                     />
                     <AppText variant="bodyBold" color={active ? palette.kale : palette.stone}>
                       {option.label}
@@ -783,7 +784,14 @@ export function CreateListingScreen({ navigation }: any) {
                 {confirmedSafe ? <Ionicons name="checkmark" size={normalize(15)} color={palette.white} /> : null}
               </View>
               <AppText variant="body1" color={palette.midgray} style={styles.confirmText}>
-                I confirm this food is safe for human consumption and suitable for charity donation. See Terms & Conditions
+                I confirm this food is safe for human consumption and suitable for charity donation. See{' '}
+                <AppText
+                  variant="body1"
+                  style={styles.termsLink}
+                  onPress={() => Linking.openURL('https://www.saveful.com/saveful-for-business-terms-conditions') }
+                >
+                  Terms & Conditions
+                </AppText>
               </AppText>
             </Pressable>
 
@@ -813,7 +821,7 @@ export function CreateListingScreen({ navigation }: any) {
                 </View>
               </View>
               <AppText variant="bodySmall" color={palette.success}>
-                42g = 1 meal
+                420g = 1 meal
               </AppText>
             </View>
           </View>
@@ -1366,5 +1374,9 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     borderBottomWidth: 1,
     borderBottomColor: '#ECECEC',
+  },
+  termsLink: {
+    color: palette.primary,
+    textDecorationLine: 'underline',
   },
 });
