@@ -478,7 +478,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 <Skeleton width="100%" height={normalize(56)} borderRadius={normalize(8)} />
               </View>
             </View>
-            <Skeleton width="60%" height={normalize(56)} borderRadius={normalize(8)} style={styles.skeletonMetaCentered} />
+            <Skeleton width="100%" height={normalize(56)} borderRadius={normalize(8)} style={styles.skeletonMetaCentered} />
           </View>
           <Skeleton width="100%" height={normalize(32)} borderRadius={normalize(8)} />
           <View style={styles.skeletonRowBetween}>
@@ -830,7 +830,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minWidth: 0,
-    borderWidth: normalize(1),
+    borderWidth: normalize(0.5),
     borderRadius: normalize(8),
     backgroundColor: palette.white,
     paddingHorizontal: wp(2),
@@ -839,11 +839,11 @@ const styles = StyleSheet.create({
   },
 
   metaBoxPeople: {
-    borderColor: palette.kale,
+    borderColor: '#D9D9D9',
   },
 
   metaBoxAnimal: {
-    borderColor: palette.orange,
+    borderColor: '#D9D9D9',
   },
 
   metaBoxHalf: {
@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
   },
 
   metaBoxCentered: {
-    width: '60%',
+    width: '100%',
     marginLeft: 'auto',
     marginRight: 'auto',
   },

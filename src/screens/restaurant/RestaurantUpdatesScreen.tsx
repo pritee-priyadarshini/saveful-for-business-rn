@@ -917,11 +917,11 @@ const styles = StyleSheet.create({
   },
 
   detailBoxPeople: {
-    borderColor: palette.kale,
+    borderColor: '#D9D9D9',
   },
 
   detailBoxAnimal: {
-    borderColor: palette.orange,
+    borderColor: '#D9D9D9',
   },
 
   detailBoxWide: {
@@ -936,7 +936,7 @@ const styles = StyleSheet.create({
 
   detailBoxFull: {
     alignSelf: 'stretch',
-    width: '60%',
+    width: '100%',
     marginLeft: 'auto',
     marginRight: 'auto',
     
