@@ -2,7 +2,9 @@ export type UserRole =
   | 'restaurant_single'
   | 'restaurant_multi'
   | 'charity_single'
-  | 'charity_multi';
+  | 'charity_multi'
+  | 'farmer';
+  
 
 export type OrganizationType = 'restaurant' | 'charity';
 export type SiteType = 'head_office' | 'branch';
@@ -13,7 +15,8 @@ export type BackendOrgType =
   | 'BUSINESS_SINGLE'
   | 'BUSINESS_MULTI'
   | 'CHARITY_SINGLE'
-  | 'CHARITY_MULTI';
+  | 'CHARITY_MULTI'
+  | 'FARMER';
 
 export type BackendVenueType =
   | 'CAFE_RESTAURANT'

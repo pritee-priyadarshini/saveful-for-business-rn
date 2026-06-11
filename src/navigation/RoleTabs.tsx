@@ -13,12 +13,16 @@ import { RestaurantHomeScreen } from '../screens/restaurant/RestaurantHomeScreen
 import { CharityUpdatesScreen } from '../screens/charity/CharityUpdatesScreen';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { useAppContext } from '../store/AppContext';
-import { CharityTabsParamList, RestaurantTabsParamList } from './types';
+import { CharityTabsParamList, FarmerTabsParamList, RestaurantTabsParamList } from './types';
 import { palette } from '../theme/colors';
 import { RestaurantStack } from './RestaurantStack';
 import { CharityStack } from './CharityStack';
 import { RestaurantUpdatesScreen } from '@/screens/restaurant/RestaurantUpdatesScreen';
 import { Dimensions } from 'react-native';
+import { FarmerHomeScreen } from '@/screens/farmer/FarmerHomeScreen';
+import { FarmerStack } from './FarmerStack';
+import { FarmerAnalyticsScreen } from '@/screens/farmer/FarmerAnalyticsScreen';
+import { FarmerUpdatesScreen } from '@/screens/farmer/FarmerUpdatesScreen';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -30,6 +34,7 @@ const normalize = (size: number) => {
 
 const RestaurantTab = createBottomTabNavigator<RestaurantTabsParamList>();
 const CharityTab = createBottomTabNavigator<CharityTabsParamList>();
+const FarmerTab = createBottomTabNavigator<FarmerTabsParamList>();
 
 const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
   Home: 'home-outline',
@@ -80,6 +85,18 @@ export function RoleTabs() {
       </CharityTab.Navigator>
     );
   }
+
+  if (selectedRole === 'farmer') {
+  return (
+    <FarmerTab.Navigator screenOptions={screenOptions}>
+      <FarmerTab.Screen component={FarmerHomeScreen}  name="Home"/>
+      <FarmerTab.Screen component={FarmerStack} name="Available"/>
+      <FarmerTab.Screen component={FarmerAnalyticsScreen} name="Impact"/>
+      <FarmerTab.Screen component={FarmerUpdatesScreen} name="Updates"/>
+      <FarmerTab.Screen component={ProfileScreen} name="Account"/>
+    </FarmerTab.Navigator>
+  );
+}
 
   return (
     <RestaurantTab.Navigator screenOptions={screenOptions}>

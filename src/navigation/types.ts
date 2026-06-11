@@ -25,10 +25,10 @@ export type CharityTabsParamList = {
   Account: undefined;
 };
 
-export type DriverStackParamList = {
-  DriverDeliveries: undefined;
-  DriverPickupConfirm: {
-    pickup: any;
-    onConfirm?: (id: string) => void;
-  };
+export type FarmerTabsParamList = {
+  Home: undefined;
+  Available: undefined;
+  Impact: undefined;
+  Updates: undefined;
+  Account: undefined;
 };

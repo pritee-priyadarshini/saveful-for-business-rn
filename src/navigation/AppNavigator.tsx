@@ -90,21 +90,7 @@ export function AppNavigator() {
     <NavigationContainer theme={navTheme}>
       {isAuthenticated ? (
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
-
-          {/* {selectedRole === 'driver' ? (
-            <RootStack.Screen name="Tabs" component={DriverTabs} />
-          ) : selectedRole === 'restaurant_multi' ? (
-            <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
-          ) : selectedRole === 'charity_multi' ? (
-            <RootStack.Screen
-              name="MultiCharityManageSites"
-              component={MultiCharityManageSitesScreen}
-            />
-          ) : (
-            <RootStack.Screen name="Tabs" component={RoleTabs} />
-          )} */}
-
-
+          
           {effectiveRole === 'restaurant_multi' ? (
             <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
           ) : effectiveRole === 'charity_multi' ? (

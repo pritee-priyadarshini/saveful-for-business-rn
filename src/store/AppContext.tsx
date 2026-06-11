@@ -15,6 +15,7 @@ import {
   AppContextValue,
   AuthUser,
   CharityForm,
+  FarmerForm,
   RestaurantForm,
   Subscription,
 } from './types';
@@ -58,16 +59,35 @@ const defaultCharityForm: CharityForm = {
   pickupPostCode: '',
 };
 
+const defaultFarmerForm: FarmerForm = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  mobile: '',
+  farmName: '',
+  farmAddress: '',
+  branding: '',
+  logo: '',
+  postcodes: '',
+  pickupRadius: '',
+  region: '',
+  latitude: '',
+  longitude: '',
+};
+
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: PropsWithChildren) {
   const [isAuthenticated, setAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi'>('restaurant_single');
+  const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi' | 'farmer'>('restaurant_single');
   const [selectedPlanId, setSelectedPlanId] = useState('single_plus');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>(defaultRestaurantForm);
   const [charityForm, setCharityForm] = useState<CharityForm>(defaultCharityForm);
+  const [farmerForm, setFarmerForm] = useState<FarmerForm>(defaultFarmerForm);
 
   useEffect(() => {
     async function restoreSession() {
@@ -102,6 +122,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const resetForms = () => {
     setRestaurantForm(defaultRestaurantForm);
     setCharityForm(defaultCharityForm);
+    setFarmerForm(defaultFarmerForm);
   };
 
   const resolvedRole = (() => {
@@ -139,6 +160,10 @@ export function AppProvider({ children }: PropsWithChildren) {
       return 'charity_single';
     }
 
+    if (orgType === 'FARMER') {
+      return 'farmer';
+    }
+
     return selectedRole;
   })();
 
@@ -172,7 +197,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         verificationStatus: 'Pending',
         phone: '',
         logo: '',
-        email:'',
+        email: '',
       };
 
     const subscription: Subscription = {
@@ -196,6 +221,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       currentPlan,
       restaurantForm,
       charityForm,
+      farmerForm,
       authUser,
 
       setRole: setSelectedRole,
@@ -214,6 +240,13 @@ export function AppProvider({ children }: PropsWithChildren) {
 
       updateCharityField: (field, value) => {
         setCharityForm((current) => ({
+          ...current,
+          [field]: value,
+        }));
+      },
+
+      updateFarmerField: (field, value) => {
+        setFarmerForm((current) => ({
           ...current,
           [field]: value,
         }));
@@ -239,6 +272,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   }, [
     authUser,
     charityForm,
+    farmerForm,
     isAuthenticated,
     restaurantForm,
     selectedPlanId,

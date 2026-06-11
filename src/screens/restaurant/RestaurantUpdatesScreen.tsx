@@ -57,7 +57,7 @@ const DETAIL_ICONS = {
   basket: require('../../../assets/placeholder/veggie_basket_icon.png'),
   clock: require('../../../assets/placeholder/clock_icon.png'),
   leaf: require('../../../assets/placeholder/leaf_icon.png'),
-  meal: require('../../../assets/placeholder/meal_icon.png'),
+  meal: require('../../../assets/placeholder/cutlery_icon.png'),
 };
 
 type UpdateFilter = 'all' | 'people' | 'animals';
