@@ -43,28 +43,25 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const impactConfig = [
     {
-      label: 'KG',
-      icon: require('../../../assets/placeholder/bowl.png'),
-      title: 'You have potentially saved',
-      value: `${impact.kgSaved} KGs`,
+      label: 'Food',
+      icon: require('../../../assets/placeholder/storage_box_green.png'),
+      title: 'You have saved',
+      title2: 'From going to landfill',
+      value: `${impact.kgSaved} kgs`,
     },
     {
-      label: 'Charity',
-      icon: require('../../../assets/track/Charities.png'),
-      title: 'You have potentially helped',
-      value: `${impact.charitiesSupported} Charities`,
+      label: 'Collections',
+      icon: require('../../../assets/placeholder/truck_icon.png'),
+      title: 'You have generated',
+      title2: 'Collections to help save food',
+      value: `${impact.charitiesSupported}`,
     },
     {
       label: 'CO2',
-      icon: require('../../../assets/track/co2.png'),
+      icon: require('../../../assets/placeholder/co2_green_icon.png'),
       title: 'You have avoided',
-      value: `${impact.co2SavedKg} KGs`,
-    },
-    {
-      label: 'Money',
-      icon: require('../../../assets/placeholder/money.png'),
-      title: 'You have potentially saved',
-      value: `${impact.currency}${impact.moneySaved}`,
+      title2: 'CO2 emissions',
+      value: `${impact.co2SavedKg} kgs`,
     },
   ];
 
@@ -171,11 +168,11 @@ export function RestaurantHomeScreen({ navigation }: any) {
             Welcome back, {firstName}
           </AppText>
 
-          <AppText variant="bodyLarge" style={styles.welcomeSub}>
+          <AppText variant="subheading" style={styles.welcomeSub}>
             Got surplus today?
           </AppText>
 
-          <AppText variant="bodyLarge" style={styles.welcomeSub}>
+          <AppText variant="subheading" style={styles.welcomeSub2}>
             Share it with a local charity 💜
           </AppText>
         </View>
@@ -189,23 +186,17 @@ export function RestaurantHomeScreen({ navigation }: any) {
             })
           }
         >
-          <AppText variant="bodyLarge" style={styles.ctaText}>
-            List Surplus Food
+          <AppText variant="h8" style={styles.ctaText}>
+            List Surplus
           </AppText>
         </Pressable>
 
         {/* IMPACT */}
         <View style={styles.section}>
-          <View style={styles.headingContainer}>
-            <Image
-              source={require('../../../assets/placeholder/Illustration.png')}
-              style={styles.headingBg}
-            />
-
-            <AppText variant="heading" style={styles.headingText}>
+            <AppText variant="h6" style={styles.headingText}>
               Your Savings & Impact So Far
             </AppText>
-          </View>
+         
 
           <View style={styles.impactCardContainer}>
             {/* PILLS */}
@@ -220,7 +211,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   ]}
                 >
                   <AppText
-                    variant="bodyBold"
+                    variant="subheading"
                     style={[
                       styles.pillText,
                       activeIndex === index && styles.activePillText,
@@ -250,8 +241,12 @@ export function RestaurantHomeScreen({ navigation }: any) {
               </AppText>
             </View>
 
+            <AppText variant="subheading" numberOfLines={1} >
+              {impactData[activeIndex].title2}
+            </AppText>
+
             {/* SUB TEXT */}
-            <AppText variant="h7" numberOfLines={1}>
+            <AppText variant="h5" numberOfLines={1}>
               Keep making an impact!
             </AppText>
 
@@ -322,7 +317,15 @@ const styles = StyleSheet.create({
 
   welcomeSub: {
     color: '#666',
-    fontSize: normalize(15),
+    marginTop:hp(2.4),
+    fontSize: normalize(18),
+    lineHeight: normalize(20),
+    textAlign: 'center',
+  },
+
+  welcomeSub2: {
+    color: '#666',
+    fontSize: normalize(18),
     lineHeight: normalize(20),
     textAlign: 'center',
   },
@@ -361,7 +364,7 @@ const styles = StyleSheet.create({
 
   ctaButton: {
     marginHorizontal: wp(8),
-    backgroundColor: '#7B3FE4',
+    backgroundColor: palette.middlegreen,
     padding: hp(1.8),
     borderRadius: normalize(14),
     alignItems: 'center',
@@ -390,7 +393,7 @@ const styles = StyleSheet.create({
 
   headingText: {
     textAlign: 'center',
-    fontSize: normalize(18),
+    marginTop: hp(2.2),
   },
 
   section: {
@@ -411,8 +414,10 @@ const styles = StyleSheet.create({
 
   pillRow: {
     flexDirection: 'row',
-    backgroundColor: '#F3E8FF',
+    backgroundColor: '#e1fce1',
     borderRadius: normalize(30),
+    borderWidth: 1,
+    borderColor: palette.middlegreen,
     padding: wp(1),
   },
 
@@ -420,8 +425,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.2),
-    paddingVertical: hp(0.8),
-    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(7),
     borderRadius: normalize(25),
   },
 
@@ -431,7 +436,7 @@ const styles = StyleSheet.create({
 
   pillText: {
     color: palette.black,
-    fontSize: normalize(12),
+    fontSize: normalize(15),
   },
 
   activePillText: {

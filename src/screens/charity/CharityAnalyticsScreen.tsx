@@ -31,411 +31,294 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-const historyData = [
-  {
-    id: '1',
-    business: 'Saveful Bakery',
-    qty: '6 kg',
-    date: 'Today · 4:30 PM',
-    status: 'Completed',
-    meals: 12,
-  },
-  {
-    id: '2',
-    business: 'Harvest Cafe',
-    qty: '10 kg',
-    date: 'Yesterday · 6:00 PM',
-    status: 'Completed',
-    meals: 20,
-  },
-  {
-    id: '3',
-    business: 'Green Table',
-    qty: '4 kg',
-    date: 'Mon · 5:00 PM',
-    status: 'Completed',
-    meals: 8,
-  },
-];
-
-const chartDataByRange = {
-  week: {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    meals: [8, 20, 12, 30, 25, 40, 50],
-    co2: [4, 10, 7, 18, 14, 24, 30],
-  },
-  month: {
-    labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4'],
-    meals: [80, 120, 100, 185],
-    co2: [48, 72, 60, 111],
-  },
-  year: {
-    labels: ['2020', '2021', '2022', '2023', '2024', '2025'],
-    meals: [300, 480, 420, 650, 590, 820],
-    co2: [180, 288, 252, 390, 354, 492],
-  },
-};
-
-const calcTrend = (data: number[]) => {
-  const last = data[data.length - 1];
-  const prev = data[data.length - 2] || 1;
-  return Math.round(((last - prev) / prev) * 100);
-};
-
 const chartConfig = {
   backgroundGradientFrom: palette.white,
   backgroundGradientTo: palette.white,
   decimalPlaces: 0,
-  color: () => palette.primary,
-  labelColor: () => '#888',
+  color: () => palette.middlegreen,
+  labelColor: () => palette.stone,
   propsForDots: {
     r: '4',
     strokeWidth: '2',
-    stroke: palette.primary,
+    stroke: palette.middlegreen,
   },
 };
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <View style={styles.statusBadge}>
-      <View style={styles.statusDot} />
-      <AppText variant='bodySmall' style={styles.statusText}>{status}</AppText>
-    </View>
-  );
-}
-
-function HistoryItem({ item, isLast }: { item: (typeof historyData)[0]; isLast: boolean }) {
-  return (
-    <View style={styles.timelineRow}>
-      <View style={styles.timeline}>
-        <View style={styles.dot} />
-        {!isLast && <View style={styles.line} />}
-      </View>
-
-      <View style={styles.historyCard}>
-        <View style={styles.historyHeader}>
-          <View style={{ flex: 1 }}>
-            <AppText variant='label'>{item.business}</AppText>
-            <AppText variant='bodySmall'>{item.date}</AppText>
-          </View>
-          <StatusBadge status={item.status} />
-        </View>
-
-        <View style={styles.historyFooter}>
-          <View style={styles.chip}>
-            <Ionicons name="scale-outline" size={normalize(13)} color={palette.primary} />
-            <AppText variant='body' style={styles.chipText}>{item.qty}</AppText>
-          </View>
-          <View style={styles.chip}>
-            <Ionicons name="restaurant-outline" size={normalize(13)} color={palette.primary} />
-            <AppText variant='body' style={styles.chipText}>{item.meals} meals</AppText>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 
 export function CharityAnalyticsScreen() {
   const navigation = useNavigation<any>();
-  const [range, setRange] = React.useState<'week' | 'month' | 'year'>('week');
-  const [loading, setLoading] = React.useState(true);
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 900);
-    return () => clearTimeout(timer);
-  }, []);
+  const [selectedRange, setSelectedRange] = React.useState<'week' | 'month' | 'year'>('week');
+  const [selectedMetric, setSelectedMetric] = React.useState<'food' | 'meals' | 'co2' | 'collection'>('food');
+  const thisMonthCards = [
+    {
+      value: '1000 kg',
+      label: 'Food Recovered',
+      icon: require('../../../assets/placeholder/storage_box_green.png'),
+    },
+    {
+      value: '2340',
+      label: 'Meals Created',
+      icon: require('../../../assets/placeholder/cutlery_icon.png'),
+    },
+    {
+      value: '6400 kg',
+      label: 'Total CO₂ Avoided',
+      icon: require('../../../assets/placeholder/co2_green_icon.png'),
+    },
+    {
+      value: '18',
+      label: 'Collections Completed',
+      icon: require('../../../assets/placeholder/truck_icon.png'),
+    },
+    {
+      value: '4.5/5',
+      label: 'Rating',
+      icon: require('../../../assets/placeholder/rating_icon.png'),
+    },
+  ];
 
-  const renderSkeleton = () => (
-    <ScrollView contentContainerStyle={styles.skeletonWrap} showsVerticalScrollIndicator={false}>
-      <Skeleton width="100%" height={hp(20)} borderRadius={0} />
-      <View style={styles.skeletonBannerWrap}>
-        <Skeleton width="100%" height={hp(12)} borderRadius={normalize(24)} />
-      </View>
-      <View style={styles.skeletonGrid}>
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} width="48%" height={hp(10)} borderRadius={normalize(18)} />
-        ))}
-      </View>
-      <View style={styles.skeletonTrendRow}>
-        <Skeleton width="48%" height={hp(12)} borderRadius={normalize(18)} />
-        <Skeleton width="48%" height={hp(12)} borderRadius={normalize(18)} />
-      </View>
-      <View style={styles.skeletonChartWrap}>
-        <Skeleton width="100%" height={hp(32)} borderRadius={normalize(20)} />
-      </View>
-      <View style={styles.skeletonActivityHeader}>
-        <Skeleton width={wp(40)} height={normalize(20)} borderRadius={normalize(8)} />
-      </View>
-      {[1, 2].map((i) => (
-        <View key={i} style={styles.skeletonActivityRow}>
-          <View style={styles.skeletonDotCol}>
-            <Skeleton width={normalize(10)} height={normalize(10)} borderRadius={normalize(5)} />
-          </View>
-          <Skeleton width="85%" height={hp(9)} borderRadius={normalize(16)} />
-        </View>
-      ))}
-    </ScrollView>
-  );
+  const lifetimeCards = [
+    {
+      value: '4800 kg',
+      label: 'Food Recovered',
+      icon: require('../../../assets/placeholder/storage_box_green.png'),
+    },
+    {
+      value: '11240',
+      label: 'Meals Created',
+      icon: require('../../../assets/placeholder/cutlery_icon.png'),
+    },
+    {
+      value: '15000 kg',
+      label: 'Total CO₂ Avoided',
+      icon: require('../../../assets/placeholder/co2_green_icon.png'),
+    },
+    {
+      value: '123',
+      label: 'Collections Completed',
+      icon: require('../../../assets/placeholder/truck_icon.png'),
+    },
+    {
+      value: '4.5/5',
+      label: 'Rating',
+      icon: require('../../../assets/placeholder/rating_icon.png'),
+    },
+  ];
 
-  const filtered = chartDataByRange[range];
-  const mealsTrend = calcTrend(filtered.meals);
-  const co2Trend = calcTrend(filtered.co2);
-  const chartWidth = wp(84);
+  const graphData = {
+    week: {
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      food: [120, 180, 140, 260, 220, 340, 400],
+      meals: [300, 420, 350, 620, 540, 780, 920],
+      co2: [90, 130, 100, 190, 170, 260, 330],
+      collection: [1, 2, 3, 4, 5, 7, 8],
+    },
+
+    month: {
+      labels: ['W1', 'W2', 'W3', 'W4'],
+      food: [800, 1100, 1400, 1800],
+      meals: [2400, 3200, 4100, 5200],
+      co2: [500, 700, 900, 1200],
+      collection: [12, 18, 24, 30],
+    },
+
+    year: {
+      labels: ['21', '22', '23', '24', '25'],
+      food: [6000, 7200, 8400, 9800, 11200],
+      meals: [15000, 18000, 21000, 26000, 32000],
+      co2: [4200, 5100, 6200, 7700, 9200],
+      collection: [90, 110, 130, 150, 180],
+    },
+  };
+
+  const current = graphData[selectedRange];
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false}>
-      {loading ? renderSkeleton() : (
-      <FlatList
-        data={historyData}
-        keyExtractor={(item) => item.id}
+      <ScrollView
+        contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
+      >
 
-        // HEADER 
-        ListHeaderComponent={
-          <>
-            {/* HEADER */}
-            <View style={styles.heroContainer}>
-
-              <Image
-                source={require('../../../assets/placeholder/feed-bg.png')}
-                style={styles.heroBg}
-              />
-
-              {/* TOP ROW */}
-              <View style={styles.topBar}>
-                <View style={{ flex: 1 }}>
-                  <AppText variant='body' style={styles.whiteText}>
-                    {charityProfile.organization}
-                  </AppText>
-
-                  <View style={styles.locationRow}>
-                    <Ionicons name="location-outline" size={normalize(16)} color="white" />
-                    <AppText variant='body' style={styles.location}>
-                      {charityProfile.address}
-                    </AppText>
-                  </View>
-                </View>
-
-                <View style={styles.logoCircle}>
-                  <AppText variant='body' style={styles.logoFallback}>S</AppText>
-                </View>
-              </View>
-
-              {/* TITLE */}
-              <View style={styles.header}>
-                <AppText variant='h5' style={styles.heroText}>Your Dashboard</AppText>
-              </View>
-
-            </View>
-
-            {/* HERO BANNER */}
-            <View style={styles.heroBanner}>
-
-              <AppText variant='h5' style={styles.heroValue}>
-                {charityImpact.mealsCreated}
+        {/* HEADER */}
+        <View style={styles.heroContainer}>
+          <Image source={require('../../../assets/placeholder/feed-bg.png')} style={styles.heroBg} />
+          <View style={styles.topBar}>
+            <View style={{ flex: 1 }}>
+              <AppText variant="h7" style={styles.whiteText} >
+                {charityProfile.organization}
               </AppText>
-              <AppText variant='h7' style={styles.heroLabel}>Meals created 🍱</AppText>
 
-            </View>
-
-            {/* IMPACT GRID */}
-            <View style={styles.grid}>
-              <Card style={styles.statCard}>
-                <AppText variant='label'>{charityImpact.businessesSupported}</AppText>
-                <AppText variant='body'>Partners</AppText>
-              </Card>
-
-              <Card style={styles.statCard}>
-                <AppText variant='label'>{charityImpact.rating} ⭐</AppText>
-                <AppText variant='body'>Rating</AppText>
-              </Card>
-
-              <Card style={[styles.statCard, styles.statHighlight]}>
-                <AppText variant='label' style={{ color: palette.white }}>Top 10%</AppText>
-                <AppText variant='body' style={styles.statLabelWhite}>Impact Rank 🚀</AppText>
-              </Card>
-
-              <Card style={styles.statCard}>
-                <AppText variant='label' style={styles.statValue}>{charityImpact.collections}</AppText>
-                <AppText variant='body'>Collections</AppText>
-              </Card>
-            </View>
-
-            {/* TREND CARDS */}
-            <View style={styles.trendRow}>
-              <Card style={styles.trendCard}>
-                <Ionicons name="restaurant-outline" size={normalize(18)} color={palette.primary} />
-                <AppText variant='body'>Meals this week</AppText>
-                <AppText variant='label'>{filtered.meals[filtered.meals.length - 1]}</AppText>
-                <AppText variant='bodyBold' style={mealsTrend >= 0 ? styles.trendUp : styles.trendDown}>
-                  {mealsTrend >= 0 ? '+' : ''}{mealsTrend}% vs last period
+              <View style={styles.locationRow}>
+                <Ionicons name="location-outline" size={normalize(14)} color={palette.white} />
+                <AppText variant="h8" style={styles.location}>
+                  {charityProfile.address}
                 </AppText>
-              </Card>
-
-              <Card style={styles.trendCard}>
-                <Ionicons name="leaf-outline" size={normalize(18)} color={palette.primary} />
-                <AppText variant='body'>CO₂ avoided</AppText>
-                <AppText variant='label'>{filtered.co2[filtered.co2.length - 1]}kg</AppText>
-                <AppText variant='bodyBold' style={co2Trend >= 0 ? styles.trendUp : styles.trendDown}>
-                  {co2Trend >= 0 ? '+' : ''}{co2Trend}% vs last period
-                </AppText>
-              </Card>
-            </View>
-
-            {/* CHARTS */}
-            <View style={styles.chartSection}>
-              {/* Range filter */}
-              <View style={styles.chartTitleRow}>
-                <View style={styles.headingContainer}>
-                  <Image
-                    source={require('../../../assets/placeholder/Illustration.png')}
-                    style={styles.headingBg}
-                  />
-
-                  <AppText variant="heading" style={styles.headingText}>
-                    Impact Over Time
-                  </AppText>
-                </View>
               </View>
 
-              <View style={styles.filterRow}>
-                {(['week', 'month', 'year'] as const).map((r) => (
-                  <TouchableOpacity
-                    key={r}
-                    onPress={() => setRange(r)}
-                    style={[styles.filterChip, range === r && styles.activeChip]}
-                  >
-                    <AppText style={range === r ? styles.activeChipText : styles.inactiveChipText}>
-                      {r.toUpperCase()}
-                    </AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <AppText variant='h7' style={{ marginTop: spacing.md }}>Meals Created</AppText>
-              <LineChart
-                data={{ labels: filtered.labels, datasets: [{ data: filtered.meals }] }}
-                width={chartWidth}
-                height={hp(22)}
-                chartConfig={chartConfig}
-                bezier
-                style={styles.chart}
-              />
-
-              <AppText variant='h7' style={{ marginTop: spacing.md }}>CO₂ Avoided (kg)</AppText>
-              <LineChart
-                data={{ labels: filtered.labels, datasets: [{ data: filtered.co2 }] }}
-                width={chartWidth}
-                height={hp(22)}
-                yAxisSuffix="kg"
-                chartConfig={chartConfig}
-                bezier
-                style={styles.chart}
-              />
             </View>
 
-            {/* RECENT ACTIVITY HEADER */}
-            <AppText style={styles.sectionHeader}>Recent Activity</AppText>
-          </>
-        }
+            <View style={styles.logoCircle}>
+              <AppText variant="h6" style={styles.logoFallback} > S </AppText>
+            </View>
+          </View>
 
-        renderItem={({ item, index }) => (
-          <HistoryItem item={item} isLast={index === historyData.length - 1} />
-        )}
+          <View style={styles.header}>
+            <AppText variant="h3" style={styles.heroText}> YOUR DASHBOARD </AppText>
+          </View>
+        </View>
 
-        ListFooterComponent={
-          <Button
-            label="View Full History"
-            variant="primary"
-            style={styles.cta}
-            onPress={() => navigation.navigate('CharityHistory')}
+        {/* THIS MONTH */}
+        <AppText variant="bodyBold" style={styles.sectionHeader} > This Month </AppText>
+
+        <View style={styles.grid}>
+          {thisMonthCards.map((item, index) => (
+            <View key={index} style={styles.analyticsCard} >
+              <Image source={item.icon} style={styles.analyticsIcon} />
+
+              <View style={styles.analyticsContent}>
+                <AppText variant="h8" style={styles.analyticsValue}> {item.value} </AppText>
+                <AppText variant="h8" style={styles.analyticsLabel}> {item.label} </AppText>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* IMPACT OVER TIME */}
+        <AppText variant="bodyBold" style={styles.sectionHeader}> Impact Over Time </AppText>
+
+        {/* RANGE FILTER */}
+        <View style={styles.rangeRow}>
+          {(['week', 'month', 'year'] as const).map((range) => (
+            <TouchableOpacity
+              key={range}
+              style={[
+                styles.rangeChip,
+                selectedRange === range && styles.rangeChipActive,
+              ]}
+              onPress={() => setSelectedRange(range)}
+            >
+              <AppText variant='bodyBold' style={selectedRange === range ? styles.rangeChipTextActive : styles.rangeChipText} >
+                {range.toUpperCase()}
+              </AppText>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* METRIC FILTER */}
+        <View style={styles.metricFilterRow}>
+          {[
+            ['food', 'Food Recovered'],
+            ['meals', 'Meals Created'],
+            ['co2', 'CO₂ Avoided'],
+            ['collection', 'Collections Completed'],
+          ].map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[
+                styles.metricChip,
+                selectedMetric === key && styles.metricChipActive,
+              ]}
+              onPress={() => setSelectedMetric(key as any)}
+            >
+              <AppText variant='label' style={selectedMetric === key ? styles.metricChipTextActive : styles.metricChipText} >
+                {label}
+              </AppText>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* GRAPH */}
+        <View style={styles.chartCard}>
+          <LineChart
+            data={{
+              labels: current.labels,
+              datasets: [ { data: current[ selectedMetric ], }, ],
+            }}
+            width={wp(88)}
+            height={hp(22)}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
           />
-        }
-      />
-      )}
+        </View>
+
+        {/* LIFETIME IMPACT */}
+        <AppText variant="bodyBold" style={styles.sectionHeader} > Lifetime Impact </AppText>
+
+        <View style={styles.grid}>
+          {lifetimeCards.map((item, index) => (
+            <View key={index} style={styles.analyticsCard}>
+              <Image source={item.icon} style={styles.analyticsIcon} />
+
+              <View style={styles.analyticsContent}>
+                <AppText variant="h8" style={styles.analyticsValue} > {item.value} </AppText>
+                <AppText variant="h8" style={styles.analyticsLabel} > {item.label} </AppText>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <Button
+          label="View Collections History"
+          style={styles.cta}
+          onPress={() => navigation.navigate('CharityHistory' ) }
+        />
+
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  headingContainer: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: hp(4.5),
-    marginBottom: hp(4),
-  },
-
-  headingBg: {
-    position: 'absolute',
-    width: '100%',
-    height: hp(10),
-    resizeMode: 'contain',
-  },
-
-  headingText: {
-    textAlign: 'center',
-  },
-
-  heroBanner: {
-    margin: wp(3.5),
-    backgroundColor: palette.primary,
-    borderRadius: normalize(24),
-    padding: wp(4.5),
-    alignItems: 'center',
-    gap: hp(0.5),
-  },
-
-  heroValue: {
-    color: palette.white,
-    lineHeight: normalize(50),
-  },
-
-  heroLabel: {
-    color: palette.white,
-  },
+  container: {
+    paddingBottom: hp(4),
+  }, 
 
   heroContainer: {
-    height: hp(20),
+    height: hp(18),
     width: '100%',
-    paddingTop: hp(2.2),
-    paddingRight: wp(4),
     overflow: 'hidden',
     backgroundColor: palette.primary,
+    paddingTop: hp(2),
   },
 
   heroBg: {
     ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
 
   topBar: {
     flexDirection: 'row',
-    paddingLeft: wp(4),
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: wp(4),
+  },
+
+  whiteText: {
+    color: palette.white,
   },
 
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: hp(0.5),
-    gap: wp(1.5),
-  },
-
-  whiteText: {
-    color: 'white',
+    gap: wp(1),
   },
 
   location: {
-    color: 'white',
+    color: palette.white,
+    fontSize: normalize(11),
+    flexShrink: 1,
   },
 
   logoCircle: {
-    width: normalize(44),
-    height: normalize(44),
-    borderRadius: normalize(22),
-    backgroundColor: 'white',
+    width: normalize(38),
+    height: normalize(38),
+    borderRadius: normalize(19),
+    backgroundColor: palette.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -445,243 +328,172 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    marginTop: hp(2),
     alignItems: 'center',
+    marginTop: hp(4.5),
   },
 
   heroText: {
     color: palette.white,
   },
 
+  sectionHeader: {
+    marginHorizontal: wp(4),
+    marginTop: hp(1.6),
+    marginBottom: hp(0.8),
+    lineHeight: normalize(40),
+    fontSize: normalize(18),
+  },
+
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: wp(4),
-    marginVertical: hp(1.8),
-    gap: wp(2.5),
-  },
-
-  statCard: {
-    width: '48%',
-    padding: wp(3.5),
-    borderRadius: normalize(18),
-    gap: hp(0.4),
-  },
-
-  statHighlight: {
-    backgroundColor: palette.primary,
-  },
-
-  statValue: {
-    color: palette.text ?? palette.white,
-  },
-
-  statLabelWhite: {
-    color: palette.white,
-  },
-
-  trendRow: {
-    flexDirection: 'row',
-    marginHorizontal: wp(4),
-    gap: wp(2.5),
-  },
-
-  trendCard: {
-    flex: 1,
-    padding: wp(3.5),
-    borderRadius: normalize(18),
-    gap: hp(0.5),
-  },
-
-  trendCardLabel: {
-    marginTop: 4,
-  },
-
-  trendUp: {
-    color: palette.middlegreen,
-  },
-
-  trendDown: {
-    color: palette.chilli,
-  },
-
-  chartSection: {
-    marginHorizontal: wp(4),
-    marginVertical: hp(1.2),
-    backgroundColor: palette.white,
-    borderRadius: normalize(20),
-    padding: wp(3.5),
-    gap: hp(0.8),
-  },
-
-  chartTitleRow: {
-    marginHorizontal: wp(2),
-    flexDirection: 'row',
     justifyContent: 'space-between',
+    marginHorizontal: wp(4),
+  },
+
+  analyticsCard: {
+    width: '48.5%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: palette.white,
+    borderRadius: normalize(12),
+    borderWidth: 1,
+    borderColor: '#DDE5DE',
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2.8),
+    marginBottom: hp(1),
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    elevation: 1,
+  },
+
+  analyticsIcon: {
+    width: normalize(24),
+    height: normalize(24),
+    resizeMode: 'contain',
+    marginRight: wp(2),
+  },
+
+  analyticsContent: {
+    flex: 1,
     alignItems: 'center',
   },
 
-  filterRow: {
+  analyticsValue: {
+    color: palette.middlegreen,
+    marginBottom: hp(0.1),
+  },
+
+  analyticsLabel: {
+    fontSize: normalize(10),
+    color: palette.stone,
+  },
+
+  rangeRow: {
     flexDirection: 'row',
+    marginHorizontal: wp(4),
+    marginBottom: hp(0.8),
     gap: wp(2),
   },
 
-  filterChip: {
-    paddingHorizontal: wp(3.5),
-    paddingVertical: hp(0.7),
-    borderRadius: normalize(20),
-    backgroundColor: '#F0F0F0',
+  rangeChip: {
+    flex: 1,
+    height: hp(4.2),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    borderWidth:1,
+    borderColor:palette.middlegreen,
   },
 
-  activeChip: {
+  rangeChipActive: {
     backgroundColor: palette.primary,
   },
 
-  activeChipText: {
+  rangeChipText: {
+    fontSize: normalize(11),
+    color: palette.middlegreen,
+  },
+
+  rangeChipTextActive: {
+    fontSize: normalize(11),
     color: palette.white,
   },
 
-  inactiveChipText: {
-    color: '#888',
+  metricFilterRow: {
+    flexDirection: 'row',
+    marginHorizontal: wp(4),
+    marginBottom: hp(1),
+    gap: wp(2),
+  },
+
+  metricChip: {
+    flex: 1,
+    height: hp(4.2),
+    paddingHorizontal: wp(2),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    borderWidth:1,
+    borderColor:palette.middlegreen,
+  },
+
+  metricChipActive: {
+    backgroundColor: palette.primary,
+  },
+
+  metricChipText: {
+    fontSize: normalize(10),
+    color: palette.middlegreen,
+
+  },
+
+  metricChipTextActive: {
+    fontSize: normalize(10),
+    color: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignContent: 'center',
+  },
+
+  chartCard: {
+    backgroundColor: palette.white,
+    marginHorizontal: wp(4),
+    marginBottom: hp(1.5),
+    borderRadius: normalize(14),
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    paddingTop: hp(1),
+    paddingBottom: hp(2),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    elevation: 1,
   },
 
   chart: {
     borderRadius: normalize(12),
-    marginLeft: -wp(2),
-  },
-
-  sectionHeader: {
-    marginHorizontal: wp(4),
-    marginVertical: hp(2),
-  },
-
-  timelineRow: {
-    flexDirection: 'row',
-    gap: wp(2.5),
-  },
-
-  timeline: {
-    marginLeft: wp(4),
-    width: wp(5),
-    alignItems: 'center',
-    paddingTop: hp(0.7),
-  },
-
-  dot: {
-    width: normalize(10),
-    height: normalize(10),
-    borderRadius: normalize(5),
-    backgroundColor: palette.primary,
-  },
-
-  line: {
-    width: normalize(2),
-    flex: 1,
-    backgroundColor: '#E0E0E0',
-    marginTop: hp(0.4),
-  },
-
-  historyCard: {
-    flex: 1,
-    backgroundColor: palette.white,
-    paddingVertical: hp(1.2),
-    paddingHorizontal: wp(2),
-    borderRadius: normalize(16),
-    marginBottom: hp(1.2),
-    gap: hp(0.8),
-  },
-
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E6F6EC',
-    paddingHorizontal: wp(2.5),
-    borderRadius: normalize(10),
-  },
-
-  statusDot: {
-    width: normalize(6),
-    height: normalize(6),
-    borderRadius: normalize(3),
-    backgroundColor: palette.mint,
-    marginTop: hp(0.1),
-  },
-
-  statusText: {
-    color: palette.mint,
-    marginLeft: wp(1.5),
-  },
-
-  historyFooter: {
-    flexDirection: 'row',
-    gap: wp(2),
-  },
-
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1),
-    backgroundColor: '#F4F0FF',
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.6),
-    borderRadius: normalize(10),
-  },
-
-  chipText: {
-    color: palette.primary,
+    marginLeft: -wp(4),
   },
 
   cta: {
-    margin: wp(4),
+    marginHorizontal: wp(4),
+    marginTop: hp(1),
+    marginBottom: hp(3),
     backgroundColor: palette.middlegreen,
-  },
-
-  skeletonWrap: {
-    gap: hp(2),
-    paddingBottom: hp(4),
-  },
-
-  skeletonBannerWrap: {
-    marginHorizontal: wp(3.5),
-  },
-
-  skeletonGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: wp(4),
-    gap: wp(2.5),
-  },
-
-  skeletonTrendRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: wp(4),
-    gap: wp(2.5),
-  },
-
-  skeletonChartWrap: {
-    marginHorizontal: wp(4),
-  },
-
-  skeletonActivityHeader: {
-    marginHorizontal: wp(4),
-  },
-
-  skeletonActivityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2.5),
-    marginHorizontal: wp(4),
-  },
-
-  skeletonDotCol: {
-    width: wp(5),
-    alignItems: 'center',
+    borderWidth:1,
+    borderColor:palette.middlegreen,
   },
 });
