@@ -10,6 +10,7 @@ import {
   Dimensions,
   ViewStyle,
   TextStyle,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -71,7 +72,6 @@ type ThemeStyleSet = {
   metaIconCircle: ViewStyle;
   viewDetailsBtn: ViewStyle;
   viewDetailsText: TextStyle;
-  accentColor: string;
 };
 
 const getMonthsForYear = (year: string) => {
@@ -297,17 +297,25 @@ export default function CollectionHistoryScreen({ navigation }: any) {
               },
             ]}
           >
-            {items.map((item, index) => (
-              <Pressable
-                key={item}
-                style={[styles.dropdownItem, index === items.length - 1 && styles.dropdownItemLast]}
-                onPress={() => onSelect(item)}
-              >
-                <AppText variant="bodySmall" style={styles.dropdownItemText}>
-                  {item}
-                </AppText>
-              </Pressable>
-            ))}
+
+            <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              keyboardShouldPersistTaps="handled"
+              style={styles.dropdownScroll}
+            >
+              {items.map((item, index) => (
+                <Pressable
+                  key={item}
+                  style={[styles.dropdownItem, index === items.length - 1 && styles.dropdownItemLast]}
+                  onPress={() => onSelect(item)}
+                >
+                  <AppText variant="bodySmall" style={styles.dropdownItemText}>
+                    {item}
+                  </AppText>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
         ) : null}
       </View>
@@ -404,7 +412,11 @@ export default function CollectionHistoryScreen({ navigation }: any) {
       <Pressable
         key={key}
         onPress={() => setStatusFilter(active ? 'all' : key)}
-        style={[styles.filterChip, active ? styles.filterChipActive : styles.filterChipInactive]}
+        style={[
+          styles.filterChip,
+          styles.statusFilterChip,
+          active ? styles.filterChipActive : styles.filterChipInactive,
+        ]}
       >
         <Ionicons
           name={iconName}
@@ -414,10 +426,9 @@ export default function CollectionHistoryScreen({ navigation }: any) {
         <AppText
           variant="bodyBold"
           style={[
-            styles.filterChipText,
+            styles.statusFilterChipText,
             active ? styles.filterChipTextActive : styles.filterChipTextInactive,
           ]}
-          numberOfLines={1}
         >
           {label}
         </AppText>
@@ -460,7 +471,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
               </View>
             ) : null}
           </View>
-          <AppText variant="bodyBold" style={styles.orgNameText} numberOfLines={1}>
+          <AppText variant="bodyBold" style={styles.orgNameText} numberOfLines={2} ellipsizeMode="tail">
             {getOrgName(item)}
           </AppText>
         </View>
@@ -779,7 +790,6 @@ const styles = StyleSheet.create({
     paddingBottom: hp(3),
     gap: hp(1),
   },
-
   header: {
     height: hp(13.5),
     justifyContent: 'flex-end',
@@ -910,6 +920,18 @@ const styles = StyleSheet.create({
   filterChipTextInactive: {
     color: palette.stone,
   },
+  statusFilterChip: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  statusFilterChipText: {
+    fontSize: normalize(13),
+    lineHeight: normalize(16),
+    textTransform: 'none',
+    flexShrink: 0,
+    textAlign: 'center',
+  },
   dropdownRow: {
     flexDirection: 'row',
     gap: wp(2.5),
@@ -976,7 +998,9 @@ const styles = StyleSheet.create({
   dropdownItemText: {
     textTransform: 'none',
   },
-
+  dropdownScroll: {
+    maxHeight: hp(25),
+  },
   collectionCard: {
     marginHorizontal: wp(4),
     borderWidth: normalize(1),
@@ -988,23 +1012,26 @@ const styles = StyleSheet.create({
 
   cardTopRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: wp(2),
+    gap: wp(1.5),
     minWidth: 0,
   },
   cardTopLeft: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: wp(1.5),
-    flexShrink: 1,
-    minWidth: 0,
+    flexShrink: 0,
+    maxWidth: '100%',
   },
 
   statusBadge: {
     paddingHorizontal: wp(2.5),
     paddingVertical: hp(0.4),
     borderRadius: normalize(8),
+    flexShrink: 0,
   },
 
   categoryBadge: {
@@ -1016,6 +1043,7 @@ const styles = StyleSheet.create({
     borderRadius: normalize(8),
     borderWidth: normalize(1),
     backgroundColor: palette.white,
+    flexShrink: 0,
   },
 
   categoryIcon: {
@@ -1024,21 +1052,22 @@ const styles = StyleSheet.create({
   },
 
   badgeText: {
-    fontSize: normalize(13),
+    fontSize: normalize(12),
+    lineHeight: normalize(15),
     textTransform: 'none',
-    flexShrink: 1,
+    flexShrink: 0,
   },
 
   orgNameText: {
-    flex: 1,
+    flexGrow: 1,
     flexShrink: 1,
-    minWidth: 0,
+    flexBasis: wp(28),
+    minWidth: wp(24),
     fontSize: normalize(13),
     color: palette.black,
     textTransform: 'none',
     textAlign: 'right',
   },
-
   metaRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -1129,7 +1158,6 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     textAlign: 'center',
   },
-
   emptyWrap: {
     paddingHorizontal: wp(4),
     paddingVertical: hp(3),
@@ -1141,7 +1169,6 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     color: palette.stone,
   },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -1198,7 +1225,6 @@ const styles = StyleSheet.create({
     color: palette.midgray,
     textTransform: 'none',
   },
-
   skeletonWrap: {
     gap: hp(1.2),
   },
@@ -1260,6 +1286,7 @@ const styles = StyleSheet.create({
   },
 });
 
+/** Per-card colour themes (people / animal / cancelled). */
 const themeStyles: { people: ThemeStyleSet; animal: ThemeStyleSet; cancelled: ThemeStyleSet } = {
   people: {
     sectionCard: { borderColor: palette.kale },
@@ -1273,7 +1300,6 @@ const themeStyles: { people: ThemeStyleSet; animal: ThemeStyleSet; cancelled: Th
     metaIconCircle: { backgroundColor: 'transparent' },
     viewDetailsBtn: { borderColor: palette.kale, backgroundColor: palette.kale },
     viewDetailsText: { color: palette.white },
-    accentColor: palette.kale,
   },
   animal: {
     sectionCard: { borderColor: palette.kale },
@@ -1287,7 +1313,6 @@ const themeStyles: { people: ThemeStyleSet; animal: ThemeStyleSet; cancelled: Th
     metaIconCircle: { backgroundColor: '#FFE8CC' },
     viewDetailsBtn: { borderColor: palette.orange, backgroundColor: palette.orange },
     viewDetailsText: { color: palette.white },
-    accentColor: palette.orange,
   },
   cancelled: {
     sectionCard: { borderColor: palette.kale },
@@ -1301,6 +1326,5 @@ const themeStyles: { people: ThemeStyleSet; animal: ThemeStyleSet; cancelled: Th
     metaIconCircle: { backgroundColor: '#F2F2F2' },
     viewDetailsBtn: { borderColor: '#BDBDBD', backgroundColor: palette.eggplant },
     viewDetailsText: { color: palette.white },
-    accentColor: palette.stone,
   },
 };
