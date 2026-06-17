@@ -60,6 +60,48 @@ export function SignInScreen() {
                 setError('Please enter email and password');
                 return;
             }
+
+            // DEMO FARMER LOGIN
+            if (
+                email.trim().toLowerCase() === 'farmer@saveful.com' &&
+                password === '123456'
+            ) {
+                setAuthUser({
+                    id: 'demo-farmer',
+                    firstName: 'Demo',
+                    lastName: 'Farmer',
+                    email: 'farmer@saveful.com',
+                    accessToken: 'demo-token',
+                    orgType: 'FARMER',
+                    orgRole: 'OWNER',
+                    siteRole: null,
+                    profile: {
+                        user: {
+                            firstName: 'Demo',
+                            lastName: 'Farmer',
+                            email: 'farmer@saveful.com',
+                            phoneNumber: '9999999999',
+                            createdAt: new Date().toISOString(),
+                        },
+                        organisation: {
+                            name: 'Green Valley Farm',
+                            address: 'Demo Farm Address',
+                            logoUrl: '',
+                            type: 'FARMER',
+                        },
+                        role: {
+                            orgRole: 'OWNER',
+                            siteRole: null,
+                        },
+                        sites: [],
+                    },
+                } as any);
+
+                return;
+            }
+
+
+            
             setLoading(true);
 
             const res = await authService.login(
@@ -72,7 +114,7 @@ export function SignInScreen() {
 
             const profileRes = await authService.profile();
             const profile = profileRes.data;
- 
+
             setAuthUser({
                 ...profile.user,
                 accessToken: data.accessToken,

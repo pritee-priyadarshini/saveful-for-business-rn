@@ -42,7 +42,7 @@ const STAT_ICONS = {
 const META_ICONS = {
   calendar: require('../../../assets/placeholder/clock_icon.png'),
   basket: require('../../../assets/placeholder/veggie_basket_icon.png'),
-  meal: require('../../../assets/placeholder/meal_icon.png'),
+  meal: require('../../../assets/placeholder/cutlery_icon.png'),
   leaf: require('../../../assets/placeholder/co2_orange_icon.png'),
 };
 

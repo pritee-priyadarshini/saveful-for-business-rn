@@ -42,6 +42,24 @@ export type CharityForm = {
   pickupPostCode: string;
 };
 
+export interface FarmerForm {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  mobile: string;
+  farmName: string;
+  farmAddress: string;
+  branding: string;
+  logo: string;
+  postcodes: string;
+  pickupRadius: string;
+  region: string;
+  latitude: string;
+  longitude: string;
+}
+
 export type Subscription = {
   planId: string | null;
   isActive: boolean;
@@ -71,6 +89,7 @@ export type AppContextValue = {
   currentPlan: DemoPlan | null;
   restaurantForm: RestaurantForm;
   charityForm: CharityForm;
+  farmerForm: FarmerForm;
   authUser: AuthUser | null;
   setRole: (role: UserRole) => void;
   selectPlan: (planId: string) => void;
@@ -81,6 +100,10 @@ export type AppContextValue = {
   ) => void;
   updateCharityField: (
     field: keyof CharityForm,
+    value: string
+  ) => void;
+  updateFarmerField: (
+    field: keyof FarmerForm,
     value: string
   ) => void;
   setAuthUser: (user: AuthUser | null) => void;
