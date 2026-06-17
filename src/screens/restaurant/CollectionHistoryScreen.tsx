@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1),
-    paddingHorizontal: wp(2.15),
+    paddingHorizontal: wp(2),
     paddingVertical: hp(0.7),
     borderRadius: normalize(8),
     borderWidth: normalize(1),
