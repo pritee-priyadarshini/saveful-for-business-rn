@@ -66,12 +66,11 @@ const defaultFarmerForm: FarmerForm = {
   password: '',
   confirmPassword: '',
   mobile: '',
-  farmName: '',
-  farmAddress: '',
+  businessName: '',
+  businessAddress: '',
+  venueType: '',
   branding: '',
   logo: '',
-  postcodes: '',
-  pickupRadius: '',
   region: '',
   latitude: '',
   longitude: '',
@@ -82,7 +81,7 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: PropsWithChildren) {
   const [isAuthenticated, setAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi' | 'farmer'>('restaurant_single');
+  const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi' | 'farmer' | 'farm_business'>('restaurant_single');
   const [selectedPlanId, setSelectedPlanId] = useState('single_plus');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>(defaultRestaurantForm);
@@ -95,7 +94,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         const token = await SecureStore.getItemAsync('accessToken');
         if (token) {
           const profileRes = await authService.profile();
-          const profile = profileRes.data;
+          const profile = profileRes.data as any;
 
           setAuthUser({
             ...profile.user,
@@ -160,9 +159,9 @@ export function AppProvider({ children }: PropsWithChildren) {
       return 'charity_single';
     }
 
-    if (orgType === 'FARMER') {
-      return 'farmer';
-    }
+    if (orgType === 'FARMER_PRODUCER') return 'farm_business';
+    if (orgType === 'FARMER_CONSUMER') return 'farmer';
+    if (orgType === 'FARMER') return 'farmer';
 
     return selectedRole;
   })();

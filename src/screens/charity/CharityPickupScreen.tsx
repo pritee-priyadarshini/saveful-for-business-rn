@@ -1,27 +1,25 @@
 import React, { useMemo, useState } from 'react';
 import {
-    View,
-    StyleSheet,
-    ScrollView,
-    Pressable,
-    ImageBackground,
-    Modal,
-    Alert,
-    Linking,
-    Dimensions,
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  ImageBackground,
+  Image,
+  Modal,
+  Alert,
+  Linking,
+  Dimensions,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 
 import { Screen } from '../../components/Screen';
-import { Card } from '../../components/Card';
 import { AppText } from '../../components/AppText';
-
-import { spacing } from '../../theme/spacing';
 import { palette } from '../../theme/colors';
-import { ListingStatus, OrderStatus } from '@/types';
 
-const { width, height } = Dimensions.get("window");
+const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
 const hp = (p: number) => (height * p) / 100;
 const normalize = (size: number) => {
@@ -29,702 +27,891 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-type Driver = {
-    id: string;
-    name: string;
-    phone: string;
-    online: boolean;
+type StatusFilter = 'all' | 'completed' | 'cancelled';
+
+type PickupCardStatus =
+  | 'unclaimed'
+  | 'claimed'
+  | 'awaiting_driver'
+  | 'enroute'
+  | 'completed'
+  | 'cancelled';
+
+type PickupItem = {
+  name: string;
+  available: number;
+  claimed: number;
 };
 
 type Pickup = {
-    id: string;
-    restaurantName: string;
-    restaurantAddress: string;
-    distance: string;
-    restaurantPhone: string;
-    listingStatus: ListingStatus;
-    orderStatus: OrderStatus;
-    driverName: string | null;
-    driverPhone: string | null;
-    pickupDate: string;
-    pickupTime: string;
-    instructions: string;
-    items: any[];
+  id: string;
+  restaurantName: string;
+  restaurantAddress: string;
+  distance: string;
+  restaurantPhone: string;
+  driverName: string | null;
+  driverPhone: string | null;
+  pickupDateLabel: string;
+  pickupTimeLabel: string;
+  instructions: string;
+  weightKg: number;
+  cardStatus: PickupCardStatus;
+  isNextPickup?: boolean;
+  items: PickupItem[];
 };
 
-const drivers: Driver[] = [
-    {
-        id: 'd1',
-        name: 'Rahul Das',
-        phone: '+91 9876512345',
-        online: true,
-    },
-    {
-        id: 'd2',
-        name: 'Sanjay Rout',
-        phone: '+91 9876523456',
-        online: false,
-    },
-    {
-        id: 'd3',
-        name: 'Amit Sahu',
-        phone: '+91 9876534567',
-        online: true,
-    },
-];
+type ThemeStyleSet = {
+  card: ViewStyle;
+  statusBadge: ViewStyle;
+  badgeText: TextStyle;
+  weightBox: ViewStyle;
+  weightText: TextStyle;
+  viewDetailsBtn: ViewStyle;
+  viewDetailsText: TextStyle;
+  contactBtn: ViewStyle;
+  contactBtnText: TextStyle;
+  contactIconColor: string;
+  weightIcon: ReturnType<typeof require>;
+};
+
+const WEIGHT_ICONS = {
+  claimed: require('../../../assets/placeholder/storage_box_green.png'),
+  awaiting_driver: require('../../../assets/placeholder/storage_box_orange.png'),
+  enroute: require('../../../assets/placeholder/storage_box_green.png'),
+  completed: require('../../../assets/placeholder/storage_box_green.png'),
+  cancelled: require('../../../assets/placeholder/storage_box_green.png'),
+  unclaimed: require('../../../assets/placeholder/storage_box_green.png'),
+};
+
+const STATUS_LABELS: Record<PickupCardStatus, string> = {
+  unclaimed: 'AVAILABLE',
+  claimed: 'CLAIMED',
+  awaiting_driver: 'AWAITING DRIVER',
+  enroute: 'EN ROUTE',
+  completed: 'COMPLETED',
+  cancelled: 'CANCELLED',
+};
 
 const initialPickups: Pickup[] = [
-    {
-        id: '1',
-        restaurantName: 'Spice Route Kitchen',
-        restaurantAddress: 'Patia Main Road, Bhubaneswar',
-        distance: '1.8 km away',
-        restaurantPhone: '+91 9876543210',
-        listingStatus: 'CLAIMED',
-        orderStatus: 'enroute',
-        driverName: 'Rahul Das',
-        driverPhone: '+91 9876512345',
-        pickupDate: '28/04/2026',
-        pickupTime: '5:30 PM',
-        instructions: 'Needs refrigeration',
-        items: [
-            { name: 'Rice', available: 10, claimed: 10 },
-            { name: 'Dal', available: 8, claimed: 8 },
-            { name: 'Sweets', available: 4, claimed: 4 },
-        ],
-    },
-    {
-        id: '2',
-        restaurantName: 'Biryani Box',
-        restaurantAddress: 'Saheed Nagar, Bhubaneswar',
-        distance: '3.2 km away',
-        restaurantPhone: '+91 9876500000',
-        listingStatus: 'PARTIAL',
-        orderStatus: 'driver_assigned',
-        driverName: null,
-        driverPhone: null,
-        pickupDate: '28/04/2026',
-        pickupTime: '7:00 PM',
-        instructions: 'Reheat before serving',
-        items: [
-            { name: 'Fruits', available: 15, claimed: 8 },
-            { name: 'Bread', available: 10, claimed: 4 },
-            { name: 'Vegetables', available: 12, claimed: 6 },
-        ],
-    },
+  {
+    id: 'next-1',
+    restaurantName: 'Green Bowl Cafe',
+    restaurantAddress: 'Nayapalli, Bhubaneswar',
+    distance: '0.9 kms away',
+    restaurantPhone: '+91 9876543001',
+    driverName: null,
+    driverPhone: null,
+    pickupDateLabel: 'Today',
+    pickupTimeLabel: '4.00pm - 4.30pm',
+    instructions: 'Collect from back entrance',
+    weightKg: 12,
+    cardStatus: 'unclaimed',
+    isNextPickup: true,
+    items: [
+      { name: 'Salad', available: 6, claimed: 0 },
+      { name: 'Bread', available: 6, claimed: 0 },
+    ],
+  },
+  {
+    id: '1',
+    restaurantName: 'Spice Route Kitchen',
+    restaurantAddress: 'Patia Main Road, Bhubaneswar',
+    distance: '1.8 kms away',
+    restaurantPhone: '+91 9876543210',
+    driverName: 'Rakesh Sahu',
+    driverPhone: '+91 9876512345',
+    pickupDateLabel: 'Today',
+    pickupTimeLabel: '5.30pm - 6.00pm',
+    instructions: 'Needs refrigeration',
+    weightKg: 18,
+    cardStatus: 'claimed',
+    items: [
+      { name: 'Rice', available: 10, claimed: 10 },
+      { name: 'Dal', available: 8, claimed: 8 },
+    ],
+  },
+  {
+    id: '2',
+    restaurantName: 'Biryani Box',
+    restaurantAddress: 'Saheed Nagar, Bhubaneswar',
+    distance: '3.2 kms away',
+    restaurantPhone: '+91 9876500000',
+    driverName: null,
+    driverPhone: null,
+    pickupDateLabel: 'Today',
+    pickupTimeLabel: '7.00pm - 7.30pm',
+    instructions: 'Reheat before serving',
+    weightKg: 22,
+    cardStatus: 'awaiting_driver',
+    items: [
+      { name: 'Biryani', available: 15, claimed: 15 },
+      { name: 'Raita', available: 7, claimed: 7 },
+    ],
+  },
+  {
+    id: '3',
+    restaurantName: 'ABC Box',
+    restaurantAddress: 'Khandagiri, Bhubaneswar',
+    distance: '2.5 kms away',
+    restaurantPhone: '+91 9876501111',
+    driverName: 'Sanjay Rout',
+    driverPhone: '+91 9876523456',
+    pickupDateLabel: 'Today',
+    pickupTimeLabel: '6.00pm - 6.30pm',
+    instructions: 'Ring bell on arrival',
+    weightKg: 22,
+    cardStatus: 'enroute',
+    items: [
+      { name: 'Curry', available: 12, claimed: 12 },
+      { name: 'Rice', available: 10, claimed: 10 },
+    ],
+  },
+  {
+    id: '4',
+    restaurantName: 'XYZ Box',
+    restaurantAddress: 'Chandrasekharpur, Bhubaneswar',
+    distance: '4.1 kms away',
+    restaurantPhone: '+91 9876502222',
+    driverName: 'Amit Sahu',
+    driverPhone: '+91 9876534567',
+    pickupDateLabel: 'May 14th 2026',
+    pickupTimeLabel: '',
+    instructions: 'Completed pickup',
+    weightKg: 22,
+    cardStatus: 'completed',
+    items: [
+      { name: 'Meals', available: 14, claimed: 14 },
+      { name: 'Dessert', available: 8, claimed: 8 },
+    ],
+  },
+  {
+    id: '5',
+    restaurantName: 'Sunrise Kitchen',
+    restaurantAddress: 'Unit 3, Bhubaneswar',
+    distance: '5.0 kms away',
+    restaurantPhone: '+91 9876503333',
+    driverName: null,
+    driverPhone: null,
+    pickupDateLabel: 'May 10th 2026',
+    pickupTimeLabel: '',
+    instructions: 'Cancelled by restaurant',
+    weightKg: 16,
+    cardStatus: 'cancelled',
+    items: [
+      { name: 'Pasta', available: 10, claimed: 0 },
+      { name: 'Soup', available: 6, claimed: 0 },
+    ],
+  },
 ];
 
-function prettyStatus(status: string) {
-    return status
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
+function isCompletedStatus(status: PickupCardStatus) {
+  return status === 'completed';
 }
 
-function prettyListingStatus(status: ListingStatus) {
-    if (status === 'PARTIAL') return 'Partial Claimed';
-    return status.charAt(0) + status.slice(1).toLowerCase();
+function isCancelledStatus(status: PickupCardStatus) {
+  return status === 'cancelled';
 }
 
-export default function CharityPickupScreen({ navigation, }: any) {
-    const [pickups, setPickups] = useState(initialPickups);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [selectedItems, setSelectedItems] = useState<any[]>([]);
-    const [expandedDriverId, setExpandedDriverId] = useState<string | null>(null);
-    const [selectedDriver, setSelectedDriver] = useState<Record<string, string>>({});
-    const modalTotals = useMemo(() => {
-        const totalAvailable = selectedItems.reduce((sum, i) => sum + (i.available || 0), 0);
-        const totalClaimed = selectedItems.reduce((sum, i) => sum + (i.claimed || 0), 0);
-        return { totalAvailable, totalClaimed };
-    }, [selectedItems]);
+function formatTimeLine(pickup: Pickup) {
+  if (isCompletedStatus(pickup.cardStatus) || isCancelledStatus(pickup.cardStatus)) {
+    return pickup.pickupDateLabel;
+  }
+  if (pickup.pickupTimeLabel) {
+    return `${pickup.pickupDateLabel} - ${pickup.pickupTimeLabel}`;
+  }
+  return pickup.pickupDateLabel;
+}
 
-    const makeCall = async (phone?: string | null) => {
-        if (!phone) {
-            Alert.alert('Unavailable', 'Phone number not available');
-            return;
-        }
+function getDriverLabel(pickup: Pickup) {
+  if (pickup.cardStatus === 'unclaimed') return null;
+  return pickup.driverName ? `Driver: ${pickup.driverName}` : 'Driver: No Driver assigned';
+}
 
-        const url = `tel:${phone.replace(/[^+\d]/g, '')}`;
-        try {
-            await Linking.openURL(url);
-        } catch {
-            Alert.alert('Error', 'Unable to open dialer');
-        }
-    };
+export default function CharityPickupScreen({ navigation }: any) {
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedPickup, setSelectedPickup] = useState<Pickup | null>(null);
 
-    const sendMessage = async (phone?: string | null) => {
-        if (!phone) {
-            Alert.alert('Unavailable', 'Phone number not available');
-            return;
-        }
-        await Linking.openURL(`sms:${phone}`);
-    };
+  const nextPickup = useMemo(
+    () => initialPickups.find((p) => p.isNextPickup || p.cardStatus === 'unclaimed') ?? null,
+    [],
+  );
 
-    const assignDriver = (pickupId: string) => {
-        const driverId = selectedDriver[pickupId];
-        if (!driverId) return;
+  const claimedPickups = useMemo(
+    () => initialPickups.filter((p) => p.cardStatus !== 'unclaimed' && !p.isNextPickup),
+    [],
+  );
 
-        const driver = drivers.find(
-            d => d.id === driverId
-        );
+  const filteredPickups = useMemo(() => {
+    return claimedPickups.filter((pickup) => {
+      if (statusFilter === 'completed') return isCompletedStatus(pickup.cardStatus);
+      if (statusFilter === 'cancelled') return isCancelledStatus(pickup.cardStatus);
+      return true;
+    });
+  }, [claimedPickups, statusFilter]);
 
-        if (!driver) return;
+  const modalTotals = useMemo(() => {
+    if (!selectedPickup) return { totalAvailable: 0, totalClaimed: 0 };
+    const totalAvailable = selectedPickup.items.reduce((sum, i) => sum + (i.available || 0), 0);
+    const totalClaimed = selectedPickup.items.reduce((sum, i) => sum + (i.claimed || 0), 0);
+    return { totalAvailable, totalClaimed };
+  }, [selectedPickup]);
 
-        setPickups(prev =>
-            prev.map(p =>
-                p.id === pickupId
-                    ? {
-                        ...p,
-                        driverName: driver.name,
-                        driverPhone: driver.phone,
-                    }
-                    : p
-            )
-        );
+  const makeCall = async (phone?: string | null) => {
+    if (!phone) {
+      Alert.alert('Unavailable', 'Phone number not available');
+      return;
+    }
+    const url = `tel:${phone.replace(/[^+\d]/g, '')}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Error', 'Unable to open dialer');
+    }
+  };
 
-        setExpandedDriverId(null);
-    };
+  const sendMessage = async (phone?: string | null) => {
+    if (!phone) {
+      Alert.alert('Unavailable', 'Phone number not available');
+      return;
+    }
+    await Linking.openURL(`sms:${phone}`);
+  };
+
+  const openDetails = (pickup: Pickup) => {
+    setSelectedPickup(pickup);
+    setModalVisible(true);
+  };
+
+  const handleViewDetails = (pickup: Pickup) => {
+    if (pickup.cardStatus === 'enroute') {
+      navigation.navigate('DriverTracking', {
+        trackingId: pickup.id,
+        source: 'charity',
+      });
+      return;
+    }
+    openDetails(pickup);
+  };
+
+  const renderContactButton = (
+    label: 'Call' | 'Message',
+    onPress: () => void,
+    theme: ThemeStyleSet,
+    icon: keyof typeof Ionicons.glyphMap,
+  ) => (
+    <Pressable
+      style={[styles.contactBtn, theme.contactBtn]}
+      onPress={onPress}
+    >
+      <Ionicons name={icon} size={normalize(14)} color={theme.contactIconColor} />
+      <AppText variant="bodyBold" style={[styles.contactBtnText, theme.contactBtnText]}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+
+  const renderPickupCard = (pickup: Pickup) => {
+    const theme = themeStyles[pickup.cardStatus];
+    const driverLabel = getDriverLabel(pickup);
+    const showDriverContact =
+      pickup.cardStatus !== 'unclaimed' &&
+      pickup.cardStatus !== 'completed' &&
+      pickup.cardStatus !== 'cancelled';
+    const statusLabel = STATUS_LABELS[pickup.cardStatus];
 
     return (
-        <Screen backgroundColor={palette.creme}>
-            <ScrollView contentContainerStyle={styles.container} >
-                <ImageBackground
-                    source={require('../../../assets/placeholder/feed-bg.png')}
-                    style={styles.headerBg}
-                >
-                    <AppText variant="h5" style={styles.white} > Your Pickups </AppText>
-                </ImageBackground>
+      <View key={pickup.id} style={[styles.pickupCard, theme.card]}>
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.statusBadge, theme.statusBadge]}>
+            <AppText variant="bodyBold" style={[styles.badgeText, theme.badgeText]} numberOfLines={1}>
+              {statusLabel}
+            </AppText>
+          </View>
+          <AppText variant="bodyBold" style={styles.restaurantName} numberOfLines={2} ellipsizeMode="tail">
+            {pickup.restaurantName}
+          </AppText>
+        </View>
 
-                {pickups.map(item => {
-                    return (
-                        <Card key={item.id} style={styles.card}>
-                            {/* TOP */}
-                            <View style={styles.topRow}>
-                                <View style={styles.leftBlock}>
-                                    <AppText variant="bodyBold">{item.restaurantName}</AppText>
-                                    <AppText variant="caption"> 📍 {item.restaurantAddress}</AppText>
-                                    <AppText variant="caption"> {item.distance} </AppText>
-                                    <View style={styles.driverRow}>
-                                        <AppText variant="bodySmall" style={styles.driverInline} >
-                                            <AppText variant="caption" style={styles.driverLabel} >
-                                                Driver:{' '}
-                                            </AppText>
-                                            {item.driverName || 'To be assigned'}
-                                        </AppText>
-                                    </View>
-                                </View>
+        <View style={styles.cardBodyRow}>
+          <View style={[styles.weightBox, theme.weightBox]}>
+            <Image source={theme.weightIcon} style={styles.weightIcon} resizeMode="contain" />
+            <AppText variant="bodyBold" style={[styles.weightText, theme.weightText]}>
+              {pickup.weightKg} kg
+            </AppText>
+          </View>
 
-                                <View style={styles.statusWrap}>
-                                    <View
-                                        style={[
-                                            styles.statusPill,
-                                            item.listingStatus === 'PARTIAL' ? styles.partialPill : styles.claimedPill,
-                                        ]}
-                                    >
-                                        <AppText variant="caption" style={styles.statusText} >
-                                            {prettyListingStatus(item.listingStatus)}
-                                        </AppText>
-                                    </View>
+          <View style={styles.detailsColumn}>
+            <View style={styles.detailLine}>
+              <Ionicons name="location-sharp" size={normalize(14)} color={palette.chilli} />
+              <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                {pickup.restaurantAddress}
+              </AppText>
+            </View>
 
-                                    <View style={styles.driverStatusPill}>
-                                        <AppText variant="caption" style={styles.statusText} >
-                                            {!item.driverName ? 'Awaiting Driver' : prettyStatus(item.orderStatus || 'awaiting_driver')}
-                                        </AppText>
-                                    </View>
+            <AppText variant="bodySmall" style={styles.distanceText}>
+              {pickup.distance}
+            </AppText>
 
-                                    <View>
-                                        {item.listingStatus !== 'ACTIVE' ? (
-                                            <Pressable
-                                                style={styles.trackBtn}
-                                                onPress={() =>
-                                                    navigation.navigate('DriverTracking', {
-                                                        trackingId: item.id,
-                                                        source: 'charity',
-                                                    })
-                                                }
-                                            >
-                                                <AppText variant="bodyBold" style={styles.trackText} > Track </AppText>
-                                            </Pressable>
-                                        ) : null}
-                                    </View>
+            <View style={styles.detailLine}>
+              <Image
+                source={require('../../../assets/placeholder/clock_icon_2.png')}
+                style={styles.inlineIcon}
+                resizeMode="contain"
+              />
+              <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                {formatTimeLine(pickup)}
+              </AppText>
+            </View>
 
-
-                                </View>
-                            </View>
-
-                            {/* META */}
-                            <View style={styles.metaRow}>
-                                <Pressable
-                                    style={styles.metaCard}
-                                    onPress={() => {
-                                        setSelectedItems(item.items);
-                                        setModalVisible(true);
-                                    }}
-                                >
-                                    <AppText variant="bodyBold"> Items </AppText>
-                                    <View style={styles.viewBtn}>
-                                        <AppText variant="bodyBold" style={styles.viewText} > View </AppText>
-                                    </View>
-                                </Pressable>
-
-                                <View style={styles.metaCard}>
-                                    <AppText variant="bodyBold"> Pickup Date </AppText>
-                                    <AppText variant="bodySmall"> {item.pickupDate} </AppText>
-                                </View>
-
-                                <View style={styles.metaCard}>
-                                    <AppText variant="bodyBold"> Pickup Time </AppText>
-                                    <AppText variant="bodySmall"> {item.pickupTime} </AppText>
-                                </View>
-                            </View>
-
-                            {/* INSTRUCTION */}
-                            <View style={styles.infoBlock}>
-                                <AppText variant="caption"> Instructions:{" "} {item.instructions} </AppText>
-                            </View>
-
-                            {/* DRIVER ASSIGN */}
-                            <Pressable
-                                style={styles.modifyBtn}
-                                onPress={() =>
-                                    setExpandedDriverId(
-                                        expandedDriverId === item.id ? null : item.id
-                                    )
-                                }
-                            >
-                                <AppText variant="bodyBold" style={styles.modifyText} >
-                                    {item.driverName ? 'Modify Driver' : 'Add Driver'}
-                                </AppText>
-                            </Pressable>
-
-                            {
-                                expandedDriverId === item.id && (
-                                    <View style={styles.assignBox}>
-                                        <View style={styles.driverDropdown} >
-                                            <Picker
-                                                selectedValue={
-                                                    selectedDriver[
-                                                    item.id
-                                                    ] || ''
-                                                }
-                                                onValueChange={v =>
-                                                    setSelectedDriver(
-                                                        prev => ({
-                                                            ...prev,
-                                                            [item.id]: v,
-                                                        })
-                                                    )
-                                                }
-                                            >
-                                                <Picker.Item label="Select driver" value="" />
-
-                                                {drivers.map(driver => (
-                                                    <Picker.Item
-                                                        key={driver.id}
-                                                        label={`${driver.online ? '✓' : '✕'} ${driver.name}`}
-                                                        value={driver.id}
-                                                    />
-                                                ))}
-                                            </Picker>
-                                        </View>
-
-                                        {selectedDriver[item.id] && (
-                                            <View style={styles.driverAssignedRow} >
-                                                <AppText variant="bodySmall">
-                                                    Driver to be assigned:{' '}
-                                                    <AppText variant="bodyBold">
-                                                        {
-                                                            drivers.find(
-                                                                d => d.id === selectedDriver[item.id]
-                                                            )?.name
-                                                        }
-                                                    </AppText>
-                                                </AppText>
-
-                                                <Ionicons
-                                                    name={
-                                                        drivers.find(
-                                                            d => d.id === selectedDriver[item.id]
-                                                        )?.online ? 'checkmark-circle' : 'close-circle'
-                                                    }
-                                                    size={normalize(22)}
-                                                    color={
-                                                        drivers.find(
-                                                            d => d.id === selectedDriver[item.id]
-                                                        )?.online ? palette.middlegreen : palette.chilli
-                                                    }
-                                                />
-                                            </View>
-                                        )}
-
-                                        <Pressable
-                                            style={styles.saveBtn}
-                                            onPress={() => assignDriver(item.id)}
-                                        >
-                                            <AppText variant="bodyBold" style={styles.saveBtnText}> Save Driver </AppText>
-                                        </Pressable>
-                                    </View>
-                                )
-                            }
-
-                            {/* CONTACT RESTAURANT */}
-                            <View style={styles.contactLine}>
-                                <AppText variant="bodyBold"> Contact Restaurant </AppText>
-
-                                <View style={styles.iconRow}>
-                                    <Pressable
-                                        style={styles.iconPill}
-                                        onPress={() => makeCall(item.restaurantPhone)}
-                                    >
-                                        <Ionicons name="call-outline" size={normalize(18)} color={palette.white} />
-                                        <AppText variant="bodyBold" style={styles.iconText} > Call </AppText>
-                                    </Pressable>
-
-                                    <Pressable
-                                        style={styles.iconPill}
-                                        onPress={() => sendMessage(item.restaurantPhone)}
-                                    >
-                                        <Ionicons name="chatbubble-outline" size={normalize(18)} color={palette.white} />
-                                        <AppText variant="bodyBold" style={styles.iconText} > Message </AppText>
-                                    </Pressable>
-                                </View>
-                            </View>
-
-                            {/* CONTACT DRIVER */}
-                            {
-                                item.driverPhone && (
-                                    <View style={styles.contactLine}>
-                                        <AppText variant="bodyBold"> Contact Driver </AppText>
-                                        <View style={styles.iconRow}>
-                                            <Pressable
-                                                style={styles.iconPill}
-                                                onPress={() => makeCall(item.driverPhone)}
-                                            >
-                                                <Ionicons name="call-outline" size={normalize(18)} color={palette.white} />
-                                                <AppText variant="bodyBold" style={styles.iconText} > Call </AppText>
-                                            </Pressable>
-
-                                            <Pressable
-                                                style={styles.iconPill}
-                                                onPress={() => sendMessage(item.driverPhone)}
-                                            >
-                                                <Ionicons name="chatbubble-outline" size={normalize(18)} color={palette.white} />
-                                                <AppText variant="bodyBold" style={styles.iconText} > Message </AppText>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                )
-                            }
-                        </Card>
-                    );
-                })}
-            </ScrollView>
-
-            <Modal
-                visible={modalVisible}
-                transparent
-                animationType="slide"
-            >
-                <View style={styles.modalWrap} >
-                    <View style={styles.modalCard} >
-                        <View style={styles.modalTopBar}>
-                            <AppText variant="h6"> Items </AppText>
-
-                            <Pressable
-                                style={styles.closeIconBtn}
-                                onPress={() => setModalVisible(false)}
-                            >
-                                <Ionicons name="close" size={normalize(20)} color={palette.black} />
-                            </Pressable>
-                        </View>
-
-                        <View style={styles.modalHeaderRow} >
-                            <AppText variant="bodyBold" style={{ flex: 2, }}> Item Name </AppText>
-
-                            <AppText variant="bodyBold" style={styles.modalCol} >
-                                Available
-                            </AppText>
-
-                            <AppText variant="bodyBold" style={styles.modalCol} >
-                                Claimed
-                            </AppText>
-                        </View>
-
-                        {selectedItems.map(
-                            (item, idx) => (
-                                <View
-                                    key={idx}
-                                    style={styles.modalItemRow}
-                                >
-                                    <AppText variant="bodyBold" style={{ flex: 2, }} >
-                                        {item.name}
-                                    </AppText>
-
-                                    <AppText variant="bodySmall" style={styles.modalCol} >
-                                        {item.available} kg
-                                    </AppText>
-
-                                    <AppText variant="bodySmall" style={styles.modalCol} >
-                                        {item.claimed} kg
-                                    </AppText>
-                                </View>
-                            )
-                        )}
-
-                        <AppText variant="bodyBold">
-                            Total Quantity:{' '}{modalTotals.totalAvailable}{' '} kg
-                        </AppText>
-
-                        <AppText variant="bodyBold">
-                            Total Claimed:{' '} {modalTotals.totalClaimed}{' '} kg
-                        </AppText>
-                    </View>
+            {driverLabel ? (
+              <View style={styles.driverDetailsRow}>
+                <View style={styles.detailLine}>
+                  <Image
+                    source={require('../../../assets/placeholder/driver_icon.png')}
+                    style={styles.inlineIcon}
+                    resizeMode="contain"
+                  />
+                  <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                    {driverLabel}
+                  </AppText>
                 </View>
-            </Modal>
-        </Screen >
+
+                <Pressable
+                  style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
+                  onPress={() => handleViewDetails(pickup)}
+                >
+                  <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]}>
+                    View Details
+                  </AppText>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.driverDetailsRow}>
+                <View style={styles.detailLine} />
+                <Pressable
+                  style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
+                  onPress={() => handleViewDetails(pickup)}
+                >
+                  <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]}>
+                    View Details
+                  </AppText>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.contactSection}>
+          <View style={styles.contactGroup}>
+            <AppText variant="caption" style={styles.contactLabel}>
+              Contact Collection Site
+            </AppText>
+            <View style={styles.contactBtnRow}>
+              {renderContactButton('Call', () => makeCall(pickup.restaurantPhone), theme, 'call-outline')}
+              {renderContactButton('Message', () => sendMessage(pickup.restaurantPhone), theme, 'chatbubble-outline')}
+            </View>
+          </View>
+
+          {showDriverContact ? (
+            <View style={styles.contactGroup}>
+              <AppText variant="caption" style={styles.contactLabel}>
+                Contact Driver
+              </AppText>
+              <View style={styles.contactBtnRow}>
+                {renderContactButton('Call', () => makeCall(pickup.driverPhone), theme, 'call-outline')}
+                {renderContactButton('Message', () => sendMessage(pickup.driverPhone), theme, 'chatbubble-outline')}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
     );
+  };
+
+  const renderStatusChip = (
+    key: StatusFilter,
+    label: string,
+    iconName?: keyof typeof Ionicons.glyphMap,
+  ) => {
+    const active = statusFilter === key;
+    return (
+      <Pressable
+        key={key}
+        onPress={() => setStatusFilter(key)}
+        style={[styles.filterChip, active ? styles.filterChipActive : styles.filterChipInactive]}
+      >
+        {iconName ? (
+          <Ionicons
+            name={iconName}
+            size={normalize(14)}
+            color={active ? palette.white : palette.primary}
+          />
+        ) : null}
+        <AppText
+          variant="bodyBold"
+          style={[styles.filterChipText, active ? styles.filterChipTextActive : styles.filterChipTextInactive]}
+          numberOfLines={1}
+        >
+          {label}
+        </AppText>
+      </Pressable>
+    );
+  };
+
+  return (
+    <Screen backgroundColor={palette.white}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <ImageBackground
+          source={require('../../../assets/placeholder/feed-bg.png')}
+          resizeMode="cover"
+          style={styles.headerBg}
+        >
+          <AppText variant="h4" style={styles.headerTitle}>
+            YOUR PICKUPS
+          </AppText>
+        </ImageBackground>
+
+        {nextPickup ? (
+          <View style={styles.sectionBlock}>
+            <AppText variant="h8" style={styles.sectionHeading}>
+              Next Pickup
+            </AppText>
+            {renderPickupCard(nextPickup)}
+          </View>
+        ) : null}
+
+        <View style={styles.sectionBlock}>
+          <View style={styles.filterRow}>
+            {renderStatusChip('all', 'All')}
+            {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
+            {renderStatusChip('cancelled', 'Cancelled', 'close-circle-outline')}
+          </View>
+
+          {filteredPickups.length > 0 ? (
+            filteredPickups.map((pickup) => renderPickupCard(pickup))
+          ) : (
+            <View style={styles.emptyWrap}>
+              <AppText variant="bodySmall" style={styles.emptyText}>
+                No pickups match this filter.
+              </AppText>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalWrap}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalTopBar}>
+              <AppText variant="h6">Items</AppText>
+              <Pressable style={styles.closeIconBtn} onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={normalize(20)} color={palette.black} />
+              </Pressable>
+            </View>
+
+            {selectedPickup ? (
+              <>
+                <AppText variant="bodyBold" style={styles.modalSubtitle}>
+                  {selectedPickup.restaurantName}
+                </AppText>
+
+                <View style={styles.modalHeaderRow}>
+                  <AppText variant="bodyBold" style={styles.modalColWide}>
+                    Item Name
+                  </AppText>
+                  <AppText variant="bodyBold" style={styles.modalCol}>
+                    Available
+                  </AppText>
+                  <AppText variant="bodyBold" style={styles.modalCol}>
+                    Claimed
+                  </AppText>
+                </View>
+
+                {selectedPickup.items.map((item, idx) => (
+                  <View key={idx} style={styles.modalItemRow}>
+                    <AppText variant="bodyBold" style={styles.modalColWide}>
+                      {item.name}
+                    </AppText>
+                    <AppText variant="bodySmall" style={styles.modalCol}>
+                      {item.available} kg
+                    </AppText>
+                    <AppText variant="bodySmall" style={styles.modalCol}>
+                      {item.claimed} kg
+                    </AppText>
+                  </View>
+                ))}
+
+                <AppText variant="bodyBold">Total Quantity: {modalTotals.totalAvailable} kg</AppText>
+                <AppText variant="bodyBold">Total Claimed: {modalTotals.totalClaimed} kg</AppText>
+
+                {selectedPickup.instructions ? (
+                  <AppText variant="bodySmall" style={styles.modalInstructions}>
+                    Instructions: {selectedPickup.instructions}
+                  </AppText>
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+    </Screen>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        gap: hp(2),
-        paddingBottom: hp(4),
-    },
+  container: {
+    paddingBottom: hp(4),
+    gap: hp(1.5),
+  },
 
-    headerBg: {
-        width: '100%',
-        height: hp(18),
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+  /* Header */
+  headerBg: {
+    width: '100%',
+    height: hp(16),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: palette.white,
+    textTransform: 'none',
+  },
 
-    white: {
-        color: palette.white,
-    },
+  /* Sections */
+  sectionBlock: {
+    paddingHorizontal: wp(4),
+    gap: hp(1.2),
+  },
+  sectionHeading: {
+    color: palette.black,
+    textTransform: 'none',
+  },
 
-    card: {
-        padding: wp(4),
-        marginHorizontal: wp(4),
-        borderRadius: normalize(16),
-        gap: hp(1.2),
-        backgroundColor: palette.radish,
-    },
+  /* Filter chips */
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+    alignItems: 'center',
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1),
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(999),
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  filterChipInactive: {
+    backgroundColor: palette.white,
+    borderColor: palette.primary,
+  },
+  filterChipActive: {
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
+  },
+  filterChipText: {
+    fontSize: normalize(13),
+    textTransform: 'none',
+    flexShrink: 0,
+  },
+  filterChipTextActive: {
+    color: palette.white,
+  },
+  filterChipTextInactive: {
+    color: palette.primary,
+  },
 
-    topRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
+  /* Pickup card */
+  pickupCard: {
+    borderWidth: normalize(1.5),
+    borderRadius: normalize(14),
+    backgroundColor: palette.white,
+    padding: wp(3),
+    gap: hp(1.2),
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    flexWrap: 'wrap',
+  },
+  statusBadge: {
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.4),
+    borderRadius: normalize(6),
+    flexShrink: 0,
+  },
+  badgeText: {
+    fontSize: normalize(11),
+    textTransform: 'none',
+  },
+  restaurantName: {
+    flex: 1,
+    minWidth: wp(40),
+    fontSize: normalize(15),
+    color: palette.black,
+    textTransform: 'none',
+  },
+  cardBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2.5),
+  },
+  weightBox: {
+    width: wp(18),
+    minHeight: wp(18),
+    borderWidth: normalize(1),
+    borderRadius: normalize(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(0.8),
+    gap: hp(0.4),
+    flexShrink: 0,
+  },
+  weightIcon: {
+    width: normalize(28),
+    height: normalize(28),
+  },
+  weightText: {
+    fontSize: normalize(12),
+    textTransform: 'none',
+  },
+  detailsColumn: {
+    flex: 1,
+    minWidth: 0,
+    gap: hp(0.35),
+  },
+  detailLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(1),
+    flex: 1,
+    minWidth: 0,
+  },
+  detailText: {
+    flex: 1,
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
+    color: palette.black,
+    textTransform: 'none',
+  },
+  distanceText: {
+    marginLeft: wp(4.5),
+    color: palette.midgray,
+    textTransform: 'none',
+    fontSize: normalize(11),
+  },
+  inlineIcon: {
+    width: normalize(14),
+    height: normalize(14),
+    marginTop: normalize(1),
+    flexShrink: 0,
+  },
+  driverDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: wp(1.5),
+    flexWrap: 'wrap',
+    marginTop: hp(0.2),
+  },
+  viewDetailsBtn: {
+    paddingVertical: hp(0.7),
+    paddingHorizontal: wp(2.5),
+    borderRadius: normalize(8),
+    flexShrink: 0,
+    alignSelf: 'flex-end',
+  },
+  viewDetailsText: {
+    fontSize: normalize(11),
+    textTransform: 'none',
+  },
 
-    leftBlock: {
-        flex: 1,
-        gap: hp(0.5),
-    },
+  /* Contact actions */
+  contactSection: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5E5',
+    paddingTop: hp(1),
+  },
+  contactGroup: {
+    flex: 1,
+    minWidth: wp(38),
+    gap: hp(0.5),
+  },
+  contactLabel: {
+    color: palette.black,
+    textTransform: 'none',
+    fontSize: normalize(11),
+  },
+  contactBtnRow: {
+    flexDirection: 'row',
+    gap: wp(1.5),
+  },
+  contactBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1),
+    paddingVertical: hp(0.7),
+    paddingHorizontal: wp(1.5),
+    borderRadius: normalize(999),
+    borderWidth: 1,
+    backgroundColor: palette.white,
+  },
+  contactBtnText: {
+    fontSize: normalize(11),
+    textTransform: 'none',
+  },
 
-    statusWrap: {
-        alignItems: 'flex-end',
-        gap: hp(0.8),
-    },
+  /* Empty state */
+  emptyWrap: {
+    paddingVertical: hp(3),
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: palette.stone,
+    textTransform: 'none',
+  },
 
-    statusPill: {
-        minWidth: wp(30),
-        paddingVertical: hp(0.7),
-        paddingHorizontal: wp(2.5),
-        borderRadius: normalize(999),
-        alignItems: 'center',
-    },
-
-    claimedPill: {
-        backgroundColor: palette.middlegreen,
-    },
-
-    partialPill: {
-        backgroundColor: palette.primary,
-    },
-
-    statusText: {
-        color: palette.white,
-    },
-
-    driverRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        marginTop: hp(0.5),
-    },
-
-    driverLabel: {
-        color: palette.stone,
-    },
-
-    driverInline: {
-        flex: 1,
-        lineHeight: normalize(22),
-        paddingRight: wp(2.5),
-    },
-
-    driverStatusPill: {
-        backgroundColor: palette.orange,
-        minWidth: wp(30),
-        paddingVertical: hp(0.7),
-        paddingHorizontal: wp(2.5),
-        borderRadius: normalize(999),
-        alignItems: 'center',
-    },
-
-    trackBtn: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        alignSelf: 'flex-end',
-        backgroundColor: palette.primary,
-        paddingVertical: hp(0.7),
-        borderRadius: normalize(999),
-        minWidth: wp(30),
-        paddingHorizontal: wp(2.5),
-    },
-
-    trackText: {
-        color: palette.white,
-    },
-
-    metaRow: {
-        flexDirection: 'row',
-        gap: wp(2.5),
-    },
-
-    metaCard: {
-        flex: 1,
-        backgroundColor: palette.creme,
-        padding: wp(2.5),
-        borderRadius: normalize(12),
-        gap: hp(0.8),
-        alignItems: 'center',
-    },
-
-    viewBtn: {
-        backgroundColor: palette.middlegreen,
-        paddingHorizontal: wp(4),
-        paddingVertical: hp(0.7),
-        borderRadius: normalize(999),
-    },
-
-    viewText: {
-        color: palette.white,
-    },
-
-    infoBlock: {
-        backgroundColor: palette.white,
-        padding: wp(2.5),
-        borderRadius: normalize(10),
-    },
-
-    modifyBtn: {
-        backgroundColor: palette.primary,
-        paddingVertical: hp(1.3),
-        borderRadius: normalize(14),
-        alignItems: 'center',
-    },
-
-    modifyText: {
-        color: palette.white,
-    },
-
-    assignBox: {
-        gap: hp(1.2),
-    },
-
-    driverDropdown: {
-        borderWidth: 1,
-        borderColor: palette.border,
-        borderRadius: normalize(12),
-        overflow: 'hidden',
-        backgroundColor: palette.white,
-    },
-
-    driverAssignedRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-
-    saveBtn: {
-        backgroundColor: palette.middlegreen,
-        paddingVertical: hp(1.3),
-        borderRadius: normalize(14),
-        alignItems: 'center',
-    },
-
-    saveBtnText: {
-        color: palette.white,
-    },
-
-    contactLine: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-
-    iconRow: {
-        flexDirection: 'row',
-        gap: wp(1),
-    },
-
-    iconPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: wp(1),
-        backgroundColor: palette.middlegreen,
-        paddingHorizontal: wp(2),
-        paddingVertical: hp(0.9),
-        borderRadius: normalize(999),
-    },
-
-    iconText: {
-        color: palette.white,
-    },
-
-    modalWrap: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-
-    modalCard: {
-        backgroundColor: palette.white,
-        padding: wp(4),
-        borderTopLeftRadius: normalize(24),
-        borderTopRightRadius: normalize(24),
-        gap: hp(1.2),
-    },
-
-    modalTopBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-
-    closeIconBtn: {
-        width: normalize(36),
-        height: normalize(36),
-        borderRadius: normalize(18),
-        backgroundColor: '#dadbdd',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    modalHeaderRow: {
-        flexDirection: 'row',
-        paddingBottom: hp(1.2),
-        borderBottomWidth: 1,
-        borderColor: palette.border,
-    },
-
-    modalItemRow: {
-        flexDirection: 'row',
-        paddingVertical: hp(0.5),
-    },
-
-    modalCol: {
-        flex: 1,
-        textAlign: 'center',
-    },
+  /* Items modal */
+  modalWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  modalCard: {
+    backgroundColor: palette.white,
+    padding: wp(4),
+    borderTopLeftRadius: normalize(24),
+    borderTopRightRadius: normalize(24),
+    gap: hp(1.2),
+    maxHeight: hp(70),
+  },
+  modalTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  closeIconBtn: {
+    width: normalize(36),
+    height: normalize(36),
+    borderRadius: normalize(18),
+    backgroundColor: '#dadbdd',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSubtitle: {
+    textTransform: 'none',
+    color: palette.midgray,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    paddingBottom: hp(1),
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+  },
+  modalItemRow: {
+    flexDirection: 'row',
+    paddingVertical: hp(0.5),
+  },
+  modalColWide: {
+    flex: 2,
+    textTransform: 'none',
+  },
+  modalCol: {
+    flex: 1,
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  modalInstructions: {
+    color: palette.midgray,
+    textTransform: 'none',
+  },
 });
+
+const themeStyles: Record<PickupCardStatus, ThemeStyleSet> = {
+  claimed: {
+    card: { borderColor: palette.kale, backgroundColor: palette.white },
+    statusBadge: { backgroundColor: '#D8EBDF' },
+    badgeText: { color: palette.kale },
+    weightBox: { borderColor: palette.kale, backgroundColor: palette.white },
+    weightText: { color: palette.midgray },
+    viewDetailsBtn: { backgroundColor: palette.kale },
+    viewDetailsText: { color: palette.white },
+    contactBtn: { borderColor: palette.kale },
+    contactBtnText: { color: palette.kale },
+    contactIconColor: palette.kale,
+    weightIcon: WEIGHT_ICONS.claimed,
+  },
+  awaiting_driver: {
+    card: { borderColor: palette.orange, backgroundColor: palette.white },
+    statusBadge: { backgroundColor: '#FFE8CC' },
+    badgeText: { color: '#C56A00' },
+    weightBox: { borderColor: palette.orange, backgroundColor: palette.white },
+    weightText: { color: palette.midgray },
+    viewDetailsBtn: { backgroundColor: palette.orange },
+    viewDetailsText: { color: palette.white },
+    contactBtn: { borderColor: palette.orange },
+    contactBtnText: { color: palette.orange },
+    contactIconColor: palette.orange,
+    weightIcon: WEIGHT_ICONS.awaiting_driver,
+  },
+  enroute: {
+    card: { borderColor: palette.primary, backgroundColor: palette.white },
+    statusBadge: { backgroundColor: '#E8DAFF' },
+    badgeText: { color: palette.primary },
+    weightBox: { borderColor: palette.primary, backgroundColor: palette.white },
+    weightText: { color: palette.midgray },
+    viewDetailsBtn: { backgroundColor: palette.primary },
+    viewDetailsText: { color: palette.white },
+    contactBtn: { borderColor: palette.primary },
+    contactBtnText: { color: palette.primary },
+    contactIconColor: palette.primary,
+    weightIcon: WEIGHT_ICONS.enroute,
+  },
+  completed: {
+    card: { borderColor: '#BDBDBD', backgroundColor: palette.white },
+    statusBadge: { backgroundColor: '#E8E8E8' },
+    badgeText: { color: palette.midgray },
+    weightBox: { borderColor: '#BDBDBD', backgroundColor: palette.white },
+    weightText: { color: palette.midgray },
+    viewDetailsBtn: { backgroundColor: '#757575' },
+    viewDetailsText: { color: palette.white },
+    contactBtn: { borderColor: '#757575' },
+    contactBtnText: { color: '#757575' },
+    contactIconColor: '#757575',
+    weightIcon: WEIGHT_ICONS.completed,
+  },
+  cancelled: {
+    card: { borderColor: palette.primary, backgroundColor: palette.white },
+    statusBadge: { backgroundColor: palette.primary },
+    badgeText: { color: palette.white },
+    weightBox: { borderColor: palette.primary, backgroundColor: palette.white },
+    weightText: { color: palette.midgray },
+    viewDetailsBtn: { backgroundColor: palette.primary },
+    viewDetailsText: { color: palette.white },
+    contactBtn: { borderColor: palette.primary },
+    contactBtnText: { color: palette.primary },
+    contactIconColor: palette.primary,
+    weightIcon: WEIGHT_ICONS.cancelled,
+  },
+  unclaimed: {
+    card: { borderColor: palette.blueberry, backgroundColor: palette.white },
+    statusBadge: { backgroundColor: '#D6E9FF' },
+    badgeText: { color: palette.blueberry },
+    weightBox: { borderColor: palette.blueberry, backgroundColor: palette.white },
+    weightText: { color: palette.midgray },
+    viewDetailsBtn: { backgroundColor: palette.blueberry },
+    viewDetailsText: { color: palette.white },
+    contactBtn: { borderColor: palette.blueberry },
+    contactBtnText: { color: palette.blueberry },
+    contactIconColor: palette.blueberry,
+    weightIcon: WEIGHT_ICONS.unclaimed,
+  },
+};

@@ -15,6 +15,20 @@ export const authService = {
       },
     }),
 
+  registerFarmerProducer: (data: FormData) =>
+    api.post('/auth/register/farmer-producer', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
+
+  registerFarmerConsumer: (data: FormData) =>
+    api.post('/auth/register/farmer-consumer', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
+
   verifyEmail: (email: string, otp: string) =>
     api.post('/auth/verify-email', { email, otp }),
 

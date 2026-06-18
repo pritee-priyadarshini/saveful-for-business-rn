@@ -52,9 +52,11 @@ export function AuthScreen() {
   const {
     restaurantForm,
     charityForm,
+    farmerForm,
     selectedRole,
     updateRestaurantField,
     updateCharityField,
+    updateFarmerField,
   } = useAppContext();
 
   const navigation = useNavigation<NavProp>();
@@ -63,9 +65,13 @@ export function AuthScreen() {
     selectedRole === 'restaurant_single' ||
     selectedRole === 'restaurant_multi';
 
+  const isFarmerProducer = selectedRole === 'farm_business';
+  const isFarmerConsumer = selectedRole === 'farmer';
+  const isFarmer = isFarmerProducer || isFarmerConsumer;
+
   const [loading, setLoading] = useState(false);
-  //const [openSections, setOpenSections] = useState<string[]>(['personal']);
   const [currentStep, setCurrentStep] = useState(1);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [isChecked, setIsChecked] = useState(false);
   const [showPlacesSearch, setShowPlacesSearch] = useState(false);
@@ -114,9 +120,30 @@ export function AuthScreen() {
   //   );
   // };
 
-  const currentLogo = isRestaurant
+  const currentLogo = isFarmer
+    ? farmerForm.logo
+    : isRestaurant
     ? restaurantForm.logo
-    : (charityForm as any).logo;
+    : charityForm.logo;
+
+  // Unified location helpers — update the correct form based on active role
+  const updateLocationCoords = (lat: string, lng: string) => {
+    if (isFarmer) {
+      updateFarmerField('latitude', lat);
+      updateFarmerField('longitude', lng);
+    } else {
+      updateCharityField('latitude', lat);
+      updateCharityField('longitude', lng);
+    }
+  };
+
+  const updateLocationAddress = (addr: string) => {
+    if (isFarmer) {
+      updateFarmerField('businessAddress', addr);
+    } else {
+      updateCharityField('charityAddress', addr);
+    }
+  };
 
   const pickImage = async () => {
     try {
@@ -131,7 +158,9 @@ export function AuthScreen() {
 
       const uri = result.assets[0].uri;
 
-      if (isRestaurant) {
+      if (isFarmer) {
+        updateFarmerField('logo', uri);
+      } else if (isRestaurant) {
         updateRestaurantField('logo', uri);
       } else {
         updateCharityField('logo' as any, uri);
@@ -147,7 +176,9 @@ export function AuthScreen() {
   };
 
   const removeLogo = () => {
-    if (isRestaurant) {
+    if (isFarmer) {
+      updateFarmerField('logo', '');
+    } else if (isRestaurant) {
       updateRestaurantField('logo', '');
     } else {
       updateCharityField('logo' as any, '');
@@ -178,8 +209,7 @@ export function AuthScreen() {
       const newRegion = { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 };
       setRegion(newRegion);
       setMarker({ latitude, longitude });
-      updateCharityField('latitude', String(latitude));
-      updateCharityField('longitude', String(longitude));
+      updateLocationCoords(String(latitude), String(longitude));
 
       const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (addresses.length > 0) {
@@ -188,7 +218,11 @@ export function AuthScreen() {
           .filter(Boolean)
           .join(', ');
         setSelectedAddress(addr);
-        if (!charityForm.charityAddress) updateCharityField('charityAddress', addr);
+        if (isFarmer) {
+          if (!farmerForm.businessAddress) updateFarmerField('businessAddress', addr);
+        } else {
+          if (!charityForm.charityAddress) updateCharityField('charityAddress', addr);
+        }
       }
 
       openModal();
@@ -198,6 +232,7 @@ export function AuthScreen() {
   };
 
   const handleRegister = async () => {
+    setFormError(null);
     try {
       setLoading(true);
 
@@ -205,7 +240,7 @@ export function AuthScreen() {
 
       if (isRestaurant) {
         if (restaurantForm.password !== restaurantForm.confirmPassword) {
-          Alert.alert('Passwords do not match');
+          setFormError('Passwords do not match. Please re-enter.');
           return;
         }
 
@@ -233,9 +268,71 @@ export function AuthScreen() {
         }
 
         await authService.registerBusiness(form);
+
+      } else if (isFarmerProducer) {
+        if (farmerForm.password !== farmerForm.confirmPassword) {
+          setFormError('Passwords do not match. Please re-enter.');
+          return;
+        }
+
+        form.append('firstName', farmerForm.firstName);
+        form.append('lastName', farmerForm.lastName);
+        form.append('email', farmerForm.email);
+        form.append('password', farmerForm.password);
+        form.append('mobileNumber', farmerForm.mobile);
+        form.append('businessName', farmerForm.businessName);
+        form.append('businessAddress', farmerForm.businessAddress);
+        form.append('brandName', farmerForm.branding);
+        form.append('venueType', farmerForm.venueType);
+        form.append('orgType', 'FARMER_PRODUCER');
+        form.append('region', 'IN');
+        form.append('latitude', farmerForm.latitude || '20.2961');
+        form.append('longitude', farmerForm.longitude || '85.8245');
+
+        if (farmerForm.logo) {
+          form.append('logo', {
+            uri: farmerForm.logo,
+            name: 'logo.jpg',
+            type: 'image/jpeg',
+          } as any);
+        }
+
+        await authService.registerFarmerProducer(form);
+
+      } else if (isFarmerConsumer) {
+        if (farmerForm.password !== farmerForm.confirmPassword) {
+          setFormError('Passwords do not match. Please re-enter.');
+          return;
+        }
+
+        form.append('firstName', farmerForm.firstName);
+        form.append('lastName', farmerForm.lastName);
+        form.append('email', farmerForm.email);
+        form.append('password', farmerForm.password);
+        form.append('mobile', farmerForm.mobile);
+        form.append('farmName', farmerForm.businessName);
+        form.append('businessName', farmerForm.businessName);
+        form.append('address', farmerForm.businessAddress);
+        form.append('brandName', farmerForm.branding);
+        form.append('venueType', farmerForm.venueType);
+        form.append('region', 'IN');
+        form.append('latitude', farmerForm.latitude || '20.2961');
+        form.append('longitude', farmerForm.longitude || '85.8245');
+
+        if (farmerForm.logo) {
+          form.append('logo', {
+            uri: farmerForm.logo,
+            name: 'logo.jpg',
+            type: 'image/jpeg',
+          } as any);
+        }
+
+        await authService.registerFarmerConsumer(form);
+
       } else {
+        // Charity (single or multi)
         if (charityForm.password !== charityForm.confirmPassword) {
-          Alert.alert('Passwords do not match');
+          setFormError('Passwords do not match. Please re-enter.');
           return;
         }
 
@@ -269,16 +366,32 @@ export function AuthScreen() {
         await authService.registerCharity(form);
       }
 
-      navigation.navigate('EmailVerification');
+      const emailForVerification = isFarmer
+        ? farmerForm.email
+        : isRestaurant
+        ? restaurantForm.email
+        : charityForm.email;
+
+      navigation.navigate('EmailVerification', { email: emailForVerification });
     } catch (error: any) {
-      Alert.alert('Registration failed', error?.response?.data?.message || 'Something went wrong');
+      const errMsg = error?.response?.data?.message;
+      setFormError(
+        Array.isArray(errMsg) ? errMsg.join('\n') : errMsg || 'Something went wrong. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const stepTwoTitle = isRestaurant ? 'Business Details' : 'Charity Details';
-  const stepThreeTitle = isRestaurant ? 'Venue Type' : 'Pickup Radius';
+  const stepTwoTitle = isRestaurant
+    ? 'Business Details'
+    : isFarmerProducer
+    ? 'Farm Details'
+    : isFarmerConsumer
+    ? 'Organisation Details'
+    : 'Charity Details';
+
+  const stepThreeTitle = isRestaurant || isFarmer ? 'Venue Type' : 'Pickup Radius';
 
   const venueOptions = [
     { label: 'Cafe / Restaurant', value: 'CAFE_RESTAURANT' },
@@ -290,6 +403,16 @@ export function AuthScreen() {
     { label: 'Hotel', value: 'HOTEL' },
     { label: 'Wedding Venue', value: 'WEDDING_VENUE' },
     { label: 'Cloud Kitchen', value: 'CLOUD_KITCHEN' },
+    { label: 'Other', value: 'OTHER' },
+  ];
+
+  const farmerVenueOptions = [
+    { label: 'Farm', value: 'FARM' },
+    { label: 'Produce / Market Garden', value: 'PRODUCE_MARKET_GARDEN' },
+    { label: 'Livestock Farm', value: 'LIVESTOCK_FARM' },
+    { label: 'Mixed Farm', value: 'MIXED_FARM' },
+    { label: 'Orchard', value: 'ORCHARD' },
+    { label: 'Processing / Packing Facility', value: 'PROCESSING_FACILITY' },
     { label: 'Other', value: 'OTHER' },
   ];
 
@@ -332,12 +455,11 @@ export function AuthScreen() {
                         const newRegion = { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 };
                         setRegion(newRegion);
                         setMarker({ latitude: lat, longitude: lng });
-                        updateCharityField('latitude', String(lat));
-                        updateCharityField('longitude', String(lng));
+                        updateLocationCoords(String(lat), String(lng));
                       }
                       const addr = details?.formatted_address || data.description;
                       setSelectedAddress(addr);
-                      updateCharityField('charityAddress', addr);
+                      updateLocationAddress(addr);
                       Keyboard.dismiss();
                     }}
                     query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
@@ -364,14 +486,13 @@ export function AuthScreen() {
                       onPress={async (e) => {
                         const { latitude, longitude } = e.nativeEvent.coordinate;
                         setMarker({ latitude, longitude });
-                        updateCharityField('latitude', String(latitude));
-                        updateCharityField('longitude', String(longitude));
+                        updateLocationCoords(String(latitude), String(longitude));
                         const res = await Location.reverseGeocodeAsync({ latitude, longitude });
                         if (res.length > 0) {
                           const place = res[0];
                           const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
                           setSelectedAddress(addr);
-                          updateCharityField('charityAddress', addr);
+                          updateLocationAddress(addr);
                         }
                       }}
                     >
@@ -517,9 +638,11 @@ export function AuthScreen() {
               <InputField
                 label="First Name"
                 placeholder="Enter first name"
-                value={isRestaurant ? restaurantForm.firstName : charityForm.firstName}
+                value={isFarmer ? farmerForm.firstName : isRestaurant ? restaurantForm.firstName : charityForm.firstName}
                 onChangeText={(v) =>
-                  isRestaurant
+                  isFarmer
+                    ? updateFarmerField('firstName', v)
+                    : isRestaurant
                     ? updateRestaurantField('firstName', v)
                     : updateCharityField('firstName', v)
                 }
@@ -527,9 +650,11 @@ export function AuthScreen() {
               <InputField
                 label="Last Name"
                 placeholder="Enter last name"
-                value={isRestaurant ? restaurantForm.lastName : charityForm.lastName}
+                value={isFarmer ? farmerForm.lastName : isRestaurant ? restaurantForm.lastName : charityForm.lastName}
                 onChangeText={(v) =>
-                  isRestaurant
+                  isFarmer
+                    ? updateFarmerField('lastName', v)
+                    : isRestaurant
                     ? updateRestaurantField('lastName', v)
                     : updateCharityField('lastName', v)
                 }
@@ -538,9 +663,11 @@ export function AuthScreen() {
               <InputField
                 label="Email"
                 placeholder="Enter a valid email id"
-                value={isRestaurant ? restaurantForm.email : charityForm.email}
+                value={isFarmer ? farmerForm.email : isRestaurant ? restaurantForm.email : charityForm.email}
                 onChangeText={(v) =>
-                  isRestaurant
+                  isFarmer
+                    ? updateFarmerField('email', v)
+                    : isRestaurant
                     ? updateRestaurantField('email', v)
                     : updateCharityField('email', v)
                 }
@@ -549,9 +676,11 @@ export function AuthScreen() {
               <InputField
                 label="Mobile"
                 placeholder="Enter mobile"
-                value={isRestaurant ? restaurantForm.mobile : charityForm.mobile}
+                value={isFarmer ? farmerForm.mobile : isRestaurant ? restaurantForm.mobile : charityForm.mobile}
                 onChangeText={(v) =>
-                  isRestaurant
+                  isFarmer
+                    ? updateFarmerField('mobile', v)
+                    : isRestaurant
                     ? updateRestaurantField('mobile', v)
                     : updateCharityField('mobile', v)
                 }
@@ -560,9 +689,11 @@ export function AuthScreen() {
                 label="Password"
                 placeholder="Enter password"
                 isPassword
-                value={isRestaurant ? restaurantForm.password : charityForm.password}
+                value={isFarmer ? farmerForm.password : isRestaurant ? restaurantForm.password : charityForm.password}
                 onChangeText={(v) =>
-                  isRestaurant
+                  isFarmer
+                    ? updateFarmerField('password', v)
+                    : isRestaurant
                     ? updateRestaurantField('password', v)
                     : updateCharityField('password', v)
                 }
@@ -572,10 +703,12 @@ export function AuthScreen() {
                 placeholder="Re-enter password"
                 isPassword
                 value={
-                  isRestaurant ? restaurantForm.confirmPassword : charityForm.confirmPassword
+                  isFarmer ? farmerForm.confirmPassword : isRestaurant ? restaurantForm.confirmPassword : charityForm.confirmPassword
                 }
                 onChangeText={(v) =>
-                  isRestaurant
+                  isFarmer
+                    ? updateFarmerField('confirmPassword', v)
+                    : isRestaurant
                     ? updateRestaurantField('confirmPassword', v)
                     : updateCharityField('confirmPassword', v)
                 }
@@ -620,6 +753,38 @@ export function AuthScreen() {
                     onChangeText={(v) => updateRestaurantField('registrationNumber', v)}
                   />
                 </>
+              ) : isFarmerProducer ? (
+                <>
+                  <InputField
+                    label="Farm / Business Name"
+                    placeholder="Enter farm or business name"
+                    value={farmerForm.businessName}
+                    onChangeText={(v) => updateFarmerField('businessName', v)}
+                  />
+
+                  <InputField
+                    label="Farm Address"
+                    placeholder="Enter farm address"
+                    value={farmerForm.businessAddress}
+                    onChangeText={(v) => updateFarmerField('businessAddress', v)}
+                  />
+                </>
+              ) : isFarmerConsumer ? (
+                <>
+                  <InputField
+                    label="Organisation / Farm Name"
+                    placeholder="Enter organisation or farm name"
+                    value={farmerForm.businessName}
+                    onChangeText={(v) => updateFarmerField('businessName', v)}
+                  />
+
+                  <InputField
+                    label="Farm Address"
+                    placeholder="Enter farm address"
+                    value={farmerForm.businessAddress}
+                    onChangeText={(v) => updateFarmerField('businessAddress', v)}
+                  />
+                </>
               ) : (
                 <>
                   <InputField
@@ -654,12 +819,16 @@ export function AuthScreen() {
                 label="Branding"
                 placeholder="Brand name"
                 value={
-                  isRestaurant
+                  isFarmer
+                    ? farmerForm.branding
+                    : isRestaurant
                     ? restaurantForm.branding || ''
                     : (charityForm as any).branding || ''
                 }
                 onChangeText={(v) =>
-                  isRestaurant
+                  isFarmer
+                    ? updateFarmerField('branding', v)
+                    : isRestaurant
                     ? updateRestaurantField('branding', v)
                     : updateCharityField('branding' as any, v)
                 }
@@ -741,35 +910,34 @@ export function AuthScreen() {
                 {stepThreeTitle}
               </AppText>
 
-              {/* BUSINESS FLOW */}
+              {/* BUSINESS / FARMER FLOW: venue type picker */}
 
-              {isRestaurant ? (
+              {(isRestaurant || isFarmer) ? (
                 <>
                   <View style={styles.venueGrid}>
-                    {venueOptions.map((venue) => {
-                      const isSelected =
-                        restaurantForm.venueType === venue.value;
+                    {(isFarmer ? farmerVenueOptions : venueOptions).map((venue) => {
+                      const currentVenueType = isFarmer
+                        ? farmerForm.venueType
+                        : restaurantForm.venueType;
+                      const isSelected = currentVenueType === venue.value;
 
                       return (
                         <Pressable
                           key={venue.value}
                           style={[
                             styles.venueCard,
-                            isSelected &&
-                            styles.venueCardSelected,
+                            isSelected && styles.venueCardSelected,
                           ]}
                           onPress={() =>
-                            updateRestaurantField(
-                              'venueType',
-                              venue.value
-                            )
+                            isFarmer
+                              ? updateFarmerField('venueType', venue.value)
+                              : updateRestaurantField('venueType', venue.value)
                           }
                         >
                           <View
                             style={[
                               styles.radioOuter,
-                              isSelected &&
-                              styles.radioOuterActive,
+                              isSelected && styles.radioOuterActive,
                             ]}
                           >
                             {isSelected && (
@@ -787,8 +955,48 @@ export function AuthScreen() {
                       );
                     })}
                   </View>
+
+                  {/* Location picker for farmers */}
+                  {isFarmer && (
+                    <>
+                      <AppText variant="caption" style={styles.locationHelpText}>
+                        Set your farm's location for better matching.
+                        You can skip this and add it later from your dashboard.
+                      </AppText>
+
+                      <View style={styles.locationPickerRow}>
+                        <Pressable style={styles.locationPickerBtn} onPress={handleGpsLocation}>
+                          <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
+                          <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
+                        </Pressable>
+
+                        <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
+                          <Ionicons name="search" size={normalize(16)} color={palette.white} />
+                          <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
+                        </Pressable>
+                      </View>
+
+                      {!!selectedAddress && (
+                        <View style={styles.selectedAddressBox}>
+                          <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
+                          <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
+                          <Pressable
+                            onPress={() => {
+                              setSelectedAddress('');
+                              setMarker(null);
+                              setRegion(null);
+                              updateFarmerField('latitude', '');
+                              updateFarmerField('longitude', '');
+                            }}>
+                            <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
+                          </Pressable>
+                        </View>
+                      )}
+                    </>
+                  )}
                 </>
               ) : (
+                /* CHARITY FLOW: postcode, pickup radius, location */
                 <>
                   <InputField
                     label="Postcode"
@@ -803,14 +1011,8 @@ export function AuthScreen() {
                     label="Pickup Radius in Km (can change it later)"
                     placeholder="50"
                     value={charityForm.pickupRadius}
-                    onChangeText={(v) => updateCharityField(
-                      'pickupRadius',
-                      v
-                    )
-                    }
+                    onChangeText={(v) => updateCharityField('pickupRadius', v)}
                   />
-                  <>
-                  </>
 
                   <AppText variant="caption" style={styles.locationHelpText}>
                     Set your charity's location for better pickup matching.
@@ -823,16 +1025,16 @@ export function AuthScreen() {
                       <AppText style={styles.locationPickerBtnText}>Use My Location </AppText>
                     </Pressable>
 
-                    <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch,]} onPress={openModal}>
+                    <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
                       <Ionicons name="search" size={normalize(16)} color={palette.white} />
-                      <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]} >Search Address</AppText>
+                      <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
                     </Pressable>
                   </View>
 
                   {!!selectedAddress && (
                     <View style={styles.selectedAddressBox}>
                       <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
-                      <AppText style={styles.selectedAddressText} numberOfLines={2} >{selectedAddress}</AppText>
+                      <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
                       <Pressable
                         onPress={() => {
                           setSelectedAddress('');
@@ -885,6 +1087,15 @@ export function AuthScreen() {
               </View>
 
               {/* Footer Buttons */}
+
+              {!!formError && (
+                <View style={styles.errorBanner}>
+                  <Ionicons name="alert-circle-outline" size={normalize(16)} color={palette.validation} />
+                  <AppText variant="bodySmall" style={styles.errorBannerText}>
+                    {formError}
+                  </AppText>
+                </View>
+              )}
 
               <View style={styles.buttonRow}>
                 <Button
@@ -1374,6 +1585,25 @@ const styles = StyleSheet.create({
     borderRadius: normalize(12),
     borderWidth: 1,
     borderColor: palette.primary,
+  },
+
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2),
+    backgroundColor: '#FFF0EE',
+    borderWidth: 1,
+    borderColor: palette.validation,
+    borderRadius: normalize(10),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.2),
+  },
+
+  errorBannerText: {
+    flex: 1,
+    color: palette.validation,
+    textTransform: 'none',
+    lineHeight: normalize(18),
   },
 
   checkboxContainer: {

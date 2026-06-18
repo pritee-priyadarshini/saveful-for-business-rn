@@ -36,10 +36,13 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
     selectedRole,
     restaurantForm,
     charityForm,
+    farmerForm,
     setAuthUser,
   } = useAppContext();
 
   const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
+  const isFarmerProducer = selectedRole === 'farm_business';
+  const isFarmer = isFarmerProducer || selectedRole === 'farmer';
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -55,7 +58,8 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       setLoading(true);
 
       const enteredOtp = otp.join('');
-      const email = emailFromRoute || (isRestaurant ? restaurantForm.email : charityForm.email);
+      const email = emailFromRoute
+        || (isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email);
 
       if (!email) {
         Alert.alert('Missing email', 'Please enter your email to verify.');
@@ -64,12 +68,12 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       }
 
       const res = await authService.verifyEmail(email, enteredOtp);
-      const data = res.data;
+      const data = res.data as any;
 
       await SecureStore.setItemAsync('accessToken', data.accessToken);
 
       const profileRes = await authService.profile();
-      const profile = profileRes.data;
+      const profile = profileRes.data as any;
 
       setAuthUser({
         ...profile.user,
@@ -89,7 +93,11 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
 
       setShowSuccess(true);
     } catch (error: any) {
-      Alert.alert('Verification failed', error?.response?.data?.message || 'Invalid OTP');
+      const errMsg = error?.response?.data?.message;
+      Alert.alert(
+        'Verification failed',
+        Array.isArray(errMsg) ? errMsg.join('\n') : errMsg || 'Invalid OTP. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -112,7 +120,8 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
   };
 
   const handleResend = () => {
-    const email = emailFromRoute || (isRestaurant ? restaurantForm.email : charityForm.email);
+    const email = emailFromRoute
+      || (isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email);
 
     if (!email) {
       Alert.alert('Missing email', 'Please enter your email to resend the code.');
@@ -126,9 +135,14 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
         Alert.alert('Verification code sent', 'Please check your inbox / spam folder.');
       })
       .catch((error: any) => {
-        Alert.alert('Resend failed', error?.response?.data?.message || 'Please try again.');
+        const errMsg = error?.response?.data?.message;
+        Alert.alert(
+          'Resend failed',
+          Array.isArray(errMsg) ? errMsg.join('\n') : errMsg || 'Please try again.',
+        );
       })
-      .finally(() => setResending(false));
+      .then(() => setResending(false))
+      .catch(() => setResending(false));
   };
 
   useEffect(() => {
@@ -190,7 +204,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
 
           {/* INFO */}
           <AppText variant='bodyLarge' style={styles.infoText}>
-            It may take up to 5 minutes to arrive. Please remember to check your junk/spam folder if you don’t see it.
+            It may take up to 5 minutes to arrive. Please remember to check your junk/spam folder if you don't see it.
           </AppText>
 
         </View>
@@ -211,7 +225,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
 
             {/* TEXT */}
             <View style={styles.textBlock}>
-              <AppText variant="heading">YOU’RE ALL SET</AppText>
+              <AppText variant="heading">YOU'RE ALL SET</AppText>
 
               {isRestaurant ? (
                 <>
@@ -219,20 +233,28 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
                     Start your free 30-day trial and see how Saveful helps you save more,
                     share more, and run smarter.
                   </AppText>
-
                   <AppText variant="bodyBold" style={styles.subText}>
                     No payment needed to begin.
+                  </AppText>
+                </>
+              ) : isFarmerProducer ? (
+                <>
+                  <AppText variant="bodyLarge" style={styles.text}>
+                    Start listing your farm produce and connect with local businesses,
+                    charities, and collectors near you.
+                  </AppText>
+                  <AppText variant="bodyBold" style={styles.subText}>
+                    Your first 30 days are completely free.
                   </AppText>
                 </>
               ) : (
                 <>
                   <AppText variant="bodyLarge" style={styles.text}>
-                    Start receiving surplus food from nearby businesses and make a bigger
-                    impact in your community with Saveful for Business.
+                    Start receiving surplus food from nearby businesses and farms and make
+                    a bigger impact in your community with Saveful.
                   </AppText>
-
                   <AppText variant="bodyBold" style={styles.subText}>
-                    Saveful is completely free for charities.
+                    Saveful is completely free for charities and farmers.
                   </AppText>
                 </>
               )}
@@ -240,7 +262,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
 
             {/* CTA */}
             <Button
-              label={isRestaurant ? 'Start Free Trial' : "Let’s be Saveful"}
+              label={isRestaurant || isFarmerProducer ? 'Start Free Trial' : 'Go Saveful!'}
               onPress={() => {
                 setShowSuccess(false);
               }}

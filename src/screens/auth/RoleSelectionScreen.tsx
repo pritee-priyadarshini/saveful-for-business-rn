@@ -92,19 +92,18 @@ export function RoleSelectionScreen({ navigation }: Props) {
   }, [isCharity]);
 
   const onSelect = (id: string) => {
-    if (id === 'restaurant_single' || id === 'restaurant_multi' || id === 'charity_single' || id === 'charity_multi') {
-      setRole(id);
+    if (
+      id === 'restaurant_single' ||
+      id === 'restaurant_multi' ||
+      id === 'charity_single' ||
+      id === 'charity_multi' ||
+      id === 'farm_business' ||
+      id === 'farmer'
+    ) {
+      setRole(id as any);
       navigation.navigate('Auth');
       return;
     }
-
-    if (id === 'farm_business') {
-      setRole('restaurant_single');
-      navigation.navigate('Auth');
-      return;
-    }
-
-    setRole('charity_single');
     navigation.navigate('Auth');
   };
 

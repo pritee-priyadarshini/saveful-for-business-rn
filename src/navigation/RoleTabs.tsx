@@ -86,17 +86,17 @@ export function RoleTabs() {
     );
   }
 
-  if (selectedRole === 'farmer') {
-  return (
-    <FarmerTab.Navigator screenOptions={screenOptions}>
-      <FarmerTab.Screen component={FarmerHomeScreen}  name="Home"/>
-      <FarmerTab.Screen component={FarmerStack} name="Available"/>
-      <FarmerTab.Screen component={FarmerAnalyticsScreen} name="Impact"/>
-      <FarmerTab.Screen component={FarmerUpdatesScreen} name="Updates"/>
-      <FarmerTab.Screen component={ProfileScreen} name="Account"/>
-    </FarmerTab.Navigator>
-  );
-}
+  if (selectedRole === 'farmer' || selectedRole === 'farm_business') {
+    return (
+      <FarmerTab.Navigator screenOptions={screenOptions}>
+        <FarmerTab.Screen component={FarmerHomeScreen} name="Home" />
+        <FarmerTab.Screen component={FarmerStack} name="Available" />
+        <FarmerTab.Screen component={FarmerAnalyticsScreen} name="Impact" />
+        <FarmerTab.Screen component={FarmerUpdatesScreen} name="Updates" />
+        <FarmerTab.Screen component={ProfileScreen} name="Account" />
+      </FarmerTab.Navigator>
+    );
+  }
 
   return (
     <RestaurantTab.Navigator screenOptions={screenOptions}>

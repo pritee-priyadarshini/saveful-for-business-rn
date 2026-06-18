@@ -49,12 +49,11 @@ export interface FarmerForm {
   password: string;
   confirmPassword: string;
   mobile: string;
-  farmName: string;
-  farmAddress: string;
+  businessName: string;
+  businessAddress: string;
+  venueType: string;
   branding: string;
   logo: string;
-  postcodes: string;
-  pickupRadius: string;
   region: string;
   latitude: string;
   longitude: string;
