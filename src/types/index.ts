@@ -41,6 +41,8 @@ export type ListingStatus =
   | 'EXPIRED'
   | 'CANCELLED';
 
+export type FoodListingType = 'HUMAN' | 'ANIMAL' | 'BOTH';
+
 export type OrderStatus =
   | 'awaiting_driver'
   | 'driver_assigned'

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,14 +10,8 @@ import {
   Dimensions,
   Platform,
   Linking,
-  Modal,
-  Animated,
-  PanResponder,
-  Keyboard,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +20,7 @@ import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { InputField } from '../../components/InputField';
 import { Screen } from '../../components/Screen';
+import { LocationSetupModal, type SelectedLocation } from '../../components/LocationSetupModal';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 
@@ -34,9 +29,6 @@ import { AuthStackParamList } from '../../navigation/types';
 import { authService } from '@/services/auth.service';
 import { mapRole } from '@/utils/roleMapper';
 import { spacing } from '@/theme/spacing';
-import MapView, { Marker } from 'react-native-maps';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import { GOOGLE_PLACES_API_KEY } from '@/config';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -75,42 +67,9 @@ export function AuthScreen() {
 
   const [isChecked, setIsChecked] = useState(false);
   const [showPlacesSearch, setShowPlacesSearch] = useState(false);
-  const [region, setRegion] = useState<any>(null);
-  const [marker, setMarker] = useState<any>(null);
   const [selectedAddress, setSelectedAddress] = useState('');
 
-  const MODAL_HEIGHT = height * 0.72;
-  const slideAnim = useRef(new Animated.Value(height * 0.72)).current;
-
-  const openModal = () => {
-    slideAnim.setValue(MODAL_HEIGHT);
-    setShowPlacesSearch(true);
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
-  };
-
-  const closeModal = () => {
-    Keyboard.dismiss();
-    Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
-      .start(() => setShowPlacesSearch(false));
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 5,
-      onPanResponderMove: (_, gs) => {
-        if (gs.dy > 0) slideAnim.setValue(gs.dy);
-      },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 80 || gs.vy > 0.5) {
-          Keyboard.dismiss();
-          Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
-            .start(() => setShowPlacesSearch(false));
-        } else {
-          Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
-        }
-      },
-    })
-  ).current;
+  const openLocationModal = () => setShowPlacesSearch(true);
 
   // const toggle = (section: string) => {
   //   setOpenSections((prev) =>
@@ -126,9 +85,11 @@ export function AuthScreen() {
     ? restaurantForm.logo
     : charityForm.logo;
 
-  // Unified location helpers — update the correct form based on active role
   const updateLocationCoords = (lat: string, lng: string) => {
-    if (isFarmer) {
+    if (isRestaurant) {
+      updateRestaurantField('latitude', lat);
+      updateRestaurantField('longitude', lng);
+    } else if (isFarmer) {
       updateFarmerField('latitude', lat);
       updateFarmerField('longitude', lng);
     } else {
@@ -138,10 +99,37 @@ export function AuthScreen() {
   };
 
   const updateLocationAddress = (addr: string) => {
-    if (isFarmer) {
-      updateFarmerField('businessAddress', addr);
-    } else {
+    if (isRestaurant) {
+      if (!restaurantForm.businessAddress?.trim()) {
+        updateRestaurantField('businessAddress', addr);
+      }
+    } else if (isFarmer) {
+      if (!farmerForm.businessAddress?.trim()) {
+        updateFarmerField('businessAddress', addr);
+      }
+    } else if (!charityForm.charityAddress?.trim()) {
       updateCharityField('charityAddress', addr);
+    }
+  };
+
+  const handleAuthLocationConfirm = async ({ latitude, longitude, address }: SelectedLocation) => {
+    updateLocationCoords(String(latitude), String(longitude));
+    updateLocationAddress(address);
+    setSelectedAddress(address);
+    setShowPlacesSearch(false);
+  };
+
+  const clearSelectedLocation = () => {
+    setSelectedAddress('');
+    if (isRestaurant) {
+      updateRestaurantField('latitude', '');
+      updateRestaurantField('longitude', '');
+    } else if (isFarmer) {
+      updateFarmerField('latitude', '');
+      updateFarmerField('longitude', '');
+    } else {
+      updateCharityField('latitude', '');
+      updateCharityField('longitude', '');
     }
   };
 
@@ -185,52 +173,6 @@ export function AuthScreen() {
     }
   };
 
-  const handleGpsLocation = async () => {
-    try {
-      let permission = await Location.getForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        permission = await Location.requestForegroundPermissionsAsync();
-      }
-
-      if (permission.status !== 'granted') {
-        Alert.alert(
-          'Location Permission Required',
-          'Please enable location permission from app settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          ]
-        );
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const { latitude, longitude } = location.coords;
-      const newRegion = { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 };
-      setRegion(newRegion);
-      setMarker({ latitude, longitude });
-      updateLocationCoords(String(latitude), String(longitude));
-
-      const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (addresses.length > 0) {
-        const place = addresses[0];
-        const addr = [place.name, place.street, place.city, place.region, place.postalCode]
-          .filter(Boolean)
-          .join(', ');
-        setSelectedAddress(addr);
-        if (isFarmer) {
-          if (!farmerForm.businessAddress) updateFarmerField('businessAddress', addr);
-        } else {
-          if (!charityForm.charityAddress) updateCharityField('charityAddress', addr);
-        }
-      }
-
-      openModal();
-    } catch {
-      Alert.alert('Error', 'Failed to get current location');
-    }
-  };
-
   const handleRegister = async () => {
     setFormError(null);
     try {
@@ -241,6 +183,12 @@ export function AuthScreen() {
       if (isRestaurant) {
         if (restaurantForm.password !== restaurantForm.confirmPassword) {
           setFormError('Passwords do not match. Please re-enter.');
+          return;
+        }
+
+        if (!restaurantForm.latitude?.trim() || !restaurantForm.longitude?.trim()) {
+          setFormError('Please set your business location before creating your account.');
+          setCurrentStep(3);
           return;
         }
 
@@ -256,8 +204,8 @@ export function AuthScreen() {
         form.append('venueType', restaurantForm.venueType);
         form.append('orgType', mapRole(selectedRole));
         form.append('region', 'IN');
-        form.append('latitude', '20.2961');
-        form.append('longitude', '85.8245');
+        form.append('latitude', restaurantForm.latitude);
+        form.append('longitude', restaurantForm.longitude);
 
         if (restaurantForm.logo) {
           form.append('logo', {
@@ -275,6 +223,12 @@ export function AuthScreen() {
           return;
         }
 
+        if (!farmerForm.latitude?.trim() || !farmerForm.longitude?.trim()) {
+          setFormError('Please set your farm location before creating your account.');
+          setCurrentStep(3);
+          return;
+        }
+
         form.append('firstName', farmerForm.firstName);
         form.append('lastName', farmerForm.lastName);
         form.append('email', farmerForm.email);
@@ -286,8 +240,8 @@ export function AuthScreen() {
         form.append('venueType', farmerForm.venueType);
         form.append('orgType', 'FARMER_PRODUCER');
         form.append('region', 'IN');
-        form.append('latitude', farmerForm.latitude || '20.2961');
-        form.append('longitude', farmerForm.longitude || '85.8245');
+        form.append('latitude', farmerForm.latitude);
+        form.append('longitude', farmerForm.longitude);
 
         if (farmerForm.logo) {
           form.append('logo', {
@@ -305,6 +259,12 @@ export function AuthScreen() {
           return;
         }
 
+        if (!farmerForm.latitude?.trim() || !farmerForm.longitude?.trim()) {
+          setFormError('Please set your farm location before creating your account.');
+          setCurrentStep(3);
+          return;
+        }
+
         form.append('firstName', farmerForm.firstName);
         form.append('lastName', farmerForm.lastName);
         form.append('email', farmerForm.email);
@@ -316,8 +276,8 @@ export function AuthScreen() {
         form.append('brandName', farmerForm.branding);
         form.append('venueType', farmerForm.venueType);
         form.append('region', 'IN');
-        form.append('latitude', farmerForm.latitude || '20.2961');
-        form.append('longitude', farmerForm.longitude || '85.8245');
+        form.append('latitude', farmerForm.latitude);
+        form.append('longitude', farmerForm.longitude);
 
         if (farmerForm.logo) {
           form.append('logo', {
@@ -418,108 +378,18 @@ export function AuthScreen() {
 
   return (
     <Screen backgroundColor={palette.creme}>
-      {/* LOCATION BOTTOM SHEET MODAL */}
-      <Modal
+      <LocationSetupModal
         visible={showPlacesSearch}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={closeModal}
-      >
-        <TouchableWithoutFeedback onPress={closeModal}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <Animated.View
-                style={[styles.modalSheet, { transform: [{ translateY: slideAnim }] }]}
-              >
-                <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
-                  <View style={styles.dragHandle} />
-                </View>
-
-                <View style={styles.modalHeader}>
-                  <AppText style={styles.modalTitle}>Set Location</AppText>
-                  <Pressable onPress={closeModal} style={styles.modalCloseBtn}>
-                    <Ionicons name="close" size={normalize(22)} color={palette.text} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.modalSearchContainer}>
-                  <GooglePlacesAutocomplete
-                    placeholder="Search charity address or place..."
-                    fetchDetails
-                    textInputProps={{ autoFocus: true }}
-                    onPress={(data, details = null) => {
-                      const lat = details?.geometry?.location?.lat;
-                      const lng = details?.geometry?.location?.lng;
-                      if (lat && lng) {
-                        const newRegion = { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 };
-                        setRegion(newRegion);
-                        setMarker({ latitude: lat, longitude: lng });
-                        updateLocationCoords(String(lat), String(lng));
-                      }
-                      const addr = details?.formatted_address || data.description;
-                      setSelectedAddress(addr);
-                      updateLocationAddress(addr);
-                      Keyboard.dismiss();
-                    }}
-                    query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
-                    styles={{
-                      container: { flex: 0 },
-                      textInputContainer: { borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border },
-                      textInput: { height: normalize(46), color: palette.text, fontSize: normalize(14), marginBottom: 0, backgroundColor: palette.white },
-                      listView: { backgroundColor: palette.white, borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border, marginTop: normalize(4) },
-                      row: { padding: normalize(12), backgroundColor: palette.white },
-                      description: { fontSize: normalize(13), color: palette.text },
-                    }}
-                    enablePoweredByContainer={false}
-                    debounce={300}
-                    keepResultsAfterBlur
-                  />
-                </View>
-
-                <View style={styles.modalMapContainer}>
-                  {region ? (
-                    <MapView
-                      style={styles.mapView}
-                      region={region}
-                      showsUserLocation
-                      onPress={async (e) => {
-                        const { latitude, longitude } = e.nativeEvent.coordinate;
-                        setMarker({ latitude, longitude });
-                        updateLocationCoords(String(latitude), String(longitude));
-                        const res = await Location.reverseGeocodeAsync({ latitude, longitude });
-                        if (res.length > 0) {
-                          const place = res[0];
-                          const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
-                          setSelectedAddress(addr);
-                          updateLocationAddress(addr);
-                        }
-                      }}
-                    >
-                      {marker && <Marker coordinate={marker} />}
-                    </MapView>
-                  ) : (
-                    <View style={styles.mapPlaceholder}>
-                      <Ionicons name="map-outline" size={normalize(36)} color="#ccc" />
-                      <AppText style={styles.mapPlaceholderText}>Search or tap to select a location</AppText>
-                    </View>
-                  )}
-                </View>
-
-                <Pressable
-                  style={[styles.confirmBtn, !marker && styles.confirmBtnDisabled]}
-                  onPress={closeModal}
-                  disabled={!marker}
-                >
-                  <AppText style={styles.confirmBtnText}>
-                    {marker ? 'Confirm Location' : 'Select a location on the map'}
-                  </AppText>
-                </Pressable>
-              </Animated.View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        onClose={() => setShowPlacesSearch(false)}
+        onConfirm={handleAuthLocationConfirm}
+        searchPlaceholder={
+          isRestaurant
+            ? 'Search business address...'
+            : isFarmer
+            ? 'Search farm address...'
+            : 'Search charity address...'
+        }
+      />
 
       <ScrollView
         contentContainerStyle={styles.newContent}
@@ -956,21 +826,22 @@ export function AuthScreen() {
                     })}
                   </View>
 
-                  {/* Location picker for farmers */}
-                  {isFarmer && (
+                  {/* Location picker for restaurant + farmer */}
+                  {(isFarmer || isRestaurant) && (
                     <>
                       <AppText variant="caption" style={styles.locationHelpText}>
-                        Set your farm's location for better matching.
-                        You can skip this and add it later from your dashboard.
+                        {isRestaurant
+                          ? 'Set your business location so charities and collectors can find your surplus listings.'
+                          : 'Set your farm location for better matching.'}
                       </AppText>
 
                       <View style={styles.locationPickerRow}>
-                        <Pressable style={styles.locationPickerBtn} onPress={handleGpsLocation}>
+                        <Pressable style={styles.locationPickerBtn} onPress={openLocationModal}>
                           <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
                           <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
                         </Pressable>
 
-                        <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
+                        <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openLocationModal}>
                           <Ionicons name="search" size={normalize(16)} color={palette.white} />
                           <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
                         </Pressable>
@@ -980,14 +851,7 @@ export function AuthScreen() {
                         <View style={styles.selectedAddressBox}>
                           <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
                           <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
-                          <Pressable
-                            onPress={() => {
-                              setSelectedAddress('');
-                              setMarker(null);
-                              setRegion(null);
-                              updateFarmerField('latitude', '');
-                              updateFarmerField('longitude', '');
-                            }}>
+                          <Pressable onPress={clearSelectedLocation}>
                             <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
                           </Pressable>
                         </View>
@@ -1020,12 +884,12 @@ export function AuthScreen() {
                   </AppText>
 
                   <View style={styles.locationPickerRow}>
-                    <Pressable style={styles.locationPickerBtn} onPress={handleGpsLocation}>
+                    <Pressable style={styles.locationPickerBtn} onPress={openLocationModal}>
                       <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
                       <AppText style={styles.locationPickerBtnText}>Use My Location </AppText>
                     </Pressable>
 
-                    <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
+                    <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openLocationModal}>
                       <Ionicons name="search" size={normalize(16)} color={palette.white} />
                       <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
                     </Pressable>
@@ -1035,14 +899,7 @@ export function AuthScreen() {
                     <View style={styles.selectedAddressBox}>
                       <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
                       <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
-                      <Pressable
-                        onPress={() => {
-                          setSelectedAddress('');
-                          setMarker(null);
-                          setRegion(null);
-                          updateCharityField('latitude', '');
-                          updateCharityField('longitude', '');
-                        }}>
+                      <Pressable onPress={clearSelectedLocation}>
                         <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
                       </Pressable>
                     </View>
@@ -1263,104 +1120,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: normalize(13),
     color: palette.text,
-  },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-
-  modalSheet: {
-    height: height * 0.72,
-    backgroundColor: palette.white,
-    borderTopLeftRadius: normalize(20),
-    borderTopRightRadius: normalize(20),
-    overflow: 'hidden',
-  },
-
-  dragHandleArea: {
-    alignItems: 'center',
-    paddingVertical: normalize(10),
-    backgroundColor: palette.white,
-  },
-
-  dragHandle: {
-    width: normalize(40),
-    height: normalize(4),
-    borderRadius: normalize(2),
-    backgroundColor: '#ddd',
-  },
-
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: wp(4),
-    paddingBottom: normalize(10),
-  },
-
-  modalTitle: {
-    flex: 1,
-    fontSize: normalize(16),
-    fontWeight: '600',
-    color: palette.text,
-  },
-
-  modalCloseBtn: {
-    padding: normalize(4),
-  },
-
-  modalSearchContainer: {
-    paddingHorizontal: wp(4),
-    paddingBottom: normalize(8),
-    zIndex: 9999,
-    elevation: 9999,
-  },
-
-  modalMapContainer: {
-    flex: 1,
-    marginHorizontal: wp(4),
-    marginBottom: normalize(4),
-    borderRadius: normalize(12),
-    overflow: 'hidden',
-    zIndex: 1,
-  },
-
-  mapView: {
-    flex: 1,
-  },
-
-  mapPlaceholder: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: normalize(8),
-  },
-
-  mapPlaceholderText: {
-    color: '#aaa',
-    fontSize: normalize(12),
-  },
-
-  confirmBtn: {
-    backgroundColor: palette.middlegreen,
-    padding: normalize(14),
-    marginHorizontal: wp(6),
-    marginTop: normalize(8),
-    marginBottom: normalize(16),
-    borderRadius: normalize(10),
-    alignItems: 'center',
-  },
-
-  confirmBtnDisabled: {
-    backgroundColor: '#bbb',
-  },
-
-  confirmBtnText: {
-    color: palette.white,
-    fontSize: normalize(15),
-    fontWeight: '600',
   },
 
   tick: {

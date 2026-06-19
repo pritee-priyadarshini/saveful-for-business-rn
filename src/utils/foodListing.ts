@@ -34,3 +34,21 @@ export const estimateMealsSaved = (totalKg: number) => {
   const safeKg = Math.max(0, totalKg || 0);
   return Math.floor((safeKg * 1000) / 420);
 };
+
+export function getListingAudience(listing: any): 'human' | 'animal' | 'both' {
+  const type = String(listing?.listingType || '').toUpperCase();
+  if (type === 'ANIMAL') return 'animal';
+  if (type === 'HUMAN') return 'human';
+  if (type === 'BOTH') return 'both';
+  return listing?.isSafeForDonation === false ? 'animal' : 'human';
+}
+
+export function isAnimalListing(listing: any) {
+  const audience = getListingAudience(listing);
+  return audience === 'animal' || audience === 'both';
+}
+
+export function isPeopleListing(listing: any) {
+  const audience = getListingAudience(listing);
+  return audience === 'human' || audience === 'both';
+}

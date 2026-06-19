@@ -21,6 +21,8 @@ import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
 import { estimateMealsSaved, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
+import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
+import { resolveListingSiteId } from '../../utils/listingSite';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -100,7 +102,6 @@ const formatTime = (date: Date | null) => {
 
 export function CreateListingScreen({ navigation }: any) {
   const { currentProfile, authUser } = useAppContext();
-  const siteId = authUser?.profile?.sites?.[0]?.id || authUser?.profile?.site?.id || null;
 
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FoodItem[]>(seedItems);
@@ -294,8 +295,9 @@ export function CreateListingScreen({ navigation }: any) {
       return;
     }
 
-    if (!siteId) {
-      Alert.alert('Site not found', 'Please set up your site first.');
+    const resolvedSiteId = await resolveListingSiteId(authUser);
+    if (!resolvedSiteId) {
+      Alert.alert('Site not found', 'Please set up your business site first.');
       return;
     }
 
@@ -317,21 +319,40 @@ export function CreateListingScreen({ navigation }: any) {
       return;
     }
 
+    const coords = getSitePickupCoords(authUser);
+    if (!coords) {
+      Alert.alert(
+        'Location missing',
+        'Your site location is not set. Go to Home and use the location banner to set your business address on the map.',
+      );
+      setStep(2);
+      return;
+    }
+
     try {
       const payload = {
-        siteId: Number(siteId),
+        siteId: resolvedSiteId,
+        listingType: 'HUMAN' as const,
         foodItems: activeItems.map((item) => ({
+          name: item.name,
           category: item.name,
           totalQtyKg: item.qty,
-          remainingQtyKg: item.qty,
+          unit: 'kg',
         })),
-        pickupAddress: location || 'Address not provided',
+        pickupAddress: location || currentProfile?.address || 'Address not provided',
+        pickupPostcode: getSitePostcode(authUser),
+        pickupLat: coords.lat,
+        pickupLng: coords.lng,
         bestBefore: bestBeforeDate.toISOString(),
         pickupFromTime: pickupFromDate.toISOString(),
         pickupByTime: pickupToDate.toISOString(),
         needsRefrigeration: storage === 'Fridge',
+        needsFreezer: storage === 'Freezer',
+        needsAmbient: storage === 'Ambient',
         needsReheating: reheating === 'Yes',
-        containsAllergens: hasSelectedAllergens,
+        isSafeForDonation: true,
+        allergens: selectedAllergens,
+        photoUrls: images.filter((uri) => uri.startsWith('http')),
       };
 
       const response = await foodListingService.createListing(payload);
@@ -339,6 +360,7 @@ export function CreateListingScreen({ navigation }: any) {
         listing: {
           ...(response.data as any),
           foodItems: activeItems.map((item) => ({
+            name: item.name,
             category: item.name,
             totalQtyKg: item.qty,
             remainingQtyKg: item.qty,
@@ -348,7 +370,11 @@ export function CreateListingScreen({ navigation }: any) {
         },
       });
     } catch (error: any) {
-      Alert.alert('Could not create listing', error?.response?.data?.message || 'Please try again.');
+      console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
+      Alert.alert(
+        'Could not create listing',
+        formatApiError(error, 'Please try again.'),
+      );
     }
   };
 

@@ -15,7 +15,7 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { foodListingService } from '@/services/foodListing.service';
+import { foodListingService, normalizeListingsResponse } from '@/services/foodListing.service';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -42,11 +42,8 @@ export function CharityMapScreen({ navigation }: any) {
     try {
       setLoading(true);
 
-      const res = await foodListingService.getListings({
-        status: 'ACTIVE',
-      });
-
-      const data = res?.data?.listings || res?.data || [];
+      const res = await foodListingService.getRecentListings({ page: 1, limit: 50 });
+      const { listings: data } = normalizeListingsResponse(res);
 
       if (!Array.isArray(data)) {
         console.log('Invalid response', res.data);

@@ -1,9 +1,8 @@
 import type { ListingDetail } from '../services/foodListing.service';
 import type { FoodIconKey } from './foodListing';
+import { isAnimalListing } from './foodListing';
 
-export function isAnimalListing(listing: any) {
-  return listing?.isSafeForDonation === false;
-}
+export { isAnimalListing };
 
 export function parseListingDate(val: unknown): Date | null {
   if (!val) return null;

@@ -1,0 +1,115 @@
+function parseCoordinate(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const lowered = trimmed.toLowerCase();
+    if (lowered === 'null' || lowered === 'undefined' || lowered === 'nan') {
+      return null;
+    }
+  }
+
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function readLatLng(source: any): { latitude: unknown; longitude: unknown } {
+  if (!source || typeof source !== 'object') {
+    return { latitude: undefined, longitude: undefined };
+  }
+
+  return {
+    latitude: source.latitude ?? source.lat,
+    longitude: source.longitude ?? source.lng,
+  };
+}
+
+/** Normalise profile shape from auth user / API payloads. */
+export function normalizeAuthProfile(authUser: any): any {
+  if (!authUser) return null;
+
+  const nested = authUser.profile;
+  if (nested?.organisation || nested?.organization || nested?.sites || nested?.site) {
+    return nested;
+  }
+
+  if (authUser.organisation || authUser.organization || authUser.sites || authUser.site) {
+    return authUser;
+  }
+
+  return nested ?? null;
+}
+
+function collectCoordinateCandidates(profile: any): Array<{ latitude: unknown; longitude: unknown }> {
+  if (!profile) return [];
+
+  const candidates: Array<{ latitude: unknown; longitude: unknown }> = [];
+  const sites = Array.isArray(profile.sites)
+    ? profile.sites
+    : profile.site
+      ? [profile.site]
+      : [];
+
+  for (const site of sites) {
+    candidates.push(readLatLng(site));
+  }
+
+  const org = profile.organisation ?? profile.organization;
+  if (org) {
+    candidates.push(readLatLng(org));
+
+    if (org.location && typeof org.location === 'object') {
+      candidates.push(readLatLng(org.location));
+    }
+  }
+
+  return candidates;
+}
+
+export function resolveProfileCoordinates(
+  profile: any,
+): { lat: number; lng: number } | null {
+  for (const candidate of collectCoordinateCandidates(profile)) {
+    const lat = parseCoordinate(candidate.latitude);
+    const lng = parseCoordinate(candidate.longitude);
+
+    if (lat !== null && lng !== null) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+}
+
+export function profileHasCoordinates(profileOrAuthUser: any): boolean {
+  const profile = profileOrAuthUser?.profile
+    ? normalizeAuthProfile(profileOrAuthUser)
+    : profileOrAuthUser;
+
+  return resolveProfileCoordinates(profile) !== null;
+}
+
+export function getLocationDebugInfo(profile: any) {
+  const site = profile?.sites?.[0] ?? profile?.site;
+  const org = profile?.organisation ?? profile?.organization;
+  const resolved = resolveProfileCoordinates(profile);
+
+  return {
+    siteLatitude: site?.latitude ?? site?.lat,
+    siteLongitude: site?.longitude ?? site?.lng,
+    orgLatitude: org?.latitude ?? org?.lat,
+    orgLongitude: org?.longitude ?? org?.lng,
+    resolvedLatitude: resolved?.lat ?? null,
+    resolvedLongitude: resolved?.lng ?? null,
+    hasLocation: resolved !== null,
+    sitesCount: Array.isArray(profile?.sites) ? profile.sites.length : profile?.site ? 1 : 0,
+  };
+}

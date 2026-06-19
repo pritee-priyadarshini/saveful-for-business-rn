@@ -18,8 +18,9 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
-import { foodListingService } from '@/services/foodListing.service';
-import { estimateMealsSaved } from '../../utils/foodListing';
+import { foodListingService, normalizeListingsResponse } from '@/services/foodListing.service';
+import { estimateMealsSaved, getListingAudience, isAnimalListing, isPeopleListing } from '../../utils/foodListing';
+import { useAppContext } from '../../store/AppContext';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -81,10 +82,6 @@ const getMonthsForYear = (year: string) => {
   return ['All', ...MONTHS];
 };
 
-function isAnimalListing(listing: any) {
-  return listing?.isSafeForDonation === false;
-}
-
 function isCancelledListing(listing: any) {
   const status = String(listing?.status || '').toUpperCase();
   return status === 'CANCELLED' || status === 'EXPIRED';
@@ -102,7 +99,7 @@ function isCompletedListing(listing: any) {
 
 function getCardTheme(listing: any): CardTheme {
   if (isCancelledListing(listing)) return 'cancelled';
-  return isAnimalListing(listing) ? 'animal' : 'people';
+  return getListingAudience(listing) === 'animal' ? 'animal' : 'people';
 }
 
 function getTotalKg(listing: any) {
@@ -149,6 +146,7 @@ function getOrgName(listing: any) {
 }
 
 export default function CollectionHistoryScreen({ navigation }: any) {
+  const { authUser } = useAppContext();
   const [selectedYear, setSelectedYear] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [showYearDropdown, setShowYearDropdown] = useState(false);
@@ -168,13 +166,21 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [authUser?.profile?.organisation?.id]);
 
   const fetchHistory = async () => {
+    const orgId = authUser?.profile?.organisation?.id;
+    if (!orgId) {
+      setHistory([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const res = await foodListingService.getListings({ page: 1, limit: 200 });
-      setHistory((res as any).data?.listings || []);
+      const res = await foodListingService.getOrgListings(Number(orgId), { page: 1, limit: 200 });
+      const { listings } = normalizeListingsResponse(res);
+      setHistory(listings);
     } catch (error) {
       console.log('history fetch failed', error);
     } finally {
@@ -193,7 +199,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   }, [history]);
 
   const peopleCount = useMemo(
-    () => history.filter((item) => !isAnimalListing(item)).length,
+    () => history.filter((item) => isPeopleListing(item)).length,
     [history],
   );
   const animalCount = useMemo(
@@ -205,7 +211,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const completed = history.filter((item) => isCompletedListing(item));
     const totalKg = completed.reduce((sum, item) => sum + getTotalKg(item), 0);
     const peopleKg = completed
-      .filter((item) => !isAnimalListing(item))
+      .filter((item) => isPeopleListing(item))
       .reduce((sum, item) => sum + getTotalKg(item), 0);
     return {
       redistributedKg: Math.round(totalKg),
@@ -224,7 +230,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
         const monthMatch = selectedMonth === 'All' || itemMonth === selectedMonth;
         const audienceMatch =
           audienceFilter === 'all' ||
-          (audienceFilter === 'people' && !isAnimalListing(item)) ||
+          (audienceFilter === 'people' && isPeopleListing(item)) ||
           (audienceFilter === 'animals' && isAnimalListing(item));
         const statusMatch =
           statusFilter === 'all' ||

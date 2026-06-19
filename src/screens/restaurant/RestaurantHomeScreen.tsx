@@ -12,7 +12,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Skeleton } from '../../components/Skeleton';
+import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
+import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { useAppContext } from '../../store/AppContext';
+import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { dashboardService } from '@/services/dashboard.service';
 
 import { palette } from '@/theme/colors';
@@ -28,6 +31,15 @@ const normalize = (size: number) => {
 export function RestaurantHomeScreen({ navigation }: any) {
 
   const { currentProfile } = useAppContext();
+  const {
+    showBanner,
+    setBannerClosed,
+    modalVisible,
+    setModalVisible,
+    saving,
+    capturedAddress,
+    saveLocation,
+  } = useOrganizationLocation();
   const firstName = currentProfile.name?.split(' ')[0] || 'User';
   const [activeIndex, setActiveIndex] = React.useState(0);
 
@@ -121,7 +133,32 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   return (
     <Screen backgroundColor={palette.creme}>
+      <LocationSetupModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onConfirm={async ({ latitude, longitude, address }) => {
+          await saveLocation(latitude, longitude, address);
+        }}
+        confirming={saving}
+        searchPlaceholder="Search business address..."
+      />
+
       <ScrollView contentContainerStyle={styles.container}>
+        {showBanner && (
+          <LocationRequiredBanner
+            description="Set your business location so charities can find your surplus listings and pickups work correctly."
+            onUseGps={() => setModalVisible(true)}
+            onSearchAddress={() => setModalVisible(true)}
+            onDismiss={() => setBannerClosed(true)}
+          />
+        )}
+
+        {!!capturedAddress && !showBanner && (
+          <View style={styles.locationCapturedPill}>
+            <AppText variant="caption">Location set: {capturedAddress}</AppText>
+          </View>
+        )}
+
         {loadingImpact ? (
           renderSkeleton()
         ) : (
@@ -497,5 +534,13 @@ const styles = StyleSheet.create({
   skeletonPillRow: {
     flexDirection: 'row',
     gap: wp(2),
+  },
+
+  locationCapturedPill: {
+    marginHorizontal: wp(4),
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(10),
+    backgroundColor: '#F4F8EF',
   },
 });

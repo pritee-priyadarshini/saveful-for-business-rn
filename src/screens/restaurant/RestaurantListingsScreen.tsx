@@ -19,8 +19,10 @@ import { Skeleton } from '../../components/Skeleton';
 
 import { palette } from '@/theme/colors';
 import { ListingStatus } from '@/types';
-import { foodListingService } from '@/services/foodListing.service';
-import { estimateMealsSaved } from '../../utils/foodListing';
+import { foodListingService, normalizeListingsResponse } from '@/services/foodListing.service';
+import { estimateMealsSaved, getListingAudience, isAnimalListing, isPeopleListing } from '../../utils/foodListing';
+import { formatApiErrorMessage } from '../../utils/listingLocation';
+import { useAppContext } from '../../store/AppContext';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -74,12 +76,8 @@ const META_ICONS = {
   impact: require('../../../assets/placeholder/leaf_icon.png'),
 };
 
-function isAnimalListing(listing: any) {
-  return listing?.isSafeForDonation === false;
-}
-
 function getListingTheme(listing: any): ListingTheme {
-  return isAnimalListing(listing) ? ANIMAL_THEME : PEOPLE_THEME;
+  return getListingAudience(listing) === 'animal' ? ANIMAL_THEME : PEOPLE_THEME;
 }
 
 function isCompletedListing(listing: any) {
@@ -150,20 +148,21 @@ function buildInstructions(listing: any) {
   const parts = [
     listing?.needsRefrigeration && 'NEEDS REFRIGERATION',
     listing?.needsReheating && 'NEEDS REHEATING',
-    listing?.containsAllergens && 'CONTAINS ALLERGENS',
+    (listing?.containsAllergens || (listing?.allergens?.length ?? 0) > 0) && 'CONTAINS ALLERGENS',
   ].filter(Boolean);
   return parts.length ? parts.join(', ') : 'NO SPECIAL INSTRUCTIONS';
 }
 
 function getImpactText(listing: any) {
   const totalKg = getTotalKg(listing);
-  if (isAnimalListing(listing)) {
+  if (getListingAudience(listing) === 'animal') {
     return `${Math.round(totalKg)} kg feed diverted from landfill`;
   }
   return `${estimateMealsSaved(totalKg)} meals created`;
 }
 
 export function RestaurantListingsScreen({ navigation }: any) {
+  const { authUser } = useAppContext();
   const [modalVisible, setModalVisible] = React.useState(false);
   const [selectedItems, setSelectedItems] = React.useState<any[]>([]);
   const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
@@ -172,11 +171,18 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
 
   const fetchListings = async () => {
+    const orgId = authUser?.profile?.organisation?.id;
+    if (!orgId) {
+      setListings([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const res = await foodListingService.getListings();
-      const all: any[] = (res.data as any)?.listings || [];
-      setListings(all.filter((l: any) => l.status !== 'CANCELLED'));
+      const res = await foodListingService.getOrgListings(Number(orgId));
+      const { listings: all } = normalizeListingsResponse(res);
+      setListings(all.filter((listing: any) => listing.status !== 'CANCELLED'));
     } catch {
       Alert.alert('Error', 'Failed to load listings');
     } finally {
@@ -187,11 +193,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
   useFocusEffect(
     React.useCallback(() => {
       fetchListings();
-    }, []),
+    }, [authUser?.profile?.organisation?.id]),
   );
 
   const peopleCount = useMemo(
-    () => listings.filter((l) => !isAnimalListing(l)).length,
+    () => listings.filter((l) => isPeopleListing(l)).length,
     [listings],
   );
   const animalCount = useMemo(
@@ -200,7 +206,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
   );
 
   const filteredListings = useMemo(() => {
-    if (listingFilter === 'people') return listings.filter((l) => !isAnimalListing(l));
+    if (listingFilter === 'people') return listings.filter((l) => isPeopleListing(l));
     if (listingFilter === 'animals') return listings.filter((l) => isAnimalListing(l));
     return listings;
   }, [listings, listingFilter]);
@@ -219,7 +225,10 @@ export function RestaurantListingsScreen({ navigation }: any) {
               await foodListingService.cancelListing(id);
               await fetchListings();
             } catch (error: any) {
-              Alert.alert('Error', error?.response?.data?.message || 'Failed to cancel listing');
+              Alert.alert(
+                'Error',
+                formatApiErrorMessage(error?.response?.data?.message, 'Failed to cancel listing'),
+              );
             }
           },
         },
@@ -308,7 +317,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
   const renderListingCard = (item: any) => {
     const theme = getListingTheme(item);
-    const isAnimal = isAnimalListing(item);
+    const isAnimal = getListingAudience(item) === 'animal';
     const metaTheme = isAnimal ? metaThemeStyles.animal : metaThemeStyles.people;
     const completed = isCompletedListing(item);
     const active = isActiveListing(item);
@@ -586,9 +595,9 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 const claimedQty = totalQty - remainingQty;
 
                 return (
-                  <View key={`${foodItem.category}-${idx}`} style={styles.modalItemRow}>
+                  <View key={`${foodItem.name || foodItem.category}-${idx}`} style={styles.modalItemRow}>
                     <AppText variant="bodyBold" style={{ flex: 2 }}>
-                      {foodItem.category}
+                      {foodItem.name || foodItem.category}
                     </AppText>
                     <AppText variant="bodySmall" style={styles.modalCol}>
                       {totalQty} kg

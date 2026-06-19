@@ -21,6 +21,8 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
+import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
+import { resolveListingSiteId } from '../../utils/listingSite';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -117,7 +119,6 @@ export function CreateFarmListingScreen({ navigation }: any) {
   const gridLayout = useMemo(() => getGridLayout(winWidth), [winWidth]);
 
   const { currentProfile, authUser } = useAppContext();
-  const siteId = authUser?.profile?.sites?.[0]?.id || authUser?.profile?.site?.id || null;
 
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FarmItem[]>(seedItems);
@@ -289,10 +290,13 @@ export function CreateFarmListingScreen({ navigation }: any) {
       Alert.alert('Confirmation required', 'Please confirm this material is for livestock/agricultural use.');
       return;
     }
-    if (!siteId) {
-      Alert.alert('Site not found', 'Please set up your site first.');
+
+    const resolvedSiteId = await resolveListingSiteId(authUser);
+    if (!resolvedSiteId) {
+      Alert.alert('Site not found', 'Please set up your business site first.');
       return;
     }
+
     if (activeItems.length === 0) {
       Alert.alert('Food details missing', 'Add at least one food item quantity.');
       setStep(1);
@@ -309,21 +313,41 @@ export function CreateFarmListingScreen({ navigation }: any) {
       return;
     }
 
+    const coords = getSitePickupCoords(authUser);
+    if (!coords) {
+      Alert.alert(
+        'Location missing',
+        'Your site location is not set. Go to Home and use the location banner to set your farm address on the map.',
+      );
+      setStep(2);
+      return;
+    }
+
     try {
       const payload = {
-        siteId: Number(siteId),
+        siteId: resolvedSiteId,
+        listingType: 'ANIMAL' as const,
         foodItems: activeItems.map((item) => ({
+          name: item.name,
           category: item.name,
           totalQtyKg: item.qty,
-          remainingQtyKg: item.qty,
+          unit: 'kg',
         })),
-        pickupAddress: location || 'Address not provided',
+        pickupAddress: location || currentProfile?.address || 'Address not provided',
+        pickupPostcode: getSitePostcode(authUser),
+        pickupLat: coords.lat,
+        pickupLng: coords.lng,
         bestBefore: bestBeforeDate.toISOString(),
         pickupFromTime: pickupFromDate.toISOString(),
         pickupByTime: pickupToDate.toISOString(),
-        needsRefrigeration: selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
+        needsRefrigeration: selectedStorage.includes('Fridge'),
+        needsFreezer: selectedStorage.includes('Freezer'),
+        needsAmbient:
+          selectedStorage.includes('Ambient') ||
+          selectedStorage.includes('Dry storage'),
         isSafeForDonation: false,
-        containsAllergens: selectedContaminants.length > 0,
+        allergens: selectedContaminants,
+        photoUrls: images.filter((uri) => uri.startsWith('http')),
       };
 
       const response = await foodListingService.createListing(payload);
@@ -331,6 +355,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
         listing: {
           ...(response.data as any),
           foodItems: activeItems.map((item) => ({
+            name: item.name,
             category: item.name,
             totalQtyKg: item.qty,
             remainingQtyKg: item.qty,
@@ -341,9 +366,10 @@ export function CreateFarmListingScreen({ navigation }: any) {
         },
       });
     } catch (error: any) {
+      console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
       Alert.alert(
         'Could not create listing',
-        error?.response?.data?.message || 'Please try again.',
+        formatApiError(error, 'Please try again.'),
       );
     }
   };

@@ -4,36 +4,26 @@ import {
   Image,
   View,
   TouchableOpacity,
-  Pressable,
-  Alert,
   Dimensions,
   ImageBackground,
   RefreshControl,
   ActivityIndicator,
   StyleSheet,
-  Modal,
-  Animated,
-  PanResponder,
-  Keyboard,
-  TouchableWithoutFeedback,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
-import * as Location from 'expo-location';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
+import { LocationSetupModal } from '../../components/LocationSetupModal';
 
 import { useAppContext } from '../../store/AppContext';
+import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 
 import { palette } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
-import { foodListingService } from '@/services/foodListing.service';
-import { charityService } from '@/services/charity.service';
-import { authService } from '@/services/auth.service';
-import { Ionicons } from '@expo/vector-icons';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import { GOOGLE_PLACES_API_KEY } from '@/config';
+import { foodListingService, normalizeListingsResponse } from '@/services/foodListing.service';
+import { OsmMapView } from '@/components/OsmMapView';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -46,101 +36,29 @@ const normalize = (size: number) => {
 
 export function CharityDiscoverScreen() {
   const navigation = useNavigation<any>();
-  const { currentProfile, authUser, setAuthUser } = useAppContext();
+  const { currentProfile } = useAppContext();
+  const {
+    showBanner,
+    setBannerClosed,
+    modalVisible,
+    setModalVisible,
+    saving,
+    capturedAddress,
+    saveLocation,
+  } = useOrganizationLocation();
   const listRef = useRef<FlatList>(null);
 
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [locationBannerClosed, setLocationBannerClosed] = useState(false);
-  const [savingLocation, setSavingLocation] = useState(false);
-  const [showPlacesSearch, setShowPlacesSearch] = useState(false);
-  const [region, setRegion] = useState<any>(null);
-  const [marker, setMarker] = useState<any>(null);
-  const [selectedAddress, setSelectedAddress] = useState('');
-
-  const MODAL_HEIGHT = height * 0.72;
-  const slideAnim = useRef(new Animated.Value(height * 0.72)).current;
-
-  const openModal = () => {
-    slideAnim.setValue(MODAL_HEIGHT);
-    setShowPlacesSearch(true);
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
-  };
-
-  const closeModal = () => {
-    Keyboard.dismiss();
-    Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
-      .start(() => setShowPlacesSearch(false));
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 5,
-      onPanResponderMove: (_, gs) => {
-        if (gs.dy > 0) slideAnim.setValue(gs.dy);
-      },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 80 || gs.vy > 0.5) {
-          Keyboard.dismiss();
-          Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
-            .start(() => setShowPlacesSearch(false));
-        } else {
-          Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
-        }
-      },
-    })
-  ).current;
-
-  const profileLatitude =
-    authUser?.profile?.sites?.[0]?.latitude ??
-    authUser?.profile?.organisation?.latitude;
-  const profileLongitude =
-    authUser?.profile?.sites?.[0]?.longitude ??
-    authUser?.profile?.organisation?.longitude;
-
-  const hasBackendLocation =
-    profileLatitude !== null &&
-    profileLatitude !== undefined &&
-    profileLongitude !== null &&
-    profileLongitude !== undefined;
-
-  const showLocationBanner =
-    !hasBackendLocation && !locationBannerClosed;
-
-  useEffect(() => {
-    console.log('[Banner] profileLatitude =', profileLatitude);
-    console.log('[Banner] profileLongitude =', profileLongitude);
-    console.log('[Banner] hasBackendLocation =', hasBackendLocation);
-    console.log('[Banner] locationBannerClosed =', locationBannerClosed);
-    console.log('[Banner] showLocationBanner =', showLocationBanner);
-  }, [profileLatitude, profileLongitude, hasBackendLocation, locationBannerClosed]);
 
   const fetchListings = async () => {
     try {
       setLoading(true);
 
-      const res = await foodListingService.getListings({
-        status: 'ACTIVE',
-      });
-
-      const raw = res?.data;
-
-      let data: any[] = [];
-
-      if (Array.isArray(raw)) {
-        data = raw;
-      } else if (Array.isArray(raw?.data)) {
-        data = raw.data;
-      } else if (Array.isArray(raw?.data?.listings)) {
-        data = raw.data.listings;
-      } else if (Array.isArray(raw?.listings)) {
-        data = raw.listings;
-      } else {
-        console.log('Unexpected Data :', raw);
-        data = [];
-      }
+      const res = await foodListingService.getRecentListings({ page: 1, limit: 50 });
+      const { listings: data } = normalizeListingsResponse(res);
 
       const mapped = data.map((item: any) => {
         const totalQty =
@@ -206,75 +124,6 @@ export function CharityDiscoverScreen() {
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   }, []);
-
-  const handleGpsLocation = async () => {
-    try {
-      let permission = await Location.getForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        permission = await Location.requestForegroundPermissionsAsync();
-      }
-
-      if (permission.status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow location access to continue.');
-        return;
-      }
-
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const { latitude, longitude } = position.coords;
-      const newRegion = { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 };
-      setRegion(newRegion);
-      setMarker({ latitude, longitude });
-
-      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
-      const place = places[0];
-      const label = place
-        ? [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ')
-        : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-      setSelectedAddress(label);
-
-      openModal();
-    } catch (error: any) {
-      Alert.alert('Location Error', 'Unable to get your location. Please try again.');
-    }
-  };
-
-  const handleConfirmLocation = async () => {
-    if (!marker) return;
-    try {
-      setSavingLocation(true);
-      const { latitude, longitude } = marker;
-      const organizationId = authUser?.profile?.organisation?.id;
-
-      if (!organizationId) {
-        Alert.alert('Unable to Save', 'Could not find your organisation to update.');
-        return;
-      }
-
-      await charityService.updateOrganizationCoordinates(organizationId, { latitude, longitude });
-
-      try {
-        const profileRes = await authService.profile();
-        const profile = profileRes.data;
-        setAuthUser({
-          ...profile.user,
-          accessToken: authUser?.accessToken || '',
-          orgType: profile.organisation?.type,
-          orgRole: profile.role?.orgRole,
-          siteRole: profile.role?.siteRole,
-          profile,
-        });
-      } catch {
-        // profile refresh can be retried later
-      }
-
-      setLocationBannerClosed(true);
-      closeModal();
-    } catch (error: any) {
-      Alert.alert('Error', error?.response?.data?.message || 'Failed to save location. Please try again.');
-    } finally {
-      setSavingLocation(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -371,35 +220,18 @@ export function CharityDiscoverScreen() {
         </AppText>
       </ImageBackground>
 
-      {showLocationBanner && (
-        <View style={styles.locationBanner}>
-          <View style={styles.locationBannerTopRow}>
-            <AppText variant="bodyBold">Share your location to get started</AppText>
-            <Pressable onPress={() => setLocationBannerClosed(true)}>
-              <AppText variant="bodyLarge">×</AppText>
-            </Pressable>
-          </View>
-
-          <AppText variant="bodySmall" style={styles.locationBannerText}>
-            Share your charity location for better pickup matching.
-          </AppText>
-
-          <View style={styles.locationPickerRow}>
-            <Pressable style={styles.locationPickerBtn} onPress={handleGpsLocation}>
-              <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
-              <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
-            </Pressable>
-            <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
-              <Ionicons name="search" size={normalize(16)} color={palette.white} />
-              <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
-            </Pressable>
-          </View>
-        </View>
+      {showBanner && (
+        <LocationRequiredBanner
+          description="Share your charity location for better pickup matching."
+          onUseGps={() => setModalVisible(true)}
+          onSearchAddress={() => setModalVisible(true)}
+          onDismiss={() => setBannerClosed(true)}
+        />
       )}
 
-      {!!selectedAddress && !showLocationBanner && (
+      {!!capturedAddress && !showBanner && (
         <View style={styles.locationCapturedPill}>
-          <AppText variant="caption">Location captured: {selectedAddress}</AppText>
+          <AppText variant="caption">Location set: {capturedAddress}</AppText>
         </View>
       )}
 
@@ -478,26 +310,13 @@ export function CharityDiscoverScreen() {
 
     return (
       <View style={[styles.mapContainer, { marginTop: hp(1.8) }]}>
-        <MapView
+        <OsmMapView
           style={styles.map}
-          liteMode
-          initialRegion={{
-            latitude: availableListings[0].lat,
-            longitude: availableListings[0].lng,
-            latitudeDelta: 0.08,
-            longitudeDelta: 0.08,
-          }}
-        >
-          {availableListings.map((item) => (
-            <Marker
-              key={item.id}
-              coordinate={{
-                latitude: item.lat,
-                longitude: item.lng,
-              }}
-            />
-          ))}
-        </MapView>
+          markers={availableListings.map((item) => ({
+            latitude: item.lat,
+            longitude: item.lng,
+          }))}
+        />
 
         <View style={styles.cardListWrapper}>
           <FlatList
@@ -515,104 +334,15 @@ export function CharityDiscoverScreen() {
   /* RENDER */
   return (
     <Screen scrollable={false} backgroundColor={palette.creme}>
-      {/* LOCATION BOTTOM SHEET MODAL */}
-      <Modal
-        visible={showPlacesSearch}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={closeModal}
-      >
-        <TouchableWithoutFeedback onPress={closeModal}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <Animated.View
-                style={[styles.modalSheet, { transform: [{ translateY: slideAnim }] }]}
-              >
-                <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
-                  <View style={styles.dragHandle} />
-                </View>
-
-                <View style={styles.modalHeader}>
-                  <AppText style={styles.modalTitle}>Set Location</AppText>
-                  <Pressable onPress={closeModal} style={styles.modalCloseBtn}>
-                    <Ionicons name="close" size={normalize(22)} color={palette.text} />
-                  </Pressable>
-                </View>
-
-                <View style={styles.modalSearchContainer}>
-                  <GooglePlacesAutocomplete
-                    placeholder="Search charity address or place..."
-                    fetchDetails
-                    textInputProps={{ autoFocus: true }}
-                    onPress={(data, details = null) => {
-                      const lat = details?.geometry?.location?.lat;
-                      const lng = details?.geometry?.location?.lng;
-                      if (lat && lng) {
-                        const newRegion = { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 };
-                        setRegion(newRegion);
-                        setMarker({ latitude: lat, longitude: lng });
-                      }
-                      const addr = details?.formatted_address || data.description;
-                      setSelectedAddress(addr);
-                      Keyboard.dismiss();
-                    }}
-                    query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
-                    styles={{
-                      container: { flex: 0 },
-                      textInputContainer: { borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border },
-                      textInput: { height: normalize(46), color: palette.text, fontSize: normalize(14), marginBottom: 0, backgroundColor: palette.white },
-                      listView: { backgroundColor: palette.white, borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border, marginTop: normalize(4) },
-                      row: { padding: normalize(12), backgroundColor: palette.white },
-                      description: { fontSize: normalize(13), color: palette.text },
-                    }}
-                    enablePoweredByContainer={false}
-                    debounce={300}
-                    keepResultsAfterBlur
-                  />
-                </View>
-
-                <View style={styles.modalMapContainer}>
-                  {region ? (
-                    <MapView
-                      style={styles.mapView}
-                      region={region}
-                      showsUserLocation
-                      onPress={async (e) => {
-                        const { latitude, longitude } = e.nativeEvent.coordinate;
-                        setMarker({ latitude, longitude });
-                        const res = await Location.reverseGeocodeAsync({ latitude, longitude });
-                        if (res.length > 0) {
-                          const place = res[0];
-                          const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
-                          setSelectedAddress(addr);
-                        }
-                      }}
-                    >
-                      {marker && <Marker coordinate={marker} />}
-                    </MapView>
-                  ) : (
-                    <View style={styles.mapPlaceholder}>
-                      <Ionicons name="map-outline" size={normalize(36)} color="#ccc" />
-                      <AppText style={styles.mapPlaceholderText}>Search or tap to select a location</AppText>
-                    </View>
-                  )}
-                </View>
-
-                <Pressable
-                  style={[styles.confirmBtn, (!marker || savingLocation) && styles.confirmBtnDisabled]}
-                  onPress={handleConfirmLocation}
-                  disabled={!marker || savingLocation}
-                >
-                  <AppText style={styles.confirmBtnText}>
-                    {savingLocation ? 'Saving...' : marker ? 'Confirm Location' : 'Select a location on the map'}
-                  </AppText>
-                </Pressable>
-              </Animated.View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      <LocationSetupModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onConfirm={async ({ latitude, longitude, address }) => {
+          await saveLocation(latitude, longitude, address);
+        }}
+        confirming={saving}
+        searchPlaceholder="Search charity address or place..."
+      />
 
       {viewMode === 'list' ? (
         <FlatList
@@ -687,157 +417,6 @@ const styles = StyleSheet.create({
 
   headingText: {
     textAlign: 'center',
-  },
-
-  locationBanner: {
-    marginHorizontal: wp(4),
-    marginTop: hp(1.5),
-    borderRadius: normalize(16),
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.white,
-    padding: wp(3.5),
-    gap: hp(1),
-  },
-
-  locationBannerTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  locationBannerText: {
-    opacity: 0.8,
-  },
-
-  locationPickerRow: {
-    flexDirection: 'row',
-    gap: wp(2.5),
-  },
-
-  locationPickerBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: normalize(6),
-    padding: normalize(12),
-    borderRadius: normalize(10),
-    borderWidth: 1,
-    borderColor: palette.primary,
-    backgroundColor: palette.primary + '15',
-  },
-
-  locationPickerBtnSearch: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
-  },
-
-  locationPickerBtnText: {
-    fontSize: normalize(13),
-    color: palette.primary,
-    fontWeight: '500',
-  },
-
-  locationPickerBtnTextWhite: {
-    color: palette.white,
-  },
-
-  // ─── Bottom Sheet Modal ────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-
-  modalSheet: {
-    height: height * 0.72,
-    backgroundColor: palette.white,
-    borderTopLeftRadius: normalize(20),
-    borderTopRightRadius: normalize(20),
-    overflow: 'hidden',
-  },
-
-  dragHandleArea: {
-    alignItems: 'center',
-    paddingVertical: normalize(10),
-    backgroundColor: palette.white,
-  },
-
-  dragHandle: {
-    width: normalize(40),
-    height: normalize(4),
-    borderRadius: normalize(2),
-    backgroundColor: '#ddd',
-  },
-
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: wp(4),
-    paddingBottom: normalize(10),
-  },
-
-  modalTitle: {
-    flex: 1,
-    fontSize: normalize(16),
-    fontWeight: '600',
-    color: palette.text,
-  },
-
-  modalCloseBtn: {
-    padding: normalize(4),
-  },
-
-  modalSearchContainer: {
-    paddingHorizontal: wp(4),
-    paddingBottom: normalize(8),
-    zIndex: 10,
-  },
-
-  modalMapContainer: {
-    flex: 1,
-    marginHorizontal: wp(4),
-    marginBottom: normalize(4),
-    borderRadius: normalize(12),
-    overflow: 'hidden',
-  },
-
-  mapView: {
-    flex: 1,
-  },
-
-  mapPlaceholder: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: normalize(8),
-  },
-
-  mapPlaceholderText: {
-    color: '#aaa',
-    fontSize: normalize(12),
-  },
-
-  confirmBtn: {
-    backgroundColor: palette.middlegreen,
-    padding: normalize(14),
-    marginHorizontal: wp(6),
-    marginTop: normalize(8),
-    marginBottom: normalize(16),
-    borderRadius: normalize(10),
-    alignItems: 'center',
-  },
-
-  confirmBtnDisabled: {
-    backgroundColor: '#bbb',
-  },
-
-  confirmBtnText: {
-    color: palette.white,
-    fontSize: normalize(15),
-    fontWeight: '600',
   },
 
   locationCapturedPill: {
