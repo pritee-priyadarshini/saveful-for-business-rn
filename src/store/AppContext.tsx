@@ -108,7 +108,6 @@ export function AppProvider({ children }: PropsWithChildren) {
         }
       } catch (error) {
         console.log('SESSION RESTORE ERROR', error);
-        // If token is invalid or expired, clear it
         await SecureStore.deleteItemAsync('accessToken');
       } finally {
         setIsInitialLoading(false);
@@ -279,7 +278,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   ]);
 
   if (isInitialLoading) {
-    return null; // Or a loading spinner
+    return null; 
   }
 
   return (

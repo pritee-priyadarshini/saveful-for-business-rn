@@ -26,7 +26,7 @@ import { ListingStatus, OrderStatus } from '../../types';
 type Params = {
     DriverTracking: {
         trackingId: string;
-        source: 'restaurant' | 'charity';
+        source: 'restaurant' | 'charity' | 'farmer';
     };
 };
 
@@ -38,7 +38,7 @@ type TrackItem = {
 
 type TrackData = {
     id: string;
-    source: 'restaurant' | 'charity';
+    source: 'restaurant' | 'charity' | 'farmer';
     listingStatus: ListingStatus;
     orderStatus: OrderStatus;
     restaurantName: string;
@@ -149,8 +149,14 @@ export default function DriverTrackingScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<Params, 'DriverTracking'>>();
     const { trackingId, source } = route.params;
+    const isRestaurantView = source === 'restaurant';
 
-    const data = trackingData.find(x => x.id === trackingId && x.source === source) || trackingData[0];
+    const data =
+      trackingData.find(
+        (x) =>
+          x.id === trackingId &&
+          (x.source === source || (source === 'farmer' && x.source === 'charity')),
+      ) || trackingData[0];
 
     const [carCoordinate, setCarCoordinate] = useState({
         latitude: 20.2961,
@@ -323,13 +329,13 @@ export default function DriverTrackingScreen() {
                     <View style={styles.topRow}>
                         <View style={{ flex: 1 }}>
                             <AppText variant="bodyBold">
-                                {source === 'restaurant'
+                                {isRestaurantView
                                     ? `Charity Collecting: ${data.charityName}`
                                     : `Restaurant To Be Collected: ${data.restaurantName}`}
                             </AppText>
 
                             <AppText variant="bodySmall">
-                                📍{' '} {source === 'restaurant' ? data.charityAddress : data.restaurantAddress}
+                                📍{' '} {isRestaurantView ? data.charityAddress : data.restaurantAddress}
                             </AppText>
                             <AppText variant="bodyBold">{data.distance}</AppText>
                         </View>

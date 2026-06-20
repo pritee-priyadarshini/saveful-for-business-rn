@@ -15,6 +15,7 @@ import { Picker } from '@react-native-picker/picker';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { Skeleton } from '../../components/Skeleton';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { CharityMemberRole, charityService } from '@/services/charity.service';
@@ -38,7 +39,7 @@ type Member = {
   role: string;
 };
 
-export default function CharityManageAccessScreen() {
+export default function FarmerManageAccessScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { locationId, orgType } = route.params as {
@@ -48,7 +49,7 @@ export default function CharityManageAccessScreen() {
   const [activeTab, setActiveTab] = useState<AccessType>('user');
 
   const [members, setMembers] = useState<Member[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(true);
 
   useEffect(() => {
     fetchMembers();
@@ -233,6 +234,27 @@ export default function CharityManageAccessScreen() {
     if (!role) return 'Unknown';
     return role.replace(/_/g, ' ');
   };
+
+  const renderSkeleton = () => (
+    <View style={styles.skeletonWrap}>
+      <Skeleton width="100%" height={hp(14)} borderRadius={0} />
+      <View style={styles.skeletonTabRow}>
+        <Skeleton width={wp(40)} height={normalize(40)} borderRadius={normalize(10)} />
+        <Skeleton width={wp(40)} height={normalize(40)} borderRadius={normalize(10)} />
+      </View>
+      {[1, 2, 3].map((i) => (
+        <Skeleton key={i} width={wp(92)} height={normalize(64)} borderRadius={normalize(12)} style={styles.skeletonCard} />
+      ))}
+    </View>
+  );
+
+  if (loadingMembers) {
+    return (
+      <Screen backgroundColor={palette.creme}>
+        {renderSkeleton()}
+      </Screen>
+    );
+  }
 
 
   return (
@@ -623,5 +645,17 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: wp(3),
+  },
+  skeletonWrap: {
+    gap: hp(1.2),
+  },
+  skeletonTabRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: wp(3),
+    paddingVertical: hp(1),
+  },
+  skeletonCard: {
+    alignSelf: 'center',
   },
 });

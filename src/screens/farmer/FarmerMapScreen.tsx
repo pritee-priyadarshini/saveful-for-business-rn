@@ -13,8 +13,8 @@ import {
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { fetchDiscoverListings } from '@/services/foodListing.service';
 import { useAppContext } from '../../store/AppContext';
 
@@ -26,9 +26,9 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-type ClaimState = Record<string, number>; // key = listingId-itemName
+type ClaimState = Record<string, number>;
 
-export function CharityMapScreen({ navigation }: any) {
+export function FarmerMapScreen({ navigation }: any) {
   const { authUser } = useAppContext();
   const [claimState, setClaimState] = useState<ClaimState>({});
   const [activeFilter, setActiveFilter] = useState<'distance' | 'surplus' | null>(null);
@@ -50,7 +50,7 @@ export function CharityMapScreen({ navigation }: any) {
     try {
       setLoading(true);
 
-      const data = await fetchDiscoverListings('people', { page: 1, limit: 20 });
+      const data = await fetchDiscoverListings('animal', { page: 1, limit: 20 });
 
       if (!Array.isArray(data)) {
         console.log('[Listings] Invalid discover response');
@@ -164,7 +164,7 @@ export function CharityMapScreen({ navigation }: any) {
 
       <Pressable
         style={styles.pickupBtn}
-        onPress={() => navigation.navigate('CharityPickup')}
+        onPress={() => navigation.navigate('FarmerPickup')}
       >
         <AppText variant="bodyBold" style={styles.pickupBtnText} >
           View Your Pickups
@@ -329,7 +329,7 @@ export function CharityMapScreen({ navigation }: any) {
             onPress={() => {
               const payload = buildPayload(item);
 
-              navigation.navigate('ClaimConfirm', {
+              navigation.navigate('FarmerClaimConfirm', {
                 listing: item,
                 payload,
               });
@@ -341,7 +341,7 @@ export function CharityMapScreen({ navigation }: any) {
             variant="primary"
             style={styles.flexBtn}
             onPress={() =>
-              navigation.navigate('ClaimConfirm', {
+              navigation.navigate('FarmerClaimConfirm', {
                 listing: item,
               })
             }
@@ -371,12 +371,24 @@ export function CharityMapScreen({ navigation }: any) {
     return data;
   }, [listings, activeFilter]);
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
-      <Screen backgroundColor={palette.creme}>
-        <AppText style={{ textAlign: 'center', marginTop: hp(6) }}>
-          Loading listings...
-        </AppText>
+      <Screen backgroundColor={palette.creme} scrollable={false}>
+        <View style={styles.skeletonWrap}>
+          <Skeleton width="100%" height={hp(20)} borderRadius={0} />
+          <Skeleton width={wp(70)} height={normalize(44)} borderRadius={normalize(14)} style={styles.skeletonCenter} />
+          <View style={styles.skeletonActiveRow}>
+            <Skeleton width={wp(35)} height={normalize(18)} />
+            <Skeleton width={wp(16)} height={hp(4.2)} borderRadius={normalize(12)} />
+          </View>
+          <View style={styles.skeletonFilterRow}>
+            <Skeleton width={wp(42)} height={normalize(36)} borderRadius={normalize(20)} />
+            <Skeleton width={wp(42)} height={normalize(36)} borderRadius={normalize(20)} />
+          </View>
+          {[1, 2].map((i) => (
+            <Skeleton key={i} width={wp(92)} height={normalize(280)} borderRadius={normalize(20)} style={styles.skeletonCard} />
+          ))}
+        </View>
       </Screen>
     );
   }
@@ -584,6 +596,28 @@ const styles = StyleSheet.create({
   flexBtn: {
     flex: 1,
     backgroundColor: palette.middlegreen,
+  },
+
+  skeletonWrap: {
+    paddingBottom: hp(4),
+    gap: hp(1.2),
+  },
+  skeletonCenter: {
+    alignSelf: 'center',
+  },
+  skeletonActiveRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: wp(4),
+  },
+  skeletonFilterRow: {
+    flexDirection: 'row',
+    gap: wp(2.5),
+    paddingHorizontal: wp(4),
+  },
+  skeletonCard: {
+    alignSelf: 'center',
   },
 
 });

@@ -201,6 +201,8 @@ export function ProfileScreen() {
   const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
 
   const isCharity = selectedRole === 'charity_single' || selectedRole === 'charity_multi';
+  const isFarmerConsumer = selectedRole === 'farmer';
+  const isCollector = isCharity || isFarmerConsumer;
 
   // DYNAMIC SECTIONS
   const sections = [
@@ -223,8 +225,8 @@ export function ProfileScreen() {
     },
     {
       key: 'business',
-      title: isCharity ? 'Charity Details' : 'Business Details',
-      fields: isCharity
+      title: isCharity ? 'Charity Details' : isFarmerConsumer ? 'Farm Details' : 'Business Details',
+      fields: isCollector
         ? [
           { label: 'Name', value: currentProfile.organization, editable: false },
           { label: 'Address', value: currentProfile.address, editable: true },
@@ -245,7 +247,7 @@ export function ProfileScreen() {
         { label: 'Logo', value: 'Upload Logo', editable: true, isUpload: true },
       ],
     },
-    ...(isCharity
+    ...(isCollector
       ? [
         {
           key: 'pickup',
@@ -388,7 +390,7 @@ export function ProfileScreen() {
                         onChangeText={(v) => updateField('registration', v)}
                       />
 
-                      {!isCharity && (
+                      {!isCollector && (
                         <>
                           <AppText variant="bodyBold">Venue Type</AppText>
 
@@ -479,7 +481,7 @@ export function ProfileScreen() {
                     section.key === 'business' ||
                     section.key === 'extra') &&
                     true) ||
-                    (section.key === 'pickup' && isCharity) ? (
+                    (section.key === 'pickup' && isCollector) ? (
                     <Pressable
                       style={styles.saveBtn}
                       onPress={() => {
@@ -521,15 +523,19 @@ export function ProfileScreen() {
             </Pressable>
           )}
 
-          {(isRestaurant || isCharity) && (
+          {(isRestaurant || isCollector) && (
             <Pressable
               style={styles.linkRow}
               onPress={() =>
                 navigation.navigate(
-                  isCharity ? 'CharityManageAccess' : 'ManageAccess',
+                  isCharity
+                    ? 'CharityManageAccess'
+                    : isFarmerConsumer
+                      ? 'FarmerManageAccess'
+                      : 'ManageAccess',
                   {
                     locationId: selectedSiteId,
-                    orgType: isCharity ? 'charity' : 'restaurant',
+                    orgType: isCharity ? 'charity' : isFarmerConsumer ? 'farmer' : 'restaurant',
                   }
                 )
               }

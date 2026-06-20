@@ -1,5 +1,6 @@
 import api from './api';
 import type { FoodListingType, ListingStatus } from '../types';
+import { isAnimalListing, isPeopleListing } from '../utils/foodListing';
 
 export type FoodItem = {
   id?: number;
@@ -160,6 +161,16 @@ export function normalizeListingsResponse(response: any): PaginatedListingsRespo
     };
   }
 
+  if (Array.isArray(raw?.response)) {
+    return {
+      listings: raw.response,
+      total: raw.response.length,
+      page: 1,
+      limit: raw.response.length,
+      totalPages: 1,
+    };
+  }
+
   if (Array.isArray(raw?.data?.listings)) {
     return normalizeListingsResponse({ data: raw.data });
   }
@@ -227,6 +238,98 @@ export function invalidateListingDetail(listingId: number) {
   listingDetailCache.delete(listingId);
 }
 
+export type DiscoverAudience = 'people' | 'animal';
+
+function isActiveListingStatus(status: unknown) {
+  const value = String(status || '').toUpperCase();
+  return value === 'ACTIVE' || value === 'PARTIAL';
+}
+
+export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
+  const statusUpper = String(item.status || '').toUpperCase();
+  const totalQty =
+    item.foodItems?.reduce(
+      (sum: number, f: any) => sum + (f.remainingQtyKg || f.totalQtyKg || 0),
+      0,
+    ) || item.totalQtyKg || 0;
+
+  return {
+    id: String(item.id),
+    title: 'Surplus Food',
+    businessName:
+      (item as any).organisation?.name ||
+      (item as any).site?.locationName ||
+      (item as any).site?.name ||
+      (item as any).businessName ||
+      'Food Provider',
+    quantityKg: totalQty,
+    date: item.bestBefore,
+    pickupWindow:
+      item.pickupFromTime && item.pickupByTime
+        ? `${item.pickupFromTime} - ${item.pickupByTime}`
+        : 'Flexible',
+    storage: item.needsRefrigeration ? 'Keep Refrigerated' : 'Room Temperature',
+    status:
+      statusUpper === 'ACTIVE'
+        ? 'Available'
+        : statusUpper === 'PARTIAL'
+          ? 'Partial claimed'
+          : item.status,
+    lat: Number(item.pickupLat) || 20.2961,
+    lng: Number(item.pickupLng) || 85.8245,
+    distance: (item as any).distance || '—',
+  };
+}
+
+export async function fetchDiscoverListings(
+  audience: DiscoverAudience,
+  params: { page?: number; limit?: number } = {},
+): Promise<FoodListing[]> {
+  const page = params.page ?? 1;
+  const limit = params.limit ?? 20;
+
+  console.log('[Listings] Fetch discover feed', {
+    endpoint: '/food-listings/recent',
+    page,
+    limit,
+    audience,
+  });
+
+  const res = await api.get('/food-listings/recent', { params: { page, limit } });
+  const normalized = normalizeListingsResponse(res);
+  const raw = normalized.listings;
+
+  console.log('[Listings] Raw API result', {
+    total: normalized.total,
+    count: raw.length,
+    preview: raw.slice(0, 5).map((item) => ({
+      id: item.id,
+      listingType: item.listingType,
+      status: item.status,
+      siteId: item.siteId,
+    })),
+  });
+
+  const available = raw.filter((item) => isActiveListingStatus(item.status));
+  const audienceFilter = audience === 'animal' ? isAnimalListing : isPeopleListing;
+  const matched = available.filter(audienceFilter);
+
+  console.log('[Listings] After filters', {
+    available: available.length,
+    matched: matched.length,
+    audience,
+    listingTypesSeen: [...new Set(raw.map((item) => item.listingType || 'unknown'))],
+  });
+
+  if (raw.length > 0 && matched.length === 0) {
+    console.log(
+      '[Listings] Listings returned but none match audience. Check listingType values above.',
+    );
+  }
+
+  return matched;
+}
+
 export const foodListingService = {
   createListing: (payload: CreateListingPayload) => {
     const body = normalizeCreateListingPayload(payload);
@@ -235,6 +338,8 @@ export const foodListingService = {
 
   getOrgListings: (orgId: number, params?: GetListingsParams) =>
     api.get(`/food-listings/org/${orgId}`, { params }),
+
+  getSiteListings: () => api.get('/food-listings/site'),
 
   getRecentListings: (params?: Pick<GetListingsParams, 'page' | 'limit'>) =>
     api.get('/food-listings/recent', { params }),

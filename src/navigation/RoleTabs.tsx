@@ -19,10 +19,10 @@ import { RestaurantStack } from './RestaurantStack';
 import { CharityStack } from './CharityStack';
 import { RestaurantUpdatesScreen } from '@/screens/restaurant/RestaurantUpdatesScreen';
 import { Dimensions } from 'react-native';
-import { FarmerHomeScreen } from '@/screens/farmer/FarmerHomeScreen';
 import { FarmerStack } from './FarmerStack';
 import { FarmerAnalyticsScreen } from '@/screens/farmer/FarmerAnalyticsScreen';
 import { FarmerUpdatesScreen } from '@/screens/farmer/FarmerUpdatesScreen';
+import { FarmerHomeScreen } from '@/screens/farmer/FarmerHomeScreen';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -86,7 +86,7 @@ export function RoleTabs() {
     );
   }
 
-  if (selectedRole === 'farmer' || selectedRole === 'farm_business') {
+  if (selectedRole === 'farmer') {
     return (
       <FarmerTab.Navigator screenOptions={screenOptions}>
         <FarmerTab.Screen component={FarmerHomeScreen} name="Home" />
@@ -98,12 +98,23 @@ export function RoleTabs() {
     );
   }
 
+  if (selectedRole === 'farm_business') {
+    return (
+      <RestaurantTab.Navigator screenOptions={screenOptions}>
+        <RestaurantTab.Screen component={RestaurantHomeScreen} name="Home" />
+        <RestaurantTab.Screen component={RestaurantStack} name="Listings" options={{ unmountOnBlur: true }} />
+        <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
+        <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
+        <RestaurantTab.Screen component={ProfileScreen} name="Account" />
+      </RestaurantTab.Navigator>
+    );
+  }
+
   return (
     <RestaurantTab.Navigator screenOptions={screenOptions}>
       <RestaurantTab.Screen component={RestaurantHomeScreen} name="Home" />
       <RestaurantTab.Screen component={RestaurantStack} name="Listings" options={{ unmountOnBlur: true }} />
       <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
-      {/* <RestaurantTab.Screen component={RestaurantPlansScreen} name="Plans" /> */}
       <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
       <RestaurantTab.Screen component={ProfileScreen} name="Account" />
     </RestaurantTab.Navigator>

@@ -22,7 +22,7 @@ import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 
 import { palette } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
-import { foodListingService, normalizeListingsResponse } from '@/services/foodListing.service';
+import { fetchDiscoverListings, mapDiscoverListing } from '@/services/foodListing.service';
 import { OsmMapView } from '@/components/OsmMapView';
 
 const { width, height } = Dimensions.get("window");
@@ -36,7 +36,7 @@ const normalize = (size: number) => {
 
 export function CharityDiscoverScreen() {
   const navigation = useNavigation<any>();
-  const { currentProfile } = useAppContext();
+  const { currentProfile, authUser } = useAppContext();
   const {
     showBanner,
     setBannerClosed,
@@ -54,49 +54,20 @@ export function CharityDiscoverScreen() {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   const fetchListings = async () => {
+    if (!authUser?.accessToken) return;
+
     try {
       setLoading(true);
 
-      const res = await foodListingService.getRecentListings({ page: 1, limit: 50 });
-      const { listings: data } = normalizeListingsResponse(res);
-
-      const mapped = data.map((item: any) => {
-        const totalQty =
-          item.foodItems?.reduce(
-            (sum: number, f: any) =>
-              sum + (f.remainingQtyKg || f.totalQtyKg || 0),
-            0
-          ) || item.totalQtyKg || 0;
-
-        return {
-          id: String(item.id),
-          title: 'Surplus Food',
-          businessName: item.site?.locationName || item.site?.name || item.businessName || 'Food Provider',
-          quantityKg: totalQty,
-          date: item.bestBefore,
-          pickupWindow:
-            item.pickupFromTime && item.pickupByTime
-              ? `${item.pickupFromTime} - ${item.pickupByTime}`
-              : 'Flexible',
-
-          storage: item.needsRefrigeration ? 'Keep Refrigerated' : 'Room Temperature',
-          status:
-            item.status === 'ACTIVE'
-              ? 'Available'
-              : item.status === 'PARTIAL'
-                ? 'Partial claimed'
-                : item.status,
-
-          lat: Number(item.pickupLat) || 20.2961,
-          lng: Number(item.pickupLng) || 85.8245,
-
-          distance: '—',
-        };
-      });
-
+      const data = await fetchDiscoverListings('people', { page: 1, limit: 20 });
+      const mapped = data.map(mapDiscoverListing);
       setListings(mapped);
-    } catch (err) {
-      console.log('LISTING_FETCH_ERROR:', err);
+    } catch (err: any) {
+      console.log(
+        'LISTING_FETCH_ERROR:',
+        err?.response?.status,
+        err?.response?.data ?? err?.message,
+      );
       setListings([]);
     } finally {
       setLoading(false);
@@ -105,18 +76,14 @@ export function CharityDiscoverScreen() {
   };
 
   useEffect(() => {
+    if (!authUser?.accessToken) {
+      setLoading(false);
+      return;
+    }
     fetchListings();
-  }, []);
+  }, [authUser?.accessToken]);
 
-  const availableListings = useMemo(
-    () =>
-      Array.isArray(listings)
-        ? listings.filter((i) =>
-          ['Available', 'Partial claimed'].includes(i.status)
-        )
-        : [],
-    [listings]
-  );
+  const availableListings = listings;
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();

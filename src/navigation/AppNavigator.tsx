@@ -8,6 +8,7 @@ import { RoleTabs } from './RoleTabs';
 
 import { ClaimConfirmationScreen } from '../screens/charity/ClaimConfirmationScreen';
 import { CharityHistoryScreen } from '../screens/charity/CharityHistoryScreen';
+import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
 
 import { palette } from '../theme/colors';
 import { RestaurantPlansScreen } from '@/screens/restaurant/RestaurantPlansScreen';
@@ -23,11 +24,13 @@ import CharitySiteAnalyticsScreen from '@/screens/charity/CharitySiteAnalyticsSc
 import CharityAdminProfileScreen from '@/screens/charity/CharityAdminProfileScreen';
 import DriverTrackingScreen from '@/screens/shared/DriverTrackingScreen';
 import CharityManageAccessScreen from '@/screens/charity/CharityManageAccessScreen';
+import FarmerManageAccessScreen from '@/screens/farmer/FarmerManageAccessScreen';
 import ForgotPasswordScreen from '@/screens/shared/ForgotPasswordScreen';
 
 export type RootStackParamList = {
   Tabs: undefined;
   CharityHistory: undefined;
+  FarmerHistory: undefined;
   ClaimConfirm: undefined;
   CharityPostCollectSurvey: undefined;
   RestaurantPlan: undefined;
@@ -43,12 +46,17 @@ export type RootStackParamList = {
 
    ManageAccess: {
     locationId: number;
-    orgType: 'restaurant' | 'charity';
+    orgType: 'restaurant' | 'charity' | 'farmer';
   };
 
   CharityManageAccess: {
     locationId: number;
-    orgType: 'restaurant' | 'charity';
+    orgType: 'restaurant' | 'charity' | 'farmer';
+  };
+
+  FarmerManageAccess: {
+    locationId: number;
+    orgType: 'restaurant' | 'charity' | 'farmer';
   };
   
 
@@ -64,7 +72,7 @@ export type RootStackParamList = {
   //Tracking
   DriverTracking: {
     trackingId: string;
-    source: 'restaurant' | 'charity';
+    source: 'restaurant' | 'charity' | 'farmer';
   };
 };
 
@@ -102,6 +110,7 @@ export function AppNavigator() {
 
           {/* GLOBAL */}
           <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />
+          <RootStack.Screen name="FarmerHistory" component={FarmerHistoryScreen} />
           <RootStack.Screen name="ClaimConfirm" component={ClaimConfirmationScreen} />
           <RootStack.Screen name="RestaurantPlan" component={RestaurantPlansScreen} />
           <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
@@ -114,6 +123,7 @@ export function AppNavigator() {
           <RootStack.Screen name="CharityAdminProfile" component={CharityAdminProfileScreen} />
           <RootStack.Screen name="DriverTracking" component={DriverTrackingScreen} />
           <RootStack.Screen name="CharityManageAccess" component={CharityManageAccessScreen} />
+          <RootStack.Screen name="FarmerManageAccess" component={FarmerManageAccessScreen} />
           <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 
         </RootStack.Navigator>

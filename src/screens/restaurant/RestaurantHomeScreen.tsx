@@ -46,6 +46,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
   const [impact, setImpact] = React.useState({
     kgSaved: 0,
     charitiesSupported: 0,
+    collectionsCompleted: 0,
     co2SavedKg: 0,
     moneySaved: 0,
     currency: '₹',
@@ -55,28 +56,25 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const impactConfig = [
     {
-      label: 'KG',
-      icon: require('../../../assets/placeholder/bowl.png'),
-      title: 'You have potentially saved',
-      value: `${impact.kgSaved} KGs`,
+      label: 'Food',
+      icon: require('../../../assets/placeholder/storage_box_green.png'),
+      titleAbove: 'You have saved',
+      titleBelow: 'From going to landfill',
+      value: `${impact.kgSaved} kgs`,
     },
     {
-      label: 'Charity',
-      icon: require('../../../assets/track/Charities.png'),
-      title: 'You have potentially helped',
-      value: `${impact.charitiesSupported} Charities`,
+      label: 'Collections',
+      icon: require('../../../assets/placeholder/truck_icon.png'),
+      titleAbove: 'You have generated',
+      titleBelow: 'Collections to help save food',
+      value: `${impact.collectionsCompleted}`,
     },
     {
-      label: 'CO2',
-      icon: require('../../../assets/track/co2.png'),
-      title: 'You have avoided',
-      value: `${impact.co2SavedKg} KGs`,
-    },
-    {
-      label: 'Money',
-      icon: require('../../../assets/placeholder/money.png'),
-      title: 'You have potentially saved',
-      value: `${impact.currency}${impact.moneySaved}`,
+      label: 'CO₂',
+      icon: require('../../../assets/placeholder/co2_green_icon.png'),
+      titleAbove: 'You have avoided',
+      titleBelow: 'CO₂ emissions',
+      value: `${impact.co2SavedKg} kgs`,
     },
   ];
 
@@ -93,7 +91,11 @@ export function RestaurantHomeScreen({ navigation }: any) {
       const res = await dashboardService.getBusinessImpact();
 
       if (res.data) {
-        setImpact(res.data);
+        setImpact({
+          ...res.data,
+          collectionsCompleted:
+            res.data.collectionsCompleted ?? res.data.charitiesSupported ?? 0,
+        });
       }
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -233,11 +235,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
         {/* IMPACT */}
         <View style={styles.section}>
-          <View style={styles.headingContainer}>
-            <Image
-              source={require('../../../assets/placeholder/Illustration.png')}
-              style={styles.headingBg}
-            />
+          <View>
 
             <AppText variant="heading" style={styles.headingText}>
               Your Savings & Impact So Far
@@ -275,20 +273,31 @@ export function RestaurantHomeScreen({ navigation }: any) {
               style={styles.impactIcon}
             />
 
-            {/* TEXT */}
-            <AppText variant="h7" numberOfLines={1} adjustsFontSizeToFit>
-              {impactData[activeIndex].title}
+            <AppText
+              variant="h8"
+              style={styles.impactTitleLine}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {impactData[activeIndex].titleAbove}
             </AppText>
 
-            {/* VALUE */}
             <View style={styles.valuePill}>
               <AppText variant="h5" style={styles.valueText} numberOfLines={1}>
                 {loadingImpact ? '...' : impactData[activeIndex].value}
               </AppText>
             </View>
 
-            {/* SUB TEXT */}
-            <AppText variant="h7" numberOfLines={1}>
+            <AppText
+              variant="h8"
+              style={styles.impactTitleLine}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {impactData[activeIndex].titleBelow}
+            </AppText>
+
+            <AppText variant="h7" style={styles.impactFooter} numberOfLines={1}>
               Keep making an impact!
             </AppText>
 
@@ -398,14 +407,14 @@ const styles = StyleSheet.create({
 
   ctaButton: {
     marginHorizontal: wp(8),
-    backgroundColor: '#7B3FE4',
+    backgroundColor: palette.middlegreen,
     padding: hp(1.8),
     borderRadius: normalize(14),
     alignItems: 'center',
   },
 
   ctaText: {
-    color: 'white',
+    color: palette.white,
     fontSize: normalize(18),
   },
 
@@ -441,25 +450,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: normalize(20),
     paddingVertical: hp(2),
-    paddingHorizontal: wp(5),
+    paddingHorizontal: wp(10),
     alignItems: 'center',
     gap: hp(1.5),
   },
 
   pillRow: {
     flexDirection: 'row',
-    backgroundColor: '#F3E8FF',
-    borderRadius: normalize(30),
+    backgroundColor: '#dff7ea',
+    borderRadius: normalize(12),
     padding: wp(1),
+    width: '100%',
   },
 
   pill: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: wp(1.2),
     paddingVertical: hp(0.8),
-    paddingHorizontal: wp(3),
-    borderRadius: normalize(25),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(12),
   },
 
   activePill: {
@@ -481,7 +493,6 @@ const styles = StyleSheet.create({
     maxHeight: normalize(100),
     resizeMode: 'contain',
   },
-
   valuePill: {
     backgroundColor: palette.middlegreen,
     paddingVertical: hp(1.2),
@@ -490,10 +501,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   valueText: {
     color: palette.white,
     fontSize: normalize(24),
+  },
+
+  impactTitleLine: {
+    textAlign: 'center',
+    width: '100%',
+  },
+
+  impactFooter: {
+    textAlign: 'center',
+    width: '100%',
+    marginTop: hp(1.5),
   },
 
   calculationRow: {

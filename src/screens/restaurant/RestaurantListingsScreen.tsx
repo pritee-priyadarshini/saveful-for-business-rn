@@ -171,16 +171,9 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
 
   const fetchListings = async () => {
-    const orgId = authUser?.profile?.organisation?.id;
-    if (!orgId) {
-      setListings([]);
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
-      const res = await foodListingService.getOrgListings(Number(orgId));
+      const res = await foodListingService.getSiteListings();
       const { listings: all } = normalizeListingsResponse(res);
       setListings(all.filter((listing: any) => listing.status !== 'CANCELLED'));
     } catch {
@@ -192,8 +185,9 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
   useFocusEffect(
     React.useCallback(() => {
+      if (!authUser?.accessToken) return;
       fetchListings();
-    }, [authUser?.profile?.organisation?.id]),
+    }, [authUser?.accessToken]),
   );
 
   const peopleCount = useMemo(

@@ -3,6 +3,7 @@ import api from './api';
 export type BusinessImpact = {
   kgSaved: number;
   charitiesSupported: number;
+  collectionsCompleted: number;
   co2SavedKg: number;
   moneySaved: number;
   currency: string;
