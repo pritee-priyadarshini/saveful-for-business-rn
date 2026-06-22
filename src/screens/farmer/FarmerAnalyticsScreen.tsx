@@ -33,15 +33,15 @@ const normalize = (size: number) => {
 const chartWidth = width - wp(8) - wp(7);
 
 const ANALYTICS_ICONS = {
-  foodRecovered: require('../../../assets/placeholder/storage_box_green.png'),
-  meals: require('../../../assets/placeholder/cutlery_icon.png'),
+  feedCollected: require('../../../assets/placeholder/storage_box_green.png'),
+  meals: require('../../../assets/placeholder/cow_front.png'),
   co2: require('../../../assets/placeholder/co2_green_icon.png'),
   collections: require('../../../assets/placeholder/truck_icon.png'),
   rating: require('../../../assets/placeholder/rating_icon.png'),
 };
 
 const MONTHLY_STATS = {
-  foodRecoveredKg: 1300,
+  feedCollectedKg: 1300,
   mealsCreated: 2340,
   co2AvoidedKg: 6400,
   collectionsCompleted: 18,
@@ -49,8 +49,8 @@ const MONTHLY_STATS = {
 };
 
 const LIFETIME_STATS = {
-  foodRecoveredKg: 4800,
-  mealsCreated: 2340,
+  feedCollectedKg: 4800,
+  mealsCreated: 5740,
   co2AvoidedKg: 9600,
   collectionsCompleted: 123,
   rating: 4.5,
@@ -61,7 +61,7 @@ type ImpactStats = typeof MONTHLY_STATS;
 const formatNumber = (value: number) => value.toLocaleString('en-US');
 
 type TimeRange = 'week' | 'month' | 'year';
-type ImpactMetric = 'foodRecovered' | 'mealsCreated' | 'co2Avoided' | 'collectionsCompleted';
+type ImpactMetric = 'feedCollected' | 'mealsCreated' | 'co2Avoided' | 'collectionsCompleted';
 
 const TIME_RANGES: { key: TimeRange; label: string }[] = [
   { key: 'week', label: 'Week' },
@@ -70,7 +70,7 @@ const TIME_RANGES: { key: TimeRange; label: string }[] = [
 ];
 
 const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = [
-  { key: 'foodRecovered', label: 'Food recovered', suffix: 'kg' },
+  { key: 'feedCollected', label: 'Feed Collected', suffix: 'kg' },
   { key: 'mealsCreated', label: 'Meals created' },
   { key: 'co2Avoided', label: 'CO2 Avoided', suffix: 'kg' },
   { key: 'collectionsCompleted', label: 'Collections Completed' },
@@ -80,7 +80,7 @@ const TREND_DATA: Record<
   TimeRange,
   {
     labels: string[];
-    foodRecovered: number[];
+    feedCollected: number[];
     mealsCreated: number[];
     co2Avoided: number[];
     collectionsCompleted: number[];
@@ -88,21 +88,21 @@ const TREND_DATA: Record<
 > = {
   week: {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    foodRecovered: [120, 180, 140, 260, 220, 340, 400],
+    feedCollected: [120, 180, 140, 260, 220, 340, 400],
     mealsCreated: [20, 45, 30, 78, 58, 118, 150],
     co2Avoided: [90, 130, 100, 190, 170, 260, 330],
     collectionsCompleted: [1, 2, 3, 4, 5, 7, 8],
   },
   month: {
     labels: ['W1', 'W2', 'W3', 'W4'],
-    foodRecovered: [800, 1100, 1400, 1800],
+    feedCollected: [800, 1100, 1400, 1800],
     mealsCreated: [150, 220, 180, 300],
     co2Avoided: [500, 700, 900, 1200],
     collectionsCompleted: [12, 18, 24, 30],
   },
   year: {
     labels: ['21', '22', '23', '24', '25'],
-    foodRecovered: [6000, 7200, 8400, 9800, 11200],
+    feedCollected: [6000, 7200, 8400, 9800, 11200],
     mealsCreated: [500, 700, 650, 900, 1200],
     co2Avoided: [4200, 5100, 6200, 7700, 9200],
     collectionsCompleted: [90, 110, 130, 150, 180],
@@ -115,7 +115,7 @@ export function FarmerAnalyticsScreen() {
   const [loading, setLoading] = useState(true);
 
   const [range, setRange] = React.useState<TimeRange>('week');
-  const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('mealsCreated');
+  const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('feedCollected');
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 900);
@@ -178,9 +178,9 @@ export function FarmerAnalyticsScreen() {
       <View style={styles.metricsGrid}>
         <View style={styles.metricsRow}>
           {renderMetricCard(
-            ANALYTICS_ICONS.foodRecovered,
-            `${formatNumber(stats.foodRecoveredKg)} kg`,
-            'Food Recovered',
+            ANALYTICS_ICONS.feedCollected,
+            `${formatNumber(stats.feedCollectedKg)} kg`,
+            'Feed Collected',
           )}
           {renderMetricCard(
             ANALYTICS_ICONS.meals,
@@ -393,7 +393,6 @@ const styles = StyleSheet.create({
     paddingTop: hp(2),
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: palette.primary,
   },
   heroBg: {
     position: 'absolute',

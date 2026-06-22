@@ -35,14 +35,14 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 const STAT_ICONS = {
   foodRecovered: require('../../../assets/placeholder/storage_box_green.png'),
-  meals: require('../../../assets/placeholder/cutlery_icon.png'),
+  co2: require('../../../assets/placeholder/co2_green_icon.png'),
   collections: require('../../../assets/placeholder/truck_icon.png'),
 };
 
 const META_ICONS = {
   calendar: require('../../../assets/placeholder/clock_icon.png'),
   basket: require('../../../assets/placeholder/storage_box_green.png'),
-  meal: require('../../../assets/placeholder/cutlery_icon.png'),
+  carbon: require('../../../assets/placeholder/co2_green_icon.png'),
 };
 
 type StatusFilter = 'all' | 'completed' | 'cancelled';
@@ -185,7 +185,7 @@ export function FarmerHistoryScreen() {
     const totalKg = completed.reduce((sum, item) => sum + getTotalQty(item.items), 0);
     return {
       foodRecoveredKg: Math.round(totalKg),
-      mealsCreated: estimateMealsSaved(totalKg),
+      co2Avoided: Math.round(totalKg * 2.5),
       collectionsCompleted: completed.length,
     };
   }, []);
@@ -378,6 +378,7 @@ export function FarmerHistoryScreen() {
     const cancelled = cardTheme === 'cancelled';
     const totalKg = getTotalQty(item.items);
     const meals = estimateMealsSaved(totalKg);
+    const co2Avoided = Math.round(totalKg * 2.5);
     const collectedDate = formatShortDate(item.date);
     const collectedTime = formatShortTime(item.date);
     const statusLabel = cancelled ? 'Cancelled' : 'Completed';
@@ -416,7 +417,7 @@ export function FarmerHistoryScreen() {
               </View>
               <View style={styles.metaRowDouble}>
                 {renderMetaBox(cardTheme, META_ICONS.basket, 'Food saved', `${Math.round(totalKg)} kg`)}
-                {renderMetaBox(cardTheme, META_ICONS.meal, 'Meals Created', String(meals))}
+                {renderMetaBox(cardTheme, META_ICONS.carbon, 'C02 Avoided', `${co2Avoided} kg`)}
               </View>
             </View>
           )}
@@ -450,12 +451,12 @@ export function FarmerHistoryScreen() {
           {renderStatCard(
             STAT_ICONS.foodRecovered,
             `${totals.foodRecoveredKg.toLocaleString()} kg`,
-            'Food Recovered',
+            'Feed Collected',
           )}
           {renderStatCard(
-            STAT_ICONS.meals,
-            totals.mealsCreated.toLocaleString(),
-            'Meals created',
+            STAT_ICONS.co2,
+            `${totals.co2Avoided.toLocaleString()} kg`,
+            'CO2 avoided',
           )}
           {renderStatCard(
             STAT_ICONS.collections,
@@ -628,7 +629,7 @@ export function FarmerHistoryScreen() {
               {totals.foodRecoveredKg.toLocaleString()} kg food recovered
             </AppText>
             <AppText variant="body1" style={styles.modalBodyText}>
-              {totals.mealsCreated.toLocaleString()} meals created
+              {totals.co2Avoided.toLocaleString()} kg CO₂ avoided
             </AppText>
             <AppText variant="body1" style={styles.modalBodyText}>
               {totals.collectionsCompleted.toLocaleString()} collections completed
@@ -1033,10 +1034,7 @@ const styles = StyleSheet.create({
   skeletonPad: {
     marginTop: hp(1),
   },
-  skeletonWrap: {
-    paddingBottom: hp(3),
-    gap: hp(1.2),
-  },
+
   skeletonStatsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
