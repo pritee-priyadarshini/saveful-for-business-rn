@@ -59,9 +59,10 @@ const roleCards = [
 ];
 
 export function RoleSelectionMainScreen({ navigation }: Props) {
-	const { setRole } = useAppContext();
+	const { setRole, setRoleFlow } = useAppContext();
 
 	const onContinue = (role: (typeof roleCards)[number]['role']) => {
+		setRoleFlow(role === 'charity_single' ? 'consumer' : 'producer');
 		setRole(role);
 		navigation.navigate('RoleSelection');
 	};

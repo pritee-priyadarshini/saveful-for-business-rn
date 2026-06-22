@@ -79,9 +79,12 @@ export type AuthUser = {
   siteRole?: string;
 };
 
+export type RoleFlow = 'producer' | 'consumer';
+
 export type AppContextValue = {
   isAuthenticated: boolean;
   selectedRole: UserRole;
+  roleFlow: RoleFlow;
   selectedPlanId: string;
   currentProfile: UserProfile;
   subscription: Subscription;
@@ -91,6 +94,7 @@ export type AppContextValue = {
   farmerForm: FarmerForm;
   authUser: AuthUser | null;
   setRole: (role: UserRole) => void;
+  setRoleFlow: (flow: RoleFlow) => void;
   selectPlan: (planId: string) => void;
   upgradePlan: (planId: string) => void;
   updateRestaurantField: (

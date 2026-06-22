@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { StyleSheet, TextInput, View, Pressable } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, TextInput, View, Pressable, FocusEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
 import { palette } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
+
+type LabelVariant = keyof typeof typography;
 
 type InputFieldProps = {
   label: string;
@@ -15,6 +18,10 @@ type InputFieldProps = {
   multiline?: boolean;
   secureTextEntry?: boolean;
   isPassword?: boolean;
+  compact?: boolean;
+  optional?: boolean;
+  labelVariant?: LabelVariant;
+  onFieldFocus?: (field: View) => void;
 };
 
 export function InputField({
@@ -26,16 +33,32 @@ export function InputField({
   multiline,
   secureTextEntry,
   isPassword,
+  compact = false,
+  optional = false,
+  labelVariant = 'bodyBold',
+  onFieldFocus,
 }: InputFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const containerRef = useRef<View>(null);
 
   const [hidden, setHidden] = useState(secureTextEntry);
 
+  const handleFocus = (_e: FocusEvent) => {
+    setIsFocused(true);
+    if (containerRef.current) {
+      onFieldFocus?.(containerRef.current);
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Label */}
-      <AppText variant="bodyBold" color={palette.textMuted}>
+    <View ref={containerRef} style={styles.container}>
+      <AppText
+        variant={labelVariant}
+        color={compact ? palette.black : palette.textMuted}
+        style={[compact && styles.labelCompact]}
+      >
         {label}
+        {optional ? ' (optional)' : ''}
       </AppText>
 
       <View style={styles.inputWrapper}>
@@ -44,15 +67,16 @@ export function InputField({
           editable={editable}
           secureTextEntry={isPassword ? hidden : secureTextEntry}
           placeholder={placeholder}
-          placeholderTextColor={palette.textMuted}
+          placeholderTextColor={palette.stone}
           style={[
             styles.input,
+            compact && styles.inputCompact,
             multiline && styles.multiline,
             isFocused && styles.inputFocused, 
           ]}
           value={value}
           onChangeText={onChangeText}
-          onFocus={() => setIsFocused(true)}
+          onFocus={handleFocus}
           onBlur={() => setIsFocused(false)}
         />
 
@@ -79,6 +103,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
 
+  labelCompact: {
+    textTransform: 'none',
+    color: palette.black,
+  },
+
   inputWrapper: {
     position: 'relative',
     justifyContent: 'center',
@@ -93,6 +122,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingRight: 45, 
     color: palette.text,
+  },
+
+  inputCompact: {
+    minHeight: 44,
+    borderRadius: 10,
+    borderColor: '#D9D9D9',
+    backgroundColor: palette.white,
+    paddingHorizontal: 14,
+    fontSize: 14,
   },
 
   eye: {

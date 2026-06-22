@@ -63,7 +63,7 @@ const charityOptions = [
 ];
 
 export function RoleSelectionScreen({ navigation }: Props) {
-  const { selectedRole, setRole } = useAppContext();
+  const { selectedRole, setRole, roleFlow } = useAppContext();
 
   useEffect(() => {
     if (!selectedRole) {
@@ -71,10 +71,10 @@ export function RoleSelectionScreen({ navigation }: Props) {
     }
   }, [selectedRole, setRole]);
 
-  const isCharity = selectedRole.includes('charity');
+  const isConsumerFlow = roleFlow === 'consumer';
 
   const viewModel = useMemo(() => {
-    if (isCharity) {
+    if (isConsumerFlow) {
       return {
         bg: '#fdf5ff',
         accent: palette.eggplant,
@@ -89,7 +89,7 @@ export function RoleSelectionScreen({ navigation }: Props) {
       iconColor: palette.kale,
       options: businessOptions,
     };
-  }, [isCharity]);
+  }, [isConsumerFlow]);
 
   const onSelect = (id: string) => {
     if (
@@ -101,10 +101,10 @@ export function RoleSelectionScreen({ navigation }: Props) {
       id === 'farmer'
     ) {
       setRole(id as any);
-      navigation.navigate('Auth');
+      navigation.navigate('RoleReady');
       return;
     }
-    navigation.navigate('Auth');
+    navigation.navigate('RoleReady');
   };
 
   return (
