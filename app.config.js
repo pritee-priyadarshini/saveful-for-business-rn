@@ -7,6 +7,8 @@ export default {
     userInterfaceStyle: "light",
     icon: "./assets/intro/Saveful-for-Business-logo.png",
     splash: {
+      image: "./assets/intro/splash_logo.png",
+      resizeMode: "contain",
       backgroundColor: "#F6F4EE",
     },
 
@@ -16,9 +18,15 @@ export default {
       supportsTablet: true,
       icon: "./assets/intro/Saveful-for-Business-logo.png",
       bundleIdentifier: "com.priteepriyadarshini.savefulbusiness",
+      splash: {
+        image: "./assets/intro/splash_logo.png",
+        resizeMode: "contain",
+        backgroundColor: "#F6F4EE",
+      },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
-        NSPhotoLibraryUsageDescription: "Allow Saveful for Business to access your photo library to upload a logo.",
+        NSPhotoLibraryUsageDescription:
+          "Allow Saveful for Business to access your photo library to upload a logo.",
       },
       config: {
         googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
@@ -26,7 +34,12 @@ export default {
     },
 
     android: {
-      package: "com.priteepriyadarshini.savefulbusiness",
+      package: "com.savefulbusiness.app",
+      splash: {
+        image: "./assets/intro/splash_logo.png",
+        resizeMode: "contain",
+        backgroundColor: "#F6F4EE",
+      },
       adaptiveIcon: {
         foregroundImage: "./assets/intro/Saveful-for-Business-logo.png",
         backgroundColor: "#F6F4EE",
@@ -57,16 +70,16 @@ export default {
         "expo-location",
         {
           locationWhenInUsePermission:
-            "Allow Saveful for Business to access your location."
-        }
-      ]
+            "Allow Saveful for Business to access your location.",
+        },
+      ],
     ],
 
-     "extra": {
-      "eas": {
-        "projectId": "6863db47-e894-4b7e-944c-c0c66152e71d"
+    extra: {
+      eas: {
+        projectId: "6863db47-e894-4b7e-944c-c0c66152e71d",
       },
-      "googlePlacesApiKey": process.env.GOOGLE_MAPS_API_KEY
-    }
+      googlePlacesApiKey: process.env.GOOGLE_MAPS_API_KEY,
+    },
   },
 };
