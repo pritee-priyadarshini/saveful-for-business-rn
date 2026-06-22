@@ -2,6 +2,7 @@ export type AuthStackParamList = {
   Welcome: undefined;
   RoleSelectionMain: undefined;
   RoleSelection: undefined;
+  RoleReady: undefined;
   Auth: undefined;
   EmailVerification: { email?: string; autoResend?: boolean; } | undefined;
   TeamInvite: undefined;

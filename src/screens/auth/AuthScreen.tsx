@@ -1,23 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
   Pressable,
   ScrollView,
   Image,
-  ImageBackground,
   Alert,
   Dimensions,
   Platform,
   Linking,
+  Keyboard,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
-import { Button } from '../../components/Button';
 import { InputField } from '../../components/InputField';
 import { Screen } from '../../components/Screen';
 import { LocationSetupModal, type SelectedLocation } from '../../components/LocationSetupModal';
@@ -39,6 +37,141 @@ const normalize = (size: number) => {
 };
 
 type NavProp = NativeStackNavigationProp<AuthStackParamList>;
+
+function AuthContinueButton({
+  label = 'CONTINUE',
+  onPress,
+  disabled = false,
+}: {
+  label?: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      style={[styles.authContinueBtn, disabled && styles.authContinueBtnDisabled]}
+    >
+      <AppText variant="bodyBold" style={styles.authContinueText}>
+        {label}
+      </AppText>
+      <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+    </Pressable>
+  );
+}
+
+function TermsCheckbox({
+  isChecked,
+  onToggle,
+}: {
+  isChecked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <View style={styles.checkboxContainer}>
+      <Pressable
+        style={[styles.checkbox, isChecked && styles.checkboxChecked]}
+        onPress={onToggle}
+      >
+        {isChecked ? (
+          <Ionicons name="checkmark" size={normalize(14)} color={palette.white} />
+        ) : null}
+      </Pressable>
+
+      <AppText variant="bodySmall" style={styles.termsText}>
+        By continuing, I agree to the Saveful for Business{' '}
+        <AppText
+          variant="bodySmall"
+          style={styles.disclaimerLink}
+          onPress={() => Linking.openURL('https://www.saveful.com/saveful-for-business-terms-conditions')}
+        >
+          Terms & Conditions
+        </AppText>
+        {' '}and{' '}
+        <AppText
+          variant="bodySmall"
+          style={styles.disclaimerLink}
+          onPress={() => Linking.openURL('https://www.saveful.com/privacy-policy')}
+        >
+          Privacy Policy
+        </AppText>
+        . We'll send you important updates - you can opt out any time.
+      </AppText>
+    </View>
+  );
+}
+
+function VenueTypeSelector({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (value: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const selectedOption = options.find((option) => option.value === value);
+  const displayLabel = selectedOption?.label || 'Select venue type';
+
+  return (
+    <View style={styles.venueSelectorWrap}>
+      <AppText variant="label" style={styles.venueSelectorLabel}>
+        {label}
+      </AppText>
+      <AppText variant="bodySmall" style={styles.dropdownHint}>
+        Please select the venue type that most reflects your organisation
+      </AppText>
+
+      <View style={[styles.venueSelectorBox, expanded && styles.venueSelectorBoxExpanded]}>
+        <Pressable
+          style={styles.venueSelectorHeader}
+          onPress={() => setExpanded((prev) => !prev)}
+        >
+          <AppText variant="body1" style={styles.venueSelectorValue}>
+            {displayLabel}
+          </AppText>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={normalize(18)}
+            color={palette.kale}
+          />
+        </Pressable>
+
+        {expanded ? (
+          <ScrollView
+            style={styles.venueOptionsList}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {options.map((option) => {
+              const isSelected = value === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  style={[styles.venueOptionRow, isSelected && styles.venueOptionRowSelected]}
+                  onPress={() => onChange(option.value)}
+                >
+                  <View style={[styles.venueRadio, isSelected && styles.venueRadioActive]}>
+                    {isSelected ? <View style={styles.venueRadioInner} /> : null}
+                  </View>
+                  <AppText variant="body1" style={styles.venueOptionText}>
+                    {option.label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const inputPropsBase = { compact: true as const, labelVariant: 'label' as const };
 
 export function AuthScreen() {
   const {
@@ -64,6 +197,88 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [formError, setFormError] = useState<string | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const activeFieldRef = useRef<View | null>(null);
+  const keyboardHeightRef = useRef(0);
+  const keyboardVisibleRef = useRef(false);
+
+  const scrollActiveFieldIntoView = useCallback(() => {
+    const field = activeFieldRef.current;
+    if (!field || !keyboardVisibleRef.current) return;
+
+    requestAnimationFrame(() => {
+      field.measureInWindow((_x, fieldY, _w, fieldH) => {
+        const gap = hp(1.5);
+        const visibleBottom = height - keyboardHeightRef.current - gap;
+        const fieldBottom = fieldY + fieldH;
+
+        if (fieldBottom > visibleBottom) {
+          scrollRef.current?.scrollTo({
+            y: scrollYRef.current + (fieldBottom - visibleBottom),
+            animated: true,
+          });
+        }
+      });
+    });
+  }, []);
+
+  const handleFieldFocus = useCallback(
+    (field: View) => {
+      activeFieldRef.current = field;
+      if (keyboardVisibleRef.current) {
+        setTimeout(scrollActiveFieldIntoView, Platform.OS === 'ios' ? 50 : 120);
+      }
+    },
+    [scrollActiveFieldIntoView],
+  );
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      keyboardVisibleRef.current = true;
+      keyboardHeightRef.current = event.endCoordinates.height;
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+      setTimeout(scrollActiveFieldIntoView, Platform.OS === 'ios' ? 80 : 150);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      keyboardVisibleRef.current = false;
+      keyboardHeightRef.current = 0;
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      activeFieldRef.current = null;
+      scrollYRef.current = 0;
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [scrollActiveFieldIntoView]);
+
+  const inputProps = {
+    ...inputPropsBase,
+    onFieldFocus: handleFieldFocus,
+  };
+
+  const handleBack = () => {
+    setFormError(null);
+    if (currentStep === 3) {
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      setCurrentStep(1);
+    } else {
+      navigation.goBack();
+    }
+  };
 
   const [isChecked, setIsChecked] = useState(false);
   const [showPlacesSearch, setShowPlacesSearch] = useState(false);
@@ -354,15 +569,15 @@ export function AuthScreen() {
   const stepThreeTitle = isRestaurant || isFarmer ? 'Venue Type' : 'Pickup Radius';
 
   const venueOptions = [
-    { label: 'Cafe / Restaurant', value: 'CAFE_RESTAURANT' },
     { label: 'Bakery', value: 'BAKERY' },
+    { label: 'Cafe / Restaurant', value: 'CAFE_RESTAURANT' },
+    { label: 'Caterer', value: 'CATERING_SERVICE' },
+    { label: 'Cloud Kitchen', value: 'CLOUD_KITCHEN' },
     { label: 'Event Venue', value: 'EVENT_VENUE' },
-    { label: 'Grocery Store', value: 'GROCERY_STORE' },
     { label: 'Food Truck', value: 'FOOD_TRUCK' },
-    { label: 'Catering Service', value: 'CATERING_SERVICE' },
+    { label: 'Grocery Store', value: 'GROCERY_STORE' },
     { label: 'Hotel', value: 'HOTEL' },
     { label: 'Wedding Venue', value: 'WEDDING_VENUE' },
-    { label: 'Cloud Kitchen', value: 'CLOUD_KITCHEN' },
     { label: 'Other', value: 'OTHER' },
   ];
 
@@ -377,7 +592,8 @@ export function AuthScreen() {
   ];
 
   return (
-    <Screen backgroundColor={palette.creme}>
+    <Screen backgroundColor={palette.creme} scrollable={false}>
+      <View style={[styles.topAccent, { backgroundColor: palette.middlegreen }]} />
       <LocationSetupModal
         visible={showPlacesSearch}
         onClose={() => setShowPlacesSearch(false)}
@@ -391,25 +607,36 @@ export function AuthScreen() {
         }
       />
 
-      <ScrollView
-        contentContainerStyle={styles.newContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.keyboardView}>
+        <ScrollView
+          ref={scrollRef}
+          scrollEnabled={keyboardVisible}
+          bounces={keyboardVisible}
+          contentContainerStyle={[
+            styles.newContent,
+            keyboardVisible && { paddingBottom: keyboardHeight + hp(2) },
+          ]}
+          onScroll={(event) => {
+            scrollYRef.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={keyboardVisible}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
+        >
+          <View style={styles.authContainer}>
+            <Pressable style={styles.backRow} onPress={handleBack} hitSlop={8}>
+              <Ionicons name="chevron-back" size={normalize(20)} color={palette.kale} />
+              <AppText variant="bodyBold" style={styles.backRowText}>
+                Back
+              </AppText>
+            </Pressable>
 
-        <View style={styles.authContainer}>
+            <AppText variant="h6" style={styles.mainTitle}>
+              Complete your profile
+            </AppText>
 
-          {/* Header */}
-          <AppText variant='subheading' style={styles.mainTitle}>
-            Complete your profile
-          </AppText>
-
-          <AppText variant='caption' style={styles.mainSubtitle}>
-            Create your Saveful for Business account and start making an impact.
-          </AppText>
-
-          {/* Stepper */}
-
-          <View style={styles.stepperWrapper}>
+            <View style={styles.stepperWrapper}>
 
             {/* Step 1 */}
             <View style={styles.stepItem}>
@@ -501,13 +728,10 @@ export function AuthScreen() {
 
           {currentStep === 1 && (
             <View style={styles.formCard}>
-              <AppText variant='bodyLarge' style={styles.sectionTitle}>
-                Your Details
-              </AppText>
-
               <InputField
                 label="First Name"
                 placeholder="Enter first name"
+                {...inputProps}
                 value={isFarmer ? farmerForm.firstName : isRestaurant ? restaurantForm.firstName : charityForm.firstName}
                 onChangeText={(v) =>
                   isFarmer
@@ -520,6 +744,7 @@ export function AuthScreen() {
               <InputField
                 label="Last Name"
                 placeholder="Enter last name"
+                {...inputProps}
                 value={isFarmer ? farmerForm.lastName : isRestaurant ? restaurantForm.lastName : charityForm.lastName}
                 onChangeText={(v) =>
                   isFarmer
@@ -532,7 +757,8 @@ export function AuthScreen() {
 
               <InputField
                 label="Email"
-                placeholder="Enter a valid email id"
+                placeholder="Enter email"
+                {...inputProps}
                 value={isFarmer ? farmerForm.email : isRestaurant ? restaurantForm.email : charityForm.email}
                 onChangeText={(v) =>
                   isFarmer
@@ -546,6 +772,7 @@ export function AuthScreen() {
               <InputField
                 label="Mobile"
                 placeholder="Enter mobile"
+                {...inputProps}
                 value={isFarmer ? farmerForm.mobile : isRestaurant ? restaurantForm.mobile : charityForm.mobile}
                 onChangeText={(v) =>
                   isFarmer
@@ -559,6 +786,7 @@ export function AuthScreen() {
                 label="Password"
                 placeholder="Enter password"
                 isPassword
+                {...inputProps}
                 value={isFarmer ? farmerForm.password : isRestaurant ? restaurantForm.password : charityForm.password}
                 onChangeText={(v) =>
                   isFarmer
@@ -572,6 +800,7 @@ export function AuthScreen() {
                 label="Confirm Password"
                 placeholder="Re-enter password"
                 isPassword
+                {...inputProps}
                 value={
                   isFarmer ? farmerForm.confirmPassword : isRestaurant ? restaurantForm.confirmPassword : charityForm.confirmPassword
                 }
@@ -584,11 +813,7 @@ export function AuthScreen() {
                 }
               />
 
-              <Button
-                label="Continue"
-                onPress={() => setCurrentStep(2)}
-                style={styles.continueButton}
-              />
+              <AuthContinueButton onPress={() => setCurrentStep(2)} />
             </View>
           )}
 
@@ -596,15 +821,12 @@ export function AuthScreen() {
 
           {currentStep === 2 && (
             <View style={styles.formCard}>
-              <AppText variant='bodyLarge' style={styles.sectionTitle}>
-                {stepTwoTitle}
-              </AppText>
-
               {isRestaurant ? (
                 <>
                   <InputField
                     label="Business Name"
                     placeholder="Enter business name"
+                    {...inputProps}
                     value={restaurantForm.businessName}
                     onChangeText={(v) => updateRestaurantField('businessName', v)}
                   />
@@ -612,13 +834,15 @@ export function AuthScreen() {
                   <InputField
                     label="Address"
                     placeholder="Enter address"
+                    {...inputProps}
                     value={restaurantForm.businessAddress}
                     onChangeText={(v) => updateRestaurantField('businessAddress', v)}
                   />
 
                   <InputField
-                    label="Business Registration Number"
-                    placeholder="Enter registration number"
+                    label="Business Registration number (eg ABN)"
+                    placeholder="Enter number"
+                    {...inputProps}
                     value={restaurantForm.registrationNumber}
                     onChangeText={(v) => updateRestaurantField('registrationNumber', v)}
                   />
@@ -628,6 +852,7 @@ export function AuthScreen() {
                   <InputField
                     label="Farm / Business Name"
                     placeholder="Enter farm or business name"
+                    {...inputProps}
                     value={farmerForm.businessName}
                     onChangeText={(v) => updateFarmerField('businessName', v)}
                   />
@@ -635,6 +860,7 @@ export function AuthScreen() {
                   <InputField
                     label="Farm Address"
                     placeholder="Enter farm address"
+                    {...inputProps}
                     value={farmerForm.businessAddress}
                     onChangeText={(v) => updateFarmerField('businessAddress', v)}
                   />
@@ -644,6 +870,7 @@ export function AuthScreen() {
                   <InputField
                     label="Organisation / Farm Name"
                     placeholder="Enter organisation or farm name"
+                    {...inputProps}
                     value={farmerForm.businessName}
                     onChangeText={(v) => updateFarmerField('businessName', v)}
                   />
@@ -651,6 +878,7 @@ export function AuthScreen() {
                   <InputField
                     label="Farm Address"
                     placeholder="Enter farm address"
+                    {...inputProps}
                     value={farmerForm.businessAddress}
                     onChangeText={(v) => updateFarmerField('businessAddress', v)}
                   />
@@ -660,18 +888,21 @@ export function AuthScreen() {
                   <InputField
                     label="Charity / Non Profit Name"
                     placeholder="Enter charity/non-profit name"
+                    {...inputProps}
                     value={charityForm.charityName}
                     onChangeText={(v) => updateCharityField('charityName', v)}
                   />
                   <InputField
                     label="Address"
                     placeholder="Enter address"
+                    {...inputProps}
                     value={charityForm.charityAddress}
                     onChangeText={(v) => updateCharityField('charityAddress', v)}
                   />
                   <InputField
                     label="Registration Number"
                     placeholder="Enter registration number"
+                    {...inputProps}
                     value={charityForm.registrationNumber}
                     onChangeText={(v) => updateCharityField('registrationNumber', v)}
                   />
@@ -679,6 +910,7 @@ export function AuthScreen() {
                   <InputField
                     label="Postcode"
                     placeholder="Enter postcode"
+                    {...inputProps}
                     value={charityForm.postcodes}
                     onChangeText={(v) => updateCharityField('postcodes', v)}
                   />
@@ -688,6 +920,8 @@ export function AuthScreen() {
               <InputField
                 label="Branding"
                 placeholder="Brand name"
+                optional
+                {...inputProps}
                 value={
                   isFarmer
                     ? farmerForm.branding
@@ -704,71 +938,52 @@ export function AuthScreen() {
                 }
               />
 
-              {/* Logo */}
-
               <View style={styles.logoSection}>
-                <AppText variant="label">Logo</AppText>
-                <AppText variant="bodySmall" style={{ color: palette.textMuted }}>
+                <AppText variant="label" style={styles.logoLabel}>
+                  Logo (optional)
+                </AppText>
+                <AppText variant="bodySmall" style={styles.logoHint}>
                   Centre your subject — the logo displays as a circle in the app
                 </AppText>
 
                 {!currentLogo ? (
-                  <Pressable style={styles.uploadBox} onPress={pickImage}>
-                    <Ionicons
-                      name="cloud-upload-outline"
-                      size={28}
-                      color={palette.primary}
-                    />
-
-                    <AppText variant='label'> Upload Logo </AppText>
+                  <Pressable style={styles.uploadField} onPress={pickImage}>
+                    <AppText variant="body1" style={styles.uploadPlaceholder}>
+                      Upload
+                    </AppText>
                   </Pressable>
                 ) : (
-                  <View style={styles.logoActions}>
-                    <Pressable style={styles.logoPreviewCard} onPress={editLogo}>
-                      <Image
-                        source={{ uri: currentLogo }}
-                        style={styles.logoPreviewImage}
-                        resizeMode='cover'
-                      />
-
-                      {/* <View style={styles.editBadge}>
-                        <AppText style={styles.editBadgeText}>
-                          Edit
-                        </AppText>
-                      </View> */}
-                    </Pressable>
-
-                    <View style={styles.logoButtons}>
-                      <Pressable style={styles.secondaryButton} onPress={editLogo}>
-                        <AppText variant="label">Crop / Zoom</AppText>
+                  <View style={styles.logoPreviewRow}>
+                    <Image
+                      source={{ uri: currentLogo }}
+                      style={styles.logoPreviewImageSmall}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.logoPreviewActions}>
+                      <Pressable style={styles.logoActionBtn} onPress={editLogo}>
+                        <AppText variant="bodySmall" style={styles.logoActionText}>Change</AppText>
                       </Pressable>
-
-                      <Pressable style={styles.secondaryButton} onPress={removeLogo}>
-                        <AppText variant="label">Remove</AppText>
-                      </Pressable>
-
-                      <Pressable style={styles.primaryButton} onPress={pickImage}>
-                        <AppText variant="label" style={{ color: palette.white }}>Replace</AppText>
+                      <Pressable style={styles.logoActionBtn} onPress={removeLogo}>
+                        <AppText variant="bodySmall" style={styles.logoActionText}>Remove</AppText>
                       </Pressable>
                     </View>
                   </View>
                 )}
               </View>
 
-              <View style={styles.buttonRow}>
-                <Button
-                  label="Back"
-                  variant="secondary"
-                  onPress={() => setCurrentStep(1)}
-                  style={styles.backBtn}
-                />
+              <TermsCheckbox isChecked={isChecked} onToggle={() => setIsChecked(!isChecked)} />
 
-                <Button
-                  label="Continue"
-                  onPress={() => setCurrentStep(3)}
-                  style={styles.nextBtn}
-                />
-              </View>
+              <AuthContinueButton
+                disabled={!isChecked}
+                onPress={() => {
+                  if (!isChecked) {
+                    setFormError('Please accept the Terms & Conditions to continue.');
+                    return;
+                  }
+                  setFormError(null);
+                  setCurrentStep(3);
+                }}
+              />
             </View>
           )}
 
@@ -776,87 +991,52 @@ export function AuthScreen() {
 
           {currentStep === 3 && (
             <View style={styles.formCard}>
-              <AppText variant='label' style={styles.sectionTitle}>
-                {stepThreeTitle}
-              </AppText>
-
-              {/* BUSINESS / FARMER FLOW: venue type picker */}
-
               {(isRestaurant || isFarmer) ? (
                 <>
-                  <View style={styles.venueGrid}>
-                    {(isFarmer ? farmerVenueOptions : venueOptions).map((venue) => {
-                      const currentVenueType = isFarmer
-                        ? farmerForm.venueType
-                        : restaurantForm.venueType;
-                      const isSelected = currentVenueType === venue.value;
+                  <VenueTypeSelector
+                    label="Please select Venue Type"
+                    value={isFarmer ? farmerForm.venueType : restaurantForm.venueType}
+                    options={isFarmer ? farmerVenueOptions : venueOptions}
+                    onChange={(v) =>
+                      isFarmer
+                        ? updateFarmerField('venueType', v)
+                        : updateRestaurantField('venueType', v)
+                    }
+                  />
 
-                      return (
-                        <Pressable
-                          key={venue.value}
-                          style={[
-                            styles.venueCard,
-                            isSelected && styles.venueCardSelected,
-                          ]}
-                          onPress={() =>
-                            isFarmer
-                              ? updateFarmerField('venueType', venue.value)
-                              : updateRestaurantField('venueType', venue.value)
-                          }
-                        >
-                          <View
-                            style={[
-                              styles.radioOuter,
-                              isSelected && styles.radioOuterActive,
-                            ]}
-                          >
-                            {isSelected && (
-                              <View style={styles.radioInner} />
-                            )}
-                          </View>
+                  <AppText variant="bodySmall" style={styles.locationHelpText}>
+                    {isRestaurant
+                      ? 'Set your business location so charities and collectors can find your surplus listings.'
+                      : 'Set your farm location for better matching.'}
+                  </AppText>
 
-                          <AppText
-                            variant="bodyBold"
-                            style={styles.venueText}
-                          >
-                            {venue.label}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
+                  <View style={styles.locationPickerRow}>
+                    <Pressable style={styles.locationPickerBtn} onPress={openLocationModal}>
+                      <Ionicons name="locate" size={normalize(14)} color={palette.kale} />
+                      <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
+                    </Pressable>
+
+                    <Pressable
+                      style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]}
+                      onPress={openLocationModal}
+                    >
+                      <Ionicons name="search" size={normalize(14)} color={palette.white} />
+                      <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>
+                        Search Address
+                      </AppText>
+                    </Pressable>
                   </View>
 
-                  {/* Location picker for restaurant + farmer */}
-                  {(isFarmer || isRestaurant) && (
-                    <>
-                      <AppText variant="caption" style={styles.locationHelpText}>
-                        {isRestaurant
-                          ? 'Set your business location so charities and collectors can find your surplus listings.'
-                          : 'Set your farm location for better matching.'}
+                  {!!selectedAddress && (
+                    <View style={styles.selectedAddressBox}>
+                      <Ionicons name="checkmark-circle" size={normalize(16)} color={palette.middlegreen} />
+                      <AppText style={styles.selectedAddressText} numberOfLines={2}>
+                        {selectedAddress}
                       </AppText>
-
-                      <View style={styles.locationPickerRow}>
-                        <Pressable style={styles.locationPickerBtn} onPress={openLocationModal}>
-                          <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
-                          <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
-                        </Pressable>
-
-                        <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openLocationModal}>
-                          <Ionicons name="search" size={normalize(16)} color={palette.white} />
-                          <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
-                        </Pressable>
-                      </View>
-
-                      {!!selectedAddress && (
-                        <View style={styles.selectedAddressBox}>
-                          <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
-                          <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
-                          <Pressable onPress={clearSelectedLocation}>
-                            <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
-                          </Pressable>
-                        </View>
-                      )}
-                    </>
+                      <Pressable onPress={clearSelectedLocation}>
+                        <Ionicons name="close-circle" size={normalize(16)} color="#aaa" />
+                      </Pressable>
+                    </View>
                   )}
                 </>
               ) : (
@@ -865,15 +1045,15 @@ export function AuthScreen() {
                   <InputField
                     label="Postcode"
                     placeholder="Enter postcode"
+                    {...inputProps}
                     value={charityForm.postcodes}
-                    onChangeText={(v) =>
-                      updateCharityField('postcodes', v)
-                    }
+                    onChangeText={(v) => updateCharityField('postcodes', v)}
                   />
 
                   <InputField
                     label="Pickup Radius in Km (can change it later)"
                     placeholder="50"
+                    {...inputProps}
                     value={charityForm.pickupRadius}
                     onChangeText={(v) => updateCharityField('pickupRadius', v)}
                   />
@@ -907,44 +1087,6 @@ export function AuthScreen() {
                 </>
               )}
 
-              {/* Terms */}
-              <View style={styles.checkboxContainer}>
-                <Pressable
-                  style={[
-                    styles.checkbox,
-                    isChecked &&
-                    styles.checkboxChecked,
-                  ]}
-                  onPress={() =>
-                    setIsChecked(!isChecked)
-                  }
-                >
-                  {isChecked && <AppText variant="label" style={styles.tick}>✓</AppText>}
-                </Pressable>
-
-                <AppText variant="label" style={styles.termsText}>
-                  By continuing, I agree to the Saveful for Business{' '}
-                  <AppText
-                    variant="label"
-                    style={styles.disclaimerLink}
-                    onPress={() => Linking.openURL('https://www.saveful.com/saveful-for-business-terms-conditions')}
-                  >
-                    Terms & Conditions
-                  </AppText>
-                  {' '}and{' '}
-                  <AppText
-                    variant="label"
-                    style={styles.disclaimerLink}
-                    onPress={() => Linking.openURL('https://www.saveful.com/privacy-policy')}
-                  >
-                    Privacy Policy
-                  </AppText>
-                  . We’ll send you important updates - you can opt out anytime.
-                </AppText>
-              </View>
-
-              {/* Footer Buttons */}
-
               {!!formError && (
                 <View style={styles.errorBanner}>
                   <Ionicons name="alert-circle-outline" size={normalize(16)} color={palette.validation} />
@@ -954,34 +1096,23 @@ export function AuthScreen() {
                 </View>
               )}
 
-              <View style={styles.buttonRow}>
-                <Button
-                  label="Back"
-                  variant="secondary"
-                  onPress={() => setCurrentStep(2)}
-                  style={styles.backBtn}
-                />
+              <AuthContinueButton
+                label={loading ? 'CREATING...' : 'CREATE ACCOUNT'}
+                disabled={!isChecked || loading}
+                onPress={handleRegister}
+              />
 
-                <Button
-                  label={loading ? 'Creating...' : 'Create Account'}
-                  onPress={handleRegister}
-                  disabled={!isChecked || loading}
-                  style={styles.nextBtn}
-                />
-              </View>
-
-              <AppText variant="label" style={styles.tip}>
-                {isRestaurant && (
-                  <AppText variant="label" style={styles.tip}>
-                    No payment required to get started
-                  </AppText>
-                )}
-              </AppText>
+              {isRestaurant ? (
+                <AppText variant="bodySmall" style={styles.tip}>
+                  No payment required to get started
+                </AppText>
+              ) : null}
             </View>
           )}
 
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </Screen>
   );
 }
@@ -1000,6 +1131,194 @@ export function AuthScreen() {
 // }
 
 const styles = StyleSheet.create({
+  keyboardView: {
+    flex: 1,
+  },
+  topAccent: {
+    width: '100%',
+    height: hp(0.35),
+  },
+  authContinueBtn: {
+    marginTop: hp(1),
+    minHeight: normalize(48),
+    borderRadius: normalize(10),
+    backgroundColor: palette.kale,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2),
+    paddingHorizontal: wp(4),
+  },
+
+  authContinueBtnDisabled: {
+    opacity: 0.5,
+  },
+
+  authContinueText: {
+    color: palette.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    fontSize: normalize(14),
+  },
+
+  venueSelectorWrap: {
+    gap: hp(0.5),
+  },
+
+  venueSelectorLabel: {
+    color: palette.black,
+    textTransform: 'none',
+  },
+
+  venueSelectorBox: {
+    borderWidth: 1,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    overflow: 'hidden',
+  },
+
+  venueSelectorBoxExpanded: {
+    minHeight: normalize(44),
+  },
+
+  venueSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.2),
+    minHeight: normalize(44),
+  },
+
+  venueSelectorValue: {
+    flex: 1,
+    color: palette.black,
+    textTransform: 'none',
+    paddingRight: wp(2),
+  },
+
+  venueOptionsList: {
+    maxHeight: hp(28),
+    borderTopWidth: 1,
+    borderTopColor: '#ECECEC',
+  },
+
+  venueOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.1),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F2',
+  },
+
+  venueOptionRowSelected: {
+    backgroundColor: '#F7FAF7',
+  },
+
+  venueRadio: {
+    width: normalize(18),
+    height: normalize(18),
+    borderRadius: normalize(9),
+    borderWidth: 2,
+    borderColor: '#C8C8C8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  venueRadioActive: {
+    borderColor: palette.kale,
+  },
+
+  venueRadioInner: {
+    width: normalize(8),
+    height: normalize(8),
+    borderRadius: normalize(4),
+    backgroundColor: palette.kale,
+  },
+
+  venueOptionText: {
+    flex: 1,
+    color: palette.black,
+    textTransform: 'none',
+    lineHeight: normalize(20),
+  },
+
+  dropdownHint: {
+    color: palette.stone,
+    textTransform: 'none',
+    lineHeight: normalize(18),
+    marginBottom: hp(0.4),
+  },
+
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: wp(0.5),
+    marginBottom: hp(1),
+    paddingVertical: hp(0.3),
+  },
+
+  backRowText: {
+    color: palette.kale,
+    textTransform: 'none',
+    fontSize: normalize(15),
+  },
+
+  logoLabel: {
+    color: palette.black,
+    textTransform: 'none',
+  },
+
+  logoHint: {
+    color: palette.stone,
+    lineHeight: normalize(16),
+  },
+
+  uploadField: {
+    minHeight: normalize(44),
+    borderWidth: 1,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    justifyContent: 'center',
+    paddingHorizontal: wp(3.5),
+  },
+
+  uploadPlaceholder: {
+    color: palette.stone,
+    textTransform: 'none',
+  },
+
+  logoPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+
+  logoPreviewImageSmall: {
+    width: normalize(44),
+    height: normalize(44),
+    borderRadius: normalize(22),
+  },
+
+  logoPreviewActions: {
+    flexDirection: 'row',
+    gap: wp(3),
+  },
+
+  logoActionBtn: {
+    paddingVertical: hp(0.4),
+  },
+
+  logoActionText: {
+    color: palette.kale,
+    textTransform: 'none',
+  },
+
   logoActions: {
     gap: hp(1.2),
   },
@@ -1046,23 +1365,21 @@ const styles = StyleSheet.create({
     fontSize: normalize(12),
   },
 
-  disclaimerLink: {
-    color: palette.primary,
-    textDecorationLine: 'underline',
-  },
-
   checkbox: {
     width: normalize(20),
     height: normalize(20),
-    borderWidth: 1,
-    borderColor: palette.border,
+    borderWidth: 1.5,
+    borderColor: palette.kale,
     borderRadius: normalize(4),
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
+    flexShrink: 0,
   },
 
   checkboxChecked: {
-    backgroundColor: palette.primary,
+    backgroundColor: palette.kale,
+    borderColor: palette.kale,
   },
 
   locationHelpText: {
@@ -1081,23 +1398,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: normalize(6),
-    padding: normalize(12),
+    gap: normalize(4),
+    paddingVertical: normalize(10),
+    paddingHorizontal: normalize(8),
     borderRadius: normalize(10),
     borderWidth: 1,
-    borderColor: palette.primary,
-    backgroundColor: palette.primary + '15',
+    borderColor: palette.kale,
+    backgroundColor: palette.white,
   },
 
   locationPickerBtnSearch: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
+    backgroundColor: palette.kale,
+    borderColor: palette.kale,
   },
 
   locationPickerBtnText: {
-    fontSize: normalize(13),
-    color: palette.primary,
-    fontWeight: '500',
+    fontSize: normalize(12),
+    color: palette.kale,
+    fontWeight: '600',
+    textTransform: 'none',
   },
 
   locationPickerBtnTextWhite: {
@@ -1129,46 +1448,43 @@ const styles = StyleSheet.create({
 
 
   newContent: {
-    padding: wp(5),
-    paddingBottom: hp(10),
+    paddingHorizontal: wp(4.5),
+    paddingTop: hp(1),
+    paddingBottom: hp(4),
+    flexGrow: 1,
   },
 
   authContainer: {
-    gap: hp(2),
+    gap: hp(1.2),
   },
 
   mainTitle: {
-    fontSize: normalize(28),
-    lineHeight: normalize(40),
+    fontSize: normalize(22),
+    lineHeight: normalize(28),
     textAlign: 'center',
-    color: palette.text,
-    marginTop: hp(2),
-    paddingBottom: hp(0.3),
-  },
-
-  mainSubtitle: {
-    textAlign: 'center',
-    color: palette.textMuted,
-    marginBottom: hp(1),
+    color: palette.black,
+    textTransform: 'none',
+    marginTop: hp(0.5),
   },
 
   stepperWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginTop: hp(1),
-    marginBottom: hp(2),
+    marginTop: hp(0.8),
+    marginBottom: hp(1),
+    paddingHorizontal: wp(1),
   },
 
   stepItem: {
     alignItems: 'center',
-    width: wp(20),
+    width: wp(22),
   },
 
   stepCircle: {
-    width: normalize(38),
-    height: normalize(38),
-    borderRadius: normalize(19),
+    width: normalize(32),
+    height: normalize(32),
+    borderRadius: normalize(16),
     borderWidth: 2,
     borderColor: '#D9D9D9',
     backgroundColor: palette.white,
@@ -1177,8 +1493,8 @@ const styles = StyleSheet.create({
   },
 
   stepCircleActive: {
-    backgroundColor: palette.middlegreen,
-    borderColor: palette.middlegreen,
+    backgroundColor: palette.kale,
+    borderColor: palette.kale,
   },
 
   stepNumber: {
@@ -1199,31 +1515,23 @@ const styles = StyleSheet.create({
 
   stepLine: {
     flex: 1,
-    height: 3,
+    height: 2,
     backgroundColor: '#E2E2E2',
-    marginTop: normalize(18),
+    marginTop: normalize(15),
   },
 
   stepLineActive: {
-    backgroundColor: palette.middlegreen,
+    backgroundColor: palette.kale,
   },
 
   formCard: {
     backgroundColor: palette.white,
-    borderRadius: normalize(24),
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(2.5),
-    gap: hp(1.8),
-
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    elevation: 3,
+    borderRadius: normalize(14),
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.8),
+    gap: hp(1.1),
   },
 
   sectionTitle: {
@@ -1235,7 +1543,28 @@ const styles = StyleSheet.create({
   },
 
   logoSection: {
-    gap: hp(1),
+    gap: hp(0.5),
+  },
+
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2.5),
+    marginTop: hp(0.4),
+  },
+
+  termsText: {
+    flex: 1,
+    color: palette.black,
+    lineHeight: normalize(18),
+    textTransform: 'none',
+    fontSize: normalize(12),
+  },
+
+  disclaimerLink: {
+    color: palette.black,
+    textDecorationLine: 'underline',
+    fontSize: normalize(12),
   },
 
   uploadBox: {
@@ -1363,20 +1692,6 @@ const styles = StyleSheet.create({
     color: palette.validation,
     textTransform: 'none',
     lineHeight: normalize(18),
-  },
-
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: wp(3),
-    marginTop: hp(2),
-  },
-
-  termsText: {
-    flex: 1,
-    fontSize: normalize(12),
-    lineHeight: normalize(18),
-    color: palette.textMuted,
   },
 
 });

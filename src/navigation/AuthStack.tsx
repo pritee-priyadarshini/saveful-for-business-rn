@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { RoleSelectionMainScreen } from '../screens/auth/RoleSelectionMainScreen';
 import { RoleSelectionScreen } from '../screens/auth/RoleSelectionScreen';
+import { RoleReadyScreen } from '../screens/auth/RoleReadyScreen';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthStackParamList } from './types';
 import { EmailVerificationScreen } from '@/screens/auth/EmailVerificationScreen';
@@ -18,6 +19,7 @@ export function AuthStack() {
       <Stack.Screen component={WelcomeScreen} name="Welcome" />
       <Stack.Screen component={RoleSelectionMainScreen} name="RoleSelectionMain" />
       <Stack.Screen component={RoleSelectionScreen} name="RoleSelection" />
+      <Stack.Screen component={RoleReadyScreen} name="RoleReady" />
       <Stack.Screen component={AuthScreen} name="Auth" />
       <Stack.Screen component={EmailVerificationScreen} name="EmailVerification" />
       <Stack.Screen component={TeamInviteScreen} name="TeamInvite" />

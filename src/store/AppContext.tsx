@@ -18,6 +18,7 @@ import {
   FarmerForm,
   RestaurantForm,
   Subscription,
+  RoleFlow,
 } from './types';
 import { authService } from '../services/auth.service';
 
@@ -82,6 +83,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [isAuthenticated, setAuthenticated] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi' | 'farmer' | 'farm_business'>('restaurant_single');
+  const [roleFlow, setRoleFlow] = useState<RoleFlow>('producer');
   const [selectedPlanId, setSelectedPlanId] = useState('single_plus');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>(defaultRestaurantForm);
@@ -213,6 +215,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     return {
       isAuthenticated,
       selectedRole: resolvedRole,
+      roleFlow,
       selectedPlanId,
       currentProfile,
       subscription,
@@ -223,6 +226,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       authUser,
 
       setRole: setSelectedRole,
+      setRoleFlow,
       selectPlan: setSelectedPlanId,
 
       upgradePlan: () => {
@@ -260,6 +264,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         setAuthenticated(false);
         setAuthUser(null);
         setSelectedRole('restaurant_single');
+        setRoleFlow('producer');
         resetForms();
       },
 
@@ -274,6 +279,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     isAuthenticated,
     restaurantForm,
     selectedPlanId,
+    roleFlow,
     selectedRole,
   ]);
 
