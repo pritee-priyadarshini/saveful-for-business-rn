@@ -338,69 +338,63 @@ export default function FarmerPickupScreen({ navigation }: any) {
         <View style={styles.cardBodyRow}>
           <View style={[styles.weightBox, theme.weightBox]}>
             <Image source={theme.weightIcon} style={styles.weightIcon} resizeMode="contain" />
-            <AppText variant="bodyBold" style={[styles.weightText, theme.weightText]}>
+            <AppText
+              variant="bodyBold"
+              style={[styles.weightText, theme.weightText]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
               {pickup.weightKg} kg
             </AppText>
           </View>
 
-          <View style={styles.detailsColumn}>
-            <View style={styles.detailLine}>
-              <Ionicons name="location-sharp" size={normalize(14)} color={palette.chilli} />
-              <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
-                {pickup.restaurantAddress}
+          <View style={styles.cardMainArea}>
+            <View style={styles.cardContent}>
+              <View style={styles.detailLine}>
+                <Ionicons name="location-sharp" size={normalize(13)} color={palette.chilli} />
+                <AppText variant="bodySmall" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                  {pickup.restaurantAddress}
+                </AppText>
+              </View>
+
+              <AppText variant="bodySmall" style={styles.distanceText}>
+                {pickup.distance}
               </AppText>
-            </View>
 
-            <AppText variant="bodySmall" style={styles.distanceText}>
-              {pickup.distance}
-            </AppText>
+              <View style={styles.detailLine}>
+                <Image
+                  source={require('../../../assets/placeholder/clock_icon_2.png')}
+                  style={styles.inlineIcon}
+                  resizeMode="contain"
+                />
+                <AppText variant="bodySmall" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                  {formatTimeLine(pickup)}
+                </AppText>
+              </View>
 
-            <View style={styles.detailLine}>
-              <Image
-                source={require('../../../assets/placeholder/clock_icon_2.png')}
-                style={styles.inlineIcon}
-                resizeMode="contain"
-              />
-              <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
-                {formatTimeLine(pickup)}
-              </AppText>
-            </View>
-
-            {driverLabel ? (
-              <View style={styles.driverDetailsRow}>
+              {driverLabel ? (
                 <View style={styles.detailLine}>
                   <Image
                     source={require('../../../assets/placeholder/driver_icon.png')}
                     style={styles.inlineIcon}
                     resizeMode="contain"
                   />
-                  <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                  <AppText variant="bodySmall" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
                     {driverLabel}
                   </AppText>
                 </View>
+              ) : null}
+            </View>
 
-                <Pressable
-                  style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
-                  onPress={() => handleViewDetails(pickup)}
-                >
-                  <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]}>
-                    View Details
-                  </AppText>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.driverDetailsRow}>
-                <View style={styles.detailLine} />
-                <Pressable
-                  style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
-                  onPress={() => handleViewDetails(pickup)}
-                >
-                  <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]}>
-                    View Details
-                  </AppText>
-                </Pressable>
-              </View>
-            )}
+            <Pressable
+              style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
+              onPress={() => handleViewDetails(pickup)}
+            >
+              <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]} numberOfLines={2}>
+                View Details
+              </AppText>
+            </Pressable>
           </View>
         </View>
 
@@ -470,9 +464,9 @@ export default function FarmerPickupScreen({ navigation }: any) {
     <View style={styles.skeletonWrap}>
       <Skeleton width="100%" height={hp(14)} borderRadius={0} />
       <View style={styles.skeletonFilterRow}>
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} width={wp(20)} height={normalize(32)} borderRadius={normalize(16)} />
-        ))}
+        <Skeleton width="31%" height={normalize(34)} borderRadius={normalize(8)} />
+        <Skeleton width="31%" height={normalize(34)} borderRadius={normalize(8)} />
+        <Skeleton width="31%" height={normalize(34)} borderRadius={normalize(8)} />
       </View>
       {[1, 2, 3].map((i) => (
         <Skeleton key={i} width={wp(92)} height={normalize(180)} borderRadius={normalize(16)} style={styles.skeletonCard} />
@@ -513,10 +507,12 @@ export default function FarmerPickupScreen({ navigation }: any) {
         ) : null}
 
         <View style={styles.sectionBlock}>
-          <View style={styles.filterRow}>
-            {renderStatusChip('all', 'All')}
-            {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
-            {renderStatusChip('cancelled', 'Cancelled', 'close-circle-outline')}
+          <View style={styles.filterWrap}>
+            <View style={styles.filterRow}>
+              {renderStatusChip('all', 'All')}
+              {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
+              {renderStatusChip('cancelled', 'Cancelled', 'close-circle-outline')}
+            </View>
           </View>
 
           {filteredPickups.length > 0 ? (
@@ -546,6 +542,29 @@ export default function FarmerPickupScreen({ navigation }: any) {
                 <AppText variant="bodyBold" style={styles.modalSubtitle}>
                   {selectedPickup.restaurantName}
                 </AppText>
+
+                <View style={styles.modalMetaBlock}>
+                  <AppText variant="bodySmall" style={styles.modalMetaText}>
+                    {selectedPickup.restaurantAddress}
+                  </AppText>
+                  <AppText variant="bodySmall" style={styles.modalMetaText}>
+                    {selectedPickup.distance}
+                  </AppText>
+                  <AppText variant="bodySmall" style={styles.modalMetaText}>
+                    {formatTimeLine(selectedPickup)}
+                  </AppText>
+                  {getDriverLabel(selectedPickup) ? (
+                    <AppText variant="bodySmall" style={styles.modalMetaText}>
+                      {getDriverLabel(selectedPickup)}
+                    </AppText>
+                  ) : null}
+                  <AppText variant="bodySmall" style={styles.modalMetaText}>
+                    Status: {STATUS_LABELS[selectedPickup.cardStatus]}
+                  </AppText>
+                  <AppText variant="bodySmall" style={styles.modalMetaText}>
+                    Total weight: {selectedPickup.weightKg} kg
+                  </AppText>
+                </View>
 
                 <View style={styles.modalHeaderRow}>
                   <AppText variant="bodyBold" style={styles.modalColWide}>
@@ -619,25 +638,28 @@ const styles = StyleSheet.create({
   },
 
   /* Filter chips */
+  filterWrap: {
+    gap: hp(0.8),
+  },
   filterRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: wp(2),
-    alignItems: 'center',
+    width: '100%',
   },
   filterChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1),
-    paddingVertical: hp(0.8),
-    paddingHorizontal: wp(3),
-    borderRadius: normalize(999),
-    borderWidth: 1,
-    flexShrink: 0,
+    justifyContent: 'center',
+    gap: wp(1.5),
+    paddingVertical: hp(0.75),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(8),
+    borderWidth: normalize(1),
   },
   filterChipInactive: {
     backgroundColor: palette.white,
-    borderColor: palette.primary,
+    borderColor: '#D9D9D9',
   },
   filterChipActive: {
     backgroundColor: palette.primary,
@@ -646,13 +668,13 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontSize: normalize(13),
     textTransform: 'none',
-    flexShrink: 0,
+    textAlign: 'center',
   },
   filterChipTextActive: {
     color: palette.white,
   },
   filterChipTextInactive: {
-    color: palette.primary,
+    color: palette.black,
   },
 
   /* Pickup card */
@@ -692,71 +714,82 @@ const styles = StyleSheet.create({
     gap: wp(2.5),
   },
   weightBox: {
-    width: wp(18),
-    minHeight: wp(18),
+    width: wp(17),
+    height: wp(17),
     borderWidth: normalize(1),
     borderRadius: normalize(10),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: hp(0.8),
-    gap: hp(0.4),
+    paddingVertical: hp(0.35),
+    paddingHorizontal: wp(0.8),
+    gap: hp(0.2),
     flexShrink: 0,
   },
   weightIcon: {
-    width: normalize(28),
-    height: normalize(28),
+    width: normalize(24),
+    height: normalize(24),
   },
   weightText: {
-    fontSize: normalize(12),
+    fontSize: normalize(11),
+    lineHeight: normalize(13),
     textTransform: 'none',
+    textAlign: 'center',
+    width: '100%',
   },
-  detailsColumn: {
+  cardMainArea: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
     minWidth: 0,
-    gap: hp(0.35),
+  },
+  cardContent: {
+    flex: 1,
+    gap: hp(0.15),
+    minWidth: 0,
+    justifyContent: 'flex-start',
   },
   detailLine: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: wp(1),
-    flex: 1,
     minWidth: 0,
   },
   detailText: {
     flex: 1,
-    fontSize: normalize(12),
-    lineHeight: normalize(16),
-    color: palette.black,
+    flexShrink: 1,
+    fontSize: normalize(11),
+    lineHeight: normalize(15),
+    color: palette.stone,
     textTransform: 'none',
   },
   distanceText: {
-    marginLeft: wp(4.5),
+    marginLeft: wp(4),
     color: palette.midgray,
     textTransform: 'none',
     fontSize: normalize(11),
+    lineHeight: normalize(15),
   },
   inlineIcon: {
-    width: normalize(14),
-    height: normalize(14),
+    width: normalize(13),
+    height: normalize(13),
     marginTop: normalize(1),
     flexShrink: 0,
   },
-  driverDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: wp(1.5),
-    flexWrap: 'wrap',
-    marginTop: hp(0.2),
-  },
   viewDetailsBtn: {
-    paddingVertical: hp(0.7),
-    paddingHorizontal: wp(2.5),
-    borderRadius: normalize(8),
     flexShrink: 0,
-    alignSelf: 'flex-end',
+    minWidth: wp(18),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.75),
+    borderRadius: normalize(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
   },
   viewDetailsText: {
     fontSize: normalize(11),
+    lineHeight: normalize(14),
+    textAlign: 'center',
     textTransform: 'none',
   },
 
@@ -841,6 +874,17 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     color: palette.midgray,
   },
+  modalMetaBlock: {
+    gap: hp(0.35),
+    paddingBottom: hp(0.5),
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+  },
+  modalMetaText: {
+    color: palette.midgray,
+    textTransform: 'none',
+    lineHeight: normalize(16),
+  },
   modalHeaderRow: {
     flexDirection: 'row',
     paddingBottom: hp(1),
@@ -869,9 +913,9 @@ const styles = StyleSheet.create({
   },
   skeletonFilterRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: wp(2),
     paddingHorizontal: wp(4),
+    width: '100%',
   },
   skeletonCard: {
     alignSelf: 'center',

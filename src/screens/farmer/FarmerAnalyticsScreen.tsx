@@ -185,7 +185,7 @@ export function FarmerAnalyticsScreen() {
           {renderMetricCard(
             ANALYTICS_ICONS.meals,
             formatNumber(stats.mealsCreated),
-            'Meals created',
+            'Meals Collected',
           )}
         </View>
 
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     height: normalize(24),
   },
   impactOverTimeSection: {
-    marginHorizontal: wp(4),
+    marginHorizontal: wp(2),
     backgroundColor: palette.creme,
     borderRadius: normalize(16),
     paddingHorizontal: wp(3.5),
@@ -622,6 +622,7 @@ const styles = StyleSheet.create({
     width: '100%',
     overflow: 'hidden',
     marginTop: hp(0.5),
+    paddingHorizontal: wp(2),
   },
   chart: {
     borderRadius: normalize(12),
