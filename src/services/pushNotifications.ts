@@ -1,4 +1,4 @@
-﻿import { Platform } from 'react-native';
+﻿import { Alert, AppState, Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 
@@ -25,6 +25,125 @@ const FIREBASE_ENABLED = Constants.expoConfig?.extra?.firebaseEnabled === true;
 let tokenRefreshUnsubscribe: (() => void) | null = null;
 let foregroundUnsubscribe: (() => void) | null = null;
 let tapUnsubscribe: (() => void) | null = null;
+let appStateUnsubscribe: (() => void) | null = null;
+let permissionSettingsAlertShown = false;
+
+function isPermissionGranted(
+  permissions: { granted?: boolean; status?: string },
+): boolean {
+  return permissions.granted === true || permissions.status === 'granted';
+}
+
+function getNotificationsModule() {
+  return require('expo-notifications') as typeof import('expo-notifications');
+}
+
+async function setupAndroidNotificationChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  const Notifications = getNotificationsModule();
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+  });
+}
+
+function showNotificationSettingsAlert(): void {
+  if (permissionSettingsAlertShown) return;
+  permissionSettingsAlertShown = true;
+
+  Alert.alert(
+    'Enable notifications',
+    'Allow notifications to receive pickup updates, claims, and nearby listing alerts.',
+    [
+      {
+        text: 'Not now',
+        style: 'cancel',
+        onPress: () => {
+          permissionSettingsAlertShown = false;
+        },
+      },
+      {
+        text: 'Open Settings',
+        onPress: () => {
+          permissionSettingsAlertShown = false;
+          Linking.openSettings();
+        },
+      },
+    ],
+  );
+}
+
+/**
+ * Requests the OS notification permission when not yet granted.
+ * Shows the system dialog on first ask; directs to Settings if permanently denied.
+ */
+export async function ensureNotificationPermission(
+  options: { prompt?: boolean } = {},
+): Promise<boolean> {
+  const { prompt = true } = options;
+  const Notifications = getNotificationsModule();
+
+  await setupAndroidNotificationChannel();
+
+  let permissions = await Notifications.getPermissionsAsync();
+
+  if (!isPermissionGranted(permissions) && prompt) {
+    console.log('[Push] Requesting notification permission');
+    permissions = await Notifications.requestPermissionsAsync({
+      ios: {
+        allowAlert: true,
+        allowBadge: true,
+        allowSound: true,
+      },
+    });
+  }
+
+  if (!isPermissionGranted(permissions)) {
+    console.log('[Push] Notification permission not granted', {
+      status: permissions.status,
+      canAskAgain: permissions.canAskAgain,
+    });
+    if (prompt && permissions.canAskAgain === false) {
+      showNotificationSettingsAlert();
+    }
+    return false;
+  }
+
+  if (Platform.OS === 'ios' && FIREBASE_ENABLED && !IS_EXPO_GO) {
+    const {
+      default: messaging,
+      AuthorizationStatus,
+    } = require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === AuthorizationStatus.AUTHORIZED ||
+      authStatus === AuthorizationStatus.PROVISIONAL;
+    if (!enabled) {
+      console.log('[Push] iOS remote notification permission not granted');
+      if (prompt) showNotificationSettingsAlert();
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function setupPushPermissionRetryOnAppFocus(): void {
+  if (IS_EXPO_GO || !FIREBASE_ENABLED || appStateUnsubscribe) return;
+
+  appStateUnsubscribe = AppState.addEventListener('change', (nextState) => {
+    if (nextState === 'active') {
+      // Re-check silently after user may have enabled notifications in Settings.
+      void registerDeviceToken({ prompt: false });
+    }
+  }).remove;
+}
+
+export function teardownPushPermissionRetryOnAppFocus(): void {
+  appStateUnsubscribe?.();
+  appStateUnsubscribe = null;
+}
 
 function getAppBundle(): string | undefined {
   if (Platform.OS === 'ios') return Constants.expoConfig?.ios?.bundleIdentifier;
@@ -47,8 +166,9 @@ function buildTokenPayload(
   };
 }
 
-
-export async function registerDeviceToken(): Promise<void> {
+export async function registerDeviceToken(
+  options: { prompt?: boolean } = {},
+): Promise<void> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
 
   if (IS_EXPO_GO) {
@@ -57,25 +177,20 @@ export async function registerDeviceToken(): Promise<void> {
   }
 
   if (!FIREBASE_ENABLED) {
-    console.log('[Push] Skipped - google-services.json not configured. Add Firebase config and rebuild.');
+    console.log(
+      '[Push] Skipped — Firebase not configured (google-services.json missing). ' +
+        'Add google-services.json and rebuild the dev client to enable FCM push.',
+      { expoGo: IS_EXPO_GO, firebaseEnabled: FIREBASE_ENABLED },
+    );
     return;
   }
 
   try {
-    const {
-      default: messaging,
-      AuthorizationStatus,
-    } = require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
+    const { default: messaging } =
+      require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
 
-    const authStatus = await messaging().requestPermission();
-    const enabled =
-      authStatus === AuthorizationStatus.AUTHORIZED ||
-      authStatus === AuthorizationStatus.PROVISIONAL;
-
-    if (!enabled) {
-      console.log('[Push] Notification permission not granted');
-      return;
-    }
+    const permitted = await ensureNotificationPermission({ prompt: options.prompt !== false });
+    if (!permitted) return;
 
     const fcmToken = await messaging().getToken();
     if (!fcmToken) {
@@ -104,10 +219,14 @@ export async function registerDeviceToken(): Promise<void> {
 export async function unregisterDeviceToken(): Promise<void> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
 
-  // Tear down the token-refresh listener so it cannot fire with a stale JWT after logout.
   if (tokenRefreshUnsubscribe) {
     tokenRefreshUnsubscribe();
     tokenRefreshUnsubscribe = null;
+  }
+
+  if (!FIREBASE_ENABLED) {
+    console.log('[Push] Logout — skipped token unregister (Firebase not configured, no FCM token was registered)');
+    return;
   }
 
   try {
@@ -117,7 +236,7 @@ export async function unregisterDeviceToken(): Promise<void> {
     console.log('[Push] Token unregister failed', error);
   }
 
-  if (!IS_EXPO_GO && FIREBASE_ENABLED) {
+  if (!IS_EXPO_GO) {
     try {
       const { default: messaging } =
         require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');

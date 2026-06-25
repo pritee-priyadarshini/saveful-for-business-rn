@@ -18,7 +18,7 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
-import { estimateMealsSaved, getListingAudience, isAnimalListing, isPeopleListing } from '../../utils/foodListing';
+import { estimateMealsSaved, getListingAudience, isAnimalListing, isListingCancelled, isListingCollected, isListingExpired, isPeopleListing } from '../../utils/foodListing';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
 import { showErrorAlert } from '@/utils/apiError';
@@ -84,22 +84,19 @@ const getMonthsForYear = (year: string) => {
 };
 
 function isCancelledListing(listing: any) {
-  const status = String(listing?.status || '').toUpperCase();
-  return status === 'CANCELLED' || status === 'EXPIRED';
+  return isListingCancelled(listing);
+}
+
+function isExpiredListing(listing: any) {
+  return isListingExpired(listing);
 }
 
 function isCompletedListing(listing: any) {
-  if (isCancelledListing(listing)) return false;
-  const status = String(listing?.status || '').toUpperCase();
-  const claimStatus = String(listing?.claimStatus || '').toLowerCase();
-  return (
-    ['CLAIMED', 'COMPLETED'].includes(status) ||
-    ['collected', 'completed', 'verified'].includes(claimStatus)
-  );
+  return isListingCollected(listing);
 }
 
 function getCardTheme(listing: any): CardTheme {
-  if (isCancelledListing(listing)) return 'cancelled';
+  if (isCancelledListing(listing) || isExpiredListing(listing)) return 'cancelled';
   return getListingAudience(listing) === 'animal' ? 'animal' : 'people';
 }
 
@@ -223,7 +220,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
         const statusMatch =
           statusFilter === 'all' ||
           (statusFilter === 'completed' && isCompletedListing(item)) ||
-          (statusFilter === 'cancelled' && isCancelledListing(item));
+          (statusFilter === 'cancelled' && (isCancelledListing(item) || isExpiredListing(item)));
         return yearMatch && monthMatch && audienceMatch && statusMatch;
       })
       .sort(
@@ -437,6 +434,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const cardTheme = getCardTheme(item);
     const ts = themeStyles[cardTheme];
     const cancelled = cardTheme === 'cancelled';
+    const expired = isExpiredListing(item);
     const animal = cardTheme === 'animal';
     const totalKg = getTotalKg(item);
     const meals = estimateMealsSaved(totalKg);
@@ -444,7 +442,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const collectedDate = getCollectedDate(item);
     const collectedTime = getCollectedTime(item);
     const collectedInline = collectedTime ? `${collectedDate} • ${collectedTime}` : collectedDate;
-    const statusLabel = cancelled ? 'Cancelled' : 'Completed';
+    const statusLabel = cancelled && !expired ? 'Cancelled' : expired ? 'Expired' : 'Completed';
     const categoryLabel = animal ? 'For Animals' : 'For People';
     const categoryIcon = animal
       ? require('../../../assets/placeholder/cow_front.png')

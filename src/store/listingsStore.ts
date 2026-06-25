@@ -64,7 +64,19 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
     set({ isFetchingSite: true, error: null });
     try {
       const res = await foodListingService.getSiteListings();
-      const { listings: all } = normalizeListingsResponse(res);
+      console.log('[Listings] GET /food-listings/site — raw response:', JSON.stringify(res.data, null, 2));
+
+      const normalized = normalizeListingsResponse(res);
+      console.log('[Listings] GET /food-listings/site — parsed:', {
+        total: normalized.total,
+        page: normalized.page,
+        limit: normalized.limit,
+        totalPages: normalized.totalPages,
+        count: normalized.listings.length,
+        listings: normalized.listings,
+      });
+
+      const { listings: all } = normalized;
       set({
         siteListings: all.filter((l: FoodListing) => l.status !== 'CANCELLED'),
         siteLastFetched: Date.now(),

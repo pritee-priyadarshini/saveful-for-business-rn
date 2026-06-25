@@ -19,7 +19,7 @@ import { Skeleton } from '../../components/Skeleton';
 
 import { palette } from '@/theme/colors';
 import { ListingStatus } from '@/types';
-import { estimateMealsSaved, getListingAudience, isAnimalListing, isPeopleListing } from '../../utils/foodListing';
+import { estimateMealsSaved, getListingAudience, getListingStatusLabel, isAnimalListing, isListingActive, isListingCollected, isListingExpired, isPeopleListing } from '../../utils/foodListing';
 import { showErrorAlert } from '../../utils/apiError';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
@@ -80,25 +80,20 @@ function getListingTheme(listing: any): ListingTheme {
   return getListingAudience(listing) === 'animal' ? ANIMAL_THEME : PEOPLE_THEME;
 }
 
-function isCompletedListing(listing: any) {
-  const status = String(listing?.status || '').toUpperCase();
-  const claimStatus = String(listing?.claimStatus || '').toLowerCase();
-  return (
-    ['CLAIMED', 'EXPIRED', 'COMPLETED'].includes(status) ||
-    ['collected', 'completed', 'verified'].includes(claimStatus)
-  );
-}
-
-function isActiveListing(listing: any) {
-  const status = String(listing?.status || '').toUpperCase();
-  return ['ACTIVE', 'PARTIAL', 'AVAILABLE'].includes(status);
-}
-
-function getDisplayStatus(listing: any) {
-  if (isCompletedListing(listing)) return 'Completed';
-  const status = String(listing?.status || '').toUpperCase();
-  if (status === 'PARTIAL') return 'Partial';
-  return 'Active';
+function formatExpiredOn(listing: any) {
+  const value = listing?.updatedAt || listing?.pickupByTime || listing?.pickupFromTime;
+  if (!value) return '—';
+  const date = new Date(value);
+  return date
+    .toLocaleString([], {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    .replace(',', '');
 }
 
 function getTotalKg(listing: any) {
@@ -311,9 +306,13 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const theme = getListingTheme(item);
     const isAnimal = getListingAudience(item) === 'animal';
     const metaTheme = isAnimal ? metaThemeStyles.animal : metaThemeStyles.people;
-    const completed = isCompletedListing(item);
-    const active = isActiveListing(item);
-    const statusLabel = getDisplayStatus(item);
+    const collected = isListingCollected(item);
+    const expired = isListingExpired(item);
+    const active = isListingActive(item);
+    const statusLabel = getListingStatusLabel(item);
+    const statusBadgeStyle = expired
+      ? { backgroundColor: '#FFF1D6', color: palette.warning }
+      : { backgroundColor: theme.statusBg, color: theme.accent };
 
     return (
       <View
@@ -325,8 +324,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
       >
         {/* Top row: status + category + collected */}
         <View style={styles.cardTopRow}>
-          <View style={[styles.statusBadge, { backgroundColor: theme.statusBg }]}>
-            <AppText variant="bodyBold" style={{ color: theme.accent }}>
+          <View style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
+            <AppText variant="bodyBold" style={{ color: statusBadgeStyle.color }}>
               {statusLabel}
             </AppText>
           </View>
@@ -339,7 +338,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
               </AppText>
             </View>
 
-            {completed ? (
+            {collected ? (
               <View style={styles.collectedWrap}>
                 <View style={[styles.collectedIcon, { backgroundColor: theme.accent }]}>
                   <Ionicons name="checkmark" size={normalize(14)} color={palette.white} />
@@ -349,11 +348,22 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 </AppText>
               </View>
             ) : null}
+
+            {expired ? (
+              <View style={styles.collectedWrap}>
+                <View style={[styles.collectedIcon, { backgroundColor: palette.warning }]}>
+                  <Ionicons name="time-outline" size={normalize(14)} color={palette.white} />
+                </View>
+                <AppText variant="bodyBold" style={{ color: palette.warning }}>
+                  Expired
+                </AppText>
+              </View>
+            ) : null}
           </View>
         </View>
 
         {/* Notification */}
-        {!completed ? (
+        {active ? (
           <AppText variant="bodySmall" color={palette.midgray} style={styles.notificationText}>
             📍 {theme.notification}
           </AppText>
@@ -378,7 +388,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
             {renderMetaBox(
               isAnimal,
               META_ICONS.calendar,
-              completed ? 'Collected on' : 'Pickup Date',
+              collected ? 'Collected on' : expired ? 'Expired on' : 'Pickup Date',
               <AppText
                 variant="bodySmall"
                 color={palette.midgray}
@@ -386,17 +396,19 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {completed
+                {collected
                   ? formatCollectedOn(item)
-                  : formatPickupDate(item.pickupFromTime || item.createdAt)}
+                  : expired
+                    ? formatExpiredOn(item)
+                    : formatPickupDate(item.pickupFromTime || item.createdAt)}
               </AppText>,
             )}
           </View>
 
           {renderMetaBox(
             isAnimal,
-            completed ? META_ICONS.impact : META_ICONS.time,
-            completed ? 'Impact' : 'Pickup Time',
+            collected ? META_ICONS.impact : META_ICONS.time,
+            collected ? 'Impact' : 'Pickup Time',
             <AppText
               variant="bodySmall"
               color={palette.midgray}
@@ -404,7 +416,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
               numberOfLines={2}
               ellipsizeMode="tail"
             >
-              {completed
+              {collected
                 ? getImpactText(item)
                 : formatPickupTime(item.pickupFromTime, item.pickupByTime)}
             </AppText>,
@@ -413,7 +425,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
         </View>
 
         {/* Instructions banner */}
-        {!completed ? (
+        {active ? (
           <View style={[styles.instructionsBanner, { backgroundColor: theme.bannerBg }]}>
             <AppText variant="caption" color={palette.black} style={styles.instructionsText}>
               INSTRUCTIONS: {buildInstructions(item)}

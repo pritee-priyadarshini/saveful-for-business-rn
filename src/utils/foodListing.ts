@@ -1,3 +1,5 @@
+import type { ListingStatus } from '../types';
+
 export type FoodIconKey =
   | 'preparedMeals'
   | 'bread'
@@ -64,4 +66,48 @@ export function isAnimalListing(listing: any) {
 export function isPeopleListing(listing: any) {
   const audience = getListingAudience(listing);
   return audience === 'human' || audience === 'both';
+}
+
+export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
+  ACTIVE: 'Active',
+  PARTIAL: 'Partial',
+  CLAIMED: 'Claimed',
+  EXPIRED: 'Expired',
+  CANCELLED: 'Cancelled',
+};
+
+/** Map API / claim status to a canonical listing status for UI. */
+export function resolveListingStatus(listing: any): ListingStatus {
+  const status = String(listing?.status || '').toUpperCase();
+  const claimStatus = String(listing?.claimStatus || '').toLowerCase();
+
+  if (status === 'ACTIVE' || status === 'AVAILABLE') return 'ACTIVE';
+  if (status === 'PARTIAL') return 'PARTIAL';
+  if (status === 'EXPIRED') return 'EXPIRED';
+  if (status === 'CANCELLED') return 'CANCELLED';
+  if (status === 'CLAIMED' || status === 'COMPLETED' || status === 'COLLECTED') return 'CLAIMED';
+  if (['collected', 'completed', 'verified'].includes(claimStatus)) return 'CLAIMED';
+
+  return 'ACTIVE';
+}
+
+export function getListingStatusLabel(listing: any): string {
+  return LISTING_STATUS_LABELS[resolveListingStatus(listing)];
+}
+
+export function isListingActive(listing: any): boolean {
+  const status = resolveListingStatus(listing);
+  return status === 'ACTIVE' || status === 'PARTIAL';
+}
+
+export function isListingCollected(listing: any): boolean {
+  return resolveListingStatus(listing) === 'CLAIMED';
+}
+
+export function isListingExpired(listing: any): boolean {
+  return resolveListingStatus(listing) === 'EXPIRED';
+}
+
+export function isListingCancelled(listing: any): boolean {
+  return resolveListingStatus(listing) === 'CANCELLED';
 }

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from './AppText';
 import { ListingStatus } from '../types';
 import { palette } from '../theme/colors';
+import { resolveListingStatus } from '../utils/foodListing';
 
 const statusColors: Record<ListingStatus, { background: string; color: string }> = {
   ACTIVE: { background: '#E6FFF0', color: palette.kale },
@@ -21,10 +22,14 @@ const statusLabels: Record<ListingStatus, string> = {
   CANCELLED: 'Cancelled',
 };
 
-export function StatusBadge({ status }: { status: ListingStatus }) {
+export function StatusBadge({ status }: { status: ListingStatus | string }) {
+  const normalized = resolveListingStatus({ status });
+  const colors = statusColors[normalized];
+  const label = statusLabels[normalized];
+
   return (
-    <View style={[styles.badge, { backgroundColor: statusColors[status].background }]}>
-      <AppText variant="caption" color={statusColors[status].color}>{statusLabels[status]}</AppText>
+    <View style={[styles.badge, { backgroundColor: colors.background }]}>
+      <AppText variant="caption" color={colors.color}>{label}</AppText>
     </View>
   );
 }

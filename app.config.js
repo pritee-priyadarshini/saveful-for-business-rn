@@ -29,6 +29,26 @@ function shouldIncludeFirebasePlugins() {
 
 const includeFirebase = shouldIncludeFirebasePlugins();
 
+// Fail EAS Android builds early if Firebase client config is missing (APK + AAB).
+if (
+  process.env.EAS_BUILD &&
+  process.env.EAS_BUILD_PLATFORM === 'android' &&
+  !androidGoogleServicesFile
+) {
+  throw new Error(
+    '[app.config] Android EAS build requires google-services.json. ' +
+      'Run: eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --environment <env>',
+  );
+}
+
+if (includeFirebase) {
+  console.log('[app.config] Firebase enabled', {
+    android: Boolean(androidGoogleServicesFile),
+    ios: Boolean(iosGoogleServicesFile),
+    platform: process.env.EAS_BUILD_PLATFORM ?? 'local',
+  });
+}
+
 const firebasePlugins = includeFirebase
   ? ['@react-native-firebase/app', '@react-native-firebase/messaging']
   : [];

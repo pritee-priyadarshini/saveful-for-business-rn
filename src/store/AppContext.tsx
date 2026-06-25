@@ -15,6 +15,8 @@ import { setUnauthorizedHandler } from '../services/api';
 import {
   setupForegroundNotificationHandler,
   teardownForegroundNotificationHandler,
+  setupPushPermissionRetryOnAppFocus,
+  teardownPushPermissionRetryOnAppFocus,
   registerDeviceToken,
   unregisterDeviceToken,
 } from '../services/pushNotifications';
@@ -91,10 +93,12 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    registerDeviceToken();
+    registerDeviceToken({ prompt: true });
     setupForegroundNotificationHandler();
+    setupPushPermissionRetryOnAppFocus();
     return () => {
       teardownForegroundNotificationHandler();
+      teardownPushPermissionRetryOnAppFocus();
     };
   }, [isAuthenticated]);
 
