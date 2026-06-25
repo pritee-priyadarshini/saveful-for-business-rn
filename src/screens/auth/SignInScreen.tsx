@@ -29,6 +29,8 @@ import {
     isValidPassword,
     MIN_PASSWORD_LENGTH,
     passwordsMatch,
+    getForgotPasswordErrorMessage,
+    getForgotPasswordSuccessMessage,
 } from '@/utils/validation';
 
 const { width, height } = Dimensions.get('window');
@@ -73,6 +75,7 @@ export function SignInScreen() {
 
     const handleLogin = async () => {
         try {
+            if (loading) return;
             setError('');
             if (!trimmedEmail || !password) {
                 setError('Please enter email and password.');
@@ -170,6 +173,7 @@ export function SignInScreen() {
 
     const handleSendCode = async () => {
         try {
+            if (loading) return;
             setError('');
 
             if (!trimmedEmail) {
@@ -184,17 +188,23 @@ export function SignInScreen() {
 
             setLoading(true);
 
-            await authService.forgotPassword(trimmedEmail);
+            const res = await authService.forgotPassword(trimmedEmail);
 
-            Alert.alert('Verification Email Sent', 'Check your inbox for the reset code.');
+            if (res.data?.accountExists === false || res.data?.userExists === false) {
+                setError(getForgotPasswordErrorMessage({
+                    response: { status: 404, data: { message: 'not found' } },
+                }));
+                return;
+            }
+
+            Alert.alert('Check your email', getForgotPasswordSuccessMessage(res.data?.message));
             setOtp(['', '', '', '', '', '']);
             setNewPassword('');
             setConfirmPassword('');
             setMode('reset');
 
         } catch (e: any) {
-            const message = e?.response?.data?.message || 'Failed to send code';
-            setError(Array.isArray(message) ? message.join('\n') : message);
+            setError(getForgotPasswordErrorMessage(e));
         } finally {
             setLoading(false);
         }
@@ -202,6 +212,7 @@ export function SignInScreen() {
 
     const handleReset = async () => {
         try {
+            if (loading) return;
             setError('');
             const enteredOtp = otp.join('');
 
@@ -437,7 +448,11 @@ export function SignInScreen() {
 
                                 {/* LOGIN BUTTON */}
                                 {mode === 'login' && (
-                                    <TouchableOpacity style={styles.button} onPress={handleLogin}>
+                                    <TouchableOpacity
+                                        style={[styles.button, loading && { opacity: 0.65 }]}
+                                        onPress={handleLogin}
+                                        disabled={loading}
+                                    >
                                         <AppText style={styles.buttonText}>
                                             {loading ? 'Signing In...' : 'Sign In'}
                                         </AppText>

@@ -214,6 +214,8 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
           <Button
             label={loading ? 'Verifying...' : 'Continue'}
             onPress={handleVerify}
+            loading={loading}
+            disabled={loading}
           />
         </View>
 

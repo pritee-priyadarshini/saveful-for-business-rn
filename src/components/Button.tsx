@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
@@ -13,6 +13,7 @@ type ButtonProps = {
   icon?: keyof typeof Ionicons.glyphMap;
   style?: ViewStyle;
   disabled?: boolean;
+  loading?: boolean;
 };
 
 export function Button({
@@ -21,30 +22,35 @@ export function Button({
   variant = 'primary',
   icon,
   style,
-  disabled = false, 
+  disabled = false,
+  loading = false,
 }: ButtonProps) {
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
+  const isDisabled = disabled || loading;
 
   return (
     <Pressable
-      onPress={disabled ? undefined : onPress} 
+      onPress={isDisabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.button,
         isPrimary && styles.primary,
         isSecondary && styles.secondary,
         variant === 'ghost' && styles.ghost,
-
-        pressed && !disabled && styles.pressed, 
-        disabled && styles.disabled, 
-
+        pressed && !isDisabled && styles.pressed,
+        isDisabled && styles.disabled,
         style,
       ]}
     >
-      {icon ? (
+      {loading ? (
+        <ActivityIndicator
+          color={isPrimary ? palette.surface : palette.primary}
+          size="small"
+        />
+      ) : icon ? (
         <Ionicons
           color={
-            disabled
+            isDisabled
               ? '#9E9E9E'
               : isPrimary
               ? palette.surface
@@ -58,7 +64,7 @@ export function Button({
       <AppText
         variant="bodyBold"
         color={
-          disabled
+          isDisabled
             ? '#9E9E9E'
             : isPrimary
             ? palette.surface
@@ -102,7 +108,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   disabled: {
-  backgroundColor: '#E5E5E5',
-  borderColor: '#E5E5E5',
-},
+    backgroundColor: '#E5E5E5',
+    borderColor: '#E5E5E5',
+  },
 });

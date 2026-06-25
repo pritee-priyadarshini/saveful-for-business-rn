@@ -23,6 +23,8 @@ import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
 import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
+import { estimateCo2AvoidedKg } from '../../utils/foodListing';
+import { useSubmitLock } from '../../hooks/useSubmitLock';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -119,6 +121,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
   const gridLayout = useMemo(() => getGridLayout(winWidth), [winWidth]);
 
   const { currentProfile, authUser } = useAppContext();
+  const { submitting, withLock } = useSubmitLock();
 
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FarmItem[]>(seedItems);
@@ -141,7 +144,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
-  const estimatedCO2 = Math.max(0, Math.round(totalQuantity * 4));
+  const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -286,6 +289,8 @@ export function CreateFarmListingScreen({ navigation }: any) {
   };
 
   const handleCreateListing = async () => {
+    if (submitting) return;
+
     if (!confirmedSafe) {
       Alert.alert('Confirmation required', 'Please confirm this material is for livestock/agricultural use.');
       return;
@@ -323,55 +328,44 @@ export function CreateFarmListingScreen({ navigation }: any) {
       return;
     }
 
-    try {
-      const payload = {
-        siteId: resolvedSiteId,
-        listingType: 'ANIMAL' as const,
-        foodItems: activeItems.map((item) => ({
-          name: item.name,
-          category: item.name,
-          totalQtyKg: item.qty,
-          unit: 'kg',
-        })),
-        pickupAddress: location || currentProfile?.address || 'Address not provided',
-        pickupPostcode: getSitePostcode(authUser),
-        pickupLat: coords.lat,
-        pickupLng: coords.lng,
-        bestBefore: bestBeforeDate.toISOString(),
-        pickupFromTime: pickupFromDate.toISOString(),
-        pickupByTime: pickupToDate.toISOString(),
-        needsRefrigeration: selectedStorage.includes('Fridge'),
-        needsFreezer: selectedStorage.includes('Freezer'),
-        needsAmbient:
-          selectedStorage.includes('Ambient') ||
-          selectedStorage.includes('Dry storage'),
-        isSafeForDonation: false,
-        allergens: selectedContaminants,
-        photoUrls: images.filter((uri) => uri.startsWith('http')),
-      };
-
-      const response = await foodListingService.createListing(payload);
-      navigation.navigate('FarmListingConfirmation', {
-        listing: {
-          ...(response.data as any),
+    await withLock(async () => {
+      try {
+        const payload = {
+          siteId: resolvedSiteId,
+          listingType: 'ANIMAL' as const,
           foodItems: activeItems.map((item) => ({
             name: item.name,
             category: item.name,
             totalQtyKg: item.qty,
-            remainingQtyKg: item.qty,
+            unit: 'kg',
           })),
-          storage: selectedStorage,
-          contaminants: selectedContaminants,
-          totalQtyKg: totalQuantity,
-        },
-      });
-    } catch (error: any) {
-      console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
-      Alert.alert(
-        'Could not create listing',
-        formatApiError(error, 'Please try again.'),
-      );
-    }
+          pickupAddress: location || currentProfile?.address || 'Address not provided',
+          pickupPostcode: getSitePostcode(authUser),
+          pickupLat: coords.lat,
+          pickupLng: coords.lng,
+          bestBefore: bestBeforeDate.toISOString(),
+          pickupFromTime: pickupFromDate.toISOString(),
+          pickupByTime: pickupToDate.toISOString(),
+          needsRefrigeration: selectedStorage.includes('Fridge'),
+          needsFreezer: selectedStorage.includes('Freezer'),
+          needsAmbient:
+            selectedStorage.includes('Ambient') ||
+            selectedStorage.includes('Dry storage'),
+          isSafeForDonation: false,
+          allergens: selectedContaminants,
+          photoUrls: images.filter((uri) => uri.startsWith('http')),
+        };
+
+        await foodListingService.createListing(payload);
+        navigation.replace('RestaurantListings');
+      } catch (error: any) {
+        console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
+        Alert.alert(
+          'Could not create listing',
+          formatApiError(error, 'Please try again.'),
+        );
+      }
+    });
   };
 
   return (
@@ -860,13 +854,16 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
         {/* BOTTOM BUTTON */}
         <Pressable
-          style={styles.bottomButton}
+          style={[styles.bottomButton, submitting && styles.bottomButtonDisabled]}
           onPress={step === 3 ? handleCreateListing : handleContinue}
+          disabled={submitting}
         >
           <AppText variant="bodyBold" color={palette.white}>
-            {step === 3 ? 'CREATE FARM LISTING' : 'CONTINUE'}
+            {step === 3 ? (submitting ? 'CREATING...' : 'CREATE FARM LISTING') : 'CONTINUE'}
           </AppText>
-          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          {!submitting ? (
+            <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          ) : null}
         </Pressable>
       </View>
 
@@ -1405,6 +1402,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp(2.5),
+  },
+  bottomButtonDisabled: {
+    opacity: 0.65,
   },
 
   // ── iOS picker ────────────────────────────────────────────────────────────

@@ -168,6 +168,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
   const [listings, setListings] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [cancellingId, setCancellingId] = React.useState<number | null>(null);
   const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
 
   const fetchListings = async () => {
@@ -206,6 +207,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
   }, [listings, listingFilter]);
 
   const handleCancelListing = (id: number) => {
+    if (cancellingId !== null) return;
+
     Alert.alert(
       'Cancel Listing',
       'Are you sure you want to cancel this listing? This cannot be undone.',
@@ -215,6 +218,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
           text: 'Yes, Cancel',
           style: 'destructive',
           onPress: async () => {
+            if (cancellingId !== null) return;
+            setCancellingId(id);
             try {
               await foodListingService.cancelListing(id);
               await fetchListings();
@@ -223,6 +228,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 'Error',
                 formatApiErrorMessage(error?.response?.data?.message, 'Failed to cancel listing'),
               );
+            } finally {
+              setCancellingId(null);
             }
           },
         },

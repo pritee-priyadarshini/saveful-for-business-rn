@@ -35,6 +35,14 @@ export const estimateMealsSaved = (totalKg: number) => {
   return Math.floor((safeKg * 1000) / 420);
 };
 
+/** kg CO₂ avoided ≈ kg food redistributed × 2.1 */
+export const CO2_AVOIDED_FACTOR = 2.1;
+
+export const estimateCo2AvoidedKg = (totalKg: number) => {
+  const safeKg = Math.max(0, totalKg || 0);
+  return Math.round(safeKg * CO2_AVOIDED_FACTOR * 10) / 10;
+};
+
 export function getListingAudience(listing: any): 'human' | 'animal' | 'both' {
   const type = String(listing?.listingType || '').toUpperCase();
   if (type === 'ANIMAL') return 'animal';

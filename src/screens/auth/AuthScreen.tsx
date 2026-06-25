@@ -411,6 +411,7 @@ export function AuthScreen() {
   };
 
   const handleRegister = async () => {
+    if (loading) return;
     setFormError(null);
 
     const step1Error = validateStep1();

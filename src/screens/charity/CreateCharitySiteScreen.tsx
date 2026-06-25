@@ -273,6 +273,7 @@ export default function CreateCharitySiteScreen() {
     }, []);
 
     const handleCreateLocation = async () => {
+        if (loading) return;
         try {
             const {
                 locationName,
@@ -331,6 +332,7 @@ export default function CreateCharitySiteScreen() {
     };
 
     const handleAssignManager = async () => {
+        if (loading) return;
         try {
             const locationId = createdLocationId || selectedLocationId;
             if (!locationId) {

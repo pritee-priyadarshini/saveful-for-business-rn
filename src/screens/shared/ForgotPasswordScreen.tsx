@@ -27,6 +27,8 @@ import {
     isValidPassword,
     MIN_PASSWORD_LENGTH,
     passwordsMatch,
+    getForgotPasswordErrorMessage,
+    getForgotPasswordSuccessMessage,
 } from '@/utils/validation';
 
 export default function ForgotPasswordScreen() {
@@ -37,6 +39,7 @@ export default function ForgotPasswordScreen() {
     const [firstName, setFirstName] = useState('');
     const [loading, setLoading] = useState(false);
     const [formError, setFormError] = useState('');
+    const [formInfo, setFormInfo] = useState('');
     const [codeSent, setCodeSent] = useState(false);
 
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -70,6 +73,7 @@ export default function ForgotPasswordScreen() {
     };
 
     const handleSendCode = async () => {
+        if (loading) return;
         const trimmedEmail = email.trim().toLowerCase();
 
         if (!trimmedEmail) {
@@ -84,20 +88,29 @@ export default function ForgotPasswordScreen() {
 
         try {
             setFormError('');
+            setFormInfo('');
             setLoading(true);
 
             const res = await authService.forgotPassword(trimmedEmail);
+
+            if (res.data?.accountExists === false || res.data?.userExists === false) {
+                setFormError(getForgotPasswordErrorMessage({
+                    response: { status: 404, data: { message: 'not found' } },
+                }));
+                return;
+            }
+
             setCodeSent(true);
-            Alert.alert('Success', res.data.message || 'Reset code sent to your email.');
+            setFormInfo(getForgotPasswordSuccessMessage(res.data?.message));
         } catch (error: any) {
-            const message = error?.response?.data?.message || 'Something went wrong';
-            setFormError(Array.isArray(message) ? message.join('\n') : message);
+            setFormError(getForgotPasswordErrorMessage(error));
         } finally {
             setLoading(false);
         }
     };
 
     const handleReset = async () => {
+        if (loading) return;
         const trimmedEmail = email.trim().toLowerCase();
         const enteredOtp = otp.join('');
 
@@ -184,6 +197,7 @@ export default function ForgotPasswordScreen() {
                         onChangeText={(value) => {
                             setEmail(value);
                             setFormError('');
+                            setFormInfo('');
                         }}
                         editable={!authUser}
                         keyboardType="email-address"
@@ -193,11 +207,13 @@ export default function ForgotPasswordScreen() {
                     <Button
                         label={loading ? 'Sending...' : codeSent ? 'Resend Reset Code' : 'Send Reset Code'}
                         onPress={handleSendCode}
+                        loading={loading}
+                        disabled={loading}
                     />
 
                     {codeSent ? (
                         <AppText variant="bodySmall" style={styles.hintText}>
-                            A verification code was sent to your email.
+                            {formInfo || 'A verification code was sent to your email.'}
                         </AppText>
                     ) : null}
 
@@ -253,6 +269,8 @@ export default function ForgotPasswordScreen() {
                     <Button
                         label={loading ? 'Resetting...' : 'Save New Password'}
                         onPress={handleReset}
+                        loading={loading}
+                        disabled={loading}
                     />
                 </View>
             </Screen>

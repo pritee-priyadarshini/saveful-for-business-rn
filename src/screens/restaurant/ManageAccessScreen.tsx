@@ -17,6 +17,7 @@ import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Picker } from '@react-native-picker/picker';
 import { sitesService } from '@/services/sites.service';
+import { useSubmitLock } from '@/hooks/useSubmitLock';
 
 export default function ManageAccessScreen() {
   const navigation = useNavigation();
@@ -31,6 +32,7 @@ export default function ManageAccessScreen() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { submitting, withLock } = useSubmitLock();
   const [siteId, setSiteId] = useState<number | null>(null);
   const [maxUsers, setMaxUsers] = useState(0);
   const [members, setMembers] = useState<any[]>([]);
@@ -38,6 +40,8 @@ export default function ManageAccessScreen() {
   const isLimitReached = maxUsers > 0 && members.length >= maxUsers;
 
   const handleSubmit = async () => {
+    if (submitting) return;
+
     try {
       if (!siteId) {
         Alert.alert('Error', 'No site found');
@@ -55,24 +59,25 @@ export default function ManageAccessScreen() {
         phoneNumber: form.mobile || undefined,
       };
 
-      if (form.role === 'SITE_ADMIN') {
-        await sitesService.assignManager(siteId, payload);
-      } else {
-        await sitesService.addStaff(siteId, payload);
-      }
+      await withLock(async () => {
+        if (form.role === 'SITE_ADMIN') {
+          await sitesService.assignManager(siteId, payload);
+        } else {
+          await sitesService.addStaff(siteId, payload);
+        }
 
-      Alert.alert('Success', 'User added');
+        Alert.alert('Success', 'User added');
 
-      setForm({
-        name: '',
-        email: '',
-        mobile: '',
-        password: '',
-        role: '',
+        setForm({
+          name: '',
+          email: '',
+          mobile: '',
+          password: '',
+          role: '',
+        });
+
+        await fetchTeam();
       });
-
-      fetchTeam();
-
     } catch (err: any) {
       Alert.alert(
         'Error',
@@ -252,15 +257,15 @@ export default function ManageAccessScreen() {
           </View>
 
           <Pressable
-            disabled={loading || isLimitReached}
+            disabled={loading || submitting || isLimitReached}
             onPress={handleSubmit}
             style={[
               styles.addBtn,
-              isLimitReached && { backgroundColor: '#ccc' },
+              (isLimitReached || submitting) && { backgroundColor: '#ccc' },
             ]}
           >
             <AppText variant="bodyBold" style={styles.white}>
-              + Add User
+              {submitting ? 'Adding...' : '+ Add User'}
             </AppText>
           </Pressable>
         </View>

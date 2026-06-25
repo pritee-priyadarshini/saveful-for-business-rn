@@ -20,9 +20,10 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
-import { estimateMealsSaved, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
+import { estimateMealsSaved, estimateCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
+import { useSubmitLock } from '../../hooks/useSubmitLock';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -102,6 +103,7 @@ const formatTime = (date: Date | null) => {
 
 export function CreateListingScreen({ navigation }: any) {
   const { currentProfile, authUser } = useAppContext();
+  const { submitting, withLock } = useSubmitLock();
 
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FoodItem[]>(seedItems);
@@ -126,7 +128,7 @@ export function CreateListingScreen({ navigation }: any) {
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
   const estimatedMeals = estimateMealsSaved(totalQuantity);
-  const estimatedCO2 = Math.max(0, Math.round(totalQuantity * 4));
+  const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
   const hasSelectedAllergens = selectedAllergens.length > 0;
 
   const updateQty = (index: number, delta: number) => {
@@ -290,6 +292,8 @@ export function CreateListingScreen({ navigation }: any) {
   };
 
   const handleCreateListing = async () => {
+    if (submitting) return;
+
     if (!confirmedSafe) {
       Alert.alert('Confirmation required', 'Please confirm this food is safe for donation.');
       return;
@@ -329,53 +333,43 @@ export function CreateListingScreen({ navigation }: any) {
       return;
     }
 
-    try {
-      const payload = {
-        siteId: resolvedSiteId,
-        listingType: 'HUMAN' as const,
-        foodItems: activeItems.map((item) => ({
-          name: item.name,
-          category: item.name,
-          totalQtyKg: item.qty,
-          unit: 'kg',
-        })),
-        pickupAddress: location || currentProfile?.address || 'Address not provided',
-        pickupPostcode: getSitePostcode(authUser),
-        pickupLat: coords.lat,
-        pickupLng: coords.lng,
-        bestBefore: bestBeforeDate.toISOString(),
-        pickupFromTime: pickupFromDate.toISOString(),
-        pickupByTime: pickupToDate.toISOString(),
-        needsRefrigeration: storage === 'Fridge',
-        needsFreezer: storage === 'Freezer',
-        needsAmbient: storage === 'Ambient',
-        needsReheating: reheating === 'Yes',
-        isSafeForDonation: true,
-        allergens: selectedAllergens,
-        photoUrls: images.filter((uri) => uri.startsWith('http')),
-      };
-
-      const response = await foodListingService.createListing(payload);
-      navigation.navigate('ListingConfirmation', {
-        listing: {
-          ...(response.data as any),
+    await withLock(async () => {
+      try {
+        const payload = {
+          siteId: resolvedSiteId,
+          listingType: 'HUMAN' as const,
           foodItems: activeItems.map((item) => ({
             name: item.name,
             category: item.name,
             totalQtyKg: item.qty,
-            remainingQtyKg: item.qty,
-            iconKey: item.iconKey,
+            unit: 'kg',
           })),
+          pickupAddress: location || currentProfile?.address || 'Address not provided',
+          pickupPostcode: getSitePostcode(authUser),
+          pickupLat: coords.lat,
+          pickupLng: coords.lng,
+          bestBefore: bestBeforeDate.toISOString(),
+          pickupFromTime: pickupFromDate.toISOString(),
+          pickupByTime: pickupToDate.toISOString(),
+          needsRefrigeration: storage === 'Fridge',
+          needsFreezer: storage === 'Freezer',
+          needsAmbient: storage === 'Ambient',
+          needsReheating: reheating === 'Yes',
+          isSafeForDonation: true,
           allergens: selectedAllergens,
-        },
-      });
-    } catch (error: any) {
-      console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
-      Alert.alert(
-        'Could not create listing',
-        formatApiError(error, 'Please try again.'),
-      );
-    }
+          photoUrls: images.filter((uri) => uri.startsWith('http')),
+        };
+
+        await foodListingService.createListing(payload);
+        navigation.replace('RestaurantListings');
+      } catch (error: any) {
+        console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
+        Alert.alert(
+          'Could not create listing',
+          formatApiError(error, 'Please try again.'),
+        );
+      }
+    });
   };
 
   return (
@@ -853,11 +847,17 @@ export function CreateListingScreen({ navigation }: any) {
           </View>
         ) : null}
 
-        <Pressable style={styles.bottomButton} onPress={step === 3 ? handleCreateListing : handleContinue}>
+        <Pressable
+          style={[styles.bottomButton, submitting && styles.bottomButtonDisabled]}
+          onPress={step === 3 ? handleCreateListing : handleContinue}
+          disabled={submitting}
+        >
           <AppText variant="bodyBold" color={palette.white}>
-            {step === 3 ? 'CREATE CHARITY LISTING' : 'CONTINUE'}
+            {step === 3 ? (submitting ? 'CREATING...' : 'CREATE CHARITY LISTING') : 'CONTINUE'}
           </AppText>
-          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          {!submitting ? (
+            <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          ) : null}
         </Pressable>
       </View>
 
@@ -1381,6 +1381,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp(2.5),
+  },
+  bottomButtonDisabled: {
+    opacity: 0.65,
   },
   iosPickerOverlay: {
     flex: 1,

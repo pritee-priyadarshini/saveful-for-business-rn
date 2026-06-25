@@ -55,6 +55,7 @@ export default function MultiCharityManageSitesScreen() {
     const [editForm, setEditForm] = useState<any>({});
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
     const [sites, setSites] = useState<Site[]>([]);
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
     const businessLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
@@ -346,14 +347,12 @@ export default function MultiCharityManageSitesScreen() {
 
                                         {/* SAVE */}
                                         <Pressable
-                                            style={styles.saveBtn}
+                                            style={[styles.saveBtn, actionLoading && { opacity: 0.65 }]}
+                                            disabled={actionLoading}
                                             onPress={async () => {
+                                                if (actionLoading || !editingSiteId) return;
+                                                setActionLoading(true);
                                                 try {
-
-                                                    if (!editingSiteId) {
-                                                        return;
-                                                    }
-
                                                     await charityService.updateLocation(
                                                         editingSiteId,
                                                         {
@@ -369,18 +368,19 @@ export default function MultiCharityManageSitesScreen() {
                                                     setEditForm({});
 
                                                     Alert.alert('Success', 'Location updated successfully');
-
                                                 } catch (err: any) {
                                                     Alert.alert(
                                                         'Error',
                                                         err?.response?.data?.message ||
                                                         'Failed to update location'
                                                     );
+                                                } finally {
+                                                    setActionLoading(false);
                                                 }
                                             }}
                                         >
                                             <AppText variant="bodyBold" style={{ color: 'white' }} >
-                                                Save
+                                                {actionLoading ? 'Saving...' : 'Save'}
                                             </AppText>
                                         </Pressable>
 
@@ -406,17 +406,20 @@ export default function MultiCharityManageSitesScreen() {
                                                             text: 'Delete',
                                                             style: 'destructive',
                                                             onPress: async () => {
+                                                                if (actionLoading) return;
+                                                                setActionLoading(true);
                                                                 try {
                                                                     await charityService.deactivateLocation(site.id);
                                                                     await fetchLocations();
                                                                     setExpandedSite(null);
                                                                     Alert.alert('Deleted', 'Location removed successfully');
-
                                                                 } catch {
                                                                     Alert.alert(
                                                                         'Error',
                                                                         'Failed to remove location'
                                                                     );
+                                                                } finally {
+                                                                    setActionLoading(false);
                                                                 }
                                                             },
                                                         },
@@ -496,8 +499,9 @@ export default function MultiCharityManageSitesScreen() {
                                                                 text: 'Remove',
                                                                 style: 'destructive',
                                                                 onPress: async () => {
+                                                                    if (actionLoading) return;
+                                                                    setActionLoading(true);
                                                                     try {
-
                                                                         const usersRes = await charityService.listUsers();
                                                                         const users = [
                                                                             ...(usersRes.data?.headOfficeAdmins || []),
@@ -540,6 +544,8 @@ export default function MultiCharityManageSitesScreen() {
                                                                             err?.response?.data?.message ||
                                                                             'Failed to remove manager'
                                                                         );
+                                                                    } finally {
+                                                                        setActionLoading(false);
                                                                     }
                                                                 },
                                                             },

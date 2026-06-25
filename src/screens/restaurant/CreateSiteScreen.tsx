@@ -218,6 +218,7 @@ export default function CreateSiteScreen() {
     }, []);
 
     const handleCreateSite = async () => {
+        if (loading) return;
         try {
             const {
                 siteName,
@@ -269,6 +270,7 @@ export default function CreateSiteScreen() {
     };
 
     const handleAssignManager = async () => {
+        if (loading) return;
         try {
             const siteId = createdSiteId || selectedSiteId;
 

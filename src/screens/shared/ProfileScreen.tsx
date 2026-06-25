@@ -23,6 +23,7 @@ import { InputField } from '@/components/InputField';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/AppNavigator';
+import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { palette } from '@/theme/colors';
 import { charityService } from '@/services/charity.service';
 
@@ -41,6 +42,7 @@ export function ProfileScreen() {
   const navigation = useNavigation<NavigationProp>();
 
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const { submitting, withLock } = useSubmitLock();
   const [logo, setLogo] = useState<string | null>(
     authUser?.profile?.organisation?.logoUrl ||
     authUser?.profile?.organisation?.logo ||
@@ -83,66 +85,75 @@ export function ProfileScreen() {
   };
 
   const handleUpdateContact = async () => {
-    try {
-      if (!authUser?.id) {
-        Alert.alert('Error', 'User not found');
-        return;
-      }
-      await charityService.updateUser(authUser.id, { mobile: formData.mobile, });
+    if (submitting) return;
+    await withLock(async () => {
+      try {
+        if (!authUser?.id) {
+          Alert.alert('Error', 'User not found');
+          return;
+        }
+        await charityService.updateUser(authUser.id, { mobile: formData.mobile });
 
-      Alert.alert('Success', 'Contact updated');
-    } catch (err) {
-      console.log(err);
-      Alert.alert('Error', 'Failed to update contact');
-    }
+        Alert.alert('Success', 'Contact updated');
+      } catch (err) {
+        console.log(err);
+        Alert.alert('Error', 'Failed to update contact');
+      }
+    });
   };
 
   const handleUpdateLocation = async () => {
-    try {
-      const locationId = authUser?.profile?.sites?.[0]?.id;
-      if (!locationId) {
-        Alert.alert('Error', 'Location not found');
-        return;
+    if (submitting) return;
+    await withLock(async () => {
+      try {
+        const locationId = authUser?.profile?.sites?.[0]?.id;
+        if (!locationId) {
+          Alert.alert('Error', 'Location not found');
+          return;
+        }
+
+        await charityService.updateLocation(locationId, {
+          address: formData.address,
+          postcode: '',
+          radiusKm: Number(formData.radius),
+        });
+
+        Alert.alert('Success', 'Details updated');
+      } catch (err) {
+        console.log(err);
+        Alert.alert('Error', 'Failed to update');
       }
-
-      await charityService.updateLocation(locationId, {
-        address: formData.address,
-        postcode: '',
-        radiusKm: Number(formData.radius),
-      });
-
-      Alert.alert('Success', 'Details updated');
-    } catch (err) {
-      console.log(err);
-      Alert.alert('Error', 'Failed to update');
-    }
+    });
   };
 
   const handleUpdateExtra = async () => {
-    try {
-      const orgId = authUser?.profile?.organisation?.id;
-      if (!orgId) {
-        Alert.alert('Error', 'Organisation not found');
-        return;
+    if (submitting) return;
+    await withLock(async () => {
+      try {
+        const orgId = authUser?.profile?.organisation?.id;
+        if (!orgId) {
+          Alert.alert('Error', 'Organisation not found');
+          return;
+        }
+
+        const form = new FormData();
+        form.append('brandName', formData.branding);
+
+        if (logo && (logo.startsWith('file') || logo.startsWith('content'))) {
+          form.append('logo', {
+            uri: logo,
+            name: 'logo.jpg',
+            type: 'image/jpeg',
+          } as any);
+        }
+
+        await charityService.updateOrganisation(orgId, form);
+        Alert.alert('Success', 'Branding updated');
+      } catch (err) {
+        console.log(err);
+        Alert.alert('Error', 'Failed to update branding');
       }
-
-      const form = new FormData();
-      form.append('brandName', formData.branding);
-
-      if (logo && (logo.startsWith('file') || logo.startsWith('content'))) {
-        form.append('logo', {
-          uri: logo,
-          name: 'logo.jpg',
-          type: 'image/jpeg',
-        } as any);
-      }
-
-      await charityService.updateOrganisation(orgId, form);
-      Alert.alert('Success', 'Branding updated');
-    } catch (err) {
-      console.log(err);
-      Alert.alert('Error', 'Failed to update branding');
-    }
+    });
   };
 
   const { logout } = useAppContext();
@@ -483,7 +494,8 @@ export function ProfileScreen() {
                     true) ||
                     (section.key === 'pickup' && isCollector) ? (
                     <Pressable
-                      style={styles.saveBtn}
+                      style={[styles.saveBtn, submitting && { opacity: 0.65 }]}
+                      disabled={submitting}
                       onPress={() => {
                         if (section.key === 'contact') {
                           handleUpdateContact();
@@ -502,7 +514,7 @@ export function ProfileScreen() {
                         variant="bodyBold"
                         style={{ color: 'white' }}
                       >
-                        Save Changes
+                        {submitting ? 'Saving...' : 'Save Changes'}
                       </AppText>
                     </Pressable>
                   ) : null}

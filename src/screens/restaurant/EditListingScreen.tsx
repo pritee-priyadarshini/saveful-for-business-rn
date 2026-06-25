@@ -26,7 +26,7 @@ import {
   invalidateListingDetail,
   type ListingDetail,
 } from '../../services/foodListing.service';
-import { estimateMealsSaved, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
+import { estimateMealsSaved, estimateCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import {
   extractListingImages,
   getListingPickupAddress,
@@ -42,6 +42,7 @@ import {
   mergePeopleFoodItems,
   parseListingDate,
 } from '../../utils/listingFormPrefill';
+import { useSubmitLock } from '../../hooks/useSubmitLock';
 
 
 const { width, height } = Dimensions.get('window');
@@ -193,6 +194,7 @@ function EditPeopleListingForm({
   listingId: number;
   initialListing: ListingDetail;
 }) {
+  const { submitting, withLock } = useSubmitLock();
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FoodItem[]>(seedItems);
   const [customItem, setCustomItem] = useState('');
@@ -216,7 +218,7 @@ function EditPeopleListingForm({
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
   const estimatedMeals = estimateMealsSaved(totalQuantity);
-  const estimatedCO2 = Math.max(0, Math.round(totalQuantity * 4));
+  const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
   const hasSelectedAllergens = selectedAllergens.length > 0;
 
   useEffect(() => {
@@ -393,6 +395,8 @@ function EditPeopleListingForm({
   };
 
   const handleSaveChanges = async () => {
+    if (submitting) return;
+
     if (!confirmedSafe) {
       Alert.alert('Confirmation required', 'Please confirm this food is safe for donation.');
       return;
@@ -418,32 +422,34 @@ function EditPeopleListingForm({
       return;
     }
 
-    try {
-      await foodListingService.updateListing(listingId, {
-        foodItems: activeItems.map((item) => ({
-          category: item.name,
-          totalQtyKg: item.qty,
-          remainingQtyKg: item.qty,
-        })),
-        pickupAddress: location.trim(),
-        bestBefore: bestBeforeDate.toISOString(),
-        pickupFromTime: pickupFromDate.toISOString(),
-        pickupByTime: pickupToDate.toISOString(),
-        needsRefrigeration: storage === 'Fridge',
-        needsReheating: reheating === 'Yes',
-        containsAllergens: hasSelectedAllergens,
-        allergens: selectedAllergens,
-        storage,
-        reheating,
-        isSafeForDonation: true,
-      });
-      invalidateListingDetail(listingId);
-      Alert.alert('Updated', 'Listing updated successfully', [
-        { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
-      ]);
-    } catch (error: any) {
-      Alert.alert('Could not update listing', error?.response?.data?.message || 'Please try again.');
-    }
+    await withLock(async () => {
+      try {
+        await foodListingService.updateListing(listingId, {
+          foodItems: activeItems.map((item) => ({
+            category: item.name,
+            totalQtyKg: item.qty,
+            remainingQtyKg: item.qty,
+          })),
+          pickupAddress: location.trim(),
+          bestBefore: bestBeforeDate.toISOString(),
+          pickupFromTime: pickupFromDate.toISOString(),
+          pickupByTime: pickupToDate.toISOString(),
+          needsRefrigeration: storage === 'Fridge',
+          needsReheating: reheating === 'Yes',
+          containsAllergens: hasSelectedAllergens,
+          allergens: selectedAllergens,
+          storage,
+          reheating,
+          isSafeForDonation: true,
+        });
+        invalidateListingDetail(listingId);
+        Alert.alert('Updated', 'Listing updated successfully', [
+          { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
+        ]);
+      } catch (error: any) {
+        Alert.alert('Could not update listing', error?.response?.data?.message || 'Please try again.');
+      }
+    });
   };
 
   return (
@@ -909,11 +915,17 @@ function EditPeopleListingForm({
           </View>
         ) : null}
 
-        <Pressable style={peopleStyles.bottomButton} onPress={step === 3 ? handleSaveChanges : handleContinue}>
+        <Pressable
+          style={[peopleStyles.bottomButton, submitting && peopleStyles.bottomButtonDisabled]}
+          onPress={step === 3 ? handleSaveChanges : handleContinue}
+          disabled={submitting}
+        >
           <AppText variant="bodyBold" color={palette.white}>
-            {step === 3 ? 'SAVE CHANGES' : 'CONTINUE'}
+            {step === 3 ? (submitting ? 'SAVING...' : 'SAVE CHANGES') : 'CONTINUE'}
           </AppText>
-          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          {!submitting ? (
+            <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          ) : null}
         </Pressable>
       </View>
 
@@ -968,6 +980,7 @@ function EditFarmListingForm({
 }) {
   const { width: winWidth } = useWindowDimensions();
   const gridLayout = useMemo(() => getGridLayout(winWidth), [winWidth]);
+  const { submitting, withLock } = useSubmitLock();
 
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FarmItem[]>(farmSeedItems);
@@ -990,7 +1003,7 @@ function EditFarmListingForm({
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
-  const estimatedCO2 = Math.max(0, Math.round(totalQuantity * 4));
+  const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
 
   useEffect(() => {
     const data = initialListing;
@@ -1147,6 +1160,8 @@ function EditFarmListingForm({
   };
 
   const handleSaveChanges = async () => {
+    if (submitting) return;
+
     if (!confirmedSafe) {
       Alert.alert('Confirmation required', 'Please confirm this material is for livestock/agricultural use.');
       return;
@@ -1172,30 +1187,32 @@ function EditFarmListingForm({
       return;
     }
 
-    try {
-      await foodListingService.updateListing(listingId, {
-        foodItems: activeItems.map((item) => ({
-          category: item.name,
-          totalQtyKg: item.qty,
-          remainingQtyKg: item.qty,
-        })),
-        pickupAddress: location.trim(),
-        bestBefore: bestBeforeDate.toISOString(),
-        pickupFromTime: pickupFromDate.toISOString(),
-        pickupByTime: pickupToDate.toISOString(),
-        needsRefrigeration: selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
-        containsAllergens: selectedContaminants.length > 0,
-        storage: selectedStorage,
-        contaminants: selectedContaminants,
-        isSafeForDonation: false,
-      });
-      invalidateListingDetail(listingId);
-      Alert.alert('Updated', 'Listing updated successfully', [
-        { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
-      ]);
-    } catch (error: any) {
-      Alert.alert('Could not update listing', error?.response?.data?.message || 'Please try again.');
-    }
+    await withLock(async () => {
+      try {
+        await foodListingService.updateListing(listingId, {
+          foodItems: activeItems.map((item) => ({
+            category: item.name,
+            totalQtyKg: item.qty,
+            remainingQtyKg: item.qty,
+          })),
+          pickupAddress: location.trim(),
+          bestBefore: bestBeforeDate.toISOString(),
+          pickupFromTime: pickupFromDate.toISOString(),
+          pickupByTime: pickupToDate.toISOString(),
+          needsRefrigeration: selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
+          containsAllergens: selectedContaminants.length > 0,
+          storage: selectedStorage,
+          contaminants: selectedContaminants,
+          isSafeForDonation: false,
+        });
+        invalidateListingDetail(listingId);
+        Alert.alert('Updated', 'Listing updated successfully', [
+          { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
+        ]);
+      } catch (error: any) {
+        Alert.alert('Could not update listing', error?.response?.data?.message || 'Please try again.');
+      }
+    });
   };
 
   return (
@@ -1671,13 +1688,16 @@ function EditFarmListingForm({
 
         {/* BOTTOM BUTTON */}
         <Pressable
-          style={farmStyles.bottomButton}
+          style={[farmStyles.bottomButton, submitting && farmStyles.bottomButtonDisabled]}
           onPress={step === 3 ? handleSaveChanges : handleContinue}
+          disabled={submitting}
         >
           <AppText variant="bodyBold" color={palette.white}>
-            {step === 3 ? 'SAVE CHANGES' : 'CONTINUE'}
+            {step === 3 ? (submitting ? 'SAVING...' : 'SAVE CHANGES') : 'CONTINUE'}
           </AppText>
-          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          {!submitting ? (
+            <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+          ) : null}
         </Pressable>
       </View>
 
@@ -2287,6 +2307,9 @@ const peopleStyles = StyleSheet.create({
     justifyContent: 'center',
     gap: wp(2.5),
   },
+  bottomButtonDisabled: {
+    opacity: 0.65,
+  },
   iosPickerOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -2804,6 +2827,9 @@ const farmStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp(2.5),
+  },
+  bottomButtonDisabled: {
+    opacity: 0.65,
   },
 
   // ── iOS picker ────────────────────────────────────────────────────────────

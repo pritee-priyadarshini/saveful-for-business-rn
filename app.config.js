@@ -27,7 +27,7 @@ export default {
     },
 
     android: {
-      package: "com.savefulbusiness.app",
+      package: "com.saveful.business.app",
       adaptiveIcon: {
         foregroundImage: "./assets/intro/Saveful-for-Business-logo.png",
         backgroundColor: "#F6F4EE",

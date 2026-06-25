@@ -18,6 +18,7 @@ import { AppText } from '../../components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { CharityMemberRole, charityService } from '@/services/charity.service';
+import { useSubmitLock } from '@/hooks/useSubmitLock';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -49,6 +50,8 @@ export default function CharityManageAccessScreen() {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const { submitting, withLock } = useSubmitLock();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMembers();
@@ -144,6 +147,8 @@ export default function CharityManageAccessScreen() {
     }
   };
   const handleSubmit = async () => {
+    if (submitting) return;
+
     try {
       const finalRole =
         activeTab === 'driver' ? 'driver' : form.role;
@@ -170,31 +175,32 @@ export default function CharityManageAccessScreen() {
         locationId: locationId,
       };
 
-      if (editingId) {
-        await charityService.updateUser(Number(editingId), {
-          firstName: form.firstName,
-          lastName: form.lastName,
-          mobile: form.mobile,
+      await withLock(async () => {
+        if (editingId) {
+          await charityService.updateUser(Number(editingId), {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            mobile: form.mobile,
+          });
+
+          Alert.alert('Success', 'User updated');
+        } else {
+          await charityService.addMember(payload);
+          Alert.alert('Success', 'User added');
+        }
+
+        await fetchMembers();
+
+        setEditingId(null);
+        setForm({
+          firstName: '',
+          lastName: '',
+          email: '',
+          mobile: '',
+          password: '',
+          role: '',
         });
-
-        Alert.alert('Success', 'User updated');
-      } else {
-        await charityService.addMember(payload);
-        Alert.alert('Success', 'User added');
-      }
-
-      fetchMembers();
-
-      setEditingId(null);
-      setForm({
-        firstName: '',
-        lastName: '',
-        email: '',
-        mobile: '',
-        password: '',
-        role: '',
       });
-
     } catch (e: any) {
       Alert.alert(
         'Error',
@@ -221,11 +227,15 @@ export default function CharityManageAccessScreen() {
   };
 
   const handleDelete = async (id: string) => {
+    if (deletingId) return;
+    setDeletingId(id);
     try {
       await charityService.deleteUser(Number(id));
-      fetchMembers();
+      await fetchMembers();
     } catch {
       Alert.alert('Error', 'Delete failed');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -435,14 +445,16 @@ export default function CharityManageAccessScreen() {
           )}
 
           <Pressable
-            style={styles.addBtn}
+            style={[styles.addBtn, submitting && { opacity: 0.65 }]}
             onPress={handleSubmit}
+            disabled={submitting}
           >
             <AppText variant="bodyBold" style={styles.white}>
-              {editingId
+              {submitting
+                ? 'Saving...'
+                : editingId
                 ? 'Update'
-                : `+ Add ${activeTab === 'user' ? 'User' : 'Driver'}`
-              }
+                : `+ Add ${activeTab === 'user' ? 'User' : 'Driver'}`}
             </AppText>
           </Pressable>
         </View>
