@@ -111,6 +111,12 @@ export function AppNavigator() {
         trackingId: String(data.trackingId),
         source: data.source as 'restaurant' | 'charity' | 'farmer',
       });
+      return;
+    }
+    if (effectiveRole === 'restaurant_multi') {
+      navigationRef.current.navigate('ManageSites', undefined);
+    } else if (effectiveRole === 'charity_multi') {
+      navigationRef.current.navigate('MultiCharityManageSites', undefined);
     } else {
       navigationRef.current.navigate('Tabs', undefined);
     }
@@ -130,9 +136,14 @@ export function AppNavigator() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Once the user is authenticated, flush any notification that arrived before session restore.
+  // Flush pending notification when session is ready; clear it when user logs out.
   useEffect(() => {
-    if (!isAuthenticated || !pendingNotificationRef.current) return;
+    if (!isAuthenticated) {
+      // Prevent a notification queued before logout from navigating after a different user logs in.
+      pendingNotificationRef.current = null;
+      return;
+    }
+    if (!pendingNotificationRef.current) return;
     const payload = pendingNotificationRef.current;
     pendingNotificationRef.current = null;
     navigateFromNotification(payload);

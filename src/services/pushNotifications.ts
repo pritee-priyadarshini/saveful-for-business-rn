@@ -146,7 +146,9 @@ export function setupForegroundNotificationHandler(): void {
         content: {
           title: remoteMessage.notification.title ?? '',
           body: remoteMessage.notification.body ?? '',
-          data: remoteMessage.data,
+          // Stamp so addNotificationResponseReceivedListener can tell this apart from
+          // a Firebase remote notification tap (which goes through onNotificationOpenedApp).
+          data: { ...(remoteMessage.data ?? {}), _localNotif: '1' },
           sound: true,
         },
         trigger: null,
@@ -193,11 +195,15 @@ export async function setupNotificationOpenedHandler(
   });
 
   // Foreground tap: tap on a banner we displayed via scheduleNotificationAsync.
+  // Guard: only process locally-scheduled notifications (_localNotif marker).
+  // Firebase background/killed taps are handled exclusively by onNotificationOpenedApp above.
   const localNotifSub = Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = (response.notification.request.content.data ?? {}) as Record<string, string>;
+    if (!data._localNotif) return; // not a locally scheduled notification — ignore
     console.log('[Push] Foreground notification tapped:', response.notification.request.identifier);
     onOpen({
       messageId: response.notification.request.identifier,
-      data: (response.notification.request.content.data ?? {}) as Record<string, string>,
+      data,
       notification: {
         title: response.notification.request.content.title ?? undefined,
         body: response.notification.request.content.body ?? undefined,
