@@ -11,7 +11,7 @@ import {
     Dimensions,
     ScrollView,
 } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { OsmMapView } from '../../components/OsmMapView';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
@@ -69,7 +69,7 @@ const trackingData: TrackData[] = [
     {
         id: '1',
         source: 'charity',
-        listingStatus: 'Claimed',
+        listingStatus: 'CLAIMED',
         orderStatus: 'completed',
         restaurantName: 'Spice Route Kitchen',
         restaurantAddress: 'Patia Main Road, Bhubaneswar',
@@ -92,7 +92,7 @@ const trackingData: TrackData[] = [
     {
         id: '2',
         source: 'charity',
-        listingStatus: 'Partial claimed',
+        listingStatus: 'PARTIAL',
         orderStatus: 'driver_assigned',
         restaurantName: 'Biryani Box',
         restaurantAddress: 'Saheed Nagar, Bhubaneswar',
@@ -115,7 +115,7 @@ const trackingData: TrackData[] = [
     {
         id: 'listing-1',
         source: 'restaurant',
-        listingStatus: 'Claimed',
+        listingStatus: 'CLAIMED',
         orderStatus: 'enroute',
         restaurantName: 'Your Restaurant',
         restaurantAddress: 'Saheed Nagar, Bhubaneswar',
@@ -226,6 +226,9 @@ export default function DriverTrackingScreen() {
 
     const currentStep = getStepIndex(data.orderStatus);
 
+    const destination = { latitude: 20.315, longitude: 85.835 };
+    const routeStart = { latitude: 20.2961, longitude: 85.8245 };
+
     return (
         <Screen backgroundColor={palette.creme}>
             <ScrollView contentContainerStyle={styles.container}>
@@ -246,37 +249,16 @@ export default function DriverTrackingScreen() {
 
                 {/* MAP */}
                 <Card style={styles.mapCard}>
-                    <MapView
+                    <OsmMapView
                         style={styles.map}
-                        liteMode={true}
-                        initialRegion={{
-                            latitude: 20.2961,
-                            longitude: 85.8245,
-                            latitudeDelta: 0.05,
-                            longitudeDelta: 0.05,
-                        }}
-                    >
-                        <Marker coordinate={carCoordinate}>
-                            <MaterialCommunityIcons
-                                name="car-sports"
-                                size={34}
-                                color={palette.primary}
-                            />
-                        </Marker>
-
-                        <Marker coordinate={{ latitude: 20.315, longitude: 85.835 }}>
-                            <Ionicons name="flag" size={34} color={palette.middlegreen} />
-                        </Marker>
-
-                        <Polyline
-                            coordinates={[
-                                { latitude: 20.2961, longitude: 85.8245 },
-                                { latitude: 20.315, longitude: 85.835 },
-                            ]}
-                            strokeWidth={4}
-                            strokeColor={palette.primary}
-                        />
-                    </MapView>
+                        markers={[
+                            carCoordinate,
+                            destination,
+                        ]}
+                        polyline={[routeStart, destination]}
+                        initialCenter={routeStart}
+                        initialZoom={14}
+                    />
                 </Card>
 
                 {/* HORIZONTAL TRACKER */}

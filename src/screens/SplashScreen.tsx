@@ -17,7 +17,7 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
     <View style={styles.container}>
       <StatusBar hidden />
       <Image
-        source={require('../../assets/intro/splash_logo.png')}
+        source={require('../../assets/intro/splash.png')}
         style={styles.image}
         resizeMode="cover"
       />

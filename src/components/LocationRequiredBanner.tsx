@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, View, Dimensions } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
@@ -16,6 +16,7 @@ type Props = {
   onUseGps: () => void;
   onSearchAddress: () => void;
   onDismiss?: () => void;
+  gpsLoading?: boolean;
 };
 
 export function LocationRequiredBanner({
@@ -24,6 +25,7 @@ export function LocationRequiredBanner({
   onUseGps,
   onSearchAddress,
   onDismiss,
+  gpsLoading = false,
 }: Props) {
   return (
     <View style={styles.banner}>
@@ -41,9 +43,19 @@ export function LocationRequiredBanner({
       </AppText>
 
       <View style={styles.actions}>
-        <Pressable style={styles.gpsBtn} onPress={onUseGps}>
-          <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
-          <AppText style={styles.gpsBtnText}>Use My Location</AppText>
+        <Pressable
+          style={[styles.gpsBtn, gpsLoading && styles.gpsBtnDisabled]}
+          onPress={onUseGps}
+          disabled={gpsLoading}
+        >
+          {gpsLoading ? (
+            <ActivityIndicator size="small" color={palette.primary} />
+          ) : (
+            <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
+          )}
+          <AppText style={styles.gpsBtnText}>
+            {gpsLoading ? 'Getting location...' : 'Use My Location'}
+          </AppText>
         </Pressable>
 
         <Pressable style={styles.searchBtn} onPress={onSearchAddress}>
@@ -91,6 +103,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.primary,
     backgroundColor: palette.white,
+  },
+  gpsBtnDisabled: {
+    opacity: 0.7,
   },
   gpsBtnText: {
     color: palette.primary,

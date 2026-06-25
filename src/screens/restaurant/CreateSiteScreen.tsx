@@ -13,22 +13,22 @@ import {
     TouchableWithoutFeedback,
     Keyboard,
     Dimensions,
-    Linking,
     Modal,
     Animated,
     PanResponder,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { OsmMapView } from '../../components/OsmMapView';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
 import { sitesService } from '@/services/sites.service';
 import { InputField } from '@/components/InputField';
+import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
 
   const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -93,10 +93,11 @@ export default function CreateSiteScreen() {
     const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
     const [openSiteDropdown, setOpenSiteDropdown] = useState(false);
 
-    const [region, setRegion] = useState<any>(null);
-    const [marker, setMarker] = useState<any>(null);
+    const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
     const [selectedAddress, setSelectedAddress] = useState('');
     const [showPlacesSearch, setShowPlacesSearch] = useState(false);
+    const [gpsLoading, setGpsLoading] = useState(false);
 
     const MODAL_HEIGHT = height * 0.72;
     const slideAnim = useRef(new Animated.Value(height * 0.72)).current;
@@ -131,38 +132,55 @@ export default function CreateSiteScreen() {
         })
     ).current;
 
-    const goToCurrentLocation = async () => {
+    const applyMapLocation = async (
+        latitude: number,
+        longitude: number,
+        address?: string,
+        postcode?: string,
+    ) => {
+        setMapCenter({ latitude, longitude });
+        setMarker({ latitude, longitude });
+        setSiteForm((prev) => ({ ...prev, latitude, longitude }));
+
+        if (address) {
+            setSelectedAddress(address);
+            setSiteForm((prev) => ({
+                ...prev,
+                address,
+                postcode: postcode ?? prev.postcode,
+            }));
+            return;
+        }
+
+        const label = await reverseGeocodeAddress(latitude, longitude);
+        setSelectedAddress(label);
+
         try {
-            let permission = await Location.getForegroundPermissionsAsync();
-            if (permission.status !== 'granted') {
-                permission = await Location.requestForegroundPermissionsAsync();
+            const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+            if (places.length > 0) {
+                setSiteForm((prev) => ({
+                    ...prev,
+                    address: label,
+                    postcode: places[0].postalCode || prev.postcode,
+                }));
+            } else {
+                setSiteForm((prev) => ({ ...prev, address: label }));
             }
-            if (permission.status !== 'granted') {
-                Alert.alert(
-                    'Location Permission Required',
-                    'Please enable location permission from app settings.',
-                    [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Open Settings', onPress: () => Linking.openSettings() },
-                    ]
-                );
-                return;
-            }
-            const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-            const { latitude, longitude } = location.coords;
-            const newRegion = { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 };
-            setRegion(newRegion);
-            setMarker({ latitude, longitude });
-            setSiteForm((prev) => ({ ...prev, latitude, longitude }));
-            const address = await Location.reverseGeocodeAsync({ latitude, longitude });
-            if (address.length > 0) {
-                const place = address[0];
-                const formattedAddress = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
-                setSelectedAddress(formattedAddress);
-                setSiteForm((prev) => ({ ...prev, address: formattedAddress, postcode: place.postalCode || '' }));
-            }
-        } catch (err) {
-            Alert.alert('Error', 'Failed to fetch current location');
+        } catch {
+            setSiteForm((prev) => ({ ...prev, address: label }));
+        }
+    };
+
+    const goToCurrentLocation = async () => {
+        if (gpsLoading) return;
+
+        setGpsLoading(true);
+        try {
+            const location = await fetchCurrentLocation();
+            if (!location) return;
+            await applyMapLocation(location.latitude, location.longitude, location.address);
+        } finally {
+            setGpsLoading(false);
         }
     };
 
@@ -200,18 +218,14 @@ export default function CreateSiteScreen() {
 
             if (status === 'granted') {
                 const loc = await Location.getCurrentPositionAsync({});
-                setRegion({
+                setMapCenter({
                     latitude: loc.coords.latitude,
                     longitude: loc.coords.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
                 });
             } else {
-                setRegion({
+                setMapCenter({
                     latitude: 20.5937,
                     longitude: 78.9629,
-                    latitudeDelta: 5,
-                    longitudeDelta: 5,
                 });
             }
         })();
@@ -349,16 +363,11 @@ export default function CreateSiteScreen() {
                                                 onPress={(data, details = null) => {
                                                     const lat = details?.geometry?.location?.lat;
                                                     const lng = details?.geometry?.location?.lng;
-                                                    if (lat && lng) {
-                                                        const newRegion = { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 };
-                                                        setRegion(newRegion);
-                                                        setMarker({ latitude: lat, longitude: lng });
-                                                        setSiteForm((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+                                                    if (lat != null && lng != null) {
+                                                        const addr = details?.formatted_address || data.description;
+                                                        const postcode = details?.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name || '';
+                                                        applyMapLocation(lat, lng, addr, postcode);
                                                     }
-                                                    const addr = details?.formatted_address || data.description;
-                                                    const postcode = details?.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name || '';
-                                                    setSelectedAddress(addr);
-                                                    setSiteForm((prev) => ({ ...prev, address: addr, postcode }));
                                                     Keyboard.dismiss();
                                                 }}
                                                 query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
@@ -378,32 +387,16 @@ export default function CreateSiteScreen() {
 
                                         {/* MAP PREVIEW */}
                                         <View style={styles.modalMapContainer}>
-                                            {region ? (
-                                                <MapView
-                                                    style={styles.mapView}
-                                                    region={region}
-                                                    showsUserLocation
-                                                    onPress={async (e) => {
-                                                        const { latitude, longitude } = e.nativeEvent.coordinate;
-                                                        setMarker({ latitude, longitude });
-                                                        setSiteForm((prev) => ({ ...prev, latitude, longitude }));
-                                                        const res = await Location.reverseGeocodeAsync({ latitude, longitude });
-                                                        if (res.length > 0) {
-                                                            const place = res[0];
-                                                            const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
-                                                            setSelectedAddress(addr);
-                                                            setSiteForm((prev) => ({ ...prev, address: addr, postcode: place.postalCode || '' }));
-                                                        }
-                                                    }}
-                                                >
-                                                    {marker && <Marker coordinate={marker} />}
-                                                </MapView>
-                                            ) : (
-                                                <View style={styles.mapPlaceholder}>
-                                                    <Ionicons name="map-outline" size={normalize(36)} color="#ccc" />
-                                                    <AppText style={styles.mapPlaceholderText}>Search or tap to select a location</AppText>
-                                                </View>
-                                            )}
+                                            <OsmMapView
+                                                style={styles.mapView}
+                                                active={showPlacesSearch}
+                                                marker={marker}
+                                                selectable
+                                                initialCenter={mapCenter ?? undefined}
+                                                onLocationSelect={(latitude, longitude) => {
+                                                    applyMapLocation(latitude, longitude);
+                                                }}
+                                            />
                                         </View>
 
                                         {/* CONFIRM BUTTON */}
@@ -501,9 +494,15 @@ export default function CreateSiteScreen() {
 
                                 {/* LOCATION PICKER */}
                                 <View style={styles.locationPickerRow}>
-                                    <Pressable style={styles.locationPickerBtn} onPress={goToCurrentLocation}>
+                                    <Pressable
+                                        style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
+                                        onPress={goToCurrentLocation}
+                                        disabled={gpsLoading}
+                                    >
                                         <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
-                                        <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
+                                        <AppText style={styles.locationPickerBtnText}>
+                                            {gpsLoading ? 'Getting location...' : 'Use My Location'}
+                                        </AppText>
                                     </Pressable>
                                     <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
                                         <Ionicons name="search" size={normalize(16)} color={palette.white} />
@@ -528,32 +527,15 @@ export default function CreateSiteScreen() {
                                 <AppText style={styles.mapHintText}>Tap on map to fine-tune the pin</AppText>
 
                                 <View style={styles.mapContainer}>
-                                    {region ? (
-                                        <MapView
-                                            style={styles.mapView}
-                                            region={region}
-                                            showsUserLocation
-                                            onPress={async (e) => {
-                                                const { latitude, longitude } = e.nativeEvent.coordinate;
-                                                setMarker({ latitude, longitude });
-                                                setSiteForm((prev) => ({ ...prev, latitude, longitude }));
-                                                const res = await Location.reverseGeocodeAsync({ latitude, longitude });
-                                                if (res.length > 0) {
-                                                    const place = res[0];
-                                                    const addr = [place.name, place.street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
-                                                    setSelectedAddress(addr);
-                                                    setSiteForm((prev) => ({ ...prev, address: addr, postcode: place.postalCode || '' }));
-                                                }
-                                            }}
-                                        >
-                                            {marker && <Marker coordinate={marker} />}
-                                        </MapView>
-                                    ) : (
-                                        <View style={styles.mapPlaceholder}>
-                                            <Ionicons name="map-outline" size={normalize(32)} color="#ccc" />
-                                            <AppText style={styles.mapPlaceholderText}>Select a location to preview map</AppText>
-                                        </View>
-                                    )}
+                                    <OsmMapView
+                                        style={styles.mapView}
+                                        marker={marker}
+                                        selectable
+                                        initialCenter={mapCenter ?? undefined}
+                                        onLocationSelect={(latitude, longitude) => {
+                                            applyMapLocation(latitude, longitude);
+                                        }}
+                                    />
                                 </View>
 
                                 <Pressable style={styles.createBtn} onPress={handleCreateSite}>
@@ -749,6 +731,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: palette.primary,
         backgroundColor: palette.primary + '15',
+    },
+
+    locationPickerBtnDisabled: {
+        opacity: 0.7,
     },
 
     locationPickerBtnSearch: {

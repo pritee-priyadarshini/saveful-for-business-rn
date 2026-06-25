@@ -44,6 +44,8 @@ export function CharityDiscoverScreen() {
     setModalVisible,
     saving,
     capturedAddress,
+    gpsLoading,
+    useGpsLocation,
     saveLocation,
   } = useOrganizationLocation();
   const listRef = useRef<FlatList>(null);
@@ -190,9 +192,10 @@ export function CharityDiscoverScreen() {
       {showBanner && (
         <LocationRequiredBanner
           description="Share your charity location for better pickup matching."
-          onUseGps={() => setModalVisible(true)}
+          onUseGps={useGpsLocation}
           onSearchAddress={() => setModalVisible(true)}
           onDismiss={() => setBannerClosed(true)}
+          gpsLoading={gpsLoading}
         />
       )}
 

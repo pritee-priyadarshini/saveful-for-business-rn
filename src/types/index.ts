@@ -230,3 +230,17 @@ export type SiteDelivery = DriverDelivery & {
   restaurantSiteId: string;
   charitySiteId: string;
 };
+
+export type Listing = {
+  id: string;
+  foodName: string;
+  quantity: string;
+  category: string;
+  status: ListingStatus;
+  pickupWindow: string;
+  address: string;
+  distance: string;
+  notes: string;
+  charityName?: string;
+  restaurantName?: string;
+};

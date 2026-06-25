@@ -11,6 +11,7 @@ import {
   Linking,
   Keyboard,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
@@ -30,6 +31,7 @@ import { mapRole } from '@/utils/roleMapper';
 import { spacing } from '@/theme/spacing';
 import { COUNTRY_CODES, findCountryByIso, appendSignupMobileFields } from '@/data/countryCodes';
 import type { CountryCode } from '@/data/countryCodes';
+import { fetchCurrentLocation } from '@/utils/currentLocation';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -301,12 +303,27 @@ export function AuthScreen() {
 
   const [isChecked, setIsChecked] = useState(false);
   const [showPlacesSearch, setShowPlacesSearch] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [mobileFocused, setMobileFocused] = useState(false);
   const mobileFieldRef = useRef<View>(null);
 
   const openLocationModal = () => setShowPlacesSearch(true);
+
+  const handleUseGpsLocation = async () => {
+    if (gpsLoading) return;
+
+    setGpsLoading(true);
+    try {
+      const location = await fetchCurrentLocation();
+      if (!location) return;
+
+      await handleAuthLocationConfirm(location);
+    } finally {
+      setGpsLoading(false);
+    }
+  };
 
   // const toggle = (section: string) => {
   //   setOpenSections((prev) =>
@@ -1195,9 +1212,19 @@ export function AuthScreen() {
                   </AppText>
 
                   <View style={styles.locationPickerRow}>
-                    <Pressable style={styles.locationPickerBtn} onPress={openLocationModal}>
-                      <Ionicons name="locate" size={normalize(14)} color={palette.kale} />
-                      <AppText style={styles.locationPickerBtnText}>Use My Location</AppText>
+                    <Pressable
+                      style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
+                      onPress={handleUseGpsLocation}
+                      disabled={gpsLoading}
+                    >
+                      {gpsLoading ? (
+                        <ActivityIndicator size="small" color={palette.kale} />
+                      ) : (
+                        <Ionicons name="locate" size={normalize(14)} color={palette.kale} />
+                      )}
+                      <AppText style={styles.locationPickerBtnText}>
+                        {gpsLoading ? 'Getting location...' : 'Use My Location'}
+                      </AppText>
                     </Pressable>
 
                     <Pressable
@@ -1248,9 +1275,19 @@ export function AuthScreen() {
                   </AppText>
 
                   <View style={styles.locationPickerRow}>
-                    <Pressable style={styles.locationPickerBtn} onPress={openLocationModal}>
-                      <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
-                      <AppText style={styles.locationPickerBtnText}>Use My Location </AppText>
+                    <Pressable
+                      style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
+                      onPress={handleUseGpsLocation}
+                      disabled={gpsLoading}
+                    >
+                      {gpsLoading ? (
+                        <ActivityIndicator size="small" color={palette.primary} />
+                      ) : (
+                        <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
+                      )}
+                      <AppText style={styles.locationPickerBtnText}>
+                        {gpsLoading ? 'Getting location...' : 'Use My Location'}
+                      </AppText>
                     </Pressable>
 
                     <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openLocationModal}>
@@ -1669,6 +1706,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.kale,
     backgroundColor: palette.white,
+  },
+
+  locationPickerBtnDisabled: {
+    opacity: 0.7,
   },
 
   locationPickerBtnSearch: {

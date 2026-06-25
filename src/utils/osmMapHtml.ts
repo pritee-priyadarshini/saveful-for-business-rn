@@ -40,6 +40,7 @@ export const OSM_MAP_HTML = `<!DOCTYPE html>
     var map = null;
     var marker = null;
     var markerGroup = null;
+    var polylineLayer = null;
     var selectable = false;
 
     function postToRn(payload) {
@@ -117,6 +118,27 @@ export const OSM_MAP_HTML = `<!DOCTYPE html>
       }
     }
 
+    function setPolyline(points) {
+      ensureMap();
+
+      if (polylineLayer) {
+        map.removeLayer(polylineLayer);
+        polylineLayer = null;
+      }
+
+      if (!points || !points.length) return;
+
+      var latLngs = points.map(function (item) {
+        return [item.lat, item.lng];
+      });
+
+      polylineLayer = L.polyline(latLngs, {
+        color: '#2F6B2F',
+        weight: 4,
+        opacity: 0.85,
+      }).addTo(map);
+    }
+
     window.handleRnMessage = function (message) {
       ensureMap();
 
@@ -139,6 +161,11 @@ export const OSM_MAP_HTML = `<!DOCTYPE html>
 
       if (message.type === 'setMarkers') {
         setMarkers(message.markers || []);
+        return;
+      }
+
+      if (message.type === 'setPolyline') {
+        setPolyline(message.points || []);
         return;
       }
 

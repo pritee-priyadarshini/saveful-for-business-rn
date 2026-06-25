@@ -10,12 +10,14 @@ import {
   normalizeAuthProfile,
   profileHasCoordinates,
 } from '../utils/coordinates';
+import { fetchCurrentLocation } from '../utils/currentLocation';
 
 export function useOrganizationLocation() {
   const { authUser, setAuthUser } = useAppContext();
   const [bannerClosed, setBannerClosed] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
   const [capturedAddress, setCapturedAddress] = useState('');
 
   const profile = normalizeAuthProfile(authUser);
@@ -117,6 +119,20 @@ export function useOrganizationLocation() {
     }
   };
 
+  const useGpsLocation = async () => {
+    if (gpsLoading || saving) return;
+
+    setGpsLoading(true);
+    try {
+      const location = await fetchCurrentLocation();
+      if (!location) return;
+
+      await saveLocation(location.latitude, location.longitude, location.address);
+    } finally {
+      setGpsLoading(false);
+    }
+  };
+
   return {
     hasLocation,
     showBanner,
@@ -124,6 +140,8 @@ export function useOrganizationLocation() {
     modalVisible,
     setModalVisible,
     saving,
+    gpsLoading,
+    useGpsLocation,
     capturedAddress,
     saveLocation,
   };

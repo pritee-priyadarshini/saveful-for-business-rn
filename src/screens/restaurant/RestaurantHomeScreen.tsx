@@ -38,6 +38,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
     setModalVisible,
     saving,
     capturedAddress,
+    gpsLoading,
+    useGpsLocation,
     saveLocation,
   } = useOrganizationLocation();
   const firstName = currentProfile.name?.split(' ')[0] || 'User';
@@ -149,9 +151,10 @@ export function RestaurantHomeScreen({ navigation }: any) {
         {showBanner && (
           <LocationRequiredBanner
             description="Set your business location so charities can find your surplus listings and pickups work correctly."
-            onUseGps={() => setModalVisible(true)}
+            onUseGps={useGpsLocation}
             onSearchAddress={() => setModalVisible(true)}
             onDismiss={() => setBannerClosed(true)}
+            gpsLoading={gpsLoading}
           />
         )}
 

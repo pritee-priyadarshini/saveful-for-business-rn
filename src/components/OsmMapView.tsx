@@ -13,6 +13,7 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   marker?: OsmMapCoordinate | null;
   markers?: OsmMapCoordinate[];
+  polyline?: OsmMapCoordinate[];
   selectable?: boolean;
   active?: boolean;
   initialCenter?: OsmMapCoordinate;
@@ -26,6 +27,7 @@ export function OsmMapView({
   style,
   marker = null,
   markers = [],
+  polyline = [],
   selectable = false,
   active = true,
   initialCenter = DEFAULT_CENTER,
@@ -51,6 +53,15 @@ export function OsmMapView({
           lng: item.longitude,
         })),
       });
+      if (polyline.length > 0) {
+        postMessage({
+          type: 'setPolyline',
+          points: polyline.map((item) => ({
+            lat: item.latitude,
+            lng: item.longitude,
+          })),
+        });
+      }
       return;
     }
 
@@ -62,7 +73,17 @@ export function OsmMapView({
         fly: true,
       });
     }
-  }, [marker, markers, postMessage]);
+
+    if (polyline.length > 0) {
+      postMessage({
+        type: 'setPolyline',
+        points: polyline.map((item) => ({
+          lat: item.latitude,
+          lng: item.longitude,
+        })),
+      });
+    }
+  }, [marker, markers, polyline, postMessage]);
 
   useEffect(() => {
     syncMapState();

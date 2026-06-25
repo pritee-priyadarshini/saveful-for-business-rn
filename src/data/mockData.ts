@@ -398,4 +398,6 @@ export const demoRoleUsers: Record<UserRole, string> = {
   restaurant_multi: 'u2',
   charity_single: 'u4',
   charity_multi: 'u5',
+  farmer: 'u6',
+  farm_business: 'u7',
 };

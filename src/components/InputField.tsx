@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, TextInput, View, Pressable, FocusEvent } from 'react-native';
+import { KeyboardTypeOptions, StyleSheet, TextInput, View, Pressable, FocusEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
@@ -12,8 +12,8 @@ type LabelVariant = keyof typeof typography;
 type InputFieldProps = {
   label: string;
   placeholder?: string;
-  value?: string; 
-  onChangeText?: (value: string) => void; 
+  value?: string;
+  onChangeText?: (value: string) => void;
   editable?: boolean;
   multiline?: boolean;
   secureTextEntry?: boolean;
@@ -22,13 +22,16 @@ type InputFieldProps = {
   optional?: boolean;
   labelVariant?: LabelVariant;
   onFieldFocus?: (field: View) => void;
+  keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCorrect?: boolean;
 };
 
 export function InputField({
   label,
   placeholder,
-  value = '', 
-  onChangeText = () => {}, 
+  value = '',
+  onChangeText = () => {},
   editable,
   multiline,
   secureTextEntry,
@@ -37,6 +40,9 @@ export function InputField({
   optional = false,
   labelVariant = 'bodyBold',
   onFieldFocus,
+  keyboardType,
+  autoCapitalize,
+  autoCorrect,
 }: InputFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<View>(null);
@@ -78,6 +84,9 @@ export function InputField({
           onChangeText={onChangeText}
           onFocus={handleFocus}
           onBlur={() => setIsFocused(false)}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
         />
 
         {/* 👁 Eye icon */}

@@ -1,17 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Dimensions,
   Keyboard,
-  Linking,
   Modal,
   PanResponder,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
-import * as Location from 'expo-location';
+
 import { Ionicons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
@@ -19,6 +17,7 @@ import { AppText } from './AppText';
 import { OsmMapView } from './OsmMapView';
 import { palette } from '../theme/colors';
 import { GOOGLE_PLACES_API_KEY } from '@/config';
+import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -112,48 +111,14 @@ export function LocationSetupModal({
       return;
     }
 
-    try {
-      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (places.length > 0) {
-        const place = places[0];
-        const label = [place.name, place.street, place.city, place.region, place.postalCode]
-          .filter(Boolean)
-          .join(', ');
-        setSelectedAddress(label || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-      } else {
-        setSelectedAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-      }
-    } catch {
-      setSelectedAddress(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-    }
+    const label = await reverseGeocodeAddress(latitude, longitude);
+    setSelectedAddress(label);
   };
 
   const handleGpsLocation = async () => {
-    try {
-      let permission = await Location.getForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        permission = await Location.requestForegroundPermissionsAsync();
-      }
-
-      if (permission.status !== 'granted') {
-        Alert.alert(
-          'Location Permission Required',
-          'Please enable location permission from app settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          ],
-        );
-        return;
-      }
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      await applyCoords(position.coords.latitude, position.coords.longitude);
-    } catch {
-      Alert.alert('Location Error', 'Unable to get your location. Please try again.');
-    }
+    const location = await fetchCurrentLocation();
+    if (!location) return;
+    await applyCoords(location.latitude, location.longitude, location.address);
   };
 
   const handleConfirm = async () => {
