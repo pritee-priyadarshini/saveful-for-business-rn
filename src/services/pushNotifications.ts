@@ -27,6 +27,7 @@ let foregroundUnsubscribe: (() => void) | null = null;
 let tapUnsubscribe: (() => void) | null = null;
 let appStateUnsubscribe: (() => void) | null = null;
 let permissionSettingsAlertShown = false;
+let tokenRegistrationInFlight = false;
 
 function isPermissionGranted(
   permissions: { granted?: boolean; status?: string },
@@ -185,6 +186,12 @@ export async function registerDeviceToken(
     return;
   }
 
+  if (tokenRegistrationInFlight) {
+    console.log('[Push] Token registration already in progress, skipping duplicate call');
+    return;
+  }
+
+  tokenRegistrationInFlight = true;
   try {
     const { default: messaging } =
       require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
@@ -213,6 +220,8 @@ export async function registerDeviceToken(
     }
   } catch (error) {
     console.log('[Push] Device token registration failed', error);
+  } finally {
+    tokenRegistrationInFlight = false;
   }
 }
 
