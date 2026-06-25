@@ -28,6 +28,7 @@ import { AppText } from '../../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
 import { sitesService } from '@/services/sites.service';
+import { InputField } from '@/components/InputField';
 
   const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -304,8 +305,8 @@ export default function CreateSiteScreen() {
     return (
         <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={20}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={10}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <Screen backgroundColor={palette.creme}>
@@ -635,17 +636,18 @@ export default function CreateSiteScreen() {
                                     { key: 'phoneNumber', label: 'Phone (Optional)' },
                                 ].map((field: any) => (
                                     <View key={field.key} style={styles.fieldWrapper}>
-                                        <AppText style={styles.label}>{field.label}</AppText>
-
-                                        <TextInput
-                                            style={styles.inputWrapper}
-                                            secureTextEntry={field.key === 'password'}
-                                            keyboardType={field.key === 'phoneNumber' ? 'number-pad' : 'default'}
-                                            maxLength={field.key === 'phoneNumber' ? 10 : undefined}
+                                        <InputField
+                                            label={field.label}
                                             value={(managerForm as any)[field.key]}
                                             onChangeText={(v) =>
-                                                setManagerForm({ ...managerForm, [field.key]: v })
+                                                setManagerForm({
+                                                    ...managerForm,
+                                                    [field.key]: v,
+                                                })
                                             }
+                                            secureTextEntry={field.key === 'password'}
+                                            isPassword={field.key === 'password'}
+                                            editable={true}
                                         />
                                     </View>
                                 ))}
