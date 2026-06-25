@@ -54,8 +54,6 @@ export const notificationsService = {
   unregisterAllTokens: () =>
     api.delete('/notifications/tokens/all'),
 
-  // ── Admin ─────────────────────────────────────────────────────────────────
-
   /** Queue a notification for delivery. Platform admin only. */
   send: (data: SendNotificationPayload) =>
     api.post('/notifications/send', data),
