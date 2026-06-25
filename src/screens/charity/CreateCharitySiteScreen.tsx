@@ -35,6 +35,7 @@ import { spacing } from '@/theme/spacing';
 
 import { CharityMemberRole, charityService } from '@/services/charity.service';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
+import { InputField } from '@/components/InputField';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -735,29 +736,17 @@ export default function CreateCharitySiteScreen() {
                                         key={field.key}
                                         style={styles.fieldWrapper}
                                     >
-                                        <AppText style={styles.label}>
-                                            {field.label}
-                                        </AppText>
-
-                                        <TextInput
-                                            style={styles.inputWrapper}
+                                        <InputField
+                                            label={field.label}
+                                            value={(managerForm as any)[field.key]}
+                                            onChangeText={(v) =>
+                                                setManagerForm({
+                                                    ...managerForm,
+                                                    [field.key]: v,
+                                                })
+                                            }
+                                            isPassword={field.key === 'password'}
                                             secureTextEntry={field.key === 'password'}
-                                            value={
-                                                (managerForm as any)[
-                                                field.key
-                                                ]
-                                            }
-                                            onChangeText={(
-                                                v
-                                            ) =>
-                                                setManagerForm(
-                                                    {
-                                                        ...managerForm,
-                                                        [field.key]:
-                                                            v,
-                                                    }
-                                                )
-                                            }
                                         />
                                     </View>
                                 ))}
