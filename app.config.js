@@ -1,5 +1,7 @@
 const { existsSync } = require('fs');
 
+const withAndroidFirebaseNotificationManifest = require('./plugins/withAndroidFirebaseNotificationManifest');
+
 const GOOGLE_SERVICES_ANDROID = './google-services.json';
 const GOOGLE_SERVICES_IOS = './GoogleService-Info.plist';
 
@@ -97,7 +99,6 @@ export default {
       "@react-native-community/datetimepicker",
       "expo-secure-store",
       "expo-font",
-      ...firebasePlugins,
       [
         "expo-notifications",
         {
@@ -106,6 +107,8 @@ export default {
           defaultChannel: "default",
         },
       ],
+      ...firebasePlugins,
+      ...(includeFirebase ? [withAndroidFirebaseNotificationManifest] : []),
       [
         "expo-location",
         {
