@@ -28,6 +28,7 @@ import { palette } from '@/theme/colors';
 import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -239,6 +240,11 @@ export function ProfileScreen() {
       ],
     },
     {
+      key: 'notifications',
+      title: 'Notifications',
+      fields: [],
+    },
+    {
       key: 'business',
       title: isCharity ? 'Charity Details' : isFarmerConsumer ? 'Farm Details' : 'Business Details',
       fields: isCollector
@@ -382,6 +388,8 @@ export function ProfileScreen() {
                       </View>
                     </>
                   )}
+
+                  {section.key === 'notifications' && <NotificationPermissionSettings />}
 
                   {section.key === 'business' && (
                     <>

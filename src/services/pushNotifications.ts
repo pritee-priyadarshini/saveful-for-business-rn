@@ -130,6 +130,68 @@ export async function ensureNotificationPermission(
   return true;
 }
 
+export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined' | 'unavailable';
+
+export type NotificationPermissionState = {
+  supported: boolean;
+  firebaseEnabled: boolean;
+  granted: boolean;
+  status: NotificationPermissionStatus;
+  canAskAgain: boolean;
+};
+
+export function isPushSupportedOnDevice(): boolean {
+  return (Platform.OS === 'ios' || Platform.OS === 'android') && !IS_EXPO_GO;
+}
+
+export async function readNotificationPermissionState(): Promise<NotificationPermissionState> {
+  if (!isPushSupportedOnDevice()) {
+    return {
+      supported: false,
+      firebaseEnabled: FIREBASE_ENABLED,
+      granted: false,
+      status: 'unavailable',
+      canAskAgain: false,
+    };
+  }
+
+  const Notifications = getNotificationsModule();
+  const permissions = await Notifications.getPermissionsAsync();
+  const granted = isPermissionGranted(permissions);
+
+  let status: NotificationPermissionStatus = 'undetermined';
+  if (granted) {
+    status = 'granted';
+  } else if (permissions.status === 'denied') {
+    status = 'denied';
+  }
+
+  return {
+    supported: true,
+    firebaseEnabled: FIREBASE_ENABLED,
+    granted,
+    status,
+    canAskAgain: permissions.canAskAgain !== false,
+  };
+}
+
+export async function requestNotificationPermissionFromSettings(): Promise<NotificationPermissionState> {
+  if (!isPushSupportedOnDevice()) {
+    return readNotificationPermissionState();
+  }
+
+  const granted = await ensureNotificationPermission({ prompt: true });
+  if (granted) {
+    await registerDeviceToken({ prompt: false });
+  }
+
+  return readNotificationPermissionState();
+}
+
+export function openNotificationSystemSettings(): void {
+  Linking.openSettings();
+}
+
 export function setupPushPermissionRetryOnAppFocus(): void {
   if (IS_EXPO_GO || !FIREBASE_ENABLED || appStateUnsubscribe) return;
 

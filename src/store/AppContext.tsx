@@ -12,14 +12,7 @@ import { UserProfile } from '../types';
 import { AppContextValue } from './types';
 import { authService } from '../services/auth.service';
 import { setUnauthorizedHandler } from '../services/api';
-import {
-  setupForegroundNotificationHandler,
-  teardownForegroundNotificationHandler,
-  setupPushPermissionRetryOnAppFocus,
-  teardownPushPermissionRetryOnAppFocus,
-  registerDeviceToken,
-  unregisterDeviceToken,
-} from '../services/pushNotifications';
+import { useNotificationsStore } from './notificationsStore';
 
 import { useAuthStore } from './authStore';
 import { useRegistrationStore } from './registrationStore';
@@ -93,12 +86,13 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    registerDeviceToken({ prompt: true });
-    setupForegroundNotificationHandler();
-    setupPushPermissionRetryOnAppFocus();
+
+    const notificationsStore = useNotificationsStore.getState();
+    void notificationsStore.registerDeviceToken({ prompt: true });
+    notificationsStore.setupPushHandlers();
+
     return () => {
-      teardownForegroundNotificationHandler();
-      teardownPushPermissionRetryOnAppFocus();
+      useNotificationsStore.getState().teardownPushHandlers();
     };
   }, [isAuthenticated]);
 
@@ -188,8 +182,9 @@ export function AppProvider({ children }: PropsWithChildren) {
       resetForms,
 
       logout: async () => {
-        teardownForegroundNotificationHandler();
-        await unregisterDeviceToken();
+        const notificationsStore = useNotificationsStore.getState();
+        notificationsStore.teardownPushHandlers();
+        await notificationsStore.unregisterDeviceToken();
         await authStoreLogout();
         resetForms();
         resetAllDataStores();
