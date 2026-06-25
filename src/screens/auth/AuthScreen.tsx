@@ -539,7 +539,7 @@ export function AuthScreen() {
       } else {
         form.append('firstName', charityForm.firstName);
         form.append('lastName', charityForm.lastName);
-        form.append('email', charityForm.email);
+        form.append('email', charityForm.email.trim().toLowerCase());
         form.append('password', charityForm.password);
         appendSignupMobileFields(form, charityForm);
 
@@ -568,11 +568,11 @@ export function AuthScreen() {
         await authService.registerCharity(form);
       }
 
-      const emailForVerification = isFarmer
+      const emailForVerification = (isFarmer
         ? farmerForm.email
         : isRestaurant
         ? restaurantForm.email
-        : charityForm.email;
+        : charityForm.email).trim().toLowerCase();
 
       navigation.navigate('EmailVerification', { email: emailForVerification });
     } catch (error: unknown) {
@@ -711,6 +711,10 @@ export function AuthScreen() {
       }
     } else {
       if (!charityForm.postcodes.trim()) return 'Please enter your postcode.';
+
+      if (!charityForm.latitude.trim() || !charityForm.longitude.trim()) {
+        return 'Please set your charity location before creating your account.';
+      }
 
       const radius = charityForm.pickupRadius.trim();
       if (radius && (Number.isNaN(Number(radius)) || Number(radius) <= 0)) {
@@ -1271,7 +1275,6 @@ export function AuthScreen() {
 
                   <AppText variant="caption" style={styles.locationHelpText}>
                     Set your charity's location for better pickup matching.
-                    You can skip this and add it later from your dashboard.
                   </AppText>
 
                   <View style={styles.locationPickerRow}>

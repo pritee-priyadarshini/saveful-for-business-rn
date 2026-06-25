@@ -20,6 +20,10 @@ import { palette } from '../../theme/colors';
 import { useAppContext } from '@/store/AppContext';
 import { authService } from '@/services/auth.service';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import {
+  buildAuthUserFromProfile,
+  resolveUserRole,
+} from '@/utils/authSession';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -39,6 +43,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
     charityForm,
     farmerForm,
     setAuthUser,
+    setRole,
   } = useAppContext();
 
   const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
@@ -60,8 +65,10 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       setLoading(true);
 
       const enteredOtp = otp.join('');
-      const email = emailFromRoute
-        || (isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email);
+      const email = (
+        emailFromRoute
+        || (isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email)
+      ).trim().toLowerCase();
 
       if (!email) {
         Alert.alert('Missing email', 'Please enter your email to verify.');
@@ -75,23 +82,13 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       await SecureStore.setItemAsync('accessToken', data.accessToken);
 
       const profileRes = await authService.profile();
-      const profile = profileRes.data as any;
+      const authUser = buildAuthUserFromProfile(
+        profileRes.data,
+        data.accessToken,
+      );
 
-      setAuthUser({
-        ...profile.user,
-        platformRole: profile.user.platformRole || 'ORG_USER',
-        accessToken: data.accessToken,
-        orgType: profile.organisation?.type,
-        orgRole: profile.role?.orgRole,
-        siteRole: profile.role?.siteRole,
-        profile: {
-          user: profile.user,
-          organisation: profile.organisation,
-          subscription: profile.subscription,
-          sites: profile.sites || [],
-          role: profile.role,
-        },
-      });
+      setRole(resolveUserRole(authUser));
+      setAuthUser(authUser);
 
       setShowSuccess(true);
     } catch (error: unknown) {

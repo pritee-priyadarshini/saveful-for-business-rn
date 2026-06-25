@@ -38,6 +38,10 @@ import {
     showSuccessAlert,
 } from '@/utils/apiError';
 import { isAxiosError } from 'axios';
+import {
+    buildAuthUserFromProfile,
+    resolveUserRole,
+} from '@/utils/authSession';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -48,7 +52,7 @@ const normalize = (size: number) => {
 };
 
 export function SignInScreen() {
-    const { setAuthUser } = useAppContext();
+    const { setAuthUser, setRole } = useAppContext();
 
     const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
 
@@ -141,17 +145,19 @@ export function SignInScreen() {
 
             await SecureStore.setItemAsync('accessToken', data.accessToken);
 
-            const profileRes = await authService.profile();
-            const profile = profileRes.data;
-
-            setAuthUser({
-                ...profile.user,
-                accessToken: data.accessToken,
-                orgType: profile.organisation?.type,
-                orgRole: profile.role?.orgRole,
-                siteRole: profile.role?.siteRole,
-                profile: profile,
-            });
+            try {
+                const profileRes = await authService.profile();
+                const authUser = buildAuthUserFromProfile(
+                    profileRes.data,
+                    data.accessToken,
+                    data.siteAccess,
+                );
+                setRole(resolveUserRole(authUser));
+                setAuthUser(authUser);
+            } catch (profileError) {
+                await SecureStore.deleteItemAsync('accessToken');
+                throw profileError;
+            }
 
         } catch (error: unknown) {
             const status = isAxiosError(error) ? error.response?.status : undefined;

@@ -21,6 +21,10 @@ import {
 
 import { useAuthStore } from './authStore';
 import { useRegistrationStore } from './registrationStore';
+import {
+  buildAuthUserFromProfile,
+  resolveUserRole,
+} from '@/utils/authSession';
 import { resetAllDataStores } from './index';
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -58,16 +62,12 @@ export function AppProvider({ children }: PropsWithChildren) {
         const token = await SecureStore.getItemAsync('accessToken');
         if (token) {
           const profileRes = await authService.profile();
-          const profile = profileRes.data as any;
-
-          setAuthUser({
-            ...profile.user,
-            accessToken: token,
-            orgType: profile.organisation?.type,
-            orgRole: profile.role?.orgRole,
-            siteRole: profile.role?.siteRole,
-            profile: profile,
-          });
+          const authUser = buildAuthUserFromProfile(
+            profileRes.data,
+            token,
+          );
+          setRole(resolveUserRole(authUser));
+          setAuthUser(authUser);
         }
       } catch (error) {
         console.log('SESSION RESTORE ERROR', error);
@@ -98,46 +98,10 @@ export function AppProvider({ children }: PropsWithChildren) {
     };
   }, [isAuthenticated]);
 
-  const resolvedRole = useMemo(() => {
-    if (!authUser) return selectedRole;
-
-    const orgType = authUser.orgType?.toUpperCase();
-    const orgRole = authUser.orgRole?.toUpperCase();
-    const siteRole = authUser.siteRole?.toUpperCase();
-
-    if (orgType === 'BUSINESS_MULTI') {
-      if (orgRole === 'SUPER_ADMIN') return 'restaurant_multi';
-      if (siteRole === 'SITE_ADMIN' || siteRole === 'STAFF') return 'restaurant_single';
-      return 'restaurant_multi';
-    }
-    if (orgType === 'BUSINESS_SINGLE') return 'restaurant_single';
-
-    if (orgType === 'CHARITY_MULTI') {
-      if (
-        orgRole === 'SUPER_ADMIN' ||
-        orgRole === 'HEAD_OFFICE_ADMIN' ||
-        orgRole === 'HEAD_OFFICE'
-      ) {
-        return 'charity_multi';
-      }
-      if (
-        siteRole === 'SITE_ADMIN' ||
-        siteRole === 'LOCATION_ADMIN' ||
-        siteRole === 'TEAM_MEMBER' ||
-        siteRole === 'STAFF'
-      ) {
-        return 'charity_single';
-      }
-      return 'charity_multi';
-    }
-    if (orgType === 'CHARITY_SINGLE') return 'charity_single';
-
-    if (orgType === 'FARMER_PRODUCER') return 'farm_business';
-    if (orgType === 'FARMER_CONSUMER') return 'farmer';
-    if (orgType === 'FARMER') return 'farmer';
-
-    return selectedRole;
-  }, [authUser, selectedRole]);
+  const resolvedRole = useMemo(
+    () => resolveUserRole(authUser, selectedRole),
+    [authUser, selectedRole],
+  );
 
   const value = useMemo<AppContextValue>(() => {
     const isBusinessLocationUser =

@@ -5,6 +5,9 @@ web-build
 *.log
 .env.local
 
+android/
+ios/
+
 .expo-shared/
 coverage/
 .metro-cache/

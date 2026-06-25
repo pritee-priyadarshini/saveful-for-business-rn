@@ -35,33 +35,48 @@ const firebasePlugins = includeFirebase
 
 if (!includeFirebase && process.env.EAS_BUILD) {
   console.warn(
-    '[app.config] Firebase plugins skipped — add google-services.json (Android) and/or GoogleService-Info.plist (iOS) to enable push.',
+    '[app.config] Firebase config plugins skipped — add google-services.json to enable FCM push. ' +
+      'Manifest merge fix still applied for autolinked firebase modules.',
   );
 }
 
+// Full notification manifest meta-data only when Firebase config plugins run.
+// Without google-services.json, skip icon/color/channel here to avoid duplicate
+// meta-data; channel is created at runtime in pushNotifications.ts.
+const expoNotificationsPlugin = includeFirebase
+  ? [
+      'expo-notifications',
+      {
+        icon: './assets/intro/Saveful-for-Business-logo.png',
+        color: '#F6F4EE',
+        defaultChannel: 'default',
+      },
+    ]
+  : ['expo-notifications'];
+
 export default {
   expo: {
-    name: "Saveful For Business",
-    slug: "saveful-business",
-    version: "1.0.0",
-    orientation: "portrait",
-    userInterfaceStyle: "light",
-    icon: "./assets/intro/Saveful-for-Business-logo.png",
+    name: 'Saveful For Business',
+    slug: 'saveful-business',
+    version: '1.0.0',
+    orientation: 'portrait',
+    userInterfaceStyle: 'light',
+    icon: './assets/intro/Saveful-for-Business-logo.png',
     splash: {
-      backgroundColor: "#F6F4EE",
+      backgroundColor: '#F6F4EE',
     },
 
-    assetBundlePatterns: ["**/*"],
+    assetBundlePatterns: ['**/*'],
 
     ios: {
       supportsTablet: true,
-      icon: "./assets/intro/Saveful-for-Business-logo.png",
-      bundleIdentifier: "com.priteepriyadarshini.savefulbusiness",
+      icon: './assets/intro/Saveful-for-Business-logo.png',
+      bundleIdentifier: 'com.priteepriyadarshini.savefulbusiness',
       ...(iosGoogleServicesFile && { googleServicesFile: iosGoogleServicesFile }),
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSPhotoLibraryUsageDescription:
-          "Allow Saveful for Business to access your photo library to upload a logo.",
+          'Allow Saveful for Business to access your photo library to upload a logo.',
       },
       config: {
         googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
@@ -69,19 +84,19 @@ export default {
     },
 
     android: {
-      package: "com.saveful.business.app",
+      package: 'com.saveful.business.app',
       ...(androidGoogleServicesFile && { googleServicesFile: androidGoogleServicesFile }),
       adaptiveIcon: {
-        foregroundImage: "./assets/intro/Saveful-for-Business-logo.png",
-        backgroundColor: "#F6F4EE",
+        foregroundImage: './assets/intro/Saveful-for-Business-logo.png',
+        backgroundColor: '#F6F4EE',
       },
       permissions: [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "POST_NOTIFICATIONS",
-        "android.permission.POST_NOTIFICATIONS",
+        'ACCESS_COARSE_LOCATION',
+        'ACCESS_FINE_LOCATION',
+        'READ_EXTERNAL_STORAGE',
+        'WRITE_EXTERNAL_STORAGE',
+        'POST_NOTIFICATIONS',
+        'android.permission.POST_NOTIFICATIONS',
       ],
       config: {
         googleMaps: {
@@ -91,36 +106,30 @@ export default {
     },
 
     web: {
-      bundler: "metro",
+      bundler: 'metro',
     },
 
     plugins: [
-      "expo-asset",
-      "@react-native-community/datetimepicker",
-      "expo-secure-store",
-      "expo-font",
-      [
-        "expo-notifications",
-        {
-          icon: "./assets/intro/Saveful-for-Business-logo.png",
-          color: "#F6F4EE",
-          defaultChannel: "default",
-        },
-      ],
+      'expo-asset',
+      '@react-native-community/datetimepicker',
+      'expo-secure-store',
+      'expo-font',
+      expoNotificationsPlugin,
       ...firebasePlugins,
-      ...(includeFirebase ? [withAndroidFirebaseNotificationManifest] : []),
       [
-        "expo-location",
+        'expo-location',
         {
           locationWhenInUsePermission:
-            "Allow Saveful for Business to access your location.",
+            'Allow Saveful for Business to access your location.',
         },
       ],
+      // Must be last — adds tools:replace after expo-notifications / firebase plugins.
+      withAndroidFirebaseNotificationManifest,
     ],
 
     extra: {
       eas: {
-        projectId: "6863db47-e894-4b7e-944c-c0c66152e71d",
+        projectId: '6863db47-e894-4b7e-944c-c0c66152e71d',
       },
       googlePlacesApiKey: process.env.GOOGLE_MAPS_API_KEY,
       firebaseEnabled: includeFirebase,

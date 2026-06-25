@@ -15,13 +15,20 @@ const MERGE_RULES = [
   },
 ];
 
+/**
+ * expo-notifications and @react-native-firebase/messaging both declare FCM
+ * notification meta-data. Firebase packages are autolinked even when the Expo
+ * config plugins are skipped (no google-services.json), so this merge fix must
+ * always run whenever both libraries are installed.
+ */
 function withAndroidFirebaseNotificationManifest(config) {
   return withAndroidManifest(config, (modConfig) => {
     const manifest = modConfig.modResults;
 
-    if (!manifest.manifest.$['xmlns:tools']) {
-      manifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
-    }
+    manifest.manifest.$ = {
+      ...manifest.manifest.$,
+      'xmlns:tools': 'http://schemas.android.com/tools',
+    };
 
     const application = AndroidConfig.Manifest.getMainApplicationOrThrow(manifest);
     const metaData = application['meta-data'] ?? [];
