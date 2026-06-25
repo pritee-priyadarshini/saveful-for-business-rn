@@ -60,16 +60,15 @@ if (!includeFirebase && process.env.EAS_BUILD) {
   );
 }
 
-// Full notification manifest meta-data only when Firebase config plugins run.
-// Without google-services.json, skip icon/color/channel here to avoid duplicate
-// meta-data; channel is created at runtime in pushNotifications.ts.
+// When Firebase is enabled, omit defaultChannel here — the channel is created at
+// runtime in pushNotifications.ts. Including defaultChannel makes expo-notifications
+// emit FCM channel meta-data that conflicts with @react-native-firebase/messaging.
 const expoNotificationsPlugin = includeFirebase
   ? [
       'expo-notifications',
       {
-        icon: './assets/intro/Saveful-for-Business-logo.png',
-        color: '#F6F4EE',
-        defaultChannel: 'default',
+        icon: './assets/intro/notification_icon.png',
+        color: '#9B8AFB',
       },
     ]
   : ['expo-notifications'];
