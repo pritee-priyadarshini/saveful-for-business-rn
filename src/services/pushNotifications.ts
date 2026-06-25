@@ -20,6 +20,7 @@ import {
  * Use a development build to test push notifications end-to-end.
  */
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
+const FIREBASE_ENABLED = Constants.expoConfig?.extra?.firebaseEnabled === true;
 
 let tokenRefreshUnsubscribe: (() => void) | null = null;
 let foregroundUnsubscribe: (() => void) | null = null;
@@ -46,13 +47,17 @@ function buildTokenPayload(
   };
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ register / unregister â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function registerDeviceToken(): Promise<void> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
 
   if (IS_EXPO_GO) {
-    console.log('[Push] Skipped â€” remote push removed from Expo Go (SDK 53+). Use a dev build.');
+    console.log('[Push] Skipped - remote push removed from Expo Go (SDK 53+). Use a dev build.');
+    return;
+  }
+
+  if (!FIREBASE_ENABLED) {
+    console.log('[Push] Skipped - google-services.json not configured. Add Firebase config and rebuild.');
     return;
   }
 
@@ -112,7 +117,7 @@ export async function unregisterDeviceToken(): Promise<void> {
     console.log('[Push] Token unregister failed', error);
   }
 
-  if (!IS_EXPO_GO) {
+  if (!IS_EXPO_GO && FIREBASE_ENABLED) {
     try {
       const { default: messaging } =
         require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
@@ -126,10 +131,7 @@ export async function unregisterDeviceToken(): Promise<void> {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ foreground handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function setupForegroundNotificationHandler(): void {
-  if (IS_EXPO_GO) {
-    console.log('[Push] Skipped â€” foreground handler not available in Expo Go (SDK 53+).');
-    return;
-  }
+  if (IS_EXPO_GO || !FIREBASE_ENABLED) return;
   if (foregroundUnsubscribe) return;
 
   const Notifications =
@@ -175,7 +177,12 @@ export async function setupNotificationOpenedHandler(
   onOpen: (payload: NotificationPayload) => void,
 ): Promise<void> {
   if (IS_EXPO_GO) {
-    console.log('[Push] Skipped â€” notification tap handler not available in Expo Go (SDK 53+).');
+    console.log('[Push] Skipped - notification tap handler not available in Expo Go (SDK 53+).');
+    return;
+  }
+
+  if (!FIREBASE_ENABLED) {
+    console.log('[Push] Skipped - Firebase not configured for notification tap handling.');
     return;
   }
 
