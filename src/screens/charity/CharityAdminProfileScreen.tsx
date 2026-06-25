@@ -21,6 +21,8 @@ import { spacing } from '@/theme/spacing';
 
 import { useAppContext } from '@/store/AppContext';
 import { charityService } from '@/services/charity.service';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/navigation/AppNavigator';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -62,7 +64,9 @@ type CharityProfileData = {
 };
 
 export default function CharityAdminProfileScreen() {
-  const navigation = useNavigation();
+  type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+  const navigation = useNavigation<NavigationProp>();
   const { authUser } = useAppContext();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -298,6 +302,36 @@ export default function CharityAdminProfileScreen() {
             </View>
           </View>
         </View>
+
+
+        {/* CHANGE PASSWORD */}
+        <View style={styles.actionCard}>
+          <AppText variant="bodyBold" style={styles.sectionTitle} >
+            Password
+          </AppText>
+
+          <Pressable
+            style={styles.passwordBtn}
+            onPress={() =>
+              navigation.navigate('ForgotPassword')
+            }
+          >
+            <Ionicons
+              name="lock-closed-outline"
+              size={18}
+              color={palette.white}
+            />
+
+            <AppText variant="bodyBold" style={styles.passwordBtnText} >
+              Change Password
+            </AppText>
+          </Pressable>
+
+          <AppText variant="caption" style={styles.helperText}>
+            A verification code will be sent to your registered email address.
+          </AppText>
+        </View>
+
       </ScrollView>
     </Screen>
   );
@@ -449,5 +483,49 @@ const styles = StyleSheet.create({
   value: {
     color: '#111',
     lineHeight: normalize(22),
+  },
+
+  actionCard: {
+    backgroundColor: palette.white,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: 16,
+    padding: spacing.md,
+  },
+
+  sectionTitle: {
+    marginBottom: spacing.md,
+  },
+
+  fieldBlock: {
+    marginBottom: spacing.md,
+  },
+  
+  readOnlyField: {
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: palette.stone,
+    borderRadius: 12,
+    padding: 12,
+  },
+
+  passwordBtn: {
+    backgroundColor: palette.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+
+  passwordBtnText: {
+    color: palette.white,
+    marginLeft: 8,
+  },
+
+  helperText: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    opacity: 0.7,
   },
 });
