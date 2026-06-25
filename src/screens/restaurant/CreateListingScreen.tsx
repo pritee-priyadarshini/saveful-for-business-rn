@@ -20,6 +20,7 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
+import { useListingsStore } from '../../store/listingsStore';
 import { estimateMealsSaved, estimateCo2AvoidedKg, formatCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
@@ -387,6 +388,8 @@ export function CreateListingScreen({ navigation }: any) {
         };
 
         await foodListingService.createListing(payload);
+        // Invalidate the site listings cache so the new listing shows immediately
+        useListingsStore.getState().invalidateSite();
         navigation.replace('RestaurantListings');
       } catch (error: any) {
         console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);

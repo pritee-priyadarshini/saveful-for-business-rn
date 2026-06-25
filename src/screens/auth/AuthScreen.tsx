@@ -32,6 +32,7 @@ import { spacing } from '@/theme/spacing';
 import { COUNTRY_CODES, findCountryByIso, appendSignupMobileFields } from '@/data/countryCodes';
 import type { CountryCode } from '@/data/countryCodes';
 import { fetchCurrentLocation } from '@/utils/currentLocation';
+import { getUserFriendlyErrorMessage } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -574,10 +575,9 @@ export function AuthScreen() {
         : charityForm.email;
 
       navigation.navigate('EmailVerification', { email: emailForVerification });
-    } catch (error: any) {
-      const errMsg = error?.response?.data?.message;
+    } catch (error: unknown) {
       setFormError(
-        Array.isArray(errMsg) ? errMsg.join('\n') : errMsg || 'Something went wrong. Please try again.',
+        getUserFriendlyErrorMessage(error, 'Something went wrong. Please try again.'),
       );
     } finally {
       setLoading(false);

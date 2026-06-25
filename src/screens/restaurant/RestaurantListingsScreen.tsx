@@ -19,10 +19,10 @@ import { Skeleton } from '../../components/Skeleton';
 
 import { palette } from '@/theme/colors';
 import { ListingStatus } from '@/types';
-import { foodListingService, normalizeListingsResponse } from '@/services/foodListing.service';
 import { estimateMealsSaved, getListingAudience, isAnimalListing, isPeopleListing } from '../../utils/foodListing';
-import { formatApiErrorMessage } from '../../utils/listingLocation';
+import { showErrorAlert } from '../../utils/apiError';
 import { useAppContext } from '../../store/AppContext';
+import { useListingsStore } from '../../store/listingsStore';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -163,32 +163,26 @@ function getImpactText(listing: any) {
 
 export function RestaurantListingsScreen({ navigation }: any) {
   const { authUser } = useAppContext();
+  const {
+    siteListings: listings,
+    isFetchingSite: loading,
+    fetchSiteListings,
+    cancelListing: storeCancelListing,
+  } = useListingsStore();
+
   const [modalVisible, setModalVisible] = React.useState(false);
   const [selectedItems, setSelectedItems] = React.useState<any[]>([]);
   const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
-  const [listings, setListings] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
   const [cancellingId, setCancellingId] = React.useState<number | null>(null);
   const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
-
-  const fetchListings = async () => {
-    try {
-      setLoading(true);
-      const res = await foodListingService.getSiteListings();
-      const { listings: all } = normalizeListingsResponse(res);
-      setListings(all.filter((listing: any) => listing.status !== 'CANCELLED'));
-    } catch {
-      Alert.alert('Error', 'Failed to load listings');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useFocusEffect(
     React.useCallback(() => {
       if (!authUser?.accessToken) return;
-      fetchListings();
-    }, [authUser?.accessToken]),
+      fetchSiteListings().catch((e) =>
+        showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
+      );
+    }, [authUser?.accessToken, fetchSiteListings]),
   );
 
   const peopleCount = useMemo(
@@ -221,13 +215,10 @@ export function RestaurantListingsScreen({ navigation }: any) {
             if (cancellingId !== null) return;
             setCancellingId(id);
             try {
-              await foodListingService.cancelListing(id);
-              await fetchListings();
-            } catch (error: any) {
-              Alert.alert(
-                'Error',
-                formatApiErrorMessage(error?.response?.data?.message, 'Failed to cancel listing'),
-              );
+              // storeCancelListing cancels then force-refetches the store
+              await storeCancelListing(id);
+            } catch (error: unknown) {
+              showErrorAlert(error, 'Could not cancel listing', 'Failed to cancel listing');
             } finally {
               setCancellingId(null);
             }
@@ -444,12 +435,17 @@ export function RestaurantListingsScreen({ navigation }: any) {
             </Pressable>
 
             <Pressable
-              style={[styles.outlineBtn, styles.cancelOutlineBtn]}
+              style={[
+                styles.outlineBtn,
+                styles.cancelOutlineBtn,
+                (cancellingId !== null) && { opacity: 0.65 },
+              ]}
+              disabled={cancellingId !== null}
               onPress={() => handleCancelListing(item.id)}
             >
               <Ionicons name="close-circle-outline" size={normalize(16)} color={palette.white} />
               <AppText variant="bodyBold" style={{ color: palette.white }}>
-                Cancel Listing
+                {cancellingId === item.id ? 'Cancelling...' : 'Cancel Listing'}
               </AppText>
             </Pressable>
           </View>

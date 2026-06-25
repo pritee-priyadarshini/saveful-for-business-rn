@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -15,8 +15,9 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { fetchDiscoverListings } from '@/services/foodListing.service';
 import { useAppContext } from '../../store/AppContext';
+import { useDiscoverStore } from '../../store/discoverStore';
+import { showErrorAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -26,84 +27,70 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-type ClaimState = Record<string, number>; // key = listingId-itemName
+type ClaimState = Record<string, number>;
+
+function mapToMapListing(item: any) {
+  return {
+    id: String(item.id),
+    businessName:
+      item?.site?.locationName ||
+      item?.organisation?.name ||
+      'Food Provider',
+    suburb: item?.pickupAddress || 'Unknown',
+    type: 'Surplus',
+    distance: item.distance || '—',
+    quantityKg:
+      item.foodItems?.reduce(
+        (sum: number, f: any) => sum + (f.remainingQtyKg || 0),
+        0,
+      ) || 0,
+    pickupDate: item.bestBefore,
+    pickupTime:
+      item.pickupFromTime && item.pickupByTime
+        ? `${item.pickupFromTime} - ${item.pickupByTime}`
+        : 'Flexible',
+    storage: item.needsRefrigeration ? 'Keep Refrigerated' : 'Room Temp',
+    items:
+      item.foodItems?.map((f: any) => ({
+        name: f.category,
+        quantityKg: f.remainingQtyKg,
+      })) || [],
+  };
+}
 
 export function CharityMapScreen({ navigation }: any) {
   const { authUser } = useAppContext();
+  const {
+    people: { rawListings, isFetching: loading },
+    fetchListings: storeFetchListings,
+  } = useDiscoverStore();
+
   const [claimState, setClaimState] = useState<ClaimState>({});
   const [activeFilter, setActiveFilter] = useState<'distance' | 'surplus' | null>(null);
-  const [listings, setListings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const listings = useMemo(
+    () => rawListings.map(mapToMapListing),
+    [rawListings],
+  );
+
   useEffect(() => {
-    if (!authUser?.accessToken) {
-      setLoading(false);
-      return;
-    }
-    fetchListings();
+    if (!authUser?.accessToken) return;
+    storeFetchListings('people').catch((e) =>
+      showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
+    );
   }, [authUser?.accessToken]);
 
-  const fetchListings = async () => {
-    if (!authUser?.accessToken) return;
-
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
     try {
-      setLoading(true);
-
-      const data = await fetchDiscoverListings('people', { page: 1, limit: 20 });
-
-      if (!Array.isArray(data)) {
-        console.log('[Listings] Invalid discover response');
-        setListings([]);
-        return;
-      }
-
-      const mapped = data.map((item: any) => {
-        return {
-          id: String(item.id),
-
-          businessName:
-            item?.site?.locationName ||
-            item?.organisation?.name ||
-            'Food Provider',
-
-          suburb: item?.pickupAddress || 'Unknown',
-          type: 'Surplus',
-
-          distance: item.distance || '—',
-
-          quantityKg:
-            item.foodItems?.reduce(
-              (sum: number, f: any) => sum + (f.remainingQtyKg || 0),
-              0
-            ) || 0,
-
-          pickupDate: item.bestBefore,
-          pickupTime:
-            item.pickupFromTime && item.pickupByTime
-              ? `${item.pickupFromTime} - ${item.pickupByTime}`
-              : 'Flexible',
-
-          storage: item.needsRefrigeration
-            ? 'Keep Refrigerated'
-            : 'Room Temp',
-
-          items:
-            item.foodItems?.map((f: any) => ({
-              name: f.category,
-              quantityKg: f.remainingQtyKg,
-            })) || [],
-        };
-      });
-
-      setListings(mapped);
-    } catch (err) {
-      console.log('FETCH ERROR', err);
+      await storeFetchListings('people', true);
+    } catch (e) {
+      showErrorAlert(e, 'Could not load listings', 'Could not load listings');
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [storeFetchListings]);
 
   const getKey = (listingId: string, itemName: string) =>
     `${listingId}-${itemName}`;
@@ -405,10 +392,7 @@ export function CharityMapScreen({ navigation }: any) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchListings();
-            }}
+            onRefresh={handleRefresh}
           />
         }
 

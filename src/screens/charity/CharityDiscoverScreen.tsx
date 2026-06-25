@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import {
   FlatList,
   Image,
@@ -19,10 +19,11 @@ import { LocationSetupModal } from '../../components/LocationSetupModal';
 
 import { useAppContext } from '../../store/AppContext';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
+import { useDiscoverStore } from '../../store/discoverStore';
+import { showErrorAlert } from '@/utils/apiError';
 
 import { palette } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
-import { fetchDiscoverListings, mapDiscoverListing } from '@/services/foodListing.service';
 import { OsmMapView } from '@/components/OsmMapView';
 
 const { width, height } = Dimensions.get("window");
@@ -50,40 +51,32 @@ export function CharityDiscoverScreen() {
   } = useOrganizationLocation();
   const listRef = useRef<FlatList>(null);
 
-  const [listings, setListings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const {
+    people: { listings: rawListings, isFetching: loading },
+    fetchListings: storeFetchListings,
+  } = useDiscoverStore();
 
-  const fetchListings = async () => {
+  const listings = rawListings;
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<'list' | 'map'>('list');
+
+  useEffect(() => {
     if (!authUser?.accessToken) return;
+    storeFetchListings('people').catch((e) =>
+      showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
+    );
+  }, [authUser?.accessToken]);
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
     try {
-      setLoading(true);
-
-      const data = await fetchDiscoverListings('people', { page: 1, limit: 20 });
-      const mapped = data.map(mapDiscoverListing);
-      setListings(mapped);
-    } catch (err: any) {
-      console.log(
-        'LISTING_FETCH_ERROR:',
-        err?.response?.status,
-        err?.response?.data ?? err?.message,
-      );
-      setListings([]);
+      await storeFetchListings('people', true);
+    } catch (e) {
+      showErrorAlert(e, 'Could not load listings', 'Could not load listings');
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
-
-  useEffect(() => {
-    if (!authUser?.accessToken) {
-      setLoading(false);
-      return;
-    }
-    fetchListings();
-  }, [authUser?.accessToken]);
 
   const availableListings = listings;
 
@@ -331,10 +324,7 @@ export function CharityDiscoverScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                fetchListings();
-              }}
+              onRefresh={handleRefresh}
             />
           }
         />
@@ -353,8 +343,6 @@ export function CharityDiscoverScreen() {
     </Screen>
   );
 }
-
-/* STYLES */
 
 const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },

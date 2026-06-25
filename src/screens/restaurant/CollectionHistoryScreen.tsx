@@ -18,9 +18,10 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
-import { foodListingService, normalizeListingsResponse } from '@/services/foodListing.service';
 import { estimateMealsSaved, getListingAudience, isAnimalListing, isPeopleListing } from '../../utils/foodListing';
 import { useAppContext } from '../../store/AppContext';
+import { useListingsStore } from '../../store/listingsStore';
+import { showErrorAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -147,6 +148,13 @@ function getOrgName(listing: any) {
 
 export default function CollectionHistoryScreen({ navigation }: any) {
   const { authUser } = useAppContext();
+
+  const {
+    orgListings: history,
+    isFetchingOrg: loading,
+    fetchOrgListings,
+  } = useListingsStore();
+
   const [selectedYear, setSelectedYear] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [showYearDropdown, setShowYearDropdown] = useState(false);
@@ -157,42 +165,22 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   const [impactModalVisible, setImpactModalVisible] = useState(false);
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [yearDropdownAnchor, setYearDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const [monthDropdownAnchor, setMonthDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const yearDropdownRef = useRef<View>(null);
   const monthDropdownRef = useRef<View>(null);
 
   useEffect(() => {
-    fetchHistory();
+    fetchOrgListings().catch((e) =>
+      showErrorAlert(e, 'Could not load history', 'Could not load collection history'),
+    );
   }, [authUser?.profile?.organisation?.id]);
-
-  const fetchHistory = async () => {
-    const orgId = authUser?.profile?.organisation?.id;
-    if (!orgId) {
-      setHistory([]);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await foodListingService.getOrgListings(Number(orgId), { page: 1, limit: 200 });
-      const { listings } = normalizeListingsResponse(res);
-      setHistory(listings);
-    } catch (error) {
-      console.log('history fetch failed', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const months = getMonthsForYear(selectedYear);
 
   const years = useMemo(() => {
     const uniqueYears = [
-      ...new Set(history.map((item) => new Date(item.createdAt).getFullYear().toString())),
+      ...new Set(history.map((item) => new Date(item.createdAt ?? 0).getFullYear().toString())),
     ];
     uniqueYears.sort((a, b) => Number(b) - Number(a));
     return ['All', ...uniqueYears];
@@ -223,7 +211,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   const filteredData = useMemo(() => {
     return history
       .filter((item) => {
-        const date = new Date(item.createdAt);
+        const date = new Date(item.createdAt ?? 0);
         const itemMonth = date.toLocaleString('default', { month: 'short' });
         const itemYear = date.getFullYear().toString();
         const yearMatch = selectedYear === 'All' || itemYear === selectedYear;
@@ -238,7 +226,10 @@ export default function CollectionHistoryScreen({ navigation }: any) {
           (statusFilter === 'cancelled' && isCancelledListing(item));
         return yearMatch && monthMatch && audienceMatch && statusMatch;
       })
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+      );
   }, [history, selectedMonth, selectedYear, audienceFilter, statusFilter]);
 
   const openDetailsModal = (item: any) => {

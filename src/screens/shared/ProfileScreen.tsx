@@ -25,7 +25,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { palette } from '@/theme/colors';
-import { charityService } from '@/services/charity.service';
+import { useCharityStore } from '@/store/charityStore';
+import { useAuthStore } from '@/store/authStore';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -36,7 +38,9 @@ const normalize = (size: number) => {
 };
 
 export function ProfileScreen() {
-  const { currentProfile, authUser, setAuthUser } = useAppContext();
+  const { currentProfile, authUser } = useAppContext();
+  const { updateUser, updateLocation, updateOrganisation } = useCharityStore();
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
   type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
   const navigation = useNavigation<NavigationProp>();
@@ -92,12 +96,12 @@ export function ProfileScreen() {
           Alert.alert('Error', 'User not found');
           return;
         }
-        await charityService.updateUser(authUser.id, { mobile: formData.mobile });
+        await updateUser(authUser.id, { mobile: formData.mobile });
+        await refreshProfile();
 
-        Alert.alert('Success', 'Contact updated');
+        showSuccessAlert('Contact updated');
       } catch (err) {
-        console.log(err);
-        Alert.alert('Error', 'Failed to update contact');
+        showErrorAlert(err, 'Could not update contact', 'Failed to update contact');
       }
     });
   };
@@ -112,16 +116,16 @@ export function ProfileScreen() {
           return;
         }
 
-        await charityService.updateLocation(locationId, {
+        await updateLocation(locationId, {
           address: formData.address,
           postcode: '',
           radiusKm: Number(formData.radius),
         });
+        await refreshProfile();
 
-        Alert.alert('Success', 'Details updated');
+        showSuccessAlert('Details updated');
       } catch (err) {
-        console.log(err);
-        Alert.alert('Error', 'Failed to update');
+        showErrorAlert(err, 'Could not update details', 'Failed to update');
       }
     });
   };
@@ -147,11 +151,11 @@ export function ProfileScreen() {
           } as any);
         }
 
-        await charityService.updateOrganisation(orgId, form);
-        Alert.alert('Success', 'Branding updated');
+        await updateOrganisation(orgId, form);
+        await refreshProfile();
+        showSuccessAlert('Branding updated');
       } catch (err) {
-        console.log(err);
-        Alert.alert('Error', 'Failed to update branding');
+        showErrorAlert(err, 'Could not update branding', 'Failed to update branding');
       }
     });
   };

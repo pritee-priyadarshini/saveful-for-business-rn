@@ -43,6 +43,8 @@ import {
   parseListingDate,
 } from '../../utils/listingFormPrefill';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
+import { useListingsStore } from '../../store/listingsStore';
+import { showErrorAlert } from '../../utils/apiError';
 
 
 const { width, height } = Dimensions.get('window');
@@ -443,11 +445,12 @@ function EditPeopleListingForm({
           isSafeForDonation: true,
         });
         invalidateListingDetail(listingId);
+        useListingsStore.getState().invalidateSite();
         Alert.alert('Updated', 'Listing updated successfully', [
           { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
         ]);
-      } catch (error: any) {
-        Alert.alert('Could not update listing', error?.response?.data?.message || 'Please try again.');
+      } catch (error: unknown) {
+        showErrorAlert(error, 'Could not update listing', 'Please try again.');
       }
     });
   };
@@ -1200,18 +1203,20 @@ function EditFarmListingForm({
           bestBefore: bestBeforeDate.toISOString(),
           pickupFromTime: pickupFromDate.toISOString(),
           pickupByTime: pickupToDate.toISOString(),
-          needsRefrigeration: selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
+          needsRefrigeration:
+            selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
           containsAllergens: selectedContaminants.length > 0,
           storage: selectedStorage,
           contaminants: selectedContaminants,
           isSafeForDonation: false,
         });
         invalidateListingDetail(listingId);
+        useListingsStore.getState().invalidateSite();
         Alert.alert('Updated', 'Listing updated successfully', [
           { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
         ]);
-      } catch (error: any) {
-        Alert.alert('Could not update listing', error?.response?.data?.message || 'Please try again.');
+      } catch (error: unknown) {
+        showErrorAlert(error, 'Could not update listing', 'Please try again.');
       }
     });
   };
@@ -1760,11 +1765,10 @@ export function EditListingScreen({ navigation, route }: any) {
         const data = await fetchListingDetail(listingId, { refresh: true });
         if (cancelled) return;
         setListing(data);
-      } catch {
+      } catch (error: unknown) {
         if (!cancelled) {
-          Alert.alert('Error', 'Failed to load listing details', [
-            { text: 'OK', onPress: () => navigation.goBack() },
-          ]);
+          showErrorAlert(error, 'Could not load listing', 'Failed to load listing details');
+          navigation.goBack();
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -2820,7 +2824,6 @@ const farmStyles = StyleSheet.create({
     textTransform: 'none',
   },
 
-  // ── bottom button ─────────────────────────────────────────────────────────
   bottomButton: {
     marginTop: hp(1.6),
     minHeight: hp(5.2),

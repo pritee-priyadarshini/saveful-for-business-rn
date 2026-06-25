@@ -21,6 +21,7 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
+import { useListingsStore } from '../../store/listingsStore';
 import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
 import { estimateCo2AvoidedKg, estimateMealsSaved, formatCo2AvoidedKg } from '../../utils/foodListing';
@@ -383,6 +384,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
         };
 
         await foodListingService.createListing(payload);
+        useListingsStore.getState().invalidateSite();
         navigation.replace('RestaurantListings');
       } catch (error: any) {
         console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
@@ -1456,7 +1458,6 @@ const styles = StyleSheet.create({
     textTransform: 'none',
   },
 
-  // ── bottom button ─────────────────────────────────────────────────────────
   bottomButton: {
     marginTop: hp(1.6),
     minHeight: hp(5.2),
@@ -1472,7 +1473,6 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
 
-  // ── iOS picker ────────────────────────────────────────────────────────────
   iosPickerOverlay: {
     flex: 1,
     justifyContent: 'flex-end',

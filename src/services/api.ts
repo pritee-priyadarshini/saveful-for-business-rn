@@ -1,6 +1,15 @@
 import axios, { InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
+type UnauthorizedHandler = () => void | Promise<void>;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+/** Called from AppContext so a 401 clears session and redirects to login. */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  unauthorizedHandler = handler;
+}
+
 const api = axios.create({
   baseURL: 'https://s4b.saveful.app/api/v1',
   headers: {
@@ -51,6 +60,11 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync('accessToken');
+      try {
+        await unauthorizedHandler?.();
+      } catch {
+        // session teardown failed — token is already cleared
+      }
     }
     return Promise.reject(error);
   },

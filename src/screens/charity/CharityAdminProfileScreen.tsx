@@ -20,9 +20,10 @@ import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 
 import { useAppContext } from '@/store/AppContext';
-import { charityService } from '@/services/charity.service';
+import { useCharityStore } from '@/store/charityStore';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/AppNavigator';
+import { showErrorAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -68,6 +69,7 @@ export default function CharityAdminProfileScreen() {
 
   const navigation = useNavigation<NavigationProp>();
   const { authUser } = useAppContext();
+  const { fetchUser } = useCharityStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [profileData, setProfileData] =
@@ -86,11 +88,7 @@ export default function CharityAdminProfileScreen() {
       setLoading(true);
       let currentUser: CharityUser | null = null;
       if (authUser?.id) {
-        const userRes = await charityService.getUser(
-          Number(authUser.id)
-        );
-
-        currentUser = userRes?.data || null;
+        currentUser = (await fetchUser(Number(authUser.id), true)) as CharityUser | null;
       }
 
       let assignedLocation: CharityLocation | null = null;
@@ -108,10 +106,7 @@ export default function CharityAdminProfileScreen() {
         assignedLocation,
       });
     } catch (error) {
-      console.log(
-        'CHARITY_ADMIN_PROFILE_FETCH_ERROR:',
-        error
-      );
+      showErrorAlert(error, 'Could not load profile', 'Could not load profile');
     } finally {
       setLoading(false);
       setRefreshing(false);

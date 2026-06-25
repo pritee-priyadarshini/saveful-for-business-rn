@@ -4,109 +4,53 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useState,
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
 import { plansData } from '../data/plansData';
-
 import { UserProfile } from '../types';
-import {
-  AppContextValue,
-  AuthUser,
-  CharityForm,
-  FarmerForm,
-  RestaurantForm,
-  Subscription,
-  RoleFlow,
-} from './types';
+import { AppContextValue } from './types';
 import { authService } from '../services/auth.service';
+import { setUnauthorizedHandler } from '../services/api';
 import {
   setupForegroundNotificationHandler,
   teardownForegroundNotificationHandler,
+  registerDeviceToken,
+  unregisterDeviceToken,
 } from '../services/pushNotifications';
-import {
-  TokenManager,
-  TokenManagerEvents,
-} from '../modules/pushNotifications/TokenManager';
-import { pushTokenFromToken } from '../modules/pushNotifications/pushTokenFromToken';
-import { notificationsService } from '../services/notifications.service';
 
-import { DEFAULT_COUNTRY_CODE } from '../data/countryCodes';
-
-const defaultRestaurantForm: RestaurantForm = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  mobile: '',
-  mobileCountryCode: DEFAULT_COUNTRY_CODE,
-  mobileCountryIso: 'IN',
-  businessName: '',
-  businessAddress: '',
-  registrationNumber: '',
-  venueType: '',
-  branding: '',
-  logo: '',
-  region: '',
-  latitude: '',
-  longitude: '',
-};
-
-const defaultCharityForm: CharityForm = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  mobile: '',
-  mobileCountryCode: DEFAULT_COUNTRY_CODE,
-  mobileCountryIso: 'IN',
-  charityName: '',
-  charityAddress: '',
-  registrationNumber: '',
-  branding: '',
-  logo: '',
-  postcodes: '',
-  pickupRadius: '',
-  region: '',
-  latitude: '',
-  longitude: '',
-  pickupPostCode: '',
-};
-
-const defaultFarmerForm: FarmerForm = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  mobile: '',
-  mobileCountryCode: DEFAULT_COUNTRY_CODE,
-  mobileCountryIso: 'IN',
-  businessName: '',
-  businessAddress: '',
-  venueType: '',
-  branding: '',
-  logo: '',
-  region: '',
-  latitude: '',
-  longitude: '',
-};
+import { useAuthStore } from './authStore';
+import { useRegistrationStore } from './registrationStore';
+import { resetAllDataStores } from './index';
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: PropsWithChildren) {
-  const [isAuthenticated, setAuthenticated] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<'restaurant_single' | 'restaurant_multi' | 'charity_single' | 'charity_multi' | 'farmer' | 'farm_business'>('restaurant_single');
-  const [roleFlow, setRoleFlow] = useState<RoleFlow>('producer');
-  const [selectedPlanId, setSelectedPlanId] = useState('single_plus');
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [restaurantForm, setRestaurantForm] = useState<RestaurantForm>(defaultRestaurantForm);
-  const [charityForm, setCharityForm] = useState<CharityForm>(defaultCharityForm);
-  const [farmerForm, setFarmerForm] = useState<FarmerForm>(defaultFarmerForm);
+  const {
+    isAuthenticated,
+    isInitialLoading,
+    authUser,
+    selectedRole,
+    roleFlow,
+    selectedPlanId,
+    setAuthUser,
+    setAuthenticated,
+    setRole,
+    setRoleFlow,
+    selectPlan,
+    setInitialLoading,
+    logout: authStoreLogout,
+  } = useAuthStore();
+
+  const {
+    restaurantForm,
+    charityForm,
+    farmerForm,
+    updateRestaurantField,
+    updateCharityField,
+    updateFarmerField,
+    resetForms,
+  } = useRegistrationStore();
 
   useEffect(() => {
     async function restoreSession() {
@@ -124,130 +68,122 @@ export function AppProvider({ children }: PropsWithChildren) {
             siteRole: profile.role?.siteRole,
             profile: profile,
           });
-          setAuthenticated(true);
         }
       } catch (error) {
         console.log('SESSION RESTORE ERROR', error);
         await SecureStore.deleteItemAsync('accessToken');
       } finally {
-        setIsInitialLoading(false);
+        setInitialLoading(false);
       }
     }
 
     restoreSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await authStoreLogout();
+      resetAllDataStores();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [authStoreLogout]);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
-    TokenManager.shared.initialize();
+    registerDeviceToken();
     setupForegroundNotificationHandler();
     return () => {
       teardownForegroundNotificationHandler();
     };
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const onTokenChanged = async (token?: string) => {
-      if (!token) return;
-      try {
-        const payload = pushTokenFromToken(token);
-        await notificationsService.registerToken(payload);
-        console.log('[Push] Token registered with backend');
-      } catch (error) {
-        console.warn('[Push] Failed to register token with backend:', error);
-      }
-    };
-
-    TokenManager.shared.addListener(TokenManagerEvents.TokenChanged, onTokenChanged);
-    return () => {
-      TokenManager.shared.removeListener(TokenManagerEvents.TokenChanged, onTokenChanged);
-    };
-  }, [isAuthenticated]);
-
-  const resetForms = () => {
-    setRestaurantForm(defaultRestaurantForm);
-    setCharityForm(defaultCharityForm);
-    setFarmerForm(defaultFarmerForm);
-  };
-
-  const resolvedRole = (() => {
+  const resolvedRole = useMemo(() => {
     if (!authUser) return selectedRole;
 
-    const orgType = authUser?.orgType?.toUpperCase();
-    const orgRole = authUser?.orgRole?.toUpperCase();
-    const siteRole = authUser?.siteRole?.toUpperCase();
+    const orgType = authUser.orgType?.toUpperCase();
+    const orgRole = authUser.orgRole?.toUpperCase();
+    const siteRole = authUser.siteRole?.toUpperCase();
 
     if (orgType === 'BUSINESS_MULTI') {
-      if (orgRole === 'SUPER_ADMIN') {
-        return 'restaurant_multi';
-      }
-      if (siteRole === 'SITE_ADMIN' || siteRole === 'STAFF') {
-        return 'restaurant_single';
-      }
+      if (orgRole === 'SUPER_ADMIN') return 'restaurant_multi';
+      if (siteRole === 'SITE_ADMIN' || siteRole === 'STAFF') return 'restaurant_single';
       return 'restaurant_multi';
     }
-
     if (orgType === 'BUSINESS_SINGLE') return 'restaurant_single';
 
-
     if (orgType === 'CHARITY_MULTI') {
-      if (orgRole === 'SUPER_ADMIN' || orgRole === 'HEAD_OFFICE_ADMIN' || orgRole === 'HEAD_OFFICE') {
+      if (
+        orgRole === 'SUPER_ADMIN' ||
+        orgRole === 'HEAD_OFFICE_ADMIN' ||
+        orgRole === 'HEAD_OFFICE'
+      ) {
         return 'charity_multi';
       }
-
-      if (siteRole === 'SITE_ADMIN' || siteRole === 'LOCATION_ADMIN' || siteRole === 'TEAM_MEMBER' || siteRole === 'STAFF') {
+      if (
+        siteRole === 'SITE_ADMIN' ||
+        siteRole === 'LOCATION_ADMIN' ||
+        siteRole === 'TEAM_MEMBER' ||
+        siteRole === 'STAFF'
+      ) {
         return 'charity_single';
       }
       return 'charity_multi';
     }
-
-    if (orgType === 'CHARITY_SINGLE') {
-      return 'charity_single';
-    }
+    if (orgType === 'CHARITY_SINGLE') return 'charity_single';
 
     if (orgType === 'FARMER_PRODUCER') return 'farm_business';
     if (orgType === 'FARMER_CONSUMER') return 'farmer';
     if (orgType === 'FARMER') return 'farmer';
 
     return selectedRole;
-  })();
+  }, [authUser, selectedRole]);
 
   const value = useMemo<AppContextValue>(() => {
-
-    const isBusinessLocationUser = authUser?.orgType === 'BUSINESS_MULTI' &&
+    const isBusinessLocationUser =
+      authUser?.orgType === 'BUSINESS_MULTI' &&
       (authUser?.siteRole === 'SITE_ADMIN' || authUser?.siteRole === 'STAFF');
 
-    const isCharityLocationUser = authUser?.orgType === 'CHARITY_MULTI' &&
-      (authUser?.siteRole === 'LOCATION_ADMIN' || authUser?.siteRole === 'TEAM_MEMBER');
+    const isCharityLocationUser =
+      authUser?.orgType === 'CHARITY_MULTI' &&
+      (authUser?.siteRole === 'LOCATION_ADMIN' ||
+        authUser?.siteRole === 'TEAM_MEMBER');
 
     const isLocationUser = isBusinessLocationUser || isCharityLocationUser;
-
-    const assignedSite = isLocationUser && authUser?.profile?.sites?.length ? authUser.profile.sites[0] : null;
+    const assignedSite =
+      isLocationUser && authUser?.profile?.sites?.length
+        ? authUser.profile.sites[0]
+        : null;
 
     const currentProfile: UserProfile = authUser?.profile
       ? {
-        name: `${authUser.profile.user.firstName} ${authUser.profile.user.lastName}`,
-        organization: assignedSite?.locationName || assignedSite?.name || authUser.profile.organisation?.name || '',
-        address: assignedSite?.address || authUser.profile.organisation?.address || '',
-        verificationStatus: 'Verified',
-        phone: authUser.profile.user.phoneNumber || '',
-        logo: authUser.profile.organisation?.logoUrl || '',
-        memberSince: authUser.profile.user.createdAt,
-        email: authUser.profile.user.email || '',
-      }
+          name: `${authUser.profile.user.firstName} ${authUser.profile.user.lastName}`,
+          organization:
+            assignedSite?.locationName ||
+            assignedSite?.name ||
+            authUser.profile.organisation?.name ||
+            '',
+          address:
+            assignedSite?.address ||
+            authUser.profile.organisation?.address ||
+            '',
+          verificationStatus: 'Verified',
+          phone: authUser.profile.user.phoneNumber || '',
+          logo: authUser.profile.organisation?.logoUrl || '',
+          memberSince: authUser.profile.user.createdAt,
+          email: authUser.profile.user.email || '',
+        }
       : {
-        name: '',
-        organization: '',
-        address: '',
-        verificationStatus: 'Pending',
-        phone: '',
-        logo: '',
-        email: '',
-      };
+          name: '',
+          organization: '',
+          address: '',
+          verificationStatus: 'Pending',
+          phone: '',
+          logo: '',
+          email: '',
+        };
 
-    const subscription: Subscription = {
+    const subscription = {
       planId: null,
       billingCycle: null,
       isActive: true,
@@ -255,9 +191,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     };
 
     const currentPlan =
-      plansData.find(
-        (plan) => plan.id === subscription.planId
-      ) || null;
+      plansData.find((plan) => plan.id === subscription.planId) || null;
 
     return {
       isAuthenticated,
@@ -272,74 +206,51 @@ export function AppProvider({ children }: PropsWithChildren) {
       farmerForm,
       authUser,
 
-      setRole: setSelectedRole,
+      setRole,
       setRoleFlow,
-      selectPlan: setSelectedPlanId,
-
+      selectPlan,
       upgradePlan: () => {
-        console.log('Upgrade handled via backend later/ API to be integrated');
+        console.log('Upgrade handled via backend later / API to be integrated');
       },
-
-      updateRestaurantField: (field, value) => {
-        setRestaurantForm((current) => ({
-          ...current,
-          [field]: value,
-        }));
-      },
-
-      updateCharityField: (field, value) => {
-        setCharityForm((current) => ({
-          ...current,
-          [field]: value,
-        }));
-      },
-
-      updateFarmerField: (field, value) => {
-        setFarmerForm((current) => ({
-          ...current,
-          [field]: value,
-        }));
-      },
-
-      setAuthUser: (user) => {
-        setAuthUser(user);
-        setAuthenticated(!!user);
-      },
+      updateRestaurantField,
+      updateCharityField,
+      updateFarmerField,
+      setAuthUser,
+      setAuthenticated,
+      resetForms,
 
       logout: async () => {
         teardownForegroundNotificationHandler();
-        try {
-          await notificationsService.unregisterAllTokens();
-          console.log('[Push] All tokens unregistered');
-        } catch (error) {
-          console.warn('[Push] Failed to unregister tokens:', error);
-        }
-        TokenManager.shared.setToken(undefined);
-        await SecureStore.deleteItemAsync('accessToken');
-        setAuthenticated(false);
-        setAuthUser(null);
-        setSelectedRole('restaurant_single');
-        setRoleFlow('producer');
+        await unregisterDeviceToken();
+        await authStoreLogout();
         resetForms();
+        resetAllDataStores();
       },
-
-      setAuthenticated,
-
-      resetForms,
     };
   }, [
+    isAuthenticated,
     authUser,
+    selectedRole,
+    resolvedRole,
+    roleFlow,
+    selectedPlanId,
+    restaurantForm,
     charityForm,
     farmerForm,
-    isAuthenticated,
-    restaurantForm,
-    selectedPlanId,
-    roleFlow,
-    selectedRole,
+    setRole,
+    setRoleFlow,
+    selectPlan,
+    updateRestaurantField,
+    updateCharityField,
+    updateFarmerField,
+    setAuthUser,
+    setAuthenticated,
+    resetForms,
+    authStoreLogout,
   ]);
 
   if (isInitialLoading) {
-    return null; 
+    return null;
   }
 
   return (
@@ -353,9 +264,7 @@ export function useAppContext() {
   const context = useContext(AppContext);
 
   if (!context) {
-    throw new Error(
-      'useAppContext must be used within AppProvider'
-    );
+    throw new Error('useAppContext must be used within AppProvider');
   }
 
   return context;

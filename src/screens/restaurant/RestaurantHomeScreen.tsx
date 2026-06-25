@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -16,7 +16,8 @@ import { LocationRequiredBanner } from '../../components/LocationRequiredBanner'
 import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { useAppContext } from '../../store/AppContext';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
-import { dashboardService } from '@/services/dashboard.service';
+import { useDashboardStore } from '../../store/dashboardStore';
+import { showErrorAlert } from '@/utils/apiError';
 
 import { palette } from '@/theme/colors';
 
@@ -42,19 +43,30 @@ export function RestaurantHomeScreen({ navigation }: any) {
     useGpsLocation,
     saveLocation,
   } = useOrganizationLocation();
-  const firstName = currentProfile.name?.split(' ')[0] || 'User';
-  const [activeIndex, setActiveIndex] = React.useState(0);
 
-  const [impact, setImpact] = React.useState({
+  const {
+    businessImpact,
+    isFetching: loadingImpact,
+    fetchBusinessImpact,
+  } = useDashboardStore();
+
+  const impact = businessImpact ?? {
     kgSaved: 0,
     charitiesSupported: 0,
     collectionsCompleted: 0,
     co2SavedKg: 0,
     moneySaved: 0,
     currency: '₹',
-  });
+  };
 
-  const [loadingImpact, setLoadingImpact] = React.useState(true);
+  const firstName = currentProfile.name?.split(' ')[0] || 'User';
+  const [activeIndex, setActiveIndex] = React.useState(0);
+
+  useEffect(() => {
+    fetchBusinessImpact().catch((e) =>
+      showErrorAlert(e, 'Could not load dashboard', 'Could not load dashboard data'),
+    );
+  }, []);
 
   const impactConfig = [
     {
@@ -81,34 +93,6 @@ export function RestaurantHomeScreen({ navigation }: any) {
   ];
 
   const impactData = impactConfig;
-
-  React.useEffect(() => {
-    fetchImpact();
-  }, []);
-
-  const fetchImpact = async () => {
-    try {
-      setLoadingImpact(true);
-
-      const res = await dashboardService.getBusinessImpact();
-
-      if (res.data) {
-        setImpact({
-          ...res.data,
-          collectionsCompleted:
-            res.data.collectionsCompleted ?? res.data.charitiesSupported ?? 0,
-        });
-      }
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        console.log('Impact data not yet available (404)');
-      } else {
-        console.log('Impact fetch failed', error);
-      }
-    } finally {
-      setLoadingImpact(false);
-    }
-  };
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>

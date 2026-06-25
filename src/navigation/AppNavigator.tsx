@@ -92,7 +92,7 @@ const navTheme = {
 };
 
 export function AppNavigator() {
-  const { isAuthenticated, selectedRole, authUser } = useAppContext();
+  const { isAuthenticated, selectedRole } = useAppContext();
   const effectiveRole = selectedRole;
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 

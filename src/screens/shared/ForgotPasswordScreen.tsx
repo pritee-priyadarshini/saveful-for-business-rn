@@ -30,6 +30,7 @@ import {
     getForgotPasswordErrorMessage,
     getForgotPasswordSuccessMessage,
 } from '@/utils/validation';
+import { getUserFriendlyErrorMessage } from '@/utils/apiError';
 
 export default function ForgotPasswordScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -151,9 +152,8 @@ export default function ForgotPasswordScreen() {
                     onPress: () => navigation.goBack(),
                 },
             ]);
-        } catch (error: any) {
-            const message = error?.response?.data?.message || 'Something went wrong';
-            setFormError(Array.isArray(message) ? message.join('\n') : message);
+        } catch (error: unknown) {
+            setFormError(getUserFriendlyErrorMessage(error, 'Something went wrong. Please try again.'));
         } finally {
             setLoading(false);
         }

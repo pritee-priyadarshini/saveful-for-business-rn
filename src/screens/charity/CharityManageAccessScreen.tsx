@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ImageBackground,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,8 +18,10 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
-import { CharityMemberRole, charityService } from '@/services/charity.service';
+import { CharityMemberRole } from '@/services/charity.service';
+import { useCharityStore } from '@/store/charityStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -48,58 +51,22 @@ export default function CharityManageAccessScreen() {
   };
   const [activeTab, setActiveTab] = useState<AccessType>('user');
 
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(false);
+  const {
+    users: members,
+    isFetchingUsers: loadingMembers,
+    fetchUsers,
+    addMember,
+    updateUser,
+    deleteUser,
+  } = useCharityStore();
   const { submitting, withLock } = useSubmitLock();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  const fetchMembers = async () => {
-    try {
-      setLoadingMembers(true);
-
-      const res = await charityService.listUsers();
-
-      //onsole.log('USERS API RESPONSE:', res.data);
-
-      const normalizeUsers = (data: any) => [
-        ...(data.headOfficeAdmins || []).map((u: any) => ({
-          ...u,
-          role: 'HEAD_OFFICE_ADMIN',
-        })),
-
-        ...(data.headOfficeMembers || []).map((u: any) => ({
-          ...u,
-          role: 'HEAD_OFFICE',
-        })),
-
-        ...(data.locationAdmins || []).map((u: any) => ({
-          ...u,
-          role: 'LOCATION_ADMIN',
-        })),
-
-        ...(data.teamMembers || []).map((u: any) => ({
-          ...u,
-          role: 'TEAM_MEMBER',
-        })),
-
-        ...(data.drivers || []).map((u: any) => ({
-          ...u,
-          role: 'DRIVER',
-        })),
-      ];
-
-      setMembers(normalizeUsers(res.data));
-
-    } catch (e) {
-      Alert.alert('Error', 'Failed to load members');
-    } finally {
-      setLoadingMembers(false);
-    }
-  };
+    fetchUsers().catch((e) =>
+      showErrorAlert(e, 'Could not load team', 'Could not load team members'),
+    );
+  }, [fetchUsers]);
 
   const [form, setForm] = useState({
     firstName: '',
@@ -177,19 +144,19 @@ export default function CharityManageAccessScreen() {
 
       await withLock(async () => {
         if (editingId) {
-          await charityService.updateUser(Number(editingId), {
+          await updateUser(Number(editingId), {
             firstName: form.firstName,
             lastName: form.lastName,
             mobile: form.mobile,
           });
 
-          Alert.alert('Success', 'User updated');
+          showSuccessAlert('User updated');
         } else {
-          await charityService.addMember(payload);
-          Alert.alert('Success', 'User added');
+          await addMember(payload);
+          showSuccessAlert('User added');
         }
 
-        await fetchMembers();
+        await fetchUsers(true);
 
         setEditingId(null);
         setForm({
@@ -201,11 +168,8 @@ export default function CharityManageAccessScreen() {
           role: '',
         });
       });
-    } catch (e: any) {
-      Alert.alert(
-        'Error',
-        e?.response?.data?.message || 'Something went wrong'
-      );
+    } catch (e: unknown) {
+      showErrorAlert(e, 'Something went wrong', 'Something went wrong');
     }
   };
 
@@ -230,10 +194,10 @@ export default function CharityManageAccessScreen() {
     if (deletingId) return;
     setDeletingId(id);
     try {
-      await charityService.deleteUser(Number(id));
-      await fetchMembers();
-    } catch {
-      Alert.alert('Error', 'Delete failed');
+      await deleteUser(Number(id));
+      await fetchUsers(true);
+    } catch (e) {
+      showErrorAlert(e, 'Could not delete user', 'Delete failed');
     } finally {
       setDeletingId(null);
     }
@@ -494,8 +458,14 @@ export default function CharityManageAccessScreen() {
 
                       <Pressable
                         onPress={() => handleDelete(member.id.toString())}
+                        disabled={deletingId !== null}
+                        style={{ opacity: deletingId === member.id.toString() ? 0.5 : 1 }}
                       >
-                        <Ionicons name="trash-outline" size={normalize(22)} color={palette.chilli} />
+                        {deletingId === member.id.toString() ? (
+                          <ActivityIndicator size="small" color={palette.chilli} />
+                        ) : (
+                          <Ionicons name="trash-outline" size={normalize(22)} color={palette.chilli} />
+                        )}
                       </Pressable>
                     </>
                   )}

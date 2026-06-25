@@ -3,17 +3,19 @@ import { Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useAppContext } from '../store/AppContext';
-import { authService } from '../services/auth.service';
-import { organizationService } from '../services/organization.service';
+import { useAuthStore } from '../store/authStore';
 import {
   getLocationDebugInfo,
   normalizeAuthProfile,
   profileHasCoordinates,
 } from '../utils/coordinates';
 import { fetchCurrentLocation } from '../utils/currentLocation';
+import { showErrorAlert } from '../utils/apiError';
 
 export function useOrganizationLocation() {
-  const { authUser, setAuthUser } = useAppContext();
+  const { authUser } = useAppContext();
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
+  const updateCoordinates = useAuthStore((s) => s.updateCoordinates);
   const [bannerClosed, setBannerClosed] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,26 +51,6 @@ export function useOrganizationLocation() {
     console.log('[Location] sitesCount =', debug.sitesCount);
   }, [authUser, bannerClosed, profile, showBanner]);
 
-  const refreshProfile = useCallback(async () => {
-    if (!authUser?.accessToken) return;
-
-    try {
-      const profileRes = await authService.profile();
-      const nextProfile = profileRes.data as any;
-
-      setAuthUser({
-        ...nextProfile.user,
-        accessToken: authUser.accessToken,
-        orgType: nextProfile.organisation?.type,
-        orgRole: nextProfile.role?.orgRole,
-        siteRole: nextProfile.role?.siteRole,
-        profile: nextProfile,
-      });
-    } catch {
-      // keep existing profile data
-    }
-  }, [authUser?.accessToken, setAuthUser]);
-
   useFocusEffect(
     useCallback(() => {
       if (!hasLocation) {
@@ -96,23 +78,14 @@ export function useOrganizationLocation() {
 
     try {
       setSaving(true);
-      await organizationService.updateCoordinates(organizationId, {
-        latitude,
-        longitude,
-      });
-
-      await refreshProfile();
+      await updateCoordinates(organizationId, latitude, longitude);
 
       if (address) setCapturedAddress(address);
       setBannerClosed(true);
       setModalVisible(false);
       return true;
-    } catch (error: any) {
-      const errMsg = error?.response?.data?.message;
-      Alert.alert(
-        'Error',
-        Array.isArray(errMsg) ? errMsg.join('\n') : errMsg || 'Failed to save location.',
-      );
+    } catch (error: unknown) {
+      showErrorAlert(error, 'Could not save location', 'Failed to save location');
       return false;
     } finally {
       setSaving(false);

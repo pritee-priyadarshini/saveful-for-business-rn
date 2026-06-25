@@ -27,8 +27,10 @@ import { OsmMapView } from '../../components/OsmMapView';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
 import { sitesService } from '@/services/sites.service';
+import { useSitesStore } from '@/store/sitesStore';
 import { InputField } from '@/components/InputField';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
   const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -40,8 +42,14 @@ const normalize = (size: number) => {
 
 export default function CreateSiteScreen() {
     const navigation = useNavigation();
-
     const route = useRoute<any>();
+    const {
+        sites: storeSites,
+        fetchOrganisation,
+        fetchStaff,
+        createSite,
+        assignManager,
+    } = useSitesStore();
 
     useEffect(() => {
         if (route.params?.mode === 'manager') {
@@ -59,26 +67,22 @@ export default function CreateSiteScreen() {
     const fetchSiteDetails = async (siteId: number) => {
         try {
             setLoading(true);
-            const res = await sitesService.getSiteDetails(siteId);
-            const siteDetails = res.data;
+            await sitesService.getSiteDetails(siteId);
 
-            // Find manager in staff
-            const staffRes = await sitesService.listStaff(siteId);
-            const staff = staffRes.data || [];
-            const managerEntry = staff.find((u: any) => u.siteRole === 'SITE_ADMIN');
+            const staff = await fetchStaff(siteId, true);
+            const managerEntry = staff.find((u) => u.role === 'SITE_ADMIN');
 
-            if (managerEntry?.user) {
-                const { firstName, lastName, email, phoneNumber } = managerEntry.user;
+            if (managerEntry) {
                 setManagerForm({
-                    firstName: firstName || '',
-                    lastName: lastName || '',
-                    email: email || '',
-                    password: '', // Password shouldn't be prefilled for security/API reasons
-                    phoneNumber: phoneNumber || '',
+                    firstName: managerEntry.firstName || '',
+                    lastName: managerEntry.lastName || '',
+                    email: managerEntry.email || '',
+                    password: '',
+                    phoneNumber: managerEntry.mobile || '',
                 });
             }
         } catch (error) {
-            console.log('Failed to fetch site details or staff', error);
+            showErrorAlert(error, 'Could not load site', 'Could not load site details');
         } finally {
             setLoading(false);
         }
@@ -89,7 +93,7 @@ export default function CreateSiteScreen() {
 
     const [createdSiteId, setCreatedSiteId] = useState<number | null>(null);
 
-    const [sites, setSites] = useState<any[]>([]);
+    const sites = storeSites;
     const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
     const [openSiteDropdown, setOpenSiteDropdown] = useState(false);
 
@@ -199,17 +203,8 @@ export default function CreateSiteScreen() {
         phoneNumber: '',
     });
     useEffect(() => {
-        const fetchSites = async () => {
-            try {
-                const res = await sitesService.getOrganisation();
-                setSites(res.data?.sites || []);
-            } catch (e) {
-                console.log('Failed to fetch sites');
-            }
-        };
-
-        fetchSites();
-    }, []);
+        fetchOrganisation();
+    }, [fetchOrganisation]);
 
 
     useEffect(() => {
@@ -255,12 +250,12 @@ export default function CreateSiteScreen() {
 
             setLoading(true);
 
-            const res = await sitesService.createSite({
+            const res = await createSite({
                 siteName,
                 address,
                 postcode,
 
-                // 🔥 dummy system values
+                // dummy system values
                 contactName: 'Business Multi Admin',
                 contactEmail: 'businessmulti@gmail.com',
                 phoneNumber: '9999999999',
@@ -271,13 +266,10 @@ export default function CreateSiteScreen() {
 
             const siteId = res.data.id;
             setCreatedSiteId(siteId);
-            Alert.alert('Success', 'Site created. Now assign manager.');
+            showSuccessAlert('Site created. Now assign manager.');
             setActiveTab('manager');
-        } catch (err: any) {
-            Alert.alert(
-                'Error',
-                err?.response?.data?.message || 'Failed to create site'
-            );
+        } catch (err: unknown) {
+            showErrorAlert(err, 'Could not create site', 'Failed to create site');
         } finally {
             setLoading(false);
         }
@@ -302,17 +294,12 @@ export default function CreateSiteScreen() {
 
             setLoading(true);
 
-            await sitesService.assignManager(siteId, managerForm);
+            await assignManager(siteId, managerForm);
 
-            Alert.alert('Success', 'Manager assigned');
+            showSuccessAlert('Manager assigned', 'Done', () => navigation.goBack());
 
-            navigation.goBack();
-
-        } catch (err: any) {
-            Alert.alert(
-                'Error',
-                err?.response?.data?.message || 'Failed to assign manager'
-            );
+        } catch (err: unknown) {
+            showErrorAlert(err, 'Could not assign manager', 'Failed to assign manager');
         } finally {
             setLoading(false);
         }
@@ -538,7 +525,11 @@ export default function CreateSiteScreen() {
                                     />
                                 </View>
 
-                                <Pressable style={styles.createBtn} onPress={handleCreateSite}>
+                                <Pressable
+                                    style={[styles.createBtn, loading && { opacity: 0.65 }]}
+                                    onPress={handleCreateSite}
+                                    disabled={loading}
+                                >
                                     <AppText style={styles.btnText}>
                                         {loading ? 'Creating...' : 'Create Site'}
                                     </AppText>
@@ -636,7 +627,11 @@ export default function CreateSiteScreen() {
                                     </View>
                                 ))}
 
-                                <Pressable style={styles.createBtn} onPress={handleAssignManager}>
+                                <Pressable
+                                    style={[styles.createBtn, loading && { opacity: 0.65 }]}
+                                    onPress={handleAssignManager}
+                                    disabled={loading}
+                                >
                                     <AppText style={styles.btnText}>
                                         {loading ? 'Assigning...' : 'Assign Manager'}
                                     </AppText>
@@ -805,7 +800,6 @@ const styles = StyleSheet.create({
         fontSize: normalize(12),
     },
 
-    // ─── Bottom Sheet Modal ─────────────────────────────────────────
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.45)',

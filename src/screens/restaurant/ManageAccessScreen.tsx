@@ -7,6 +7,7 @@ import {
   Alert,
   StyleSheet,
   ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,11 +17,22 @@ import { AppText } from '../../components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Picker } from '@react-native-picker/picker';
-import { sitesService } from '@/services/sites.service';
+import { useSitesStore } from '@/store/sitesStore';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 
 export default function ManageAccessScreen() {
   const navigation = useNavigation();
+  const {
+    firstSiteId: siteId,
+    maxUsersPerSite: maxUsers,
+    staffBySiteId,
+    isFetching: loading,
+    fetchFirstSiteTeam,
+    assignManager,
+    addStaff,
+    removeAccess,
+  } = useSitesStore();
 
   const [form, setForm] = useState({
     name: '',
@@ -31,11 +43,9 @@ export default function ManageAccessScreen() {
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const { submitting, withLock } = useSubmitLock();
-  const [siteId, setSiteId] = useState<number | null>(null);
-  const [maxUsers, setMaxUsers] = useState(0);
-  const [members, setMembers] = useState<any[]>([]);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const members = siteId ? staffBySiteId[siteId] ?? [] : [];
 
   const isLimitReached = maxUsers > 0 && members.length >= maxUsers;
 
@@ -61,12 +71,12 @@ export default function ManageAccessScreen() {
 
       await withLock(async () => {
         if (form.role === 'SITE_ADMIN') {
-          await sitesService.assignManager(siteId, payload);
+          await assignManager(siteId, payload);
         } else {
-          await sitesService.addStaff(siteId, payload);
+          await addStaff(siteId, payload);
         }
 
-        Alert.alert('Success', 'User added');
+        showSuccessAlert('User added');
 
         setForm({
           name: '',
@@ -76,13 +86,10 @@ export default function ManageAccessScreen() {
           role: '',
         });
 
-        await fetchTeam();
+        await fetchFirstSiteTeam(true);
       });
-    } catch (err: any) {
-      Alert.alert(
-        'Error',
-        err?.response?.data?.message || 'Failed'
-      );
+    } catch (err: unknown) {
+      showErrorAlert(err, 'Could not add user', 'Failed to add user');
     }
   };
 
@@ -98,11 +105,15 @@ export default function ManageAccessScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
+            if (deletingId !== null) return;
+            setDeletingId(userId);
             try {
-              await sitesService.removeAccess(siteId, userId);
-              fetchTeam();
-            } catch {
-              Alert.alert('Error', 'Failed');
+              await removeAccess(siteId, userId);
+              await fetchFirstSiteTeam(true);
+            } catch (err) {
+              showErrorAlert(err, 'Could not remove user', 'Failed to remove user');
+            } finally {
+              setDeletingId(null);
             }
           },
         },
@@ -111,43 +122,10 @@ export default function ManageAccessScreen() {
   };
 
   useEffect(() => {
-    fetchTeam();
-  }, []);
-
-  const fetchTeam = async () => {
-    try {
-      setLoading(true);
-
-      const orgRes = await sitesService.getOrganisation();
-
-      const firstSite = orgRes.data?.sites?.[0];
-
-      if (!firstSite) return;
-
-      setSiteId(firstSite.id);
-      setMaxUsers(
-        orgRes.data?.subscription?.plan?.maxUsersPerSite || 0
-      );
-
-      const staffRes = await sitesService.listStaff(firstSite.id);
-
-      const formatted = staffRes.data.map((item: any) => ({
-        id: item.user.id,
-        firstName: item.user.firstName,
-        lastName: item.user.lastName,
-        email: item.user.email,
-        mobile: item.user.phoneNumber,
-        role: item.siteRole,
-      }));
-
-      setMembers(formatted);
-
-    } catch (err) {
-      Alert.alert('Error', 'Failed to load team');
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchFirstSiteTeam().catch((e) =>
+      showErrorAlert(e, 'Could not load team', 'Could not load team members'),
+    );
+  }, [fetchFirstSiteTeam]);
 
   return (
     <Screen backgroundColor={palette.creme}>
@@ -287,8 +265,16 @@ export default function ManageAccessScreen() {
             <View style={styles.actions}>
               {member.role !== 'SITE_ADMIN' && (
                 <>
-                  <Pressable onPress={() => handleDelete(member.id)} >
-                    <Ionicons name="trash-outline" size={20} color="red" />
+                  <Pressable
+                    onPress={() => handleDelete(member.id)}
+                    disabled={deletingId !== null}
+                    style={{ opacity: deletingId === member.id ? 0.5 : 1 }}
+                  >
+                    {deletingId === member.id ? (
+                      <ActivityIndicator size="small" color="red" />
+                    ) : (
+                      <Ionicons name="trash-outline" size={20} color="red" />
+                    )}
                   </Pressable>
                 </>
               )}

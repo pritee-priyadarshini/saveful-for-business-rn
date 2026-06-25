@@ -32,6 +32,12 @@ import {
     getForgotPasswordErrorMessage,
     getForgotPasswordSuccessMessage,
 } from '@/utils/validation';
+import {
+    extractApiMessage,
+    getUserFriendlyErrorMessage,
+    showSuccessAlert,
+} from '@/utils/apiError';
+import { isAxiosError } from 'axios';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -147,15 +153,15 @@ export function SignInScreen() {
                 profile: profile,
             });
 
-        } catch (error: any) {
-            const message = error?.response?.data?.message || 'Invalid credentials';
-            const status = error?.response?.status;
+        } catch (error: unknown) {
+            const status = isAxiosError(error) ? error.response?.status : undefined;
+            const apiMessage = isAxiosError(error)
+                ? extractApiMessage(error.response?.data)
+                : null;
             const isUnverified =
                 status === 403 &&
-                typeof message === 'string' &&
-                message.toLowerCase().includes('verify');
-
-            console.log('LOGIN ERROR', error?.response?.data || error);
+                typeof apiMessage === 'string' &&
+                apiMessage.toLowerCase().includes('verify');
 
             if (isUnverified) {
                 navigation.navigate('EmailVerification', {
@@ -165,7 +171,12 @@ export function SignInScreen() {
                 return;
             }
 
-            setError(message);
+            setError(
+                getUserFriendlyErrorMessage(
+                    error,
+                    'Email or password is incorrect. Please try again.',
+                ),
+            );
         } finally {
             setLoading(false);
         }
@@ -203,7 +214,7 @@ export function SignInScreen() {
             setConfirmPassword('');
             setMode('reset');
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             setError(getForgotPasswordErrorMessage(e));
         } finally {
             setLoading(false);
@@ -240,12 +251,16 @@ export function SignInScreen() {
 
             await authService.resetPassword(trimmedEmail, enteredOtp, newPassword);
 
-            Alert.alert('Success', 'Password reset successful. You can sign in now.');
-            switchMode('login');
+            showSuccessAlert(
+                'Password reset successful. You can sign in now.',
+                'Success',
+                () => switchMode('login'),
+            );
 
-        } catch (e: any) {
-            const message = e?.response?.data?.message || 'Reset failed';
-            setError(Array.isArray(message) ? message.join('\n') : message);
+        } catch (e: unknown) {
+            setError(
+                getUserFriendlyErrorMessage(e, 'Could not reset password. Please try again.'),
+            );
         } finally {
             setLoading(false);
         }

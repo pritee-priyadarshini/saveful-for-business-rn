@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   ScrollView,
@@ -19,8 +19,9 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { useAppContext } from '@/store/AppContext';
+import { useSitesStore } from '@/store/sitesStore';
 import { palette } from '@/theme/colors';
-import { sitesService } from '@/services/sites.service';
+import { showErrorAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -35,12 +36,17 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'ManageSites
 export default function ManageSitesScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { logout } = useAppContext();
+  const {
+    organisation,
+    sitesWithManagers: sites,
+    isFetchingManagers: loading,
+    fetchSitesWithManagers,
+    removeAccess,
+  } = useSitesStore();
 
-  const [expandedSite, setExpandedSite] = useState<string | null>(null);
-  const [sites, setSites] = useState<any[]>([]);
-  const [organisation, setOrganisation] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [expandedSite, setExpandedSite] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [removingManagerSiteId, setRemovingManagerSiteId] = useState<number | null>(null);
 
   const actions = [
     { label: 'Add Site & Manager', route: 'CreateSite' },
@@ -51,71 +57,21 @@ export default function ManageSitesScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchSites();
-    }, [])
+      fetchSitesWithManagers().catch((e) =>
+        showErrorAlert(e, 'Could not load sites', 'Could not load sites'),
+      );
+    }, [fetchSitesWithManagers]),
   );
 
-  const fetchSites = async (isRefreshing = false) => {
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      if (isRefreshing) setRefreshing(true);
-      else setLoading(true);
-      
-      const res = await sitesService.getOrganisation();
-      const data = res.data;
-      setOrganisation(data.organisation);
-
-      const sitesWithManagers = await Promise.all(
-        (data.sites || []).map(async (s: any) => {
-          try {
-            const staffRes = await sitesService.listStaff(s.id);
-            const staff = staffRes.data || [];
-
-            const managerEntry = staff.find(
-              (u: any) => u.siteRole === 'SITE_ADMIN'
-            );
-
-            const manager = managerEntry?.user;
-
-            return {
-              id: s.id,
-              tradingName: s.siteName,
-              address: s.address,
-              postCode: s.postcode,
-              managerId: managerEntry?.userId || null,
-              contactName: manager ? `${manager.firstName} ${manager.lastName}` : 'Manager not yet assigned',
-              email: manager?.email || '-',
-              mobile: manager?.phoneNumber || '-',
-              logo: null,
-            };
-          } catch (err) {
-            console.log(`Staff fetch failed for site ${s.id}`);
-
-            return {
-              id: s.id,
-              tradingName: s.siteName,
-              address: s.address,
-              postCode: s.postcode,
-              managerId: null,
-              contactName: 'No Manager',
-              email: '-',
-              mobile: '-',
-              logo: null,
-            };
-          }
-        })
-      );
-
-      setSites(sitesWithManagers);
-    } catch (error) {
-      console.log('Fetch sites error', error);
+      await fetchSitesWithManagers(true);
+    } catch (e) {
+      showErrorAlert(e, 'Could not load sites', 'Could not load sites');
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  const onRefresh = () => {
-    fetchSites(true);
   };
 
   const handleRemoveManager = async (siteId: number, userId: number) => {
@@ -128,15 +84,19 @@ export default function ManageSitesScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
+            if (removingManagerSiteId !== null) return;
+            setRemovingManagerSiteId(siteId);
             try {
-              await sitesService.removeAccess(siteId, userId);
-              fetchSites();
+              await removeAccess(siteId, userId);
+              await fetchSitesWithManagers(true);
             } catch (err) {
-              Alert.alert('Error', 'Failed to remove manager');
+              showErrorAlert(err, 'Could not remove manager', 'Failed to remove manager');
+            } finally {
+              setRemovingManagerSiteId(null);
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -329,12 +289,17 @@ export default function ManageSitesScreen() {
                       {/* REMOVE MANAGER */}
                       {site.managerId && (
                         <Pressable
-                          style={styles.viewBtn}
-                          onPress={() =>
-                            handleRemoveManager(site.id, site.managerId)
-                          }
+                          style={[styles.viewBtn, removingManagerSiteId === site.id && { opacity: 0.65 }]}
+                          disabled={removingManagerSiteId !== null}
+                          onPress={() => {
+                            if (site.managerId) {
+                              handleRemoveManager(site.id, site.managerId);
+                            }
+                          }}
                         >
-                          <AppText variant="bodyBold" style={{ color: palette.white }}>Remove Manager</AppText>
+                          <AppText variant="bodyBold" style={{ color: palette.white }}>
+                            {removingManagerSiteId === site.id ? 'Removing...' : 'Remove Manager'}
+                          </AppText>
                         </Pressable>
                       )}
 

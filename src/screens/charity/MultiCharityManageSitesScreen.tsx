@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     View,
     ScrollView,
@@ -19,10 +19,11 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { useAppContext } from '@/store/AppContext';
+import { useCharityStore } from '@/store/charityStore';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
-import { charityService } from '@/services/charity.service';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -50,15 +51,50 @@ type Site = {
 export default function MultiCharityManageSitesScreen() {
     const navigation = useNavigation<NavigationProp>();
     const { logout, currentProfile, authUser } = useAppContext();
+    const {
+        locations,
+        users,
+        isFetchingLocations,
+        isFetchingUsers,
+        fetchLocations,
+        fetchUsers,
+        updateLocation,
+        deactivateLocation,
+        deleteUser,
+    } = useCharityStore();
+
     const [showPassword, setShowPassword] = useState(false);
     const [editingSiteId, setEditingSiteId] = useState<number | null>(null);
     const [editForm, setEditForm] = useState<any>({});
-    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
-    const [sites, setSites] = useState<Site[]>([]);
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
     const businessLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
+
+    const loading = isFetchingLocations || isFetchingUsers;
+
+    const sites = useMemo<Site[]>(() => {
+        return locations.map((location: any) => {
+            const admin =
+                users.find((u) =>
+                    u.locations?.some((loc: any) => loc.id === location.id),
+                ) || null;
+
+            return {
+                id: location.id,
+                tradingName: location.locationName,
+                address: location.address,
+                postCode: location.postcode,
+                contactName: admin ? `${admin.firstName} ${admin.lastName}` : 'No Admin',
+                email: admin?.email || '-',
+                mobile: admin?.mobile || '-',
+                latitude: location.latitude,
+                longitude: location.longitude,
+                radiusKm: location.pickupRadiusKm,
+                logoUrl: businessLogo || '',
+            };
+        });
+    }, [locations, users, businessLogo]);
 
     const actions = [
         { label: 'Create Site', route: 'CreateCharitySite' },
@@ -70,69 +106,27 @@ export default function MultiCharityManageSitesScreen() {
         },
     ];
 
+    const loadData = async (force = false) => {
+        await Promise.all([fetchLocations(force), fetchUsers(force)]);
+    };
+
     const onRefresh = async () => {
         try {
             setRefreshing(true);
-            await fetchLocations();
+            await loadData(true);
+        } catch (e) {
+            showErrorAlert(e, 'Could not load locations', 'Could not load locations');
         } finally {
             setRefreshing(false);
         }
     };
 
     React.useEffect(() => {
-        fetchLocations();
+        loadData().catch((e) =>
+            showErrorAlert(e, 'Could not load locations', 'Could not load locations'),
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const fetchLocations = async () => {
-        try {
-            setLoading(true);
-
-            const [locationsRes, usersRes] = await Promise.all([charityService.listLocations(), charityService.listUsers(),]);
-
-            const locations = Array.isArray(locationsRes.data)
-                ? locationsRes.data
-                : locationsRes.data?.locations || [];
-            const users = [
-                ...(usersRes.data?.headOfficeAdmins || []),
-                ...(usersRes.data?.headOfficeMembers || []),
-                ...(usersRes.data?.locationAdmins || []),
-                ...(usersRes.data?.teamMembers || []),
-                ...(usersRes.data?.drivers || []),
-            ];
-            const formattedSites = locations.map(
-                (location: any) => {
-                    const admin =
-                        users.find(
-                            (u: any) =>
-                                u.locations?.some(
-                                    (loc: any) => loc.id === location.id
-                                )
-                        ) || null;
-
-                    return {
-                        id: location.id,
-                        tradingName: location.locationName,
-                        address: location.address,
-                        postCode: location.postcode,
-                        contactName: admin ? `${admin.firstName} ${admin.lastName}` : 'No Admin',
-                        email: admin?.email || '-',
-                        mobile: admin?.mobile || '-',
-                        latitude: location.latitude,
-                        longitude: location.longitude,
-                        radiusKm: location.pickupRadiusKm,
-                        logoUrl: currentProfile.logo || authUser?.profile?.organisation?.logoUrl || '',
-                    };
-                }
-            );
-
-            setSites(formattedSites);
-
-        } catch (err) {
-            Alert.alert('Error', 'Failed to load locations');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     if (loading) {
         return (
@@ -258,37 +252,23 @@ export default function MultiCharityManageSitesScreen() {
                                 {/* EDIT */}
                                 <Pressable
                                     style={styles.editBtn}
-                                    onPress={async () => {
-                                        try {
-                                            const [locationRes, usersRes] =
-                                                await Promise.all([
-                                                    charityService.getLocation(site.id),
-                                                    charityService.listUsers(),
-                                                ]);
-                                            const location =
-                                                locationRes.data?.location ||
-                                                locationRes.data;
-
-                                            setEditingSiteId(site.id);
-
-                                            setEditForm({
-                                                tradingName: String(location?.locationName || ''),
-                                                address: String(location?.address || ''),
-                                                postCode: String(location?.postcode || ''),
-                                                radiusKm: String(location?.pickupRadiusKm || ''),
-                                                latitude: location?.latitude || '',
-                                                longitude: location?.longitude || '',
-                                            });
-
-                                            setExpandedSite(site.id);
-
-                                            setTimeout(() => {
-                                                setEditingSiteId(site.id);
-                                            }, 0);
-
-                                        } catch (err) {
+                                    onPress={() => {
+                                        const location = locations.find((loc) => loc.id === site.id);
+                                        if (!location) {
                                             Alert.alert('Error', 'Failed to load location details');
+                                            return;
                                         }
+
+                                        setEditingSiteId(site.id);
+                                        setEditForm({
+                                            tradingName: String(location?.locationName || ''),
+                                            address: String(location?.address || ''),
+                                            postCode: String(location?.postcode || ''),
+                                            radiusKm: String(location?.pickupRadiusKm || ''),
+                                            latitude: location?.latitude || '',
+                                            longitude: location?.longitude || '',
+                                        });
+                                        setExpandedSite(site.id);
                                     }}
                                 >
                                     <AppText variant="bodyBold" style={{ color: 'white' }} >
@@ -353,26 +333,23 @@ export default function MultiCharityManageSitesScreen() {
                                                 if (actionLoading || !editingSiteId) return;
                                                 setActionLoading(true);
                                                 try {
-                                                    await charityService.updateLocation(
-                                                        editingSiteId,
-                                                        {
-                                                            locationName: editForm.tradingName,
-                                                            address: editForm.address,
-                                                            postcode: editForm.postCode,
-                                                            radiusKm: Number(editForm.radiusKm),
-                                                        }
-                                                    );
-                                                    await fetchLocations();
+                                                    await updateLocation(editingSiteId, {
+                                                        locationName: editForm.tradingName,
+                                                        address: editForm.address,
+                                                        postcode: editForm.postCode,
+                                                        radiusKm: Number(editForm.radiusKm),
+                                                    });
+                                                    await loadData(true);
 
                                                     setEditingSiteId(null);
                                                     setEditForm({});
 
-                                                    Alert.alert('Success', 'Location updated successfully');
-                                                } catch (err: any) {
-                                                    Alert.alert(
-                                                        'Error',
-                                                        err?.response?.data?.message ||
-                                                        'Failed to update location'
+                                                    showSuccessAlert('Location updated successfully');
+                                                } catch (err: unknown) {
+                                                    showErrorAlert(
+                                                        err,
+                                                        'Could not update location',
+                                                        'Failed to update location',
                                                     );
                                                 } finally {
                                                     setActionLoading(false);
@@ -392,7 +369,9 @@ export default function MultiCharityManageSitesScreen() {
                                                     backgroundColor: '#D9534F',
                                                     marginTop: hp(1.2),
                                                 },
+                                                actionLoading && { opacity: 0.65 },
                                             ]}
+                                            disabled={actionLoading}
                                             onPress={() => {
                                                 Alert.alert(
                                                     'Delete Location',
@@ -409,14 +388,15 @@ export default function MultiCharityManageSitesScreen() {
                                                                 if (actionLoading) return;
                                                                 setActionLoading(true);
                                                                 try {
-                                                                    await charityService.deactivateLocation(site.id);
-                                                                    await fetchLocations();
+                                                                    await deactivateLocation(site.id);
+                                                                    await loadData(true);
                                                                     setExpandedSite(null);
-                                                                    Alert.alert('Deleted', 'Location removed successfully');
-                                                                } catch {
-                                                                    Alert.alert(
-                                                                        'Error',
-                                                                        'Failed to remove location'
+                                                                    showSuccessAlert('Location removed successfully', 'Deleted');
+                                                                } catch (err) {
+                                                                    showErrorAlert(
+                                                                        err,
+                                                                        'Could not remove location',
+                                                                        'Failed to remove location',
                                                                     );
                                                                 } finally {
                                                                     setActionLoading(false);
@@ -428,7 +408,7 @@ export default function MultiCharityManageSitesScreen() {
                                             }}
                                         >
                                             <AppText variant="bodyBold" style={{ color: 'white' }} >
-                                                Delete Location
+                                                {actionLoading ? 'Deleting...' : 'Delete Location'}
                                             </AppText>
                                         </Pressable>
                                     </>
@@ -502,47 +482,28 @@ export default function MultiCharityManageSitesScreen() {
                                                                     if (actionLoading) return;
                                                                     setActionLoading(true);
                                                                     try {
-                                                                        const usersRes = await charityService.listUsers();
-                                                                        const users = [
-                                                                            ...(usersRes.data?.headOfficeAdmins || []),
-                                                                            ...(usersRes.data?.headOfficeMembers || []),
-                                                                            ...(usersRes.data?.locationAdmins || []),
-                                                                            ...(usersRes.data?.teamMembers || []),
-                                                                            ...(usersRes.data?.drivers || []),
-                                                                        ];
-
-                                                                        const admin =
-                                                                            users.find(
-                                                                                (u: any) =>
-                                                                                    u.locations?.some(
-                                                                                        (loc: any) =>
-                                                                                            loc.id === site.id
-                                                                                    )
-                                                                            );
+                                                                        await fetchUsers(true);
+                                                                        const admin = users.find((u) =>
+                                                                            u.locations?.some(
+                                                                                (loc: any) => loc.id === site.id,
+                                                                            ),
+                                                                        );
 
                                                                         if (!admin) {
-                                                                            Alert.alert(
-                                                                                'No manager assigned'
-                                                                            );
+                                                                            Alert.alert('No manager assigned');
                                                                             return;
                                                                         }
 
-                                                                        await charityService.deleteUser(
-                                                                            admin.id
-                                                                        );
+                                                                        await deleteUser(admin.id);
+                                                                        await loadData(true);
 
-                                                                        await fetchLocations();
+                                                                        showSuccessAlert('Manager removed successfully');
 
-                                                                        Alert.alert(
-                                                                            'Success',
-                                                                            'Manager removed successfully'
-                                                                        );
-
-                                                                    } catch (err: any) {
-                                                                        Alert.alert(
-                                                                            'Error',
-                                                                            err?.response?.data?.message ||
-                                                                            'Failed to remove manager'
+                                                                    } catch (err: unknown) {
+                                                                        showErrorAlert(
+                                                                            err,
+                                                                            'Could not remove manager',
+                                                                            'Failed to remove manager',
                                                                         );
                                                                     } finally {
                                                                         setActionLoading(false);

@@ -33,9 +33,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 
-import { CharityMemberRole, charityService } from '@/services/charity.service';
+import { CharityMemberRole } from '@/services/charity.service';
+import { useCharityStore } from '@/store/charityStore';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
 import { InputField } from '@/components/InputField';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -48,6 +50,12 @@ const normalize = (size: number) => {
 export default function CreateCharitySiteScreen() {
     const navigation = useNavigation();
     const route = useRoute<any>();
+    const {
+        locations: storeLocations,
+        fetchLocations,
+        addLocation,
+        addMember,
+    } = useCharityStore();
     useEffect(() => {
         if (route.params?.mode === 'manager') {
             setActiveTab('manager');
@@ -58,7 +66,7 @@ export default function CreateCharitySiteScreen() {
     const [activeTab, setActiveTab] = useState<'site' | 'manager'>('site');
     const [loading, setLoading] = useState(false);
     const [createdLocationId, setCreatedLocationId] = useState<number | null>(null);
-    const [locations, setLocations] = useState<any[]>([]);
+    const locations = storeLocations;
     const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
     const [openLocationDropdown, setOpenLocationDropdown] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -177,17 +185,7 @@ export default function CreateCharitySiteScreen() {
 
     useEffect(() => {
         fetchLocations();
-    }, []);
-
-    const fetchLocations = async () => {
-        try {
-            const res = await charityService.listLocations();
-            const data = res.data?.locations || res.data || [];
-            setLocations(data);
-        } catch (e) {
-            console.log('Failed to fetch locations');
-        }
-    };
+    }, [fetchLocations]);
 
     useEffect(() => {
         (async () => {
@@ -239,7 +237,7 @@ export default function CreateCharitySiteScreen() {
             }
 
             setLoading(true);
-            const res = await charityService.addLocation({
+            const res = await addLocation({
                 locationName,
                 address,
                 postcode,
@@ -254,13 +252,13 @@ export default function CreateCharitySiteScreen() {
 
             const locationId = res.data?.id || res.data?.location?.id;
             setCreatedLocationId(locationId);
-            Alert.alert('Success', 'Location created successfully');
-            await fetchLocations();
+            showSuccessAlert('Location created successfully');
+            await fetchLocations(true);
             setSelectedLocationId(locationId);
             setActiveTab('manager');
 
-        } catch (err: any) {
-            Alert.alert('Error', err?.response?.data?.message || 'Failed to create location');
+        } catch (err: unknown) {
+            showErrorAlert(err, 'Could not create location', 'Failed to create location');
         } finally {
             setLoading(false);
         }
@@ -294,7 +292,7 @@ export default function CreateCharitySiteScreen() {
                 return;
             }
             setLoading(true);
-            await charityService.addMember({
+            await addMember({
                 firstName,
                 lastName,
                 email,
@@ -305,10 +303,9 @@ export default function CreateCharitySiteScreen() {
                 canClaimPickupsDirectly,
             });
 
-            Alert.alert('Success', 'Manager assigned successfully');
-            navigation.goBack();
-        } catch (err: any) {
-            Alert.alert('Error', err?.response?.data?.message || 'Failed to assign manager');
+            showSuccessAlert('Manager assigned successfully', 'Done', () => navigation.goBack());
+        } catch (err: unknown) {
+            showErrorAlert(err, 'Could not assign manager', 'Failed to assign manager');
         } finally {
             setLoading(false);
         }
@@ -611,7 +608,7 @@ export default function CreateCharitySiteScreen() {
                                 </View>
 
                                 <Pressable
-                                    style={styles.createBtn}
+                                    style={[styles.createBtn, loading && { opacity: 0.65 }]}
                                     disabled={loading}
                                     onPress={handleCreateLocation}
                                 >
@@ -752,7 +749,7 @@ export default function CreateCharitySiteScreen() {
                                 ))}
 
                                 <Pressable
-                                    style={styles.createBtn}
+                                    style={[styles.createBtn, loading && { opacity: 0.65 }]}
                                     disabled={loading}
                                     onPress={handleAssignManager}>
                                     <AppText style={styles.btnText} >

@@ -19,6 +19,7 @@ import { AuthStackParamList } from '../../navigation/types';
 import { palette } from '../../theme/colors';
 import { useAppContext } from '@/store/AppContext';
 import { authService } from '@/services/auth.service';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -54,6 +55,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
   const inputs = useRef<Array<TextInput | null>>([]);
 
   const handleVerify = async () => {
+    if (loading) return;
     try {
       setLoading(true);
 
@@ -92,12 +94,8 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       });
 
       setShowSuccess(true);
-    } catch (error: any) {
-      const errMsg = error?.response?.data?.message;
-      Alert.alert(
-        'Verification failed',
-        Array.isArray(errMsg) ? errMsg.join('\n') : errMsg || 'Invalid OTP. Please try again.',
-      );
+    } catch (error: unknown) {
+      showErrorAlert(error, 'Verification failed', 'That code is incorrect. Please check and try again.');
     } finally {
       setLoading(false);
     }
@@ -120,6 +118,8 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
   };
 
   const handleResend = () => {
+    if (resending) return;
+
     const email = emailFromRoute
       || (isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email);
 
@@ -132,17 +132,15 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
     authService
       .resendVerification(email)
       .then(() => {
-        Alert.alert('Verification code sent', 'Please check your inbox / spam folder.');
-      })
-      .catch((error: any) => {
-        const errMsg = error?.response?.data?.message;
-        Alert.alert(
-          'Resend failed',
-          Array.isArray(errMsg) ? errMsg.join('\n') : errMsg || 'Please try again.',
+        showSuccessAlert(
+          'Please check your inbox / spam folder.',
+          'Verification code sent',
         );
       })
-      .then(() => setResending(false))
-      .catch(() => setResending(false));
+      .catch((error: unknown) => {
+        showErrorAlert(error, 'Resend failed', 'We could not resend the code. Please try again.');
+      })
+      .finally(() => setResending(false));
   };
 
   useEffect(() => {
@@ -196,7 +194,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
           </View>
 
           {/* RESEND */}
-          <Pressable style={styles.resendButton} onPress={handleResend}>
+          <Pressable style={styles.resendButton} onPress={handleResend} disabled={resending}>
             <AppText variant='label' style={styles.resendText}>
               {resending ? 'Resending...' : 'Resend Email'}
             </AppText>
