@@ -290,13 +290,23 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
           <View style={styles.heroContent}>
             <View style={styles.topBar}>
               <View style={styles.topBarLeft}>
-                <AppText variant="h6" style={styles.brandText}>
+                <AppText
+                  variant="h6"
+                  style={styles.brandText}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
                   {(currentProfile.organization || 'SAVEFUL').toUpperCase()}
                 </AppText>
 
                 <View style={styles.locationRow}>
                   <Ionicons name="location-outline" size={normalize(20)} color={palette.white} />
-                  <AppText variant="body" style={styles.location}>
+                  <AppText
+                    variant="body"
+                    style={styles.location}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {(currentProfile.address || restaurantImpact.siteAddress).toUpperCase()}
                   </AppText>
                 </View>
@@ -318,10 +328,10 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             </View>
 
             <View style={styles.headerCenter}>
-              <AppText variant="h4" style={styles.heroTitle}>
+              <AppText variant="h4" style={styles.heroTitle} numberOfLines={1}>
                 YOUR DASHBOARD
               </AppText>
-              <AppText variant="caption" style={styles.heroSubtitle}>
+              <AppText variant="caption" style={styles.heroSubtitle} numberOfLines={1}>
                 HELP GOOD FOOD GO FURTHER 🍲
               </AppText>
             </View>
@@ -460,7 +470,7 @@ const styles = StyleSheet.create({
     paddingBottom: hp(4),
   },
   heroContainer: {
-    minHeight: hp(20),
+    minHeight: hp(22),
     width: '100%',
     paddingTop: hp(2),
     overflow: 'hidden',
@@ -473,8 +483,9 @@ const styles = StyleSheet.create({
   },
   heroContent: {
     zIndex: 1,
+    flex: 1,
     paddingHorizontal: wp(4),
-    gap: hp(1),
+    paddingBottom: hp(1.2),
   },
   topBar: {
     flexDirection: 'row',
@@ -485,10 +496,12 @@ const styles = StyleSheet.create({
   topBarLeft: {
     flex: 1,
     minWidth: 0,
+    paddingRight: wp(1),
   },
   brandText: {
     color: palette.white,
     fontSize: normalize(18),
+    lineHeight: normalize(22),
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -502,15 +515,15 @@ const styles = StyleSheet.create({
     color: palette.white,
     opacity: 0.9,
     flex: 1,
-    flexWrap: 'wrap',
+    minWidth: 0,
+    lineHeight: normalize(18),
     textTransform: 'uppercase',
-    alignSelf: 'center',
   },
   logoCircle: {
     width: normalize(48),
     height: normalize(48),
     borderRadius: normalize(24),
-    marginLeft: wp(2),
+    flexShrink: 0,
     backgroundColor: palette.white,
     justifyContent: 'center',
     alignItems: 'center',
@@ -527,20 +540,18 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     alignItems: 'center',
-    gap: hp(0.5),
-    marginTop: hp(0.5),
+    marginTop: hp(1.4),
+    gap: hp(0.4),
   },
   heroTitle: {
     color: palette.white,
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    paddingTop: hp(0.5),
   },
   heroSubtitle: {
     color: palette.white,
     textAlign: 'center',
-    paddingTop: hp(0.25),
     opacity: 0.95,
     textTransform: 'uppercase',
     letterSpacing: 0.3,

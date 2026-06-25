@@ -43,6 +43,11 @@ export const estimateCo2AvoidedKg = (totalKg: number) => {
   return Math.round(safeKg * CO2_AVOIDED_FACTOR * 10) / 10;
 };
 
+export const formatCo2AvoidedKg = (totalKg: number) => {
+  const value = estimateCo2AvoidedKg(totalKg);
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+};
+
 export function getListingAudience(listing: any): 'human' | 'animal' | 'both' {
   const type = String(listing?.listingType || '').toUpperCase();
   if (type === 'ANIMAL') return 'animal';

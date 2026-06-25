@@ -23,8 +23,10 @@ import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
 import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
-import { estimateCo2AvoidedKg } from '../../utils/foodListing';
+import { estimateCo2AvoidedKg, estimateMealsSaved, formatCo2AvoidedKg } from '../../utils/foodListing';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
+import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
+import { getFarmRelistFormValues } from '../../utils/listingRelist';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -122,6 +124,13 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
   const { currentProfile, authUser } = useAppContext();
   const { submitting, withLock } = useSubmitLock();
+  const { hasPreviousListing, previousListing } = usePreviousListingRelist('animal');
+  const businessLogo =
+    currentProfile?.logo || authUser?.profile?.organisation?.logoUrl || null;
+  const businessInitial =
+    currentProfile?.organization?.[0] ||
+    authUser?.profile?.organisation?.name?.[0] ||
+    'S';
 
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FarmItem[]>(seedItems);
@@ -144,6 +153,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
+  const estimatedMeals = estimateMealsSaved(totalQuantity);
   const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
 
   // ── helpers ──────────────────────────────────────────────────────────────
@@ -152,6 +162,22 @@ export function CreateFarmListingScreen({ navigation }: any) {
     if (step === 3) { setStep(2); return; }
     if (step === 2) { setStep(1); return; }
     navigation.goBack();
+  };
+
+  const handleRelistAgain = () => {
+    if (!previousListing) return;
+
+    const values = getFarmRelistFormValues(previousListing, seedItems);
+    setItems(values.items);
+    setLocation(values.location);
+    setBestBeforeDate(values.bestBeforeDate);
+    setPickupFromDate(values.pickupFromDate);
+    setPickupToDate(values.pickupToDate);
+    setSelectedStorage(values.selectedStorage);
+    setSelectedContaminants(values.selectedContaminants);
+    setImages(values.images);
+    setConfirmedSafe(false);
+    setStep(1);
   };
 
   const updateQty = (index: number, delta: number) => {
@@ -373,9 +399,21 @@ export function CreateFarmListingScreen({ navigation }: any) {
       <View style={styles.pageWrap}>
 
         <View style={styles.topPanel}>
-          <Pressable onPress={handleBack} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={normalize(20)} color={FARM_ACCENT} />
-          </Pressable>
+          <View style={styles.headerRow}>
+            <Pressable onPress={handleBack} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={normalize(20)} color={FARM_ACCENT} />
+            </Pressable>
+
+            <View style={styles.logoCircle}>
+              {businessLogo ? (
+                <Image source={{ uri: businessLogo }} style={styles.logoImage} resizeMode="cover" />
+              ) : (
+                <AppText variant="bodyBold" style={styles.logoFallback}>
+                  {businessInitial}
+                </AppText>
+              )}
+            </View>
+          </View>
 
           <Image
             source={require('../../../assets/placeholder/livestock.png')}
@@ -434,18 +472,19 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
         {step === 1 ? (
           <View style={styles.stepWrap}>
-            {/* Same as yesterday card */}
-            <View style={styles.relistCard}>
-              <AppText variant="bodyBold" color={palette.midgray}>
-                Same as yesterday?
-              </AppText>
-              <Pressable style={styles.relistBtn}>
-                <AppText variant="bodyBold" color={palette.white}>
-                  YES, LIST AGAIN
+            {hasPreviousListing ? (
+              <View style={styles.relistCard}>
+                <AppText variant="bodyBold" color={palette.midgray}>
+                  Same as yesterday?
                 </AppText>
-                <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
-              </Pressable>
-            </View>
+                <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
+                  <AppText variant="bodyBold" color={palette.white}>
+                    YES, LIST AGAIN
+                  </AppText>
+                  <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+                </Pressable>
+              </View>
+            ) : null}
 
             {/* Food items */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
@@ -817,30 +856,25 @@ export function CreateFarmListingScreen({ navigation }: any) {
               </AppText>
               <View style={styles.impactRow}>
                 <View style={styles.impactBlock}>
-                  {/* <Ionicons name="leaf-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} /> */}
-                  <Image
-                    source={require('../../../assets/placeholder/kg_icon.png')}
-                    style={styles.impactIcon}
-                  />
+                  <Ionicons name="restaurant-outline" size={normalize(18)} color={palette.middlegreen} />
                   <View style={styles.impactBlockContent}>
                     <AppText variant="h7" color={palette.middlegreen} style={styles.impactValue}>
-                      {Math.max(totalQuantity, 0)}kg
+                      {Math.max(estimatedMeals, 0)}
                     </AppText>
                     <AppText variant="bodySmall" color={palette.middlegreen} style={styles.impactLabel}>
-                      diverted from{'\n'}landfill
+                      meals saved
                     </AppText>
                   </View>
                 </View>
 
                 <View style={styles.impactBlock}>
-                  {/* <Ionicons name="cloud-outline" size={normalize(18)} color={FARM_ACCENT} style={styles.impactIcon} /> */}
                   <Image
                     source={require('../../../assets/placeholder/co2_green_icon.png')}
                     style={styles.impactIcon}
                   />
                   <View style={styles.impactBlockContent}>
                     <AppText variant="h7" color={palette.middlegreen} style={styles.impactValue}>
-                      {Math.max(estimatedCO2, 0)}kg
+                      {formatCo2AvoidedKg(totalQuantity)}kg
                     </AppText>
                     <AppText variant="bodySmall" color={palette.middlegreen} style={styles.impactLabel}>
                       CO2 avoided
@@ -848,6 +882,9 @@ export function CreateFarmListingScreen({ navigation }: any) {
                   </View>
                 </View>
               </View>
+              <AppText variant="bodySmall" color={palette.middlegreen} style={styles.impactFootnote}>
+                420g = 1 meal · CO₂ = food kg × 2.1
+              </AppText>
             </View>
           </View>
         ) : null}
@@ -927,8 +964,14 @@ const styles = StyleSheet.create({
   topPanel: {
     alignItems: 'center',
   },
+  headerRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(0.3),
+  },
   backBtn: {
-    alignSelf: 'flex-start',
     width: normalize(34),
     height: normalize(34),
     borderRadius: normalize(17),
@@ -936,8 +979,25 @@ const styles = StyleSheet.create({
     borderColor: '#F0C89A',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(1),
-    marginBottom: hp(0.3),
+  },
+  logoCircle: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    borderWidth: normalize(1.5),
+    borderColor: '#F0C89A',
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  logoFallback: {
+    color: FARM_ACCENT,
+    textTransform: 'uppercase',
   },
   topIcon: {
     width: wp(30),
@@ -1389,6 +1449,11 @@ const styles = StyleSheet.create({
   impactLabel: {
     flexShrink: 1,
     lineHeight: normalize(14),
+  },
+  impactFootnote: {
+    marginTop: hp(0.8),
+    textAlign: 'center',
+    textTransform: 'none',
   },
 
   // ── bottom button ─────────────────────────────────────────────────────────

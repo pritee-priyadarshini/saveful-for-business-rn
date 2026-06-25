@@ -20,10 +20,12 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
-import { estimateMealsSaved, estimateCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
+import { estimateMealsSaved, estimateCo2AvoidedKg, formatCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
+import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
+import { getPeopleRelistFormValues } from '../../utils/listingRelist';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -104,6 +106,13 @@ const formatTime = (date: Date | null) => {
 export function CreateListingScreen({ navigation }: any) {
   const { currentProfile, authUser } = useAppContext();
   const { submitting, withLock } = useSubmitLock();
+  const { hasPreviousListing, previousListing } = usePreviousListingRelist('people');
+  const businessLogo =
+    currentProfile?.logo || authUser?.profile?.organisation?.logoUrl || null;
+  const businessInitial =
+    currentProfile?.organization?.[0] ||
+    authUser?.profile?.organisation?.name?.[0] ||
+    'S';
 
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FoodItem[]>(seedItems);
@@ -130,6 +139,23 @@ export function CreateListingScreen({ navigation }: any) {
   const estimatedMeals = estimateMealsSaved(totalQuantity);
   const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
   const hasSelectedAllergens = selectedAllergens.length > 0;
+
+  const handleRelistAgain = () => {
+    if (!previousListing) return;
+
+    const values = getPeopleRelistFormValues(previousListing, seedItems);
+    setItems(values.items);
+    setLocation(values.location);
+    setBestBeforeDate(values.bestBeforeDate);
+    setPickupFromDate(values.pickupFromDate);
+    setPickupToDate(values.pickupToDate);
+    setStorage(values.storage);
+    setReheating(values.reheating);
+    setSelectedAllergens(values.selectedAllergens);
+    setImages(values.images);
+    setConfirmedSafe(false);
+    setStep(1);
+  };
 
   const updateQty = (index: number, delta: number) => {
     setItems((prev) => {
@@ -376,9 +402,21 @@ export function CreateListingScreen({ navigation }: any) {
     <Screen backgroundColor="#F2F5E9" scrollable contentStyle={styles.screenContent}>
       <View style={styles.pageWrap}>
         <View style={styles.topPanel}>
-          <Pressable onPress={handleBack} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={normalize(20)} color={palette.kale} />
-          </Pressable>
+          <View style={styles.headerRow}>
+            <Pressable onPress={handleBack} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={normalize(20)} color={palette.kale} />
+            </Pressable>
+
+            <View style={styles.logoCircle}>
+              {businessLogo ? (
+                <Image source={{ uri: businessLogo }} style={styles.logoImage} resizeMode="cover" />
+              ) : (
+                <AppText variant="bodyBold" style={styles.logoFallback}>
+                  {businessInitial}
+                </AppText>
+              )}
+            </View>
+          </View>
 
           <Image
             source={require('../../../assets/placeholder/people_icon.png')}
@@ -432,17 +470,19 @@ export function CreateListingScreen({ navigation }: any) {
 
         {step === 1 ? (
           <View style={styles.stepWrap}>
-            <View style={styles.relistCard}>
-              <AppText variant="bodyBold" color={palette.midgray}>
-                Same as yesterday?
-              </AppText>
-              <Pressable style={styles.relistBtn}>
-                <AppText variant="bodyBold" color={palette.white}>
-                  YES, LIST AGAIN
+            {hasPreviousListing ? (
+              <View style={styles.relistCard}>
+                <AppText variant="bodyBold" color={palette.midgray}>
+                  Same as yesterday?
                 </AppText>
-                <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
-              </Pressable>
-            </View>
+                <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
+                  <AppText variant="bodyBold" color={palette.white}>
+                    YES, LIST AGAIN
+                  </AppText>
+                  <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+                </Pressable>
+              </View>
+            ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               WHAT FOOD DO YOU HAVE?
@@ -833,7 +873,7 @@ export function CreateListingScreen({ navigation }: any) {
                 <View style={styles.impactBlock}>
                   <Ionicons name="leaf-outline" size={normalize(18)} color={palette.success} />
                   <AppText variant="h7" color={palette.success}>
-                    {Math.max(estimatedCO2, 0)}kg
+                    {formatCo2AvoidedKg(totalQuantity)}kg
                   </AppText>
                   <AppText variant="bodySmall" color={palette.success}>
                     CO2 avoided
@@ -914,8 +954,14 @@ const styles = StyleSheet.create({
   topPanel: {
     alignItems: 'center',
   },
+  headerRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(0.3),
+  },
   backBtn: {
-    alignSelf: 'flex-start',
     width: normalize(34),
     height: normalize(34),
     borderRadius: normalize(17),
@@ -924,7 +970,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FBF3',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: hp(0.3),
+  },
+  logoCircle: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    borderWidth: normalize(1.5),
+    borderColor: '#B8C6B1',
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  logoFallback: {
+    color: palette.kale,
+    textTransform: 'uppercase',
   },
   peopleIcon: {
     width: wp(20),

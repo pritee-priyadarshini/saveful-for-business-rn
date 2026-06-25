@@ -26,7 +26,7 @@ import {
   invalidateListingDetail,
   type ListingDetail,
 } from '../../services/foodListing.service';
-import { estimateMealsSaved, estimateCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
+import { estimateMealsSaved, estimateCo2AvoidedKg, formatCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import {
   extractListingImages,
   getListingPickupAddress,
@@ -901,7 +901,7 @@ function EditPeopleListingForm({
                 <View style={peopleStyles.impactBlock}>
                   <Ionicons name="leaf-outline" size={normalize(18)} color={palette.success} />
                   <AppText variant="h7" color={palette.success}>
-                    {Math.max(estimatedCO2, 0)}kg
+                    {formatCo2AvoidedKg(totalQuantity)}kg
                   </AppText>
                   <AppText variant="bodySmall" color={palette.success}>
                     CO2 avoided
@@ -1003,6 +1003,7 @@ function EditFarmListingForm({
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
+  const estimatedMeals = estimateMealsSaved(totalQuantity);
   const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
 
   useEffect(() => {
@@ -1651,30 +1652,25 @@ function EditFarmListingForm({
               </AppText>
               <View style={farmStyles.impactRow}>
                 <View style={farmStyles.impactBlock}>
-                  {/* <Ionicons name="leaf-outline" size={normalize(18)} color={FARM_ACCENT} style={farmStyles.impactIcon} /> */}
-                  <Image
-                    source={require('../../../assets/placeholder/kg_icon.png')}
-                    style={farmStyles.impactIcon}
-                  />
+                  <Ionicons name="restaurant-outline" size={normalize(18)} color={palette.middlegreen} />
                   <View style={farmStyles.impactBlockContent}>
                     <AppText variant="h7" color={palette.middlegreen} style={farmStyles.impactValue}>
-                      {Math.max(totalQuantity, 0)}kg
+                      {Math.max(estimatedMeals, 0)}
                     </AppText>
                     <AppText variant="bodySmall" color={palette.middlegreen} style={farmStyles.impactLabel}>
-                      diverted from{'\n'}landfill
+                      meals saved
                     </AppText>
                   </View>
                 </View>
 
                 <View style={farmStyles.impactBlock}>
-                  {/* <Ionicons name="cloud-outline" size={normalize(18)} color={FARM_ACCENT} style={farmStyles.impactIcon} /> */}
                   <Image
                     source={require('../../../assets/placeholder/co2_green_icon.png')}
                     style={farmStyles.impactIcon}
                   />
                   <View style={farmStyles.impactBlockContent}>
                     <AppText variant="h7" color={palette.middlegreen} style={farmStyles.impactValue}>
-                      {Math.max(estimatedCO2, 0)}kg
+                      {formatCo2AvoidedKg(totalQuantity)}kg
                     </AppText>
                     <AppText variant="bodySmall" color={palette.middlegreen} style={farmStyles.impactLabel}>
                       CO2 avoided
@@ -1682,6 +1678,9 @@ function EditFarmListingForm({
                   </View>
                 </View>
               </View>
+              <AppText variant="bodySmall" color={palette.middlegreen} style={farmStyles.impactFootnote}>
+                420g = 1 meal · CO₂ = food kg × 2.1
+              </AppText>
             </View>
           </View>
         ) : null}
@@ -2814,6 +2813,11 @@ const farmStyles = StyleSheet.create({
   impactLabel: {
     flexShrink: 1,
     lineHeight: normalize(14),
+  },
+  impactFootnote: {
+    marginTop: hp(0.8),
+    textAlign: 'center',
+    textTransform: 'none',
   },
 
   // ── bottom button ─────────────────────────────────────────────────────────
