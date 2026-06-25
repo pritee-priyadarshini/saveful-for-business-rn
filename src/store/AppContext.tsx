@@ -22,11 +22,15 @@ import {
 } from './types';
 import { authService } from '../services/auth.service';
 import {
-  registerDeviceToken,
-  unregisterDeviceToken,
   setupForegroundNotificationHandler,
   teardownForegroundNotificationHandler,
 } from '../services/pushNotifications';
+import {
+  TokenManager,
+  TokenManagerEvents,
+} from '../modules/pushNotifications/TokenManager';
+import { pushTokenFromToken } from '../modules/pushNotifications/pushTokenFromToken';
+import { notificationsService } from '../services/notifications.service';
 
 import { DEFAULT_COUNTRY_CODE } from '../data/countryCodes';
 
@@ -134,13 +138,31 @@ export function AppProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-    registerDeviceToken();
+    if (!isAuthenticated) return;
+    TokenManager.shared.initialize();
     setupForegroundNotificationHandler();
     return () => {
       teardownForegroundNotificationHandler();
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const onTokenChanged = async (token?: string) => {
+      if (!token) return;
+      try {
+        const payload = pushTokenFromToken(token);
+        await notificationsService.registerToken(payload);
+        console.log('[Push] Token registered with backend');
+      } catch (error) {
+        console.warn('[Push] Failed to register token with backend:', error);
+      }
+    };
+
+    TokenManager.shared.addListener(TokenManagerEvents.TokenChanged, onTokenChanged);
+    return () => {
+      TokenManager.shared.removeListener(TokenManagerEvents.TokenChanged, onTokenChanged);
     };
   }, [isAuthenticated]);
 
@@ -286,7 +308,13 @@ export function AppProvider({ children }: PropsWithChildren) {
 
       logout: async () => {
         teardownForegroundNotificationHandler();
-        await unregisterDeviceToken();
+        try {
+          await notificationsService.unregisterAllTokens();
+          console.log('[Push] All tokens unregistered');
+        } catch (error) {
+          console.warn('[Push] Failed to unregister tokens:', error);
+        }
+        TokenManager.shared.setToken(undefined);
         await SecureStore.deleteItemAsync('accessToken');
         setAuthenticated(false);
         setAuthUser(null);

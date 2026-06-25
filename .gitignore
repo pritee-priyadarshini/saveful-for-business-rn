@@ -12,5 +12,18 @@ coverage/
 .env
 .env.*
 !.env.example
+/svforb
+/svforb/node_modules
+/svforb/dist
+/svforb/build
+/svforb/coverage
+/svforb/.nyc_output
+/svforb/.idea
+/svforb/.vscode
+/svforb/.temp
+/svforb/.tmp
+/svforb/.DS_Store
 
+./svforb/.env
+.svforb/.env
 *.tsbuildinfo
