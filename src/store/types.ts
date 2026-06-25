@@ -11,6 +11,8 @@ export type RestaurantForm = {
   password: string;
   confirmPassword: string;
   mobile: string;
+  mobileCountryCode: string;
+  mobileCountryIso: string;
   businessName: string;
   businessAddress: string;
   registrationNumber: string;
@@ -29,6 +31,8 @@ export type CharityForm = {
   password: string;
   confirmPassword: string;
   mobile: string;
+  mobileCountryCode: string;
+  mobileCountryIso: string;
   charityName: string;
   charityAddress: string;
   registrationNumber: string;
@@ -49,6 +53,8 @@ export interface FarmerForm {
   password: string;
   confirmPassword: string;
   mobile: string;
+  mobileCountryCode: string;
+  mobileCountryIso: string;
   businessName: string;
   businessAddress: string;
   venueType: string;

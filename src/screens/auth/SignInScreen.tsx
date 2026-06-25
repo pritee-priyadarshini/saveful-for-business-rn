@@ -24,6 +24,12 @@ import { palette } from '../../theme/colors';
 
 import type { AuthStackParamList } from '../../navigation/types';
 import { authService } from '../../services/auth.service';
+import {
+    isValidEmail,
+    isValidPassword,
+    MIN_PASSWORD_LENGTH,
+    passwordsMatch,
+} from '@/utils/validation';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -53,11 +59,28 @@ export function SignInScreen() {
     const [secure, setSecure] = useState(true);
     const [error, setError] = useState('');
 
+    const trimmedEmail = email.trim().toLowerCase();
+
+    const switchMode = (next: 'login' | 'forgot' | 'reset') => {
+        setMode(next);
+        setError('');
+        if (next === 'login') {
+            setOtp(['', '', '', '', '', '']);
+            setNewPassword('');
+            setConfirmPassword('');
+        }
+    };
+
     const handleLogin = async () => {
         try {
             setError('');
-            if (!email || !password) {
-                setError('Please enter email and password');
+            if (!trimmedEmail || !password) {
+                setError('Please enter email and password.');
+                return;
+            }
+
+            if (!isValidEmail(trimmedEmail)) {
+                setError('Please enter a valid email address.');
                 return;
             }
 
@@ -104,10 +127,7 @@ export function SignInScreen() {
             
             setLoading(true);
 
-            const res = await authService.login(
-                email.trim().toLowerCase(),
-                password
-            );
+            const res = await authService.login(trimmedEmail, password);
             const data = res.data;
 
             await SecureStore.setItemAsync('accessToken', data.accessToken);
@@ -136,7 +156,7 @@ export function SignInScreen() {
 
             if (isUnverified) {
                 navigation.navigate('EmailVerification', {
-                    email: email.trim().toLowerCase(),
+                    email: trimmedEmail,
                     autoResend: true,
                 });
                 return;
@@ -150,20 +170,31 @@ export function SignInScreen() {
 
     const handleSendCode = async () => {
         try {
-            if (!email) {
-                setError('Enter your email');
+            setError('');
+
+            if (!trimmedEmail) {
+                setError('Please enter your email address.');
+                return;
+            }
+
+            if (!isValidEmail(trimmedEmail)) {
+                setError('Please enter a valid email address.');
                 return;
             }
 
             setLoading(true);
 
-            await authService.forgotPassword(email.trim().toLowerCase());
+            await authService.forgotPassword(trimmedEmail);
 
-            Alert.alert('Verification Email Sent', 'Check your inbox for OTP');
+            Alert.alert('Verification Email Sent', 'Check your inbox for the reset code.');
+            setOtp(['', '', '', '', '', '']);
+            setNewPassword('');
+            setConfirmPassword('');
             setMode('reset');
 
         } catch (e: any) {
-            setError(e?.response?.data?.message || 'Failed to send code');
+            const message = e?.response?.data?.message || 'Failed to send code';
+            setError(Array.isArray(message) ? message.join('\n') : message);
         } finally {
             setLoading(false);
         }
@@ -171,36 +202,39 @@ export function SignInScreen() {
 
     const handleReset = async () => {
         try {
+            setError('');
             const enteredOtp = otp.join('');
 
+            if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+                setError('Please enter a valid email address.');
+                return;
+            }
+
             if (enteredOtp.length !== 6) {
-                setError('Enter valid OTP');
+                setError('Please enter the 6-digit verification code.');
                 return;
             }
 
-            if (newPassword.length < 8) {
-                setError('Password must be 8+ characters');
+            if (!isValidPassword(newPassword)) {
+                setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
                 return;
             }
 
-            if (newPassword !== confirmPassword) {
-                setError('Passwords do not match');
+            if (!passwordsMatch(newPassword, confirmPassword)) {
+                setError('Passwords do not match. Please re-enter.');
                 return;
             }
 
             setLoading(true);
 
-            await authService.resetPassword(
-                email.trim().toLowerCase(),
-                enteredOtp,
-                newPassword
-            );
+            await authService.resetPassword(trimmedEmail, enteredOtp, newPassword);
 
-            Alert.alert('Success', 'Password reset successful');
-            setMode('login');
+            Alert.alert('Success', 'Password reset successful. You can sign in now.');
+            switchMode('login');
 
         } catch (e: any) {
-            setError(e?.response?.data?.message || 'Reset failed');
+            const message = e?.response?.data?.message || 'Reset failed';
+            setError(Array.isArray(message) ? message.join('\n') : message);
         } finally {
             setLoading(false);
         }
@@ -210,9 +244,16 @@ export function SignInScreen() {
         const next = [...otp];
         next[index] = text.replace(/[^0-9]/g, '');
         setOtp(next);
+        setError('');
 
         if (text && index < 5) {
             inputs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleOtpBackspace = (digit: string, index: number) => {
+        if (!digit && index > 0) {
+            inputs.current[index - 1]?.focus();
         }
     };
 
@@ -257,6 +298,8 @@ export function SignInScreen() {
                                     label="Email Address *"
                                     placeholder="your@email.com"
                                     value={email}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
                                     onChangeText={(text) => {
                                         setEmail(text);
                                         setError('');
@@ -277,7 +320,7 @@ export function SignInScreen() {
                                             }}
                                         />
 
-                                        <TouchableOpacity onPress={() => setMode('forgot')}>
+                                        <TouchableOpacity onPress={() => switchMode('forgot')}>
                                             <AppText variant="caption">
                                                 Forgot Password?
                                             </AppText>
@@ -307,10 +350,7 @@ export function SignInScreen() {
                                         {/* BACK TO SIGN IN */}
                                         <TouchableOpacity
                                             style={styles.backToLogin}
-                                            onPress={() => {
-                                                setMode('login');
-                                                setError('');
-                                            }}
+                                            onPress={() => switchMode('login')}
                                         >
                                             <AppText variant='label' style={styles.backText}>
                                                 Back to Sign In
@@ -338,6 +378,11 @@ export function SignInScreen() {
                                                     keyboardType="number-pad"
                                                     value={d}
                                                     onChangeText={(t) => handleOtpChange(t, i)}
+                                                    onKeyPress={({ nativeEvent }) => {
+                                                        if (nativeEvent.key === 'Backspace') {
+                                                            handleOtpBackspace(d, i);
+                                                        }
+                                                    }}
                                                 />
                                             ))}
                                         </View>
@@ -347,7 +392,10 @@ export function SignInScreen() {
                                             value={newPassword}
                                             secureTextEntry
                                             isPassword
-                                            onChangeText={setNewPassword}
+                                            onChangeText={(value) => {
+                                                setNewPassword(value);
+                                                setError('');
+                                            }}
                                         />
 
                                         <InputField
@@ -355,12 +403,28 @@ export function SignInScreen() {
                                             value={confirmPassword}
                                             secureTextEntry
                                             isPassword
-                                            onChangeText={setConfirmPassword}
+                                            onChangeText={(value) => {
+                                                setConfirmPassword(value);
+                                                setError('');
+                                            }}
                                         />
 
-                                        <TouchableOpacity style={styles.button} onPress={handleReset}>
+                                        <TouchableOpacity
+                                            style={styles.button}
+                                            onPress={handleReset}
+                                            disabled={loading}
+                                        >
                                             <AppText style={styles.buttonText}>
                                                 {loading ? 'Resetting...' : 'Reset Password'}
+                                            </AppText>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.backToLogin}
+                                            onPress={() => switchMode('login')}
+                                        >
+                                            <AppText variant="label" style={styles.backText}>
+                                                Back to Sign In
                                             </AppText>
                                         </TouchableOpacity>
                                     </>

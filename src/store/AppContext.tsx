@@ -22,6 +22,8 @@ import {
 } from './types';
 import { authService } from '../services/auth.service';
 
+import { DEFAULT_COUNTRY_CODE } from '../data/countryCodes';
+
 const defaultRestaurantForm: RestaurantForm = {
   firstName: '',
   lastName: '',
@@ -29,6 +31,8 @@ const defaultRestaurantForm: RestaurantForm = {
   password: '',
   confirmPassword: '',
   mobile: '',
+  mobileCountryCode: DEFAULT_COUNTRY_CODE,
+  mobileCountryIso: 'IN',
   businessName: '',
   businessAddress: '',
   registrationNumber: '',
@@ -47,6 +51,8 @@ const defaultCharityForm: CharityForm = {
   password: '',
   confirmPassword: '',
   mobile: '',
+  mobileCountryCode: DEFAULT_COUNTRY_CODE,
+  mobileCountryIso: 'IN',
   charityName: '',
   charityAddress: '',
   registrationNumber: '',
@@ -67,6 +73,8 @@ const defaultFarmerForm: FarmerForm = {
   password: '',
   confirmPassword: '',
   mobile: '',
+  mobileCountryCode: DEFAULT_COUNTRY_CODE,
+  mobileCountryIso: 'IN',
   businessName: '',
   businessAddress: '',
   venueType: '',

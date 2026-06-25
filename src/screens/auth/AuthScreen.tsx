@@ -10,6 +10,7 @@ import {
   Platform,
   Linking,
   Keyboard,
+  TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
@@ -27,6 +28,8 @@ import { AuthStackParamList } from '../../navigation/types';
 import { authService } from '@/services/auth.service';
 import { mapRole } from '@/utils/roleMapper';
 import { spacing } from '@/theme/spacing';
+import { COUNTRY_CODES, findCountryByIso, appendSignupMobileFields } from '@/data/countryCodes';
+import type { CountryCode } from '@/data/countryCodes';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -173,6 +176,22 @@ function VenueTypeSelector({
 
 const inputPropsBase = { compact: true as const, labelVariant: 'label' as const };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 6;
+
+function FormErrorBanner({ message }: { message: string | null }) {
+  if (!message) return null;
+
+  return (
+    <View style={styles.errorBanner}>
+      <Ionicons name="alert-circle-outline" size={normalize(16)} color={palette.validation} />
+      <AppText variant="bodySmall" style={styles.errorBannerText}>
+        {message}
+      </AppText>
+    </View>
+  );
+}
+
 export function AuthScreen() {
   const {
     restaurantForm,
@@ -283,6 +302,9 @@ export function AuthScreen() {
   const [isChecked, setIsChecked] = useState(false);
   const [showPlacesSearch, setShowPlacesSearch] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState('');
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [mobileFocused, setMobileFocused] = useState(false);
+  const mobileFieldRef = useRef<View>(null);
 
   const openLocationModal = () => setShowPlacesSearch(true);
 
@@ -390,28 +412,39 @@ export function AuthScreen() {
 
   const handleRegister = async () => {
     setFormError(null);
+
+    const step1Error = validateStep1();
+    if (step1Error) {
+      setFormError(step1Error);
+      setCurrentStep(1);
+      return;
+    }
+
+    const step2Error = validateStep2();
+    if (step2Error) {
+      setFormError(step2Error);
+      setCurrentStep(2);
+      return;
+    }
+
+    const step3Error = validateStep3();
+    if (step3Error) {
+      setFormError(step3Error);
+      return;
+    }
+
     try {
       setLoading(true);
 
       const form = new FormData();
 
       if (isRestaurant) {
-        if (restaurantForm.password !== restaurantForm.confirmPassword) {
-          setFormError('Passwords do not match. Please re-enter.');
-          return;
-        }
-
-        if (!restaurantForm.latitude?.trim() || !restaurantForm.longitude?.trim()) {
-          setFormError('Please set your business location before creating your account.');
-          setCurrentStep(3);
-          return;
-        }
-
         form.append('firstName', restaurantForm.firstName);
         form.append('lastName', restaurantForm.lastName);
         form.append('email', restaurantForm.email);
         form.append('password', restaurantForm.password);
-        form.append('mobile', restaurantForm.mobile);
+        appendSignupMobileFields(form, restaurantForm);
+
         form.append('businessName', restaurantForm.businessName);
         form.append('businessAddress', restaurantForm.businessAddress);
         form.append('registrationNumber', restaurantForm.registrationNumber);
@@ -433,22 +466,12 @@ export function AuthScreen() {
         await authService.registerBusiness(form);
 
       } else if (isFarmerProducer) {
-        if (farmerForm.password !== farmerForm.confirmPassword) {
-          setFormError('Passwords do not match. Please re-enter.');
-          return;
-        }
-
-        if (!farmerForm.latitude?.trim() || !farmerForm.longitude?.trim()) {
-          setFormError('Please set your farm location before creating your account.');
-          setCurrentStep(3);
-          return;
-        }
-
         form.append('firstName', farmerForm.firstName);
         form.append('lastName', farmerForm.lastName);
         form.append('email', farmerForm.email);
         form.append('password', farmerForm.password);
-        form.append('mobileNumber', farmerForm.mobile);
+        appendSignupMobileFields(form, farmerForm, 'mobileNumber');
+
         form.append('businessName', farmerForm.businessName);
         form.append('businessAddress', farmerForm.businessAddress);
         form.append('brandName', farmerForm.branding);
@@ -469,22 +492,12 @@ export function AuthScreen() {
         await authService.registerFarmerProducer(form);
 
       } else if (isFarmerConsumer) {
-        if (farmerForm.password !== farmerForm.confirmPassword) {
-          setFormError('Passwords do not match. Please re-enter.');
-          return;
-        }
-
-        if (!farmerForm.latitude?.trim() || !farmerForm.longitude?.trim()) {
-          setFormError('Please set your farm location before creating your account.');
-          setCurrentStep(3);
-          return;
-        }
-
         form.append('firstName', farmerForm.firstName);
         form.append('lastName', farmerForm.lastName);
         form.append('email', farmerForm.email);
         form.append('password', farmerForm.password);
-        form.append('mobile', farmerForm.mobile);
+        appendSignupMobileFields(form, farmerForm);
+
         form.append('farmName', farmerForm.businessName);
         form.append('businessName', farmerForm.businessName);
         form.append('address', farmerForm.businessAddress);
@@ -505,17 +518,12 @@ export function AuthScreen() {
         await authService.registerFarmerConsumer(form);
 
       } else {
-        // Charity (single or multi)
-        if (charityForm.password !== charityForm.confirmPassword) {
-          setFormError('Passwords do not match. Please re-enter.');
-          return;
-        }
-
         form.append('firstName', charityForm.firstName);
         form.append('lastName', charityForm.lastName);
         form.append('email', charityForm.email);
         form.append('password', charityForm.password);
-        form.append('mobile', charityForm.mobile);
+        appendSignupMobileFields(form, charityForm);
+
         form.append('charityName', charityForm.charityName);
         form.append('charityAddress', charityForm.charityAddress);
         form.append('registrationNumber', charityForm.registrationNumber);
@@ -590,6 +598,130 @@ export function AuthScreen() {
     { label: 'Processing / Packing Facility', value: 'PROCESSING_FACILITY' },
     { label: 'Other', value: 'OTHER' },
   ];
+
+  const getPersonalForm = () => {
+    if (isFarmer) return farmerForm;
+    if (isRestaurant) return restaurantForm;
+    return charityForm;
+  };
+
+  const updateMobileField = (field: 'mobile' | 'mobileCountryCode' | 'mobileCountryIso', value: string) => {
+    if (isFarmer) {
+      updateFarmerField(field, value);
+    } else if (isRestaurant) {
+      updateRestaurantField(field, value);
+    } else {
+      updateCharityField(field, value);
+    }
+  };
+
+  const handleCountryChange = (country: CountryCode) => {
+    updateMobileField('mobileCountryCode', country.dialCode);
+    updateMobileField('mobileCountryIso', country.iso);
+    setCountryPickerOpen(false);
+  };
+
+  const mobileCountryIso = isFarmer
+    ? farmerForm.mobileCountryIso
+    : isRestaurant
+    ? restaurantForm.mobileCountryIso
+    : charityForm.mobileCountryIso;
+
+  const mobileNumber = isFarmer
+    ? farmerForm.mobile
+    : isRestaurant
+    ? restaurantForm.mobile
+    : charityForm.mobile;
+
+  const selectedMobileCountry = findCountryByIso(mobileCountryIso) ?? COUNTRY_CODES[0];
+
+  const validateStep1 = (): string | null => {
+    const form = getPersonalForm();
+
+    if (!form.firstName.trim()) return 'Please enter your first name.';
+    if (!form.lastName.trim()) return 'Please enter your last name.';
+    if (!form.email.trim()) return 'Please enter your email address.';
+    if (!EMAIL_REGEX.test(form.email.trim())) return 'Please enter a valid email address.';
+    if (!form.mobile.trim()) return 'Please enter your mobile number.';
+    const digits = form.mobile.replace(/\D/g, '');
+    if (digits.length < 8 || digits.length > 15) return 'Please enter a valid mobile number.';
+    if (!form.password) return 'Please enter a password.';
+    if (form.password.length < MIN_PASSWORD_LENGTH) {
+      return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
+    if (!form.confirmPassword) return 'Please confirm your password.';
+    if (form.password !== form.confirmPassword) return 'Passwords do not match. Please re-enter.';
+
+    return null;
+  };
+
+  const validateStep2 = (): string | null => {
+    if (!isChecked) return 'Please accept the Terms & Conditions to continue.';
+
+    if (isRestaurant) {
+      if (!restaurantForm.businessName.trim()) return 'Please enter your business name.';
+      if (!restaurantForm.businessAddress.trim()) return 'Please enter your business address.';
+      if (!restaurantForm.registrationNumber.trim()) {
+        return 'Please enter your business registration number.';
+      }
+    } else if (isFarmer) {
+      if (!farmerForm.businessName.trim()) return 'Please enter your farm or business name.';
+      if (!farmerForm.businessAddress.trim()) return 'Please enter your farm address.';
+    } else {
+      if (!charityForm.charityName.trim()) return 'Please enter your charity name.';
+      if (!charityForm.charityAddress.trim()) return 'Please enter your charity address.';
+      if (!charityForm.registrationNumber.trim()) return 'Please enter your registration number.';
+      if (!charityForm.postcodes.trim()) return 'Please enter your postcode.';
+    }
+
+    return null;
+  };
+
+  const validateStep3 = (): string | null => {
+    if (!isChecked) return 'Please accept the Terms & Conditions to continue.';
+
+    if (isRestaurant || isFarmer) {
+      const venueType = isFarmer ? farmerForm.venueType : restaurantForm.venueType;
+      if (!venueType.trim()) return 'Please select a venue type.';
+
+      const latitude = isFarmer ? farmerForm.latitude : restaurantForm.latitude;
+      const longitude = isFarmer ? farmerForm.longitude : restaurantForm.longitude;
+      if (!latitude.trim() || !longitude.trim()) {
+        return isRestaurant
+          ? 'Please set your business location before creating your account.'
+          : 'Please set your farm location before creating your account.';
+      }
+    } else {
+      if (!charityForm.postcodes.trim()) return 'Please enter your postcode.';
+
+      const radius = charityForm.pickupRadius.trim();
+      if (radius && (Number.isNaN(Number(radius)) || Number(radius) <= 0)) {
+        return 'Please enter a valid pickup radius in km.';
+      }
+    }
+
+    return null;
+  };
+
+  const handleContinueStep1 = () => {
+    const error = validateStep1();
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    setFormError(null);
+    setCurrentStep(2);
+  };
+
+  const handleContinueStep2 = () => {
+    const error = validateStep2();
+    if (error) {
+      setFormError(error);
+      return;
+    }
+    setFormError(null);
+    setCurrentStep(3);
+  };
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false}>
@@ -769,19 +901,73 @@ export function AuthScreen() {
                 }
               />
 
-              <InputField
-                label="Mobile"
-                placeholder="Enter mobile"
-                {...inputProps}
-                value={isFarmer ? farmerForm.mobile : isRestaurant ? restaurantForm.mobile : charityForm.mobile}
-                onChangeText={(v) =>
-                  isFarmer
-                    ? updateFarmerField('mobile', v)
-                    : isRestaurant
-                    ? updateRestaurantField('mobile', v)
-                    : updateCharityField('mobile', v)
-                }
-              />
+              <View ref={mobileFieldRef} style={styles.mobileFieldWrap}>
+                <AppText variant="label" style={styles.mobileLabel}>
+                  Mobile
+                </AppText>
+
+                <View style={[styles.mobileInputRow, mobileFocused && styles.mobileInputRowFocused]}>
+                  <Pressable
+                    style={styles.countryCodeBtn}
+                    onPress={() => setCountryPickerOpen((open) => !open)}
+                  >
+                    <AppText style={styles.countryFlag}>{selectedMobileCountry.flag}</AppText>
+                    <AppText variant="bodyBold" style={styles.countryDialCode}>
+                      {selectedMobileCountry.dialCode}
+                    </AppText>
+                    <Ionicons
+                      name={countryPickerOpen ? 'chevron-up' : 'chevron-down'}
+                      size={normalize(14)}
+                      color={palette.stone}
+                    />
+                  </Pressable>
+
+                  <TextInput
+                    value={mobileNumber}
+                    onChangeText={(v) => updateMobileField('mobile', v.replace(/[^\d]/g, ''))}
+                    placeholder="Enter mobile number"
+                    placeholderTextColor={palette.stone}
+                    keyboardType="phone-pad"
+                    textContentType="telephoneNumber"
+                    returnKeyType="done"
+                    maxLength={15}
+                    style={styles.mobileTextInput}
+                    onFocus={() => {
+                      setMobileFocused(true);
+                      setCountryPickerOpen(false);
+                      if (mobileFieldRef.current) {
+                        handleFieldFocus(mobileFieldRef.current);
+                      }
+                    }}
+                    onBlur={() => setMobileFocused(false)}
+                  />
+                </View>
+
+                {countryPickerOpen ? (
+                  <View style={styles.countryListBox}>
+                    <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                      {COUNTRY_CODES.map((country) => {
+                        const isSelected = country.iso === selectedMobileCountry.iso;
+                        return (
+                          <Pressable
+                            key={country.iso}
+                            style={[styles.countryOptionRow, isSelected && styles.countryOptionRowSelected]}
+                            onPress={() => handleCountryChange(country)}
+                          >
+                            <AppText style={styles.countryFlag}>{country.flag}</AppText>
+                            <AppText variant="bodyBold" style={styles.countryOptionName}>
+                              {country.name}
+                            </AppText>
+                            <AppText variant="bodySmall" style={styles.countryOptionCode}>
+                              {country.dialCode}
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
+              </View>
               <InputField
                 label="Password"
                 placeholder="Enter password"
@@ -813,7 +999,9 @@ export function AuthScreen() {
                 }
               />
 
-              <AuthContinueButton onPress={() => setCurrentStep(2)} />
+              <FormErrorBanner message={formError} />
+
+              <AuthContinueButton onPress={handleContinueStep1} />
             </View>
           )}
 
@@ -973,16 +1161,11 @@ export function AuthScreen() {
 
               <TermsCheckbox isChecked={isChecked} onToggle={() => setIsChecked(!isChecked)} />
 
+              <FormErrorBanner message={formError} />
+
               <AuthContinueButton
                 disabled={!isChecked}
-                onPress={() => {
-                  if (!isChecked) {
-                    setFormError('Please accept the Terms & Conditions to continue.');
-                    return;
-                  }
-                  setFormError(null);
-                  setCurrentStep(3);
-                }}
+                onPress={handleContinueStep2}
               />
             </View>
           )}
@@ -1087,14 +1270,7 @@ export function AuthScreen() {
                 </>
               )}
 
-              {!!formError && (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle-outline" size={normalize(16)} color={palette.validation} />
-                  <AppText variant="bodySmall" style={styles.errorBannerText}>
-                    {formError}
-                  </AppText>
-                </View>
-              )}
+              <FormErrorBanner message={formError} />
 
               <AuthContinueButton
                 label={loading ? 'CREATING...' : 'CREATE ACCOUNT'}
@@ -1159,6 +1335,93 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     fontSize: normalize(14),
+  },
+
+  mobileFieldWrap: {
+    gap: spacing.xs,
+  },
+
+  mobileLabel: {
+    textTransform: 'none',
+    color: palette.black,
+  },
+
+  mobileInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: normalize(44),
+    borderWidth: 1,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    overflow: 'hidden',
+  },
+
+  mobileInputRowFocused: {
+    borderColor: palette.primary,
+  },
+
+  countryCodeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1),
+    paddingHorizontal: wp(2.5),
+    borderRightWidth: 1,
+    borderRightColor: '#E8E8E8',
+    height: '100%',
+    justifyContent: 'center',
+  },
+
+  countryFlag: {
+    fontSize: normalize(18),
+  },
+
+  countryDialCode: {
+    fontSize: normalize(14),
+    color: palette.black,
+    textTransform: 'none',
+  },
+
+  mobileTextInput: {
+    flex: 1,
+    paddingHorizontal: wp(3.5),
+    fontSize: normalize(14),
+    color: palette.text,
+  },
+
+  countryListBox: {
+    borderWidth: 1,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    maxHeight: hp(22),
+    overflow: 'hidden',
+  },
+
+  countryOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EFEFEF',
+  },
+
+  countryOptionRowSelected: {
+    backgroundColor: '#F4FAF6',
+  },
+
+  countryOptionName: {
+    flex: 1,
+    textTransform: 'none',
+    color: palette.black,
+    fontSize: normalize(13),
+  },
+
+  countryOptionCode: {
+    textTransform: 'none',
+    color: palette.stone,
   },
 
   venueSelectorWrap: {

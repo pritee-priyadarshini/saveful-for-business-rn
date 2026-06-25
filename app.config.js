@@ -7,8 +7,6 @@ export default {
     userInterfaceStyle: "light",
     icon: "./assets/intro/Saveful-for-Business-logo.png",
     splash: {
-      image: "./assets/intro/splash_logo.png",
-      resizeMode: "cover",
       backgroundColor: "#F6F4EE",
     },
 
@@ -52,28 +50,6 @@ export default {
     },
 
     plugins: [
-      [
-        "expo-splash-screen",
-        {
-          backgroundColor: "#F6F4EE",
-          image: "./assets/intro/splash_logo.png",
-          resizeMode: "cover",
-          enableFullScreenImage_legacy: true,
-          imageWidth: 200,
-          ios: {
-            backgroundColor: "#F6F4EE",
-            image: "./assets/intro/splash_logo.png",
-            resizeMode: "cover",
-            enableFullScreenImage_legacy: true,
-          },
-          android: {
-            backgroundColor: "#F6F4EE",
-            image: "./assets/intro/splash_logo.png",
-            resizeMode: "cover",
-            imageWidth: 200,
-          },
-        },
-      ],
       "expo-asset",
       "@react-native-community/datetimepicker",
       "expo-secure-store",

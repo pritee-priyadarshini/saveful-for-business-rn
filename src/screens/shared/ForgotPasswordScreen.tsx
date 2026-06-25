@@ -22,16 +22,22 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { authService } from '@/services/auth.service';
 import { RootStackParamList } from '@/navigation/AppNavigator';
 import { useAppContext } from '@/store/AppContext';
+import {
+    isValidEmail,
+    isValidPassword,
+    MIN_PASSWORD_LENGTH,
+    passwordsMatch,
+} from '@/utils/validation';
 
 export default function ForgotPasswordScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
     const { authUser } = useAppContext();
 
-
     const [email, setEmail] = useState('');
     const [firstName, setFirstName] = useState('');
-
     const [loading, setLoading] = useState(false);
+    const [formError, setFormError] = useState('');
+    const [codeSent, setCodeSent] = useState(false);
 
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [password, setPassword] = useState('');
@@ -39,26 +45,18 @@ export default function ForgotPasswordScreen() {
 
     const inputs = useRef<(TextInput | null)[]>([]);
 
-    const [otpSent, setOtpSent] = useState(false);
-
-    useEffect(() => {
-        if (email && !otpSent) {
-            handleSendCode();
-            setOtpSent(true);
-        }
-    }, [email]);
-
     useEffect(() => {
         if (authUser?.profile?.user) {
             setEmail(authUser.profile.user.email || '');
             setFirstName(authUser.profile.user.firstName || '');
         }
-    }, []);
+    }, [authUser]);
 
     const handleChange = (text: string, index: number) => {
         const next = [...otp];
         next[index] = text.replace(/[^0-9]/g, '');
         setOtp(next);
+        setFormError('');
 
         if (text && index < 5) {
             inputs.current[index + 1]?.focus();
@@ -72,59 +70,77 @@ export default function ForgotPasswordScreen() {
     };
 
     const handleSendCode = async () => {
-        try {
-            if (!email.trim()) {
-                Alert.alert('Missing Email', 'Enter your email');
-                return;
-            }
+        const trimmedEmail = email.trim().toLowerCase();
 
+        if (!trimmedEmail) {
+            setFormError('Please enter your email address.');
+            return;
+        }
+
+        if (!isValidEmail(trimmedEmail)) {
+            setFormError('Please enter a valid email address.');
+            return;
+        }
+
+        try {
+            setFormError('');
             setLoading(true);
 
-            const res = await authService.forgotPassword(email.trim().toLowerCase());
-
-            Alert.alert('Success', res.data.message);
+            const res = await authService.forgotPassword(trimmedEmail);
+            setCodeSent(true);
+            Alert.alert('Success', res.data.message || 'Reset code sent to your email.');
         } catch (error: any) {
-            Alert.alert('Error', error?.response?.data?.message || 'Something went wrong');
+            const message = error?.response?.data?.message || 'Something went wrong';
+            setFormError(Array.isArray(message) ? message.join('\n') : message);
         } finally {
             setLoading(false);
         }
     };
 
     const handleReset = async () => {
+        const trimmedEmail = email.trim().toLowerCase();
+        const enteredOtp = otp.join('');
+
+        if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+            setFormError('Please enter a valid email address.');
+            return;
+        }
+
+        if (!codeSent) {
+            setFormError('Please send a reset code to your email first.');
+            return;
+        }
+
+        if (enteredOtp.length !== 6) {
+            setFormError('Please enter the 6-digit verification code.');
+            return;
+        }
+
+        if (!isValidPassword(password)) {
+            setFormError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+            return;
+        }
+
+        if (!passwordsMatch(password, confirmPassword)) {
+            setFormError('Passwords do not match. Please re-enter.');
+            return;
+        }
+
         try {
-            const enteredOtp = otp.join('');
-
-            if (enteredOtp.length !== 6) {
-                Alert.alert('Invalid Code', 'Enter 6-digit OTP');
-                return;
-            }
-
-            if (!password || password.length < 8) {
-                Alert.alert('Invalid Password', 'Min 8 characters required');
-                return;
-            }
-
-            if (password !== confirmPassword) {
-                Alert.alert('Mismatch', 'Passwords do not match');
-                return;
-            }
-
+            setFormError('');
             setLoading(true);
 
-            const res = await authService.resetPassword(
-                email.trim().toLowerCase(),
-                enteredOtp,
-                password
-            );
+            const res = await authService.resetPassword(trimmedEmail, enteredOtp, password);
 
-            Alert.alert('Success', res.data.message, [
+            Alert.alert('Success', res.data.message || 'Password updated successfully.', [
                 {
                     text: 'OK',
                     onPress: () => navigation.goBack(),
                 },
             ]);
         } catch (error: any) {
-            Alert.alert('Reset Failed', error?.response?.data?.message || 'Something went wrong');
+            const message = error?.response?.data?.message || 'Something went wrong';
+            setFormError(Array.isArray(message) ? message.join('\n') : message);
         } finally {
             setLoading(false);
         }
@@ -133,7 +149,7 @@ export default function ForgotPasswordScreen() {
     return (
         <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
             <Screen scrollable backgroundColor={palette.creme}>
                 <ImageBackground
@@ -154,28 +170,37 @@ export default function ForgotPasswordScreen() {
                         Secure Password Reset
                     </AppText>
 
-                    {/* FIRST NAME */}
-                    <InputField
-                        label="First Name"
-                        value={firstName}
-                        editable={false}
-                    />
+                    {firstName ? (
+                        <InputField
+                            label="First Name"
+                            value={firstName}
+                            editable={false}
+                        />
+                    ) : null}
 
-                    {/* EMAIL */}
                     <InputField
                         label="Email Address"
                         value={email}
-                        onChangeText={setEmail}
-                        editable={!authUser} // editable only if not logged in
+                        onChangeText={(value) => {
+                            setEmail(value);
+                            setFormError('');
+                        }}
+                        editable={!authUser}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
                     />
 
-                    {/* SEND OTP */}
                     <Button
-                        label={loading ? 'Sending...' : 'Send Reset Code'}
+                        label={loading ? 'Sending...' : codeSent ? 'Resend Reset Code' : 'Send Reset Code'}
                         onPress={handleSendCode}
                     />
 
-                    {/* OTP */}
+                    {codeSent ? (
+                        <AppText variant="bodySmall" style={styles.hintText}>
+                            A verification code was sent to your email.
+                        </AppText>
+                    ) : null}
+
                     <View style={styles.otpContainer}>
                         {otp.map((digit, index) => (
                             <TextInput
@@ -197,11 +222,13 @@ export default function ForgotPasswordScreen() {
                         ))}
                     </View>
 
-                    {/* PASSWORD */}
                     <InputField
                         label="New Password"
                         value={password}
-                        onChangeText={setPassword}
+                        onChangeText={(value) => {
+                            setPassword(value);
+                            setFormError('');
+                        }}
                         secureTextEntry
                         isPassword
                     />
@@ -209,13 +236,20 @@ export default function ForgotPasswordScreen() {
                     <InputField
                         label="Confirm Password"
                         value={confirmPassword}
-                        onChangeText={setConfirmPassword}
+                        onChangeText={(value) => {
+                            setConfirmPassword(value);
+                            setFormError('');
+                        }}
                         secureTextEntry
                         isPassword
                     />
 
+                    {formError ? (
+                        <AppText variant="bodySmall" style={styles.errorText}>
+                            {formError}
+                        </AppText>
+                    ) : null}
 
-                    {/* RESET */}
                     <Button
                         label={loading ? 'Resetting...' : 'Save New Password'}
                         onPress={handleReset}
@@ -225,8 +259,6 @@ export default function ForgotPasswordScreen() {
         </KeyboardAvoidingView>
     );
 }
-
-/* STYLES */
 
 const styles = StyleSheet.create({
     headerBg: {
@@ -250,6 +282,12 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
+    hintText: {
+        textAlign: 'center',
+        color: palette.stone,
+        textTransform: 'none',
+    },
+
     otpContainer: {
         flexDirection: 'row',
         gap: spacing.sm,
@@ -259,8 +297,16 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 50,
         borderWidth: 1,
+        borderColor: '#D9D9D9',
         borderRadius: 10,
         textAlign: 'center',
         fontSize: 18,
+        backgroundColor: palette.white,
+    },
+
+    errorText: {
+        color: palette.validation,
+        textAlign: 'center',
+        textTransform: 'none',
     },
 });
