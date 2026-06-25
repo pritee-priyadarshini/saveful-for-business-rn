@@ -228,8 +228,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
             })
           }
         >
-          <AppText variant="bodyLarge" style={styles.ctaText}>
-            List Surplus Food
+          <AppText variant="h8" style={styles.ctaText}>
+            List Surplus 
           </AppText>
         </Pressable>
 

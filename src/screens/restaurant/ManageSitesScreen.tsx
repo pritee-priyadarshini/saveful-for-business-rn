@@ -43,7 +43,7 @@ export default function ManageSitesScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const actions = [
-    { label: 'Create Site', route: 'CreateSite' },
+    { label: 'Add Site & Manager', route: 'CreateSite' },
     { label: 'View Analytics', route: 'SiteAnalytics' },
     { label: 'Your Profile', route: 'AdminProfile' },
     { label: 'Contact Saveful', action: () => Linking.openURL('https://www.saveful.com/contact') },
@@ -384,9 +384,10 @@ const styles = StyleSheet.create({
   },
 
   logoTopRight: {
-    width: wp(30),
-    height: hp(10),
-    resizeMode: 'contain',
+    width: wp(22),
+    height: wp(22),
+    borderRadius: wp(11),
+    resizeMode: 'cover',
     position: 'absolute',
     right: wp(5),
   },
