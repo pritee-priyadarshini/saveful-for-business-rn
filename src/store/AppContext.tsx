@@ -21,6 +21,12 @@ import {
   RoleFlow,
 } from './types';
 import { authService } from '../services/auth.service';
+import {
+  registerDeviceToken,
+  unregisterDeviceToken,
+  setupForegroundNotificationHandler,
+  teardownForegroundNotificationHandler,
+} from '../services/pushNotifications';
 
 import { DEFAULT_COUNTRY_CODE } from '../data/countryCodes';
 
@@ -126,6 +132,17 @@ export function AppProvider({ children }: PropsWithChildren) {
 
     restoreSession();
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+    registerDeviceToken();
+    setupForegroundNotificationHandler();
+    return () => {
+      teardownForegroundNotificationHandler();
+    };
+  }, [isAuthenticated]);
 
   const resetForms = () => {
     setRestaurantForm(defaultRestaurantForm);
@@ -268,6 +285,8 @@ export function AppProvider({ children }: PropsWithChildren) {
       },
 
       logout: async () => {
+        teardownForegroundNotificationHandler();
+        await unregisterDeviceToken();
         await SecureStore.deleteItemAsync('accessToken');
         setAuthenticated(false);
         setAuthUser(null);

@@ -117,6 +117,6 @@ export type AppContextValue = {
   ) => void;
   setAuthUser: (user: AuthUser | null) => void;
   setAuthenticated: (auth: boolean) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   resetForms: () => void;
 };

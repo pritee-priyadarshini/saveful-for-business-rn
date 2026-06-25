@@ -1,3 +1,5 @@
+const { existsSync } = require('fs');
+
 export default {
   expo: {
     name: "Saveful For Business",
@@ -16,6 +18,7 @@ export default {
       supportsTablet: true,
       icon: "./assets/intro/Saveful-for-Business-logo.png",
       bundleIdentifier: "com.priteepriyadarshini.savefulbusiness",
+      ...(existsSync('./GoogleService-Info.plist') && { googleServicesFile: "./GoogleService-Info.plist" }),
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSPhotoLibraryUsageDescription:
@@ -28,6 +31,7 @@ export default {
 
     android: {
       package: "com.saveful.business.app",
+      ...(existsSync('./google-services.json') && { googleServicesFile: "./google-services.json" }),
       adaptiveIcon: {
         foregroundImage: "./assets/intro/Saveful-for-Business-logo.png",
         backgroundColor: "#F6F4EE",
@@ -37,6 +41,7 @@ export default {
         "ACCESS_FINE_LOCATION",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
       ],
       config: {
         googleMaps: {
@@ -54,6 +59,16 @@ export default {
       "@react-native-community/datetimepicker",
       "expo-secure-store",
       "expo-font",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/intro/Saveful-for-Business-logo.png",
+          color: "#F6F4EE",
+          defaultChannel: "default",
+        },
+      ],
       [
         "expo-location",
         {
