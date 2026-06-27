@@ -22,6 +22,7 @@ interface AuthActions {
   setRoleFlow: (flow: RoleFlow) => void;
   selectPlan: (planId: string) => void;
   setInitialLoading: (loading: boolean) => void;
+  restoreSession: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateCoordinates: (
     organizationId: number | string,
@@ -54,6 +55,26 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   selectPlan: (planId) => set({ selectedPlanId: planId }),
 
   setInitialLoading: (loading) => set({ isInitialLoading: loading }),
+
+  restoreSession: async () => {
+    try {
+      const token = await SecureStore.getItemAsync('accessToken');
+      if (token) {
+        const profileRes = await authService.profile();
+        const authUser = buildAuthUserFromProfile(profileRes.data, token);
+        set({
+          authUser,
+          isAuthenticated: true,
+          selectedRole: resolveUserRole(authUser),
+        });
+      }
+    } catch (error) {
+      console.log('SESSION RESTORE ERROR', error);
+      await SecureStore.deleteItemAsync('accessToken');
+    } finally {
+      set({ isInitialLoading: false });
+    }
+  },
 
   refreshProfile: async () => {
     const { authUser: currentUser } = get();

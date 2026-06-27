@@ -317,28 +317,48 @@ export function RestaurantUpdatesScreen() {
     );
   };
 
-  const renderContactGroup = (
-    label: string,
-    phone: string | undefined,
+  const renderContactSection = (
+    claimerLabel: string,
+    assigneeLabel: string,
+    claimerPhone: string | undefined,
+    assigneePhone: string | undefined,
     audience: Audience,
   ) => {
     const ts = getThemeStyles(audience);
 
     return (
-      <View style={styles.contactGroup}>
-        <AppText variant="bodyBold" color={palette.black} style={styles.contactGroupLabel}>
-          {label}
-        </AppText>
-        <View style={styles.contactBtnRow}>
-          <Pressable style={[styles.contactBtn, ts.contactBtn]} onPress={() => makeCall(phone)}>
-            <Ionicons name="call-outline" size={normalize(16)} color={ts.accentColor} />
-            <AppText variant="bodyBold" style={[styles.contactActionText, ts.contactActionText]}>
+      <View style={styles.contactSection}>
+        <View style={styles.contactLabelsRow}>
+          <AppText variant="bodyBold" color={palette.black} style={styles.contactGroupLabel} numberOfLines={1}>
+            {claimerLabel}
+          </AppText>
+          <AppText variant="bodyBold" color={palette.black} style={styles.contactGroupLabel} numberOfLines={1}>
+            {assigneeLabel}
+          </AppText>
+        </View>
+
+        <View style={styles.contactActionsRow}>
+          <Pressable style={[styles.contactActionBtn, ts.contactBtn]} onPress={() => makeCall(claimerPhone)}>
+            <Ionicons name="call-outline" size={normalize(14)} color={ts.accentColor} />
+            <AppText variant="bodyBold" style={[styles.contactActionText, ts.contactActionText]} numberOfLines={1}>
               Call
             </AppText>
           </Pressable>
-          <Pressable style={[styles.contactBtn, ts.contactBtn]} onPress={() => sendMessage(phone)}>
-            <Ionicons name="chatbubble-outline" size={normalize(16)} color={ts.accentColor} />
-            <AppText variant="bodyBold" style={[styles.contactActionText, ts.contactActionText]}>
+          <Pressable style={[styles.contactActionBtn, ts.contactBtn]} onPress={() => sendMessage(claimerPhone)}>
+            <Ionicons name="chatbubble-outline" size={normalize(14)} color={ts.accentColor} />
+            <AppText variant="bodyBold" style={[styles.contactActionText, ts.contactActionText]} numberOfLines={1}>
+              Message
+            </AppText>
+          </Pressable>
+          <Pressable style={[styles.contactActionBtn, ts.contactBtn]} onPress={() => makeCall(assigneePhone)}>
+            <Ionicons name="call-outline" size={normalize(14)} color={ts.accentColor} />
+            <AppText variant="bodyBold" style={[styles.contactActionText, ts.contactActionText]} numberOfLines={1}>
+              Call
+            </AppText>
+          </Pressable>
+          <Pressable style={[styles.contactActionBtn, ts.contactBtn]} onPress={() => sendMessage(assigneePhone)}>
+            <Ionicons name="chatbubble-outline" size={normalize(14)} color={ts.accentColor} />
+            <AppText variant="bodyBold" style={[styles.contactActionText, ts.contactActionText]} numberOfLines={1}>
               Message
             </AppText>
           </Pressable>
@@ -354,7 +374,7 @@ export function RestaurantUpdatesScreen() {
       item.assigneeLabel === 'Farmer'
         ? `Status: ${prettyStatus(item.assigneeStatus || 'Farmer Assigned')}`
         : `Status: ${prettyStatus(item.assigneeStatus || 'Driver Assigned')}`;
-    const contactLabel = item.audience === 'animals' ? 'Contact Farmer' : 'Contact Charity';
+    const claimerContactLabel = item.audience === 'animals' ? 'Contact Farmer' : 'Contact Charity';
     const assigneeContactLabel =
       item.assigneeLabel === 'Farmer' ? 'Contact Farmer' : 'Contact Driver';
 
@@ -428,10 +448,13 @@ export function RestaurantUpdatesScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.contactPairRow}>
-          {renderContactGroup(contactLabel, item.claimerPhone, item.audience)}
-          {renderContactGroup(assigneeContactLabel, item.assigneePhone, item.audience)}
-        </View>
+        {renderContactSection(
+          claimerContactLabel,
+          assigneeContactLabel,
+          item.claimerPhone,
+          item.assigneePhone,
+          item.audience,
+        )}
 
         {pickupStatus[item.id] === 'completed' ? (
           <AppText style={[styles.completedText, ts.completedText]}>
@@ -1022,35 +1045,40 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  contactPairRow: {
-    flexDirection: 'row',
-    gap: wp(2.5),
+  contactSection: {
+    gap: hp(0.5),
     marginTop: hp(0.4),
+    width: '100%',
   },
 
-  contactGroup: {
-    flex: 1,
-    minWidth: 0,
-    gap: hp(0.5),
+  contactLabelsRow: {
+    flexDirection: 'row',
+    gap: wp(2.5),
+    width: '100%',
   },
 
   contactGroupLabel: {
+    flex: 1,
+    minWidth: 0,
     textTransform: 'none',
   },
 
-  contactBtnRow: {
+  contactActionsRow: {
     flexDirection: 'row',
-    gap: wp(1.5),
+    flexWrap: 'nowrap',
+    gap: wp(1.2),
+    width: '100%',
   },
 
-  contactBtn: {
+  contactActionBtn: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: wp(0.8),
+    gap: wp(0.6),
     paddingVertical: hp(0.75),
-    paddingHorizontal: wp(2.2),
+    paddingHorizontal: wp(1),
     borderRadius: normalize(8),
     borderWidth: normalize(1),
     backgroundColor: palette.white,
@@ -1065,8 +1093,9 @@ const styles = StyleSheet.create({
   },
 
   contactActionText: {
-    fontSize: normalize(12),
+    fontSize: normalize(10),
     textTransform: 'none',
+    flexShrink: 1,
   },
 
   contactActionTextPeople: {

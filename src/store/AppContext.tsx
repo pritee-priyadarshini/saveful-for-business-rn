@@ -5,19 +5,15 @@ import React, {
   useEffect,
   useMemo,
 } from 'react';
-import * as SecureStore from 'expo-secure-store';
-
 import { plansData } from '../data/plansData';
 import { UserProfile } from '../types';
 import { AppContextValue } from './types';
-import { authService } from '../services/auth.service';
 import { setUnauthorizedHandler } from '../services/api';
 import { useNotificationsStore } from './notificationsStore';
 
 import { useAuthStore } from './authStore';
 import { useRegistrationStore } from './registrationStore';
 import {
-  buildAuthUserFromProfile,
   resolveUserRole,
 } from '@/utils/authSession';
 import { resetAllDataStores } from './index';
@@ -27,7 +23,6 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: PropsWithChildren) {
   const {
     isAuthenticated,
-    isInitialLoading,
     authUser,
     selectedRole,
     roleFlow,
@@ -37,7 +32,6 @@ export function AppProvider({ children }: PropsWithChildren) {
     setRole,
     setRoleFlow,
     selectPlan,
-    setInitialLoading,
     logout: authStoreLogout,
   } = useAuthStore();
 
@@ -50,31 +44,6 @@ export function AppProvider({ children }: PropsWithChildren) {
     updateFarmerField,
     resetForms,
   } = useRegistrationStore();
-
-  useEffect(() => {
-    async function restoreSession() {
-      try {
-        const token = await SecureStore.getItemAsync('accessToken');
-        if (token) {
-          const profileRes = await authService.profile();
-          const authUser = buildAuthUserFromProfile(
-            profileRes.data,
-            token,
-          );
-          setRole(resolveUserRole(authUser));
-          setAuthUser(authUser);
-        }
-      } catch (error) {
-        console.log('SESSION RESTORE ERROR', error);
-        await SecureStore.deleteItemAsync('accessToken');
-      } finally {
-        setInitialLoading(false);
-      }
-    }
-
-    restoreSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(async () => {
@@ -211,10 +180,6 @@ export function AppProvider({ children }: PropsWithChildren) {
     resetForms,
     authStoreLogout,
   ]);
-
-  if (isInitialLoading) {
-    return null;
-  }
 
   return (
     <AppContext.Provider value={value}>

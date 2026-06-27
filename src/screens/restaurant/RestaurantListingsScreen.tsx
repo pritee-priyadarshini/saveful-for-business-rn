@@ -19,7 +19,7 @@ import { Skeleton } from '../../components/Skeleton';
 
 import { palette } from '@/theme/colors';
 import { ListingStatus } from '@/types';
-import { estimateMealsSaved, getListingAudience, getListingStatusLabel, isAnimalListing, isListingActive, isListingCollected, isListingExpired, isPeopleListing } from '../../utils/foodListing';
+import { estimateMealsSaved, getListingAudience, getListingStatusLabel, isAnimalListing, isListingActive, isListingCancelled, isListingCollected, isListingExpired, isPeopleListing, resolveListingStatus } from '../../utils/foodListing';
 import { showErrorAlert } from '../../utils/apiError';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
@@ -35,6 +35,32 @@ const normalize = (size: number) => {
 type MetaBoxLayout = 'half' | 'centered';
 
 type ListingFilter = 'all' | 'people' | 'animals';
+type StatusFilter = 'all' | 'active' | 'expired' | 'collected' | 'cancelled';
+
+const STATUS_FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'expired', label: 'Expired' },
+  { key: 'collected', label: 'Collected' },
+  { key: 'cancelled', label: 'Cancelled' },
+];
+
+const LISTING_STATUS_PRIORITY: Record<ListingStatus, number> = {
+  ACTIVE: 0,
+  PARTIAL: 1,
+  CLAIMED: 2,
+  EXPIRED: 3,
+  CANCELLED: 4,
+};
+
+function matchesStatusFilter(listing: any, statusFilter: StatusFilter): boolean {
+  if (statusFilter === 'all') return true;
+  if (statusFilter === 'active') return isListingActive(listing);
+  if (statusFilter === 'expired') return isListingExpired(listing);
+  if (statusFilter === 'collected') return isListingCollected(listing);
+  if (statusFilter === 'cancelled') return isListingCancelled(listing);
+  return true;
+}
 
 type ListingTheme = {
   accent: string;
@@ -170,6 +196,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
   const [cancellingId, setCancellingId] = React.useState<number | null>(null);
   const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('all');
+  const [showStatusDropdown, setShowStatusDropdown] = React.useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -190,10 +218,31 @@ export function RestaurantListingsScreen({ navigation }: any) {
   );
 
   const filteredListings = useMemo(() => {
-    if (listingFilter === 'people') return listings.filter((l) => isPeopleListing(l));
-    if (listingFilter === 'animals') return listings.filter((l) => isAnimalListing(l));
-    return listings;
-  }, [listings, listingFilter]);
+    let result = listings;
+
+    if (listingFilter === 'people') result = result.filter((l) => isPeopleListing(l));
+    else if (listingFilter === 'animals') result = result.filter((l) => isAnimalListing(l));
+
+    result = result.filter((listing) => matchesStatusFilter(listing, statusFilter));
+
+    if (statusFilter === 'all') {
+      return [...result].sort((a, b) => {
+        const orderDiff =
+          LISTING_STATUS_PRIORITY[resolveListingStatus(a)] -
+          LISTING_STATUS_PRIORITY[resolveListingStatus(b)];
+        if (orderDiff !== 0) return orderDiff;
+        return (
+          new Date(b.updatedAt || b.createdAt || 0).getTime() -
+          new Date(a.updatedAt || a.createdAt || 0).getTime()
+        );
+      });
+    }
+
+    return result;
+  }, [listings, listingFilter, statusFilter]);
+
+  const selectedStatusLabel =
+    STATUS_FILTER_OPTIONS.find((option) => option.key === statusFilter)?.label ?? 'All';
 
   const handleCancelListing = (id: number) => {
     if (cancellingId !== null) return;
@@ -246,6 +295,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
         onPress={() => setListingFilter(key)}
         style={[
           styles.filterChip,
+          styles.audienceFilterChip,
           active && key === 'all' && styles.filterChipAllActive,
           active && isPeople && { borderColor: palette.kale, backgroundColor: palette.white },
           active && isAnimals && { borderColor: palette.orange, backgroundColor: palette.white },
@@ -257,6 +307,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
         ) : null}
         <AppText
           variant="bodyBold"
+          numberOfLines={1}
+          ellipsizeMode="tail"
           style={[
             styles.filterChipText,
             active && key === 'all' && { color: palette.midgray },
@@ -476,9 +528,13 @@ export function RestaurantListingsScreen({ navigation }: any) {
       <Skeleton width={wp(88)} height={normalize(48)} borderRadius={normalize(12)} style={{ alignSelf: 'center' }} />
       <Skeleton width={wp(55)} height={normalize(20)} style={{ marginLeft: wp(4), marginTop: hp(1) }} />
       <View style={[styles.filterRow, { paddingHorizontal: wp(4) }]}>
-        <Skeleton width={wp(22)} height={normalize(36)} borderRadius={normalize(20)} />
-        <Skeleton width={wp(30)} height={normalize(36)} borderRadius={normalize(20)} />
-        <Skeleton width={wp(30)} height={normalize(36)} borderRadius={normalize(20)} />
+        <Skeleton width="32%" height={normalize(36)} borderRadius={normalize(8)} />
+        <Skeleton width="32%" height={normalize(36)} borderRadius={normalize(8)} />
+        <Skeleton width="32%" height={normalize(36)} borderRadius={normalize(8)} />
+      </View>
+      <View style={[styles.statusDropdownRow, { paddingHorizontal: wp(4) }]}>
+        <Skeleton width={wp(18)} height={normalize(16)} />
+        <Skeleton width="100%" height={normalize(44)} borderRadius={normalize(8)} style={{ flex: 1 }} />
       </View>
       {[1, 2].map((i) => (
         <View key={i} style={[styles.skeletonCard, { marginHorizontal: wp(4) }]}>
@@ -559,6 +615,21 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 {renderFilterChip('animals', 'For Animals', animalCount, palette.orange, ANIMAL_THEME.categoryIcon)}
               </View>
 
+              <View style={styles.statusDropdownRow}>
+                <AppText variant="bodyBold" style={styles.statusDropdownLabel}>
+                  Status
+                </AppText>
+                <Pressable
+                  style={styles.statusDropdown}
+                  onPress={() => setShowStatusDropdown(true)}
+                >
+                  <AppText variant="bodyBold" style={styles.statusDropdownValue}>
+                    {selectedStatusLabel}
+                  </AppText>
+                  <Ionicons name="chevron-down" size={normalize(16)} color={palette.black} />
+                </Pressable>
+              </View>
+
               {filteredListings.length === 0 ? (
                 <View style={styles.emptyWrap}>
                   <AppText variant="body1" color={palette.stone} style={{ textAlign: 'center' }}>
@@ -572,6 +643,37 @@ export function RestaurantListingsScreen({ navigation }: any) {
           </>
         )}
       </ScrollView>
+
+      <Modal visible={showStatusDropdown} transparent animationType="fade" onRequestClose={() => setShowStatusDropdown(false)}>
+        <View style={styles.statusDropdownModalRoot}>
+          <Pressable style={styles.statusDropdownBackdrop} onPress={() => setShowStatusDropdown(false)} />
+          <View style={styles.statusDropdownList}>
+            {STATUS_FILTER_OPTIONS.map((option) => {
+              const selected = statusFilter === option.key;
+              return (
+                <Pressable
+                  key={option.key}
+                  style={[styles.statusDropdownItem, selected && styles.statusDropdownItemSelected]}
+                  onPress={() => {
+                    setStatusFilter(option.key);
+                    setShowStatusDropdown(false);
+                  }}
+                >
+                  <AppText
+                    variant="bodyBold"
+                    style={[styles.statusDropdownItemText, selected && styles.statusDropdownItemTextSelected]}
+                  >
+                    {option.label}
+                  </AppText>
+                  {selected ? (
+                    <Ionicons name="checkmark" size={normalize(16)} color={palette.kale} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalWrap}>
@@ -731,16 +833,23 @@ const styles = StyleSheet.create({
 
   filterRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: wp(2),
+    flexWrap: 'nowrap',
+    gap: wp(1.5),
     paddingHorizontal: wp(4),
     width: '100%',
+  },
+
+  audienceFilterChip: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    paddingHorizontal: wp(2),
   },
 
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1.5),
+    gap: wp(1),
     paddingHorizontal: wp(4.5),
     paddingVertical: hp(0.7),
     borderRadius: normalize(8),
@@ -764,7 +873,82 @@ const styles = StyleSheet.create({
 
   filterChipText: {
     textTransform: 'none',
-    fontSize: normalize(12),
+    fontSize: normalize(11),
+    flexShrink: 1,
+  },
+
+  statusDropdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+    paddingHorizontal: wp(4),
+    width: '100%',
+  },
+
+  statusDropdownLabel: {
+    textTransform: 'none',
+    color: palette.black,
+    minWidth: wp(14),
+  },
+
+  statusDropdown: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1),
+    borderRadius: normalize(8),
+    borderWidth: normalize(1),
+    borderColor: '#D9D9D9',
+    backgroundColor: palette.white,
+  },
+
+  statusDropdownValue: {
+    textTransform: 'none',
+    color: palette.black,
+  },
+
+  statusDropdownModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: wp(8),
+  },
+
+  statusDropdownBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+
+  statusDropdownList: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(12),
+    overflow: 'hidden',
+    borderWidth: normalize(1),
+    borderColor: '#E8E8E8',
+  },
+
+  statusDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.4),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EFEFEF',
+  },
+
+  statusDropdownItemSelected: {
+    backgroundColor: '#F4FAF6',
+  },
+
+  statusDropdownItemText: {
+    textTransform: 'none',
+    color: palette.black,
+  },
+
+  statusDropdownItemTextSelected: {
+    color: palette.kale,
   },
 
   emptyWrap: {

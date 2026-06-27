@@ -78,7 +78,7 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
 
       const { listings: all } = normalized;
       set({
-        siteListings: all.filter((l: FoodListing) => l.status !== 'CANCELLED'),
+        siteListings: all,
         siteLastFetched: Date.now(),
       });
     } catch (error: unknown) {
