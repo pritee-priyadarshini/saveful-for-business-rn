@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   Pressable,
-  TextInput,
   Alert,
   StyleSheet,
   ImageBackground,
@@ -16,14 +15,16 @@ import { Picker } from '@react-native-picker/picker';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { InputField } from '../../components/InputField';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { CharityMemberRole } from '@/services/charity.service';
 import { useCharityStore } from '@/store/charityStore';
+import { useAuthStore } from '@/store/authStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
-const { width, height } = Dimensions.get("window");
+const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
 const hp = (p: number) => (height * p) / 100;
 const normalize = (size: number) => {
@@ -31,24 +32,22 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
+const inputProps = { compact: true as const, labelVariant: 'label' as const };
+
 type AccessType = 'user' | 'driver';
 
-type Member = {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  mobile: string;
-  role: string;
-};
+const PROTECTED_ROLES = new Set(['LOCATION_ADMIN', 'HEAD_OFFICE_ADMIN']);
 
 export default function CharityManageAccessScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { locationId, orgType } = route.params as {
-    locationId: number;
+  const { locationId } = route.params as {
+    locationId?: number;
     orgType: 'charity' | 'restaurant' | 'farmer';
   };
+  const authUser = useAuthStore((state) => state.authUser);
+  const effectiveLocationId = locationId ?? authUser?.profile?.sites?.[0]?.id;
+
   const [activeTab, setActiveTab] = useState<AccessType>('user');
 
   const {
@@ -68,14 +67,17 @@ export default function CharityManageAccessScreen() {
     );
   }, [fetchUsers]);
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     firstName: '',
     lastName: '',
     email: '',
     mobile: '',
     password: '',
     role: '',
-  });
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const mapRoleToApi = (role: string): CharityMemberRole => {
     switch (role) {
@@ -90,15 +92,11 @@ export default function CharityManageAccessScreen() {
     }
   };
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  const [showPassword, setShowPassword] = useState(false);
-
-  const filteredMembers = members.filter(m => {
+  const filteredMembers = members.filter((member) => {
     if (activeTab === 'driver') {
-      return m.role === 'DRIVER';
+      return member.role === 'DRIVER';
     }
-    return m.role !== 'DRIVER';
+    return member.role !== 'DRIVER';
   });
 
   const mapApiRoleToUI = (role: string) => {
@@ -113,88 +111,98 @@ export default function CharityManageAccessScreen() {
         return '';
     }
   };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
   const handleSubmit = async () => {
     if (submitting) return;
 
     try {
-      const finalRole =
-        activeTab === 'driver' ? 'driver' : form.role;
+      const finalRole = activeTab === 'driver' ? 'driver' : form.role;
 
-      if (!form.firstName || !form.lastName || !form.mobile) {
-        Alert.alert('Error', 'Name and mobile are required');
+      if (!form.firstName.trim() || !form.lastName.trim() || !form.mobile.trim()) {
+        Alert.alert('Error', 'First name, last name, and mobile are required');
         return;
       }
 
       if (!editingId) {
-        if (!form.email || !form.password || !finalRole) {
-          Alert.alert('Error', 'Please fill all fields');
+        if (!form.email.trim() || !form.password || !finalRole) {
+          Alert.alert('Error', 'Please fill all required fields');
           return;
         }
       }
 
+      if (!effectiveLocationId) {
+        Alert.alert('Error', 'No location found for this account');
+        return;
+      }
+
       const payload = {
-        firstName: form.firstName,
-        lastName: form.lastName,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
         email: form.email.trim().toLowerCase(),
-        mobile: form.mobile,
+        mobile: form.mobile.trim(),
         password: form.password,
         role: mapRoleToApi(finalRole),
-        locationId: locationId,
+        locationId: effectiveLocationId,
       };
 
       await withLock(async () => {
         if (editingId) {
           await updateUser(Number(editingId), {
-            firstName: form.firstName,
-            lastName: form.lastName,
-            mobile: form.mobile,
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
+            mobile: form.mobile.trim(),
           });
 
           showSuccessAlert('User updated');
         } else {
           await addMember(payload);
-          showSuccessAlert('User added');
+          showSuccessAlert(
+            activeTab === 'driver'
+              ? 'Driver added. Login credentials were sent by email.'
+              : 'User added. Login credentials were sent by email.',
+          );
         }
 
         await fetchUsers(true);
-
-        setEditingId(null);
-        setForm({
-          firstName: '',
-          lastName: '',
-          email: '',
-          mobile: '',
-          password: '',
-          role: '',
-        });
+        resetForm();
       });
     } catch (e: unknown) {
       showErrorAlert(e, 'Something went wrong', 'Something went wrong');
     }
   };
 
-  const handleEdit = (member: any) => {
-    setActiveTab(
-      member.role === CharityMemberRole.DRIVER ? 'driver' : 'user'
-    );
+  const handleEdit = (member: {
+    id?: number;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    mobile?: string;
+    role: string;
+  }) => {
+    if (!member.id) return;
 
+    setActiveTab(member.role === 'DRIVER' ? 'driver' : 'user');
     setForm({
-      firstName: member.firstName,
-      lastName: member.lastName,
-      email: member.email,
-      mobile: member.mobile,
-      password: '123',
+      firstName: member.firstName ?? '',
+      lastName: member.lastName ?? '',
+      email: member.email ?? '',
+      mobile: member.mobile ?? '',
+      password: '',
       role: mapApiRoleToUI(member.role),
     });
-
-    setEditingId(member.id.toString());
+    setEditingId(String(member.id));
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     if (deletingId) return;
-    setDeletingId(id);
+    setDeletingId(String(id));
     try {
-      await deleteUser(Number(id));
+      await deleteUser(id);
       await fetchUsers(true);
     } catch (e) {
       showErrorAlert(e, 'Could not delete user', 'Delete failed');
@@ -208,205 +216,146 @@ export default function CharityManageAccessScreen() {
     return role.replace(/_/g, ' ');
   };
 
+  const memberKey = (member: { id?: number; email?: string; role: string }, index: number) =>
+    member.id ? `${member.role}-${member.id}` : `${member.role}-${member.email ?? index}`;
 
   return (
     <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container} >
-        {/* HEADER */}
+      <ScrollView contentContainerStyle={styles.container}>
         <ImageBackground
           source={require('../../../assets/placeholder/kale-header.png')}
           style={styles.headerBg}
         >
-          <Pressable
-            style={styles.backIcon}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons
-              name="arrow-back"
-              size={normalize(24)}
-              color={palette.white}
-            />
+          <Pressable style={styles.backIcon} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
           </Pressable>
 
-          <View style={styles.headerContent} >
-            <AppText variant="h3" style={styles.white} > Manage Access </AppText>
-
+          <View style={styles.headerContent}>
+            <AppText variant="h3" style={styles.white}>
+              Manage Access
+            </AppText>
             <View style={{ height: hp(0.7) }} />
-            <AppText variant="bodyBold" style={styles.white} > Add and manage users & drivers </AppText>
-
+            <AppText variant="bodyBold" style={styles.white}>
+              Add and manage users & drivers
+            </AppText>
           </View>
-
         </ImageBackground>
 
-        {/* TOGGLE PILLS */}
         <View style={styles.tabRow}>
           <Pressable
-            style={[
-              styles.tabPill,
-              activeTab === 'user' &&
-              styles.activeTab,
-            ]}
+            style={[styles.tabPill, activeTab === 'user' && styles.activeTab]}
             onPress={() => {
               setActiveTab('user');
-              setEditingId(null);
-              setForm({
-                firstName: '',
-                lastName: '',
-                email: '',
-                mobile: '',
-                password: '',
-                role: '',
-              });
+              resetForm();
             }}
           >
             <AppText
               variant="bodyBold"
-              style={[
-                styles.tabText,
-                activeTab === 'user' &&
-                styles.activeTabText,
-              ]}
+              style={[styles.tabText, activeTab === 'user' && styles.activeTabText]}
             >
               Add User
             </AppText>
           </Pressable>
 
           <Pressable
-            style={[
-              styles.tabPill,
-              activeTab ===
-              'driver' &&
-              styles.activeTab,
-            ]}
+            style={[styles.tabPill, activeTab === 'driver' && styles.activeTab]}
             onPress={() => {
               setActiveTab('driver');
-              setEditingId(null);
-              setForm({
-                firstName: '',
-                lastName: '',
-                email: '',
-                mobile: '',
-                password: '',
-                role: '',
-              });
+              resetForm();
             }}
           >
             <AppText
               variant="bodyBold"
-              style={[
-                styles.tabText,
-                activeTab ===
-                'driver' &&
-                styles.activeTabText,
-              ]}
+              style={[styles.tabText, activeTab === 'driver' && styles.activeTabText]}
             >
               Add Driver
             </AppText>
           </Pressable>
         </View>
 
-        {/* FORM */}
         <View style={styles.sectionBox}>
           <AppText variant="bodyBold">
             {editingId
               ? `Edit ${activeTab === 'user' ? 'User' : 'Driver'}`
-              : `Add ${activeTab === 'user' ? 'User' : 'Driver'}`
-            }
+              : `Add ${activeTab === 'user' ? 'User' : 'Driver'}`}
           </AppText>
 
-          <TextInput
-            placeholder="First Name"
-            value={form.firstName}
-            onChangeText={v => setForm({ ...form, firstName: v })}
-            style={styles.input}
-          />
+          <View style={styles.formFields}>
+            <InputField
+              label="First Name"
+              placeholder="Enter first name"
+              {...inputProps}
+              value={form.firstName}
+              onChangeText={(v) => setForm({ ...form, firstName: v })}
+            />
 
-          <TextInput
-            placeholder="Last Name"
-            value={form.lastName}
-            onChangeText={v => setForm({ ...form, lastName: v })}
-            style={styles.input}
-          />
+            <InputField
+              label="Last Name"
+              placeholder="Enter last name"
+              {...inputProps}
+              value={form.lastName}
+              onChangeText={(v) => setForm({ ...form, lastName: v })}
+            />
 
-          <TextInput
-            placeholder="Email"
-            value={form.email}
-            onChangeText={v =>
-              setForm({
-                ...form,
-                email: v,
-              })
-            }
-            style={styles.input}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+            <InputField
+              label="Email"
+              placeholder="Enter email"
+              {...inputProps}
+              value={form.email}
+              onChangeText={(v) => setForm({ ...form, email: v })}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!editingId}
+            />
 
-          <TextInput
-            placeholder="Phone Number"
-            value={form.mobile}
-            onChangeText={v =>
-              setForm({
-                ...form,
-                mobile: v,
-              })
-            }
-            style={styles.input}
-            keyboardType="phone-pad"
-          />
+            <InputField
+              label="Mobile"
+              placeholder="Enter mobile number"
+              {...inputProps}
+              value={form.mobile}
+              onChangeText={(v) => setForm({ ...form, mobile: v })}
+              keyboardType="phone-pad"
+            />
 
-          {activeTab === 'user' ? (
-            <View style={styles.dropdown} >
-              <Picker
-                selectedValue={form.role}
-                onValueChange={v =>
-                  setForm({
-                    ...form,
-                    role: v,
-                  })
-                }
-              >
-                <Picker.Item label="Select Role" value="" />
-                <Picker.Item label="Site Admin" value="site_admin" />
-                <Picker.Item label="Site Team Member" value="site_team_member" />
-              </Picker>
-            </View>
-          ) : (
-            <View style={styles.roleLocked} >
-              <AppText variant="bodyBold"> Driver </AppText>
-            </View>
-          )}
+            {activeTab === 'user' ? (
+              <View style={styles.pickerField}>
+                <AppText variant="label" style={styles.pickerLabel}>
+                  Role
+                </AppText>
+                <View style={styles.dropdown}>
+                  <Picker
+                    selectedValue={form.role}
+                    onValueChange={(v) => setForm({ ...form, role: v })}
+                  >
+                    <Picker.Item label="Select role" value="" />
+                    <Picker.Item label="Site Admin" value="site_admin" />
+                    <Picker.Item label="Site Team Member" value="site_team_member" />
+                  </Picker>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.pickerField}>
+                <AppText variant="label" style={styles.pickerLabel}>
+                  Role
+                </AppText>
+                <View style={styles.roleLocked}>
+                  <AppText variant="bodyBold">Driver</AppText>
+                </View>
+              </View>
+            )}
 
-          {!editingId && (
-            <View style={styles.passwordContainer}>
-              <TextInput
-                placeholder="Password"
+            {!editingId ? (
+              <InputField
+                label="Password"
+                placeholder="Enter password"
+                {...inputProps}
                 value={form.password}
-                onChangeText={v =>
-                  setForm({
-                    ...form,
-                    password: v,
-                  })
-                }
-                secureTextEntry={!showPassword}
-                style={{ flex: 1, }}
+                onChangeText={(v) => setForm({ ...form, password: v })}
+                isPassword
               />
-
-              <Pressable
-                onPress={() =>
-                  setShowPassword(
-                    !showPassword
-                  )
-                }
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={normalize(20)}
-                  color="#555"
-                />
-              </Pressable>
-            </View>
-          )}
+            ) : null}
+          </View>
 
           <Pressable
             style={[styles.addBtn, submitting && { opacity: 0.65 }]}
@@ -417,61 +366,61 @@ export default function CharityManageAccessScreen() {
               {submitting
                 ? 'Saving...'
                 : editingId
-                ? 'Update'
-                : `+ Add ${activeTab === 'user' ? 'User' : 'Driver'}`}
+                  ? 'Update'
+                  : `+ Add ${activeTab === 'user' ? 'User' : 'Driver'}`}
             </AppText>
           </Pressable>
         </View>
 
-        {/* LIST TITLE */}
-        <View style={styles.sectionTitleBox} >
+        <View style={styles.sectionTitleBox}>
           <AppText variant="bodyBold">
             {activeTab === 'user' ? 'Users' : 'Drivers'}
           </AppText>
         </View>
 
-        {/* LIST */}
-        {filteredMembers.map(
-          member => (
-            <View
-              key={member.id}
-              style={styles.memberRow}
-            >
-              <View style={{ flex: 1, }} >
-                <AppText variant="bodyBold"> Name: {member.firstName} {member.lastName} </AppText>
-                <AppText variant="bodySmall"> Email: {member.email} </AppText>
-                <AppText variant="bodySmall"> Phone: {member.mobile} </AppText>
-                <AppText variant="bodySmall"> Role: {' '} {prettyRole(member.role)} </AppText>
+        {loadingMembers ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={palette.primary} />
+          </View>
+        ) : filteredMembers.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <AppText variant="bodySmall" color={palette.stone}>
+              {activeTab === 'user' ? 'No users added yet' : 'No drivers added yet'}
+            </AppText>
+          </View>
+        ) : (
+          filteredMembers.map((member, index) => (
+            <View key={memberKey(member, index)} style={styles.memberRow}>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyBold">
+                  {member.firstName} {member.lastName}
+                </AppText>
+                <AppText variant="bodySmall">Email: {member.email || '—'}</AppText>
+                <AppText variant="bodySmall">Phone: {member.mobile || '—'}</AppText>
+                <AppText variant="bodySmall">Role: {prettyRole(member.role)}</AppText>
               </View>
 
-              <View style={styles.actions} >
-                {member.role !==
-                  'site_admin' && (
-                    <>
-                      <Pressable
-                        onPress={() =>
-                          handleEdit(member)
-                        }
-                      >
-                        <Ionicons name="create-outline" size={normalize(22)} />
-                      </Pressable>
+              {!PROTECTED_ROLES.has(member.role) && member.id ? (
+                <View style={styles.actions}>
+                  <Pressable onPress={() => handleEdit(member)}>
+                    <Ionicons name="create-outline" size={normalize(22)} />
+                  </Pressable>
 
-                      <Pressable
-                        onPress={() => handleDelete(member.id.toString())}
-                        disabled={deletingId !== null}
-                        style={{ opacity: deletingId === member.id.toString() ? 0.5 : 1 }}
-                      >
-                        {deletingId === member.id.toString() ? (
-                          <ActivityIndicator size="small" color={palette.chilli} />
-                        ) : (
-                          <Ionicons name="trash-outline" size={normalize(22)} color={palette.chilli} />
-                        )}
-                      </Pressable>
-                    </>
-                  )}
-              </View>
+                  <Pressable
+                    onPress={() => handleDelete(member.id!)}
+                    disabled={deletingId !== null}
+                    style={{ opacity: deletingId === String(member.id) ? 0.5 : 1 }}
+                  >
+                    {deletingId === String(member.id) ? (
+                      <ActivityIndicator size="small" color={palette.chilli} />
+                    ) : (
+                      <Ionicons name="trash-outline" size={normalize(22)} color={palette.chilli} />
+                    )}
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
-          )
+          ))
         )}
       </ScrollView>
     </Screen>
@@ -483,35 +432,29 @@ const styles = StyleSheet.create({
     gap: hp(2),
     paddingBottom: hp(4),
   },
-
   headerBg: {
     height: hp(20),
     justifyContent: 'center',
     paddingHorizontal: wp(4),
   },
-
   backIcon: {
     position: 'absolute',
     top: hp(2.2),
     left: wp(4),
     zIndex: 5,
   },
-
   headerContent: {
     alignItems: 'center',
   },
-
   white: {
     color: palette.white,
     textAlign: 'center',
   },
-
   tabRow: {
     flexDirection: 'row',
     gap: wp(2.5),
     marginHorizontal: wp(4),
   },
-
   tabPill: {
     flex: 1,
     paddingVertical: hp(1.2),
@@ -521,20 +464,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
   },
-
   activeTab: {
     backgroundColor: palette.primary,
     borderColor: palette.primary,
   },
-
   tabText: {
     color: palette.black,
   },
-
   activeTabText: {
     color: palette.white,
   },
-
   sectionBox: {
     backgroundColor: palette.white,
     padding: wp(4),
@@ -542,54 +481,51 @@ const styles = StyleSheet.create({
     borderRadius: normalize(12),
     borderWidth: 1,
     borderColor: palette.border,
-    gap: hp(1),
+    gap: hp(1.5),
   },
-
+  formFields: {
+    gap: spacing.md,
+  },
   sectionTitleBox: {
     marginHorizontal: wp(4),
   },
-
-  input: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: normalize(8),
-    padding: normalize(12),
-    backgroundColor: palette.white,
+  pickerField: {
+    gap: spacing.xs,
   },
-
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: normalize(8),
-    paddingHorizontal: wp(3),
-    backgroundColor: palette.white,
+  pickerLabel: {
+    textTransform: 'none',
+    color: palette.black,
   },
-
   dropdown: {
     borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: normalize(8),
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
     overflow: 'hidden',
     backgroundColor: palette.white,
   },
-
   roleLocked: {
     borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: normalize(8),
-    padding: normalize(14),
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.2),
     backgroundColor: '#F4F4F5',
   },
-
   addBtn: {
     backgroundColor: palette.primary,
     paddingVertical: hp(1.3),
     borderRadius: normalize(8),
     alignItems: 'center',
+    marginTop: hp(0.5),
   },
-
+  loadingWrap: {
+    alignItems: 'center',
+    paddingVertical: hp(2),
+  },
+  emptyWrap: {
+    marginHorizontal: wp(4),
+    paddingVertical: hp(1),
+  },
   memberRow: {
     backgroundColor: palette.white,
     padding: wp(4),
@@ -601,7 +537,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
   actions: {
     flexDirection: 'row',
     gap: wp(3),

@@ -28,28 +28,31 @@ export type CharityMember = {
 };
 
 export function normalizeCharityUsers(data: any): CharityMember[] {
-  return [
-    ...(data?.headOfficeAdmins || []).map((u: any) => ({
-      ...u,
-      role: 'HEAD_OFFICE_ADMIN',
-    })),
-    ...(data?.headOfficeMembers || []).map((u: any) => ({
-      ...u,
-      role: 'HEAD_OFFICE',
-    })),
-    ...(data?.locationAdmins || []).map((u: any) => ({
-      ...u,
-      role: 'LOCATION_ADMIN',
-    })),
-    ...(data?.teamMembers || []).map((u: any) => ({
-      ...u,
-      role: 'TEAM_MEMBER',
-    })),
-    ...(data?.drivers || []).map((u: any) => ({
-      ...u,
-      role: 'DRIVER',
-    })),
+  const normalizeOne = (user: any, role: string): CharityMember => ({
+    ...user,
+    id: user.id ?? user.userId,
+    firstName: user.firstName ?? '',
+    lastName: user.lastName ?? '',
+    email: user.email ?? '',
+    mobile: user.mobile ?? user.phoneNumber ?? '',
+    role,
+  });
+
+  const combined = [
+    ...(data?.headOfficeAdmins || []).map((u: any) => normalizeOne(u, 'HEAD_OFFICE_ADMIN')),
+    ...(data?.headOfficeMembers || []).map((u: any) => normalizeOne(u, 'HEAD_OFFICE')),
+    ...(data?.locationAdmins || []).map((u: any) => normalizeOne(u, 'LOCATION_ADMIN')),
+    ...(data?.teamMembers || []).map((u: any) => normalizeOne(u, 'TEAM_MEMBER')),
+    ...(data?.drivers || []).map((u: any) => normalizeOne(u, 'DRIVER')),
   ];
+
+  const seen = new Set<number>();
+  return combined.filter((member) => {
+    if (!member.id) return true;
+    if (seen.has(member.id)) return false;
+    seen.add(member.id);
+    return true;
+  });
 }
 
 interface CharityState {
