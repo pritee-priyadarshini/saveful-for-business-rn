@@ -2,6 +2,7 @@ import {
   DemoPlan,
   UserProfile,
   UserRole,
+  Region,
 } from '../types';
 
 export type RestaurantForm = {
@@ -19,7 +20,7 @@ export type RestaurantForm = {
   venueType: string;
   branding: string;
   logo: string;
-  region: string;
+  region: Region | '';
   latitude: string;
   longitude: string;
 };
@@ -40,7 +41,7 @@ export type CharityForm = {
   logo: string;
   postcodes: string;
   pickupRadius: string;
-  region: string;
+  region: Region | '';
   latitude: string;
   longitude: string;
   pickupPostCode: string;
@@ -60,7 +61,7 @@ export interface FarmerForm {
   venueType: string;
   branding: string;
   logo: string;
-  region: string;
+  region: Region | '';
   latitude: string;
   longitude: string;
 }

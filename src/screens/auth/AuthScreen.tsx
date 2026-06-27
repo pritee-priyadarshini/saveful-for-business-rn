@@ -10,6 +10,7 @@ import {
   Platform,
   Linking,
   Keyboard,
+  KeyboardAvoidingView,
   TextInput,
   ActivityIndicator,
 } from 'react-native';
@@ -33,6 +34,8 @@ import { COUNTRY_CODES, findCountryByIso, appendSignupMobileFields } from '@/dat
 import type { CountryCode } from '@/data/countryCodes';
 import { fetchCurrentLocation } from '@/utils/currentLocation';
 import { getUserFriendlyErrorMessage } from '@/utils/apiError';
+import { REGION_OPTIONS, getRegionLabel, appendSignupRegion, isValidRegion } from '@/data/regions';
+import type { Region } from '@/types';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -107,6 +110,82 @@ function TermsCheckbox({
   );
 }
 
+function RegionSelector({
+  value,
+  onChange,
+}: {
+  value: Region | '';
+  onChange: (value: Region) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const displayLabel = value ? getRegionLabel(value) : 'Select your region';
+
+  return (
+    <View style={styles.regionSelectorWrap}>
+      <AppText variant="label" style={styles.venueSelectorLabel}>
+        Operating Region *
+      </AppText>
+      <AppText variant="bodySmall" style={styles.dropdownHint}>
+        Surplus listings are only visible to charities and consumers registered in the same region.
+      </AppText>
+
+      <View style={[styles.venueSelectorBox, expanded && styles.venueSelectorBoxExpanded]}>
+        <Pressable
+          style={styles.venueSelectorHeader}
+          onPress={() => setExpanded((prev) => !prev)}
+        >
+          <AppText
+            variant="body1"
+            style={[styles.venueSelectorValue, !value && styles.regionPlaceholderText]}
+          >
+            {displayLabel}
+          </AppText>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={normalize(18)}
+            color={palette.kale}
+          />
+        </Pressable>
+
+        {expanded ? (
+          <ScrollView
+            style={styles.regionOptionsList}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {REGION_OPTIONS.map((option) => {
+              const isSelected = value === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  style={[styles.venueOptionRow, isSelected && styles.venueOptionRowSelected]}
+                  onPress={() => {
+                    onChange(option.value);
+                    setExpanded(false);
+                  }}
+                >
+                  <View style={[styles.venueRadio, isSelected && styles.venueRadioActive]}>
+                    {isSelected ? <View style={styles.venueRadioInner} /> : null}
+                  </View>
+                  <View style={styles.regionOptionCopy}>
+                    <AppText variant="body1" style={styles.venueOptionText}>
+                      {option.label}
+                    </AppText>
+                    <AppText variant="bodySmall" style={styles.regionOptionDescription}>
+                      {option.description}
+                    </AppText>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 function VenueTypeSelector({
   label,
   value,
@@ -118,7 +197,7 @@ function VenueTypeSelector({
   options: { label: string; value: string }[];
   onChange: (value: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const selectedOption = options.find((option) => option.value === value);
   const displayLabel = selectedOption?.label || 'Select venue type';
 
@@ -181,6 +260,7 @@ const inputPropsBase = { compact: true as const, labelVariant: 'label' as const 
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
+const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
 
 function FormErrorBanner({ message }: { message: string | null }) {
   if (!message) return null;
@@ -230,12 +310,14 @@ export function AuthScreen() {
 
   const scrollActiveFieldIntoView = useCallback(() => {
     const field = activeFieldRef.current;
-    if (!field || !keyboardVisibleRef.current) return;
+    if (!field) return;
 
     requestAnimationFrame(() => {
       field.measureInWindow((_x, fieldY, _w, fieldH) => {
         const gap = hp(1.5);
-        const visibleBottom = height - keyboardHeightRef.current - gap;
+        const activeKeyboardHeight =
+          keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
+        const visibleBottom = height - activeKeyboardHeight - gap;
         const fieldBottom = fieldY + fieldH;
 
         if (fieldBottom > visibleBottom) {
@@ -251,9 +333,10 @@ export function AuthScreen() {
   const handleFieldFocus = useCallback(
     (field: View) => {
       activeFieldRef.current = field;
-      if (keyboardVisibleRef.current) {
-        setTimeout(scrollActiveFieldIntoView, Platform.OS === 'ios' ? 50 : 120);
-      }
+      const shortDelay = Platform.OS === 'ios' ? 80 : 150;
+      const longDelay = Platform.OS === 'ios' ? 320 : 420;
+      setTimeout(scrollActiveFieldIntoView, shortDelay);
+      setTimeout(scrollActiveFieldIntoView, longDelay);
     },
     [scrollActiveFieldIntoView],
   );
@@ -276,8 +359,6 @@ export function AuthScreen() {
       setKeyboardVisible(false);
       setKeyboardHeight(0);
       activeFieldRef.current = null;
-      scrollYRef.current = 0;
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
     });
 
     return () => {
@@ -470,7 +551,7 @@ export function AuthScreen() {
         form.append('brandName', restaurantForm.branding);
         form.append('venueType', restaurantForm.venueType);
         form.append('orgType', mapRole(selectedRole));
-        form.append('region', 'IN');
+        appendSignupRegion(form, restaurantForm.region);
         form.append('latitude', restaurantForm.latitude);
         form.append('longitude', restaurantForm.longitude);
 
@@ -496,7 +577,7 @@ export function AuthScreen() {
         form.append('brandName', farmerForm.branding);
         form.append('venueType', farmerForm.venueType);
         form.append('orgType', 'FARMER_PRODUCER');
-        form.append('region', 'IN');
+        appendSignupRegion(form, farmerForm.region);
         form.append('latitude', farmerForm.latitude);
         form.append('longitude', farmerForm.longitude);
 
@@ -522,7 +603,7 @@ export function AuthScreen() {
         form.append('address', farmerForm.businessAddress);
         form.append('brandName', farmerForm.branding);
         form.append('venueType', farmerForm.venueType);
-        form.append('region', 'IN');
+        appendSignupRegion(form, farmerForm.region);
         form.append('latitude', farmerForm.latitude);
         form.append('longitude', farmerForm.longitude);
 
@@ -550,12 +631,9 @@ export function AuthScreen() {
         form.append('charityType', mapRole(selectedRole));
         form.append('pickupPostCode', charityForm.postcodes);
         form.append('pickupRadiusKm', charityForm.pickupRadius || '5');
-        form.append('region', 'IN');
-
-        if (charityForm.latitude && charityForm.longitude) {
-          form.append('latitude', charityForm.latitude);
-          form.append('longitude', charityForm.longitude);
-        }
+        appendSignupRegion(form, charityForm.region);
+        form.append('latitude', charityForm.latitude);
+        form.append('longitude', charityForm.longitude);
 
         if (charityForm.logo) {
           form.append('logo', {
@@ -621,6 +699,22 @@ export function AuthScreen() {
     if (isFarmer) return farmerForm;
     if (isRestaurant) return restaurantForm;
     return charityForm;
+  };
+
+  const getCurrentRegion = () => {
+    if (isFarmer) return farmerForm.region;
+    if (isRestaurant) return restaurantForm.region;
+    return charityForm.region;
+  };
+
+  const updateRegionField = (value: Region) => {
+    if (isFarmer) {
+      updateFarmerField('region', value);
+    } else if (isRestaurant) {
+      updateRestaurantField('region', value);
+    } else {
+      updateCharityField('region', value);
+    }
   };
 
   const updateMobileField = (field: 'mobile' | 'mobileCountryCode' | 'mobileCountryIso', value: string) => {
@@ -692,11 +786,19 @@ export function AuthScreen() {
       if (!charityForm.postcodes.trim()) return 'Please enter your postcode.';
     }
 
+    if (!isValidRegion(getCurrentRegion())) {
+      return 'Please select your operating region.';
+    }
+
     return null;
   };
 
   const validateStep3 = (): string | null => {
     if (!isChecked) return 'Please accept the Terms & Conditions to continue.';
+
+    if (!isValidRegion(getCurrentRegion())) {
+      return 'Please select your operating region.';
+    }
 
     if (isRestaurant || isFarmer) {
       const venueType = isFarmer ? farmerForm.venueType : restaurantForm.venueType;
@@ -761,14 +863,23 @@ export function AuthScreen() {
         }
       />
 
-      <View style={styles.keyboardView}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
+        enabled={keyboardVisible}
+      >
         <ScrollView
           ref={scrollRef}
-          scrollEnabled={keyboardVisible}
-          bounces={keyboardVisible}
+          scrollEnabled
+          bounces
+          nestedScrollEnabled
           contentContainerStyle={[
             styles.newContent,
-            keyboardVisible && { paddingBottom: keyboardHeight + hp(2) },
+            {
+              paddingBottom: keyboardVisible
+                ? keyboardHeight + hp(3)
+                : hp(6),
+            },
           ]}
           onScroll={(event) => {
             scrollYRef.current = event.nativeEvent.contentOffset.y;
@@ -1127,6 +1238,19 @@ export function AuthScreen() {
                 </>
               )}
 
+              <RegionSelector
+                value={getCurrentRegion()}
+                onChange={updateRegionField}
+              />
+
+              <View style={styles.regionInfoBanner}>
+                <Ionicons name="information-circle-outline" size={normalize(18)} color={palette.kale} />
+                <AppText variant="bodySmall" style={styles.regionInfoText}>
+                  Surplus will only be shown to charities and consumers registered in the same region.
+                  Pick the region where your organisation operates.
+                </AppText>
+              </View>
+
               <InputField
                 label="Branding"
                 placeholder="Brand name"
@@ -1329,7 +1453,7 @@ export function AuthScreen() {
 
         </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -1463,6 +1587,49 @@ const styles = StyleSheet.create({
   countryOptionCode: {
     textTransform: 'none',
     color: palette.stone,
+  },
+
+  regionSelectorWrap: {
+    gap: hp(0.5),
+  },
+
+  regionPlaceholderText: {
+    color: palette.stone,
+  },
+
+  regionOptionsList: {
+    borderTopWidth: 1,
+    borderTopColor: '#ECECEC',
+  },
+
+  regionOptionCopy: {
+    flex: 1,
+    gap: hp(0.2),
+  },
+
+  regionOptionDescription: {
+    color: palette.stone,
+    textTransform: 'none',
+    lineHeight: normalize(16),
+  },
+
+  regionInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2.5),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.2),
+    borderRadius: normalize(10),
+    backgroundColor: '#F4FAF6',
+    borderWidth: 1,
+    borderColor: '#D8EBDD',
+  },
+
+  regionInfoText: {
+    flex: 1,
+    color: palette.text,
+    textTransform: 'none',
+    lineHeight: normalize(18),
   },
 
   venueSelectorWrap: {

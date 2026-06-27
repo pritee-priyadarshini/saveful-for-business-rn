@@ -82,6 +82,8 @@ export default {
     userInterfaceStyle: 'light',
     icon: './assets/intro/Saveful-for-Business-logo.png',
     splash: {
+      image: './assets/intro/logo.png',
+      resizeMode: 'contain',
       backgroundColor: '#F6F4EE',
     },
 
