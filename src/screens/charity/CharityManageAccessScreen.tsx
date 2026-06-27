@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -6,15 +6,19 @@ import {
   Alert,
   StyleSheet,
   ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
   Dimensions,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { Skeleton } from '../../components/Skeleton';
 import { InputField } from '../../components/InputField';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
@@ -23,6 +27,8 @@ import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+
+const MIN_PASSWORD_LENGTH = 6;
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -38,22 +44,35 @@ type AccessType = 'user' | 'driver';
 
 const PROTECTED_ROLES = new Set(['LOCATION_ADMIN', 'HEAD_OFFICE_ADMIN']);
 
+function validatePassword(password: string, confirmPassword: string): string | null {
+  if (!password) return 'Please enter a password.';
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+  }
+  if (!confirmPassword) return 'Please confirm the password.';
+  if (password !== confirmPassword) return 'Passwords do not match.';
+  return null;
+}
+
 export default function CharityManageAccessScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { locationId } = route.params as {
+  const { locationId: routeLocationId } = route.params as {
     locationId?: number;
     orgType: 'charity' | 'restaurant' | 'farmer';
   };
   const authUser = useAuthStore((state) => state.authUser);
-  const effectiveLocationId = locationId ?? authUser?.profile?.sites?.[0]?.id;
 
   const [activeTab, setActiveTab] = useState<AccessType>('user');
+  const [selectedLocationId, setSelectedLocationId] = useState<number | ''>('');
 
   const {
     users: members,
+    locations,
     isFetchingUsers: loadingMembers,
+    isFetchingLocations: loadingLocations,
     fetchUsers,
+    fetchLocations,
     addMember,
     updateUser,
     deleteUser,
@@ -62,10 +81,35 @@ export default function CharityManageAccessScreen() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchUsers().catch((e) =>
+    Promise.all([fetchUsers(true), fetchLocations(true)]).catch((e) =>
       showErrorAlert(e, 'Could not load team', 'Could not load team members'),
     );
-  }, [fetchUsers]);
+  }, [fetchUsers, fetchLocations]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsers(true).catch(() => {});
+    }, [fetchUsers]),
+  );
+
+  const profileLocationId = authUser?.profile?.sites?.[0]?.id;
+  const effectiveLocationId = useMemo(() => {
+    if (selectedLocationId) return Number(selectedLocationId);
+    if (routeLocationId) return routeLocationId;
+    if (profileLocationId) return profileLocationId;
+    if (locations.length === 1) return locations[0].id;
+    return undefined;
+  }, [selectedLocationId, routeLocationId, profileLocationId, locations]);
+
+  useEffect(() => {
+    const initial =
+      routeLocationId ??
+      profileLocationId ??
+      (locations.length === 1 ? locations[0].id : undefined);
+    if (initial) {
+      setSelectedLocationId(initial);
+    }
+  }, [routeLocationId, profileLocationId, locations]);
 
   const emptyForm = {
     firstName: '',
@@ -73,11 +117,17 @@ export default function CharityManageAccessScreen() {
     email: '',
     mobile: '',
     password: '',
+    confirmPassword: '',
     role: '',
   };
 
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const activeMembers = useMemo(
+    () => members.filter((member) => member.isActive === true),
+    [members],
+  );
 
   const mapRoleToApi = (role: string): CharityMemberRole => {
     switch (role) {
@@ -92,10 +142,20 @@ export default function CharityManageAccessScreen() {
     }
   };
 
-  const filteredMembers = members.filter((member) => {
+  const filteredMembers = activeMembers.filter((member) => {
+    if (effectiveLocationId) {
+      const belongsToLocation =
+        member.role === 'HEAD_OFFICE_ADMIN' ||
+        member.role === 'HEAD_OFFICE' ||
+        !member.locations?.length ||
+        member.locations.some((loc: any) => loc.id === effectiveLocationId);
+      if (!belongsToLocation) return false;
+    }
+
     if (activeTab === 'driver') {
       return member.role === 'DRIVER';
     }
+
     return member.role !== 'DRIVER';
   });
 
@@ -133,10 +193,16 @@ export default function CharityManageAccessScreen() {
           Alert.alert('Error', 'Please fill all required fields');
           return;
         }
+
+        const passwordError = validatePassword(form.password, form.confirmPassword);
+        if (passwordError) {
+          Alert.alert('Error', passwordError);
+          return;
+        }
       }
 
       if (!effectiveLocationId) {
-        Alert.alert('Error', 'No location found for this account');
+        Alert.alert('Error', 'Please select a site before adding a team member');
         return;
       }
 
@@ -193,6 +259,7 @@ export default function CharityManageAccessScreen() {
       email: member.email ?? '',
       mobile: member.mobile ?? '',
       password: '',
+      confirmPassword: '',
       role: mapApiRoleToUI(member.role),
     });
     setEditingId(String(member.id));
@@ -219,241 +286,338 @@ export default function CharityManageAccessScreen() {
   const memberKey = (member: { id?: number; email?: string; role: string }, index: number) =>
     member.id ? `${member.role}-${member.id}` : `${member.role}-${member.email ?? index}`;
 
+  const selectedLocation = locations.find((loc) => loc.id === effectiveLocationId);
+
+  const renderSkeleton = () => (
+    <View style={styles.skeletonWrap}>
+      <Skeleton width="100%" height={hp(22)} borderRadius={0} />
+      <View style={styles.formCard}>
+        <Skeleton width={wp(45)} height={normalize(18)} />
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Skeleton key={i} width="100%" height={normalize(44)} borderRadius={normalize(10)} />
+        ))}
+        <Skeleton width="100%" height={normalize(48)} borderRadius={normalize(10)} />
+      </View>
+      {[1, 2].map((i) => (
+        <Skeleton
+          key={i}
+          width={wp(92)}
+          height={normalize(72)}
+          borderRadius={normalize(10)}
+          style={styles.skeletonCard}
+        />
+      ))}
+    </View>
+  );
+
+  if ((loadingMembers || loadingLocations) && members.length === 0) {
+    return (
+      <Screen backgroundColor={palette.creme}>
+        {renderSkeleton()}
+      </Screen>
+    );
+  }
+
   return (
-    <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <ImageBackground
-          source={require('../../../assets/placeholder/kale-header.png')}
-          style={styles.headerBg}
-        >
-          <Pressable style={styles.backIcon} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
-          </Pressable>
-
-          <View style={styles.headerContent}>
-            <AppText variant="h3" style={styles.white}>
-              Manage Access
-            </AppText>
-            <View style={{ height: hp(0.7) }} />
-            <AppText variant="bodyBold" style={styles.white}>
-              Add and manage users & drivers
-            </AppText>
-          </View>
-        </ImageBackground>
-
-        <View style={styles.tabRow}>
-          <Pressable
-            style={[styles.tabPill, activeTab === 'user' && styles.activeTab]}
-            onPress={() => {
-              setActiveTab('user');
-              resetForm();
-            }}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={normalize(20)}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <Screen backgroundColor={palette.creme}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
           >
-            <AppText
-              variant="bodyBold"
-              style={[styles.tabText, activeTab === 'user' && styles.activeTabText]}
+            <ImageBackground
+              source={require('../../../assets/placeholder/kale-header.png')}
+              style={styles.headerBg}
             >
-              Add User
-            </AppText>
-          </Pressable>
+              <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
+              </Pressable>
 
-          <Pressable
-            style={[styles.tabPill, activeTab === 'driver' && styles.activeTab]}
-            onPress={() => {
-              setActiveTab('driver');
-              resetForm();
-            }}
-          >
-            <AppText
-              variant="bodyBold"
-              style={[styles.tabText, activeTab === 'driver' && styles.activeTabText]}
-            >
-              Add Driver
-            </AppText>
-          </Pressable>
-        </View>
+              <AppText variant="h5" style={styles.headerTitle}>
+                Manage Access
+              </AppText>
+              <AppText variant="bodySmall" style={styles.headerSubtitle}>
+                Add and manage users & drivers
+              </AppText>
+            </ImageBackground>
 
-        <View style={styles.sectionBox}>
-          <AppText variant="bodyBold">
-            {editingId
-              ? `Edit ${activeTab === 'user' ? 'User' : 'Driver'}`
-              : `Add ${activeTab === 'user' ? 'User' : 'Driver'}`}
-          </AppText>
-
-          <View style={styles.formFields}>
-            <InputField
-              label="First Name"
-              placeholder="Enter first name"
-              {...inputProps}
-              value={form.firstName}
-              onChangeText={(v) => setForm({ ...form, firstName: v })}
-            />
-
-            <InputField
-              label="Last Name"
-              placeholder="Enter last name"
-              {...inputProps}
-              value={form.lastName}
-              onChangeText={(v) => setForm({ ...form, lastName: v })}
-            />
-
-            <InputField
-              label="Email"
-              placeholder="Enter email"
-              {...inputProps}
-              value={form.email}
-              onChangeText={(v) => setForm({ ...form, email: v })}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!editingId}
-            />
-
-            <InputField
-              label="Mobile"
-              placeholder="Enter mobile number"
-              {...inputProps}
-              value={form.mobile}
-              onChangeText={(v) => setForm({ ...form, mobile: v })}
-              keyboardType="phone-pad"
-            />
-
-            {activeTab === 'user' ? (
-              <View style={styles.pickerField}>
-                <AppText variant="label" style={styles.pickerLabel}>
-                  Role
+            <View style={styles.tabRow}>
+              <Pressable
+                style={[styles.tabPill, activeTab === 'user' && styles.activeTab]}
+                onPress={() => {
+                  setActiveTab('user');
+                  resetForm();
+                }}
+              >
+                <AppText
+                  variant="bodyBold"
+                  style={[styles.tabText, activeTab === 'user' && styles.activeTabText]}
+                >
+                  Add User
                 </AppText>
-                <View style={styles.dropdown}>
-                  <Picker
-                    selectedValue={form.role}
-                    onValueChange={(v) => setForm({ ...form, role: v })}
-                  >
-                    <Picker.Item label="Select role" value="" />
-                    <Picker.Item label="Site Admin" value="site_admin" />
-                    <Picker.Item label="Site Team Member" value="site_team_member" />
-                  </Picker>
+              </Pressable>
+
+              <Pressable
+                style={[styles.tabPill, activeTab === 'driver' && styles.activeTab]}
+                onPress={() => {
+                  setActiveTab('driver');
+                  resetForm();
+                }}
+              >
+                <AppText
+                  variant="bodyBold"
+                  style={[styles.tabText, activeTab === 'driver' && styles.activeTabText]}
+                >
+                  Add Driver
+                </AppText>
+              </Pressable>
+            </View>
+
+            <View style={styles.formCard}>
+              {locations.length > 1 ? (
+                <View style={styles.siteBanner}>
+                  <AppText variant="label" style={styles.siteBannerLabel}>
+                    Site
+                  </AppText>
+                  <View style={styles.dropdown}>
+                    <Picker
+                      selectedValue={selectedLocationId}
+                      onValueChange={(v) => setSelectedLocationId(v)}
+                    >
+                      <Picker.Item label="Select a site" value="" />
+                      {locations.map((location) => (
+                        <Picker.Item
+                          key={location.id}
+                          label={location.locationName || `Site ${location.id}`}
+                          value={location.id}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
                 </View>
-              </View>
-            ) : (
-              <View style={styles.pickerField}>
-                <AppText variant="label" style={styles.pickerLabel}>
-                  Role
-                </AppText>
-                <View style={styles.roleLocked}>
-                  <AppText variant="bodyBold">Driver</AppText>
-                </View>
-              </View>
-            )}
-
-            {!editingId ? (
-              <InputField
-                label="Password"
-                placeholder="Enter password"
-                {...inputProps}
-                value={form.password}
-                onChangeText={(v) => setForm({ ...form, password: v })}
-                isPassword
-              />
-            ) : null}
-          </View>
-
-          <Pressable
-            style={[styles.addBtn, submitting && { opacity: 0.65 }]}
-            onPress={handleSubmit}
-            disabled={submitting}
-          >
-            <AppText variant="bodyBold" style={styles.white}>
-              {submitting
-                ? 'Saving...'
-                : editingId
-                  ? 'Update'
-                  : `+ Add ${activeTab === 'user' ? 'User' : 'Driver'}`}
-            </AppText>
-          </Pressable>
-        </View>
-
-        <View style={styles.sectionTitleBox}>
-          <AppText variant="bodyBold">
-            {activeTab === 'user' ? 'Users' : 'Drivers'}
-          </AppText>
-        </View>
-
-        {loadingMembers ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={palette.primary} />
-          </View>
-        ) : filteredMembers.length === 0 ? (
-          <View style={styles.emptyWrap}>
-            <AppText variant="bodySmall" color={palette.stone}>
-              {activeTab === 'user' ? 'No users added yet' : 'No drivers added yet'}
-            </AppText>
-          </View>
-        ) : (
-          filteredMembers.map((member, index) => (
-            <View key={memberKey(member, index)} style={styles.memberRow}>
-              <View style={{ flex: 1 }}>
-                <AppText variant="bodyBold">
-                  {member.firstName} {member.lastName}
-                </AppText>
-                <AppText variant="bodySmall">Email: {member.email || '—'}</AppText>
-                <AppText variant="bodySmall">Phone: {member.mobile || '—'}</AppText>
-                <AppText variant="bodySmall">Role: {prettyRole(member.role)}</AppText>
-              </View>
-
-              {!PROTECTED_ROLES.has(member.role) && member.id ? (
-                <View style={styles.actions}>
-                  <Pressable onPress={() => handleEdit(member)}>
-                    <Ionicons name="create-outline" size={normalize(22)} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => handleDelete(member.id!)}
-                    disabled={deletingId !== null}
-                    style={{ opacity: deletingId === String(member.id) ? 0.5 : 1 }}
-                  >
-                    {deletingId === String(member.id) ? (
-                      <ActivityIndicator size="small" color={palette.chilli} />
-                    ) : (
-                      <Ionicons name="trash-outline" size={normalize(22)} color={palette.chilli} />
-                    )}
-                  </Pressable>
+              ) : selectedLocation ? (
+                <View style={styles.siteBanner}>
+                  <AppText variant="label" style={styles.siteBannerLabel}>
+                    Site
+                  </AppText>
+                  <AppText variant="bodyBold">{selectedLocation.locationName}</AppText>
+                  {selectedLocation.address ? (
+                    <AppText variant="bodySmall" style={styles.sectionHint}>
+                      {selectedLocation.address}
+                    </AppText>
+                  ) : null}
                 </View>
               ) : null}
+
+              <AppText variant="bodyBold" style={styles.sectionHeading}>
+                {editingId
+                  ? `Edit ${activeTab === 'user' ? 'user' : 'driver'}`
+                  : `${activeTab === 'user' ? 'User' : 'Driver'} details`}
+              </AppText>
+              <AppText variant="bodySmall" style={styles.sectionHint}>
+                {activeTab === 'driver'
+                  ? 'Drivers can be assigned to pickups for this site.'
+                  : 'Team members can help manage day-to-day operations for this site.'}
+              </AppText>
+
+              <InputField
+                label="First name"
+                placeholder="Enter first name"
+                {...inputProps}
+                value={form.firstName}
+                onChangeText={(v) => setForm({ ...form, firstName: v })}
+              />
+
+              <InputField
+                label="Last name"
+                placeholder="Enter last name"
+                {...inputProps}
+                value={form.lastName}
+                onChangeText={(v) => setForm({ ...form, lastName: v })}
+              />
+
+              <InputField
+                label="Email"
+                placeholder="Enter email"
+                {...inputProps}
+                value={form.email}
+                onChangeText={(v) => setForm({ ...form, email: v })}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!editingId}
+              />
+
+              <InputField
+                label="Mobile"
+                placeholder="Enter mobile number"
+                {...inputProps}
+                value={form.mobile}
+                onChangeText={(v) => setForm({ ...form, mobile: v })}
+                keyboardType="phone-pad"
+              />
+
+              {activeTab === 'user' ? (
+                <View style={styles.pickerField}>
+                  <AppText variant="label" style={styles.pickerLabel}>
+                    Role
+                  </AppText>
+                  <View style={styles.dropdown}>
+                    <Picker
+                      selectedValue={form.role}
+                      onValueChange={(v) => setForm({ ...form, role: v })}
+                    >
+                      <Picker.Item label="Select role" value="" />
+                      <Picker.Item label="Site Admin" value="site_admin" />
+                      <Picker.Item label="Site Team Member" value="site_team_member" />
+                    </Picker>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.pickerField}>
+                  <AppText variant="label" style={styles.pickerLabel}>
+                    Role
+                  </AppText>
+                  <View style={styles.roleLocked}>
+                    <AppText variant="bodyBold">Driver</AppText>
+                  </View>
+                </View>
+              )}
+
+              {!editingId ? (
+                <>
+                  <InputField
+                    label="Password"
+                    placeholder="Enter password"
+                    {...inputProps}
+                    value={form.password}
+                    onChangeText={(v) => setForm({ ...form, password: v })}
+                    isPassword
+                  />
+                  <InputField
+                    label="Confirm password"
+                    placeholder="Re-enter password"
+                    {...inputProps}
+                    value={form.confirmPassword}
+                    onChangeText={(v) => setForm({ ...form, confirmPassword: v })}
+                    isPassword
+                  />
+                </>
+              ) : null}
+
+              <Pressable
+                style={[styles.createBtn, submitting && { opacity: 0.65 }]}
+                onPress={handleSubmit}
+                disabled={submitting}
+              >
+                <AppText style={styles.btnText}>
+                  {submitting
+                    ? 'Saving...'
+                    : editingId
+                      ? 'Update'
+                      : `Add ${activeTab === 'user' ? 'user' : 'driver'}`}
+                </AppText>
+              </Pressable>
             </View>
-          ))
-        )}
-      </ScrollView>
-    </Screen>
+
+            <View style={styles.listSection}>
+              <AppText variant="bodyBold" style={styles.sectionHeading}>
+                {activeTab === 'user' ? 'Active users' : 'Active drivers'}
+              </AppText>
+
+              {loadingMembers && activeMembers.length > 0 ? (
+                <>
+                  {[1, 2].map((i) => (
+                    <Skeleton
+                      key={i}
+                      width="100%"
+                      height={normalize(72)}
+                      borderRadius={normalize(10)}
+                      style={styles.skeletonCardInline}
+                    />
+                  ))}
+                </>
+              ) : filteredMembers.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <AppText variant="bodySmall" color={palette.stone}>
+                    {activeTab === 'user' ? 'No active users yet' : 'No active drivers yet'}
+                  </AppText>
+                </View>
+              ) : (
+                filteredMembers.map((member, index) => (
+                  <View key={memberKey(member, index)} style={styles.memberRow}>
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="bodyBold">
+                        {member.firstName} {member.lastName}
+                      </AppText>
+                      <AppText variant="bodySmall">Email: {member.email || '—'}</AppText>
+                      <AppText variant="bodySmall">Phone: {member.mobile || '—'}</AppText>
+                      <AppText variant="bodySmall">Role: {prettyRole(member.role)}</AppText>
+                    </View>
+
+                    {!PROTECTED_ROLES.has(member.role) && member.id ? (
+                      <View style={styles.actions}>
+                        <Pressable onPress={() => handleEdit(member)}>
+                          <Ionicons name="create-outline" size={normalize(22)} />
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => handleDelete(member.id!)}
+                          disabled={deletingId !== null}
+                          style={{ opacity: deletingId === String(member.id) ? 0.5 : 1 }}
+                        >
+                          <Ionicons name="trash-outline" size={normalize(22)} color={palette.chilli} />
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                ))
+              )}
+            </View>
+          </ScrollView>
+        </Screen>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: hp(2),
-    paddingBottom: hp(4),
+  scrollContent: {
+    paddingBottom: hp(14),
   },
   headerBg: {
-    height: hp(20),
+    height: hp(22),
     justifyContent: 'center',
-    paddingHorizontal: wp(4),
-  },
-  backIcon: {
-    position: 'absolute',
-    top: hp(2.2),
-    left: wp(4),
-    zIndex: 5,
-  },
-  headerContent: {
     alignItems: 'center',
+    paddingHorizontal: wp(8),
+    marginBottom: hp(2),
   },
-  white: {
+  backBtn: {
+    position: 'absolute',
+    left: wp(4),
+    top: hp(2.2),
+  },
+  headerTitle: {
     color: palette.white,
     textAlign: 'center',
+  },
+  headerSubtitle: {
+    color: palette.white,
+    opacity: 0.9,
+    textAlign: 'center',
+    marginTop: hp(0.8),
   },
   tabRow: {
     flexDirection: 'row',
     gap: wp(2.5),
     marginHorizontal: wp(4),
+    marginBottom: hp(2),
   },
   tabPill: {
     flex: 1,
@@ -474,20 +638,33 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: palette.white,
   },
-  sectionBox: {
-    backgroundColor: palette.white,
-    padding: wp(4),
+  formCard: {
     marginHorizontal: wp(4),
+    marginBottom: hp(2),
+    padding: wp(4),
     borderRadius: normalize(12),
     borderWidth: 1,
     borderColor: palette.border,
-    gap: hp(1.5),
-  },
-  formFields: {
+    backgroundColor: palette.white,
     gap: spacing.md,
   },
-  sectionTitleBox: {
-    marginHorizontal: wp(4),
+  siteBanner: {
+    padding: wp(3.5),
+    borderRadius: normalize(10),
+    backgroundColor: '#F4FAF6',
+    borderWidth: 1,
+    borderColor: '#D8EBDF',
+    gap: spacing.xs,
+  },
+  siteBannerLabel: {
+    textTransform: 'none',
+    color: palette.stone,
+  },
+  sectionHeading: {
+    marginTop: hp(0.5),
+  },
+  sectionHint: {
+    color: palette.stone,
   },
   pickerField: {
     gap: spacing.xs,
@@ -511,25 +688,33 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     backgroundColor: '#F4F4F5',
   },
-  addBtn: {
-    backgroundColor: palette.primary,
-    paddingVertical: hp(1.3),
-    borderRadius: normalize(8),
+  createBtn: {
+    backgroundColor: palette.middlegreen,
+    padding: normalize(14),
+    borderRadius: normalize(10),
     alignItems: 'center',
     marginTop: hp(0.5),
   },
-  loadingWrap: {
-    alignItems: 'center',
-    paddingVertical: hp(2),
+  btnText: {
+    color: palette.white,
+    fontWeight: '600',
   },
-  emptyWrap: {
+  listSection: {
     marginHorizontal: wp(4),
-    paddingVertical: hp(1),
+    gap: spacing.md,
+  },
+  skeletonWrap: {
+    gap: hp(1.2),
+  },
+  skeletonCard: {
+    alignSelf: 'center',
+  },
+  skeletonCardInline: {
+    marginBottom: spacing.sm,
   },
   memberRow: {
     backgroundColor: palette.white,
     padding: wp(4),
-    marginHorizontal: wp(4),
     borderRadius: normalize(10),
     borderWidth: 1,
     borderColor: palette.border,
@@ -540,5 +725,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: wp(3),
+  },
+  emptyWrap: {
+    paddingVertical: hp(1),
   },
 });

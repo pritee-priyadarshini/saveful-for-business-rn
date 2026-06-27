@@ -23,32 +23,165 @@ export type CharityMember = {
   email: string;
   mobile: string;
   role: string;
+  isActive?: boolean;
   locations?: any[];
   canClaimPickupsDirectly?: boolean;
 };
 
-export function normalizeCharityUsers(data: any): CharityMember[] {
-  const normalizeOne = (user: any, role: string): CharityMember => ({
-    ...user,
-    id: user.id ?? user.userId,
-    firstName: user.firstName ?? '',
-    lastName: user.lastName ?? '',
-    email: user.email ?? '',
-    mobile: user.mobile ?? user.phoneNumber ?? '',
-    role,
-  });
+export function normalizeCharityLocations(data: any): any[] {
+  const raw = Array.isArray(data) ? data : data?.locations || [];
 
+  return raw
+    .map((location: any) => ({
+      ...location,
+      id: location.id ?? location.locationId,
+      locationName:
+        location.locationName ?? location.name ?? location.siteName ?? '',
+      postcode: location.postcode ?? location.postCode ?? '',
+      pickupRadiusKm: location.pickupRadiusKm ?? location.radiusKm,
+      logoUrl: location.logoUrl ?? null,
+      isActive: location.isActive ?? true,
+    }))
+    .filter((location) => location.isActive !== false && location.id != null);
+}
+
+export function extractCharityLocationId(data: any): number | null {
+  const candidate =
+    data?.id ??
+    data?.locationId ??
+    data?.location?.id ??
+    data?.site?.id;
+
+  if (candidate == null || candidate === '') return null;
+  const parsed = Number(candidate);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function collectUserSources(raw: any): any[] {
+  if (raw == null || typeof raw !== 'object') return [];
+
+  const nested = [raw.user, raw.profile, raw.member, raw.membership, raw.orgUser, raw.account];
+  return [raw, ...nested.filter((source) => source && typeof source === 'object')];
+}
+
+function parseActiveFlag(value: unknown): boolean | undefined {
+  if (value === null) return false;
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  }
+
+  return undefined;
+}
+
+function readActiveFlag(source: any): boolean | undefined {
+  if (!source || typeof source !== 'object') return undefined;
+
+  const isActive = parseActiveFlag(source.isActive);
+  if (isActive !== undefined) return isActive;
+
+  return parseActiveFlag(source.active);
+}
+
+export function isCharityUserActive(raw: any, role?: string): boolean {
+  const sources = collectUserSources(raw);
+  if (!sources.length) return false;
+
+  for (const source of sources) {
+    const activeFlag = readActiveFlag(source);
+    if (activeFlag === false) return false;
+
+    if (source.isDeleted === true || source.deleted === true) return false;
+    if (source.deletedAt != null && source.deletedAt !== '') return false;
+
+    const status = String(source.status ?? '').toLowerCase();
+    if (status === 'inactive' || status === 'deleted' || status === 'deactivated') {
+      return false;
+    }
+  }
+
+  for (const source of sources) {
+    const activeFlag = readActiveFlag(source);
+    if (activeFlag === true) return true;
+  }
+
+  if (role === 'HEAD_OFFICE_ADMIN' || role === 'HEAD_OFFICE') {
+    return true;
+  }
+
+  return false;
+}
+
+function resolveCharityUserRecord(raw: any, role: string): CharityMember {
+  const sources = collectUserSources(raw);
+
+  const pick = <T,>(getter: (source: any) => T | null | undefined, fallback: T): T => {
+    for (const source of sources) {
+      const value = getter(source);
+      if (value !== undefined && value !== null && value !== '') {
+        return value as T;
+      }
+    }
+    return fallback;
+  };
+
+  const id = pick((source) => source.id ?? source.userId, 0);
+
+  return {
+    id,
+    firstName: pick((source) => source.firstName, ''),
+    lastName: pick((source) => source.lastName, ''),
+    email: pick((source) => source.email, ''),
+    mobile: pick((source) => source.mobile ?? source.phoneNumber, ''),
+    role,
+    isActive: isCharityUserActive(raw, role),
+    locations: raw.locations ?? raw.user?.locations,
+    canClaimPickupsDirectly:
+      raw.canClaimPickupsDirectly ?? raw.user?.canClaimPickupsDirectly,
+  };
+}
+
+function mapRoleGroup(
+  items: any[] | undefined,
+  role: string,
+  forcedActive?: boolean,
+): CharityMember[] {
+  return (items ?? []).map((item) => {
+    const record =
+      forcedActive === false
+        ? { ...item, isActive: false, user: item.user ? { ...item.user, isActive: false } : item.user }
+        : item;
+    return resolveCharityUserRecord(record, role);
+  });
+}
+
+export function normalizeCharityUsers(data: any): CharityMember[] {
   const combined = [
-    ...(data?.headOfficeAdmins || []).map((u: any) => normalizeOne(u, 'HEAD_OFFICE_ADMIN')),
-    ...(data?.headOfficeMembers || []).map((u: any) => normalizeOne(u, 'HEAD_OFFICE')),
-    ...(data?.locationAdmins || []).map((u: any) => normalizeOne(u, 'LOCATION_ADMIN')),
-    ...(data?.teamMembers || []).map((u: any) => normalizeOne(u, 'TEAM_MEMBER')),
-    ...(data?.drivers || []).map((u: any) => normalizeOne(u, 'DRIVER')),
+    ...mapRoleGroup(data?.headOfficeAdmins, 'HEAD_OFFICE_ADMIN'),
+    ...mapRoleGroup(data?.headOfficeMembers, 'HEAD_OFFICE'),
+    ...mapRoleGroup(data?.locationAdmins, 'LOCATION_ADMIN'),
+    ...mapRoleGroup(data?.teamMembers, 'TEAM_MEMBER'),
+    ...mapRoleGroup(data?.drivers, 'DRIVER'),
+    ...mapRoleGroup(data?.inactiveHeadOfficeAdmins, 'HEAD_OFFICE_ADMIN', false),
+    ...mapRoleGroup(data?.inactiveHeadOfficeMembers, 'HEAD_OFFICE', false),
+    ...mapRoleGroup(data?.inactiveLocationAdmins, 'LOCATION_ADMIN', false),
+    ...mapRoleGroup(data?.inactiveTeamMembers, 'TEAM_MEMBER', false),
+    ...mapRoleGroup(data?.inactiveDrivers, 'DRIVER', false),
+    ...(Array.isArray(data?.users)
+      ? data.users.map((item: any) =>
+          resolveCharityUserRecord(item, String(item.role ?? item.memberRole ?? 'TEAM_MEMBER')),
+        )
+      : []),
   ];
 
   const seen = new Set<number>();
   return combined.filter((member) => {
-    if (!member.id) return true;
+    if (member.isActive !== true) return false;
+    if (!member.id) return false;
     if (seen.has(member.id)) return false;
     seen.add(member.id);
     return true;
@@ -103,7 +236,8 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
 
   fetchLocations: async (force = false) => {
     const { isFetchingLocations, locationsLastFetched } = get();
-    if (isFetchingLocations || (!force && !isStale(locationsLastFetched))) return;
+    if (isFetchingLocations && !force) return;
+    if (!force && !isStale(locationsLastFetched)) return;
 
     const { authUser } = useAuthStore.getState();
     if (!authUser?.accessToken) return;
@@ -111,9 +245,7 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
     set({ isFetchingLocations: true, error: null });
     try {
       const res = await charityService.listLocations();
-      const locations = Array.isArray(res.data)
-        ? res.data
-        : res.data?.locations || [];
+      const locations = normalizeCharityLocations(res.data);
       set({ locations, locationsLastFetched: Date.now() });
     } catch (error: unknown) {
       const message = getUserFriendlyErrorMessage(error, 'Failed to load locations');
@@ -126,7 +258,8 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
 
   fetchUsers: async (force = false) => {
     const { isFetchingUsers, usersLastFetched } = get();
-    if (isFetchingUsers || (!force && !isStale(usersLastFetched))) return;
+    if (isFetchingUsers && !force) return;
+    if (!force && !isStale(usersLastFetched)) return;
 
     const { authUser } = useAuthStore.getState();
     if (!authUser?.accessToken) return;
@@ -173,7 +306,27 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
 
   addLocation: async (data) => {
     const res = await charityService.addLocation(data);
-    get().invalidateLocations();
+    const createdId = extractCharityLocationId(res.data);
+    if (createdId) {
+      set((state) => ({
+        locationsLastFetched: Date.now(),
+        locations: [
+          ...state.locations.filter((location) => location.id !== createdId),
+          {
+            id: createdId,
+            locationName: data.locationName,
+            address: data.address,
+            postcode: data.postcode,
+            pickupRadiusKm: data.radiusKm,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            isActive: true,
+          },
+        ],
+      }));
+    } else {
+      get().invalidateLocations();
+    }
     return res;
   },
 
@@ -185,7 +338,10 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
 
   deactivateLocation: async (locationId) => {
     await charityService.deactivateLocation(locationId);
-    get().invalidateLocations();
+    set((state) => ({
+      locations: state.locations.filter((location) => location.id !== locationId),
+      locationsLastFetched: Date.now(),
+    }));
   },
 
   addMember: async (data) => {
@@ -206,13 +362,29 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
   },
 
   deleteUser: async (userId) => {
-    await charityService.deleteUser(userId);
-    get().invalidateUsers();
+    try {
+      await charityService.deleteUser(userId);
+    } catch (error) {
+      await charityService.deactivateUser(userId);
+    }
+
     set((state) => {
-      const next = { ...state.userProfiles };
-      delete next[userId];
-      return { userProfiles: next };
+      const nextProfiles = { ...state.userProfiles };
+      delete nextProfiles[userId];
+      return {
+        users: state.users.filter((user) => user.id !== userId),
+        usersLastFetched: Date.now(),
+        userProfiles: nextProfiles,
+      };
     });
+
+    try {
+      const res = await charityService.listUsers();
+      const users = normalizeCharityUsers(res.data).filter((user) => user.id !== userId);
+      set({ users, usersLastFetched: Date.now() });
+    } catch {
+      // Keep optimistic removal if refetch fails.
+    }
   },
 
   updateOrganisation: async (orgId, data) => {

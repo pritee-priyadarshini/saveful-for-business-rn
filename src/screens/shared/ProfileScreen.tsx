@@ -45,6 +45,7 @@ export function ProfileScreen() {
   type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
   const navigation = useNavigation<NavigationProp>();
+  const canGoBack = navigation.canGoBack();
 
   const [openSection, setOpenSection] = useState<string | null>(null);
   const { submitting, withLock } = useSubmitLock();
@@ -283,22 +284,32 @@ export function ProfileScreen() {
 
   return (
     <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
-        {/* HEADER */}
         <View style={styles.header}>
           <Image
             source={require('../../../assets/placeholder/modal-head-backgrounda.png')}
             style={styles.headerBg}
-            resizeMode='cover'
+            resizeMode="cover"
           />
+
           <View style={styles.headerContent}>
-            <View>
-              <AppText variant="heading" style={styles.white}>
+            {canGoBack ? (
+              <Pressable
+                onPress={() => navigation.goBack()}
+                style={styles.backBtn}
+                hitSlop={8}
+              >
+                <Ionicons name="arrow-back" size={22} color="white" />
+              </Pressable>
+            ) : null}
+
+            <View style={styles.headerTextBlock}>
+              <AppText variant="heading" style={styles.white} numberOfLines={2}>
                 {currentProfile.name}
               </AppText>
 
-              <AppText variant="caption" style={styles.white}>
+              <AppText variant="caption" style={styles.white} numberOfLines={1}>
                 {sinceDate ? `Saveful for Business since ${sinceDate}` : 'Saveful for Business'}
               </AppText>
             </View>
@@ -311,9 +322,8 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.scroll}>
 
-          {/* NEED HELP */}
           <Card style={styles.card}>
             <AppText variant="body" style={{ textAlign: 'center' }}>Need a hand?</AppText>
 
@@ -599,7 +609,7 @@ export function ProfileScreen() {
             <AppText variant='label'>Delete my account</AppText>
           </Pressable>
 
-        </ScrollView>
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -625,11 +635,21 @@ const styles = StyleSheet.create({
 
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     marginTop: -(hp(25) - 5),
     zIndex: 1,
+    gap: spacing.sm,
+  },
+
+  backBtn: {
+    marginRight: spacing.xs,
+  },
+
+  headerTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
 
   scroll: {
@@ -662,6 +682,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#A8E6CF',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
 
   supportBtn: {

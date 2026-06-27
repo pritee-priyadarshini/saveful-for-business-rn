@@ -16,12 +16,11 @@ import ManageAccessScreen from '@/screens/restaurant/ManageAccessScreen';
 import ManageSitesScreen from '@/screens/restaurant/ManageSitesScreen';
 import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
 import SiteAnalyticsScreen from '@/screens/restaurant/SiteAnalyticsScreen';
-import AdminProfileScreen from '@/screens/restaurant/AdminProfileScreen';
+import { ProfileScreen } from '@/screens/shared/ProfileScreen';
 import { CalculationScreen } from '@/screens/shared/CalculationScreen';
 import MultiCharityManageSitesScreen from '@/screens/charity/MultiCharityManageSitesScreen';
 import CreateCharitySiteScreen from '@/screens/charity/CreateCharitySiteScreen';
 import CharitySiteAnalyticsScreen from '@/screens/charity/CharitySiteAnalyticsScreen';
-import CharityAdminProfileScreen from '@/screens/charity/CharityAdminProfileScreen';
 import DriverTrackingScreen from '@/screens/shared/DriverTrackingScreen';
 import CharityManageAccessScreen from '@/screens/charity/CharityManageAccessScreen';
 import FarmerManageAccessScreen from '@/screens/farmer/FarmerManageAccessScreen';
@@ -40,7 +39,7 @@ export type RootStackParamList = {
   //CreateSite: undefined;
   CreateSite: { mode?: 'site' | 'manager'; siteId?: number };
   SiteAnalytics: undefined;
-  AdminProfile: undefined;
+  Account: undefined;
   Calculation: undefined;
   ForgotPassword: undefined;
   //CharityManageAccess: undefined;
@@ -64,12 +63,11 @@ export type RootStackParamList = {
   //MultiCharity
   MultiCharityManageSites: undefined;
   CreateCharitySite: | undefined | {
-    mode?: 'manager';
+    mode?: 'assign-manager';
     siteId?: number;
+    locationId?: number;
   };
   CharitySiteAnalytics: undefined;
-  CharityAdminProfile: undefined;
-
   //Tracking
   DriverTracking: {
     trackingId: string;
@@ -172,11 +170,10 @@ export function AppNavigator() {
           <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
           <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
           <RootStack.Screen name="SiteAnalytics" component={SiteAnalyticsScreen} />
-          <RootStack.Screen name="AdminProfile" component={AdminProfileScreen} />
+          <RootStack.Screen name="Account" component={ProfileScreen} />
           <RootStack.Screen name="Calculation" component={CalculationScreen} />
           <RootStack.Screen name="CreateCharitySite" component={CreateCharitySiteScreen} />
           <RootStack.Screen name="CharitySiteAnalytics" component={CharitySiteAnalyticsScreen} />
-          <RootStack.Screen name="CharityAdminProfile" component={CharityAdminProfileScreen} />
           <RootStack.Screen name="DriverTracking" component={DriverTrackingScreen} />
           <RootStack.Screen name="CharityManageAccess" component={CharityManageAccessScreen} />
           <RootStack.Screen name="FarmerManageAccess" component={FarmerManageAccessScreen} />

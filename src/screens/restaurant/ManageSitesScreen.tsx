@@ -51,7 +51,7 @@ export default function ManageSitesScreen() {
   const actions = [
     { label: 'Add Site & Manager', route: 'CreateSite' },
     { label: 'View Analytics', route: 'SiteAnalytics' },
-    { label: 'Your Profile', route: 'AdminProfile' },
+    { label: 'Your Profile', route: 'Account' },
     { label: 'Contact Saveful', action: () => Linking.openURL('https://www.saveful.com/contact') },
   ];
 

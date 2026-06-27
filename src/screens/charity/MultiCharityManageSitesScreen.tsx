@@ -1,25 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
     View,
     ScrollView,
     Pressable,
     StyleSheet,
     Image,
-    ImageBackground,
     Linking,
     Alert,
     TextInput,
     RefreshControl,
     Dimensions,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { Skeleton } from '../../components/Skeleton';
 import { useAppContext } from '@/store/AppContext';
-import { useCharityStore } from '@/store/charityStore';
+import { useCharityStore, type CharityMember } from '@/store/charityStore';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,8 +46,20 @@ type Site = {
     latitude?: number;
     longitude?: number;
     radiusKm?: number;
-    logoUrl?: string;
+    logoUrl?: string | null;
+    hasManager: boolean;
 };
+
+function findLocationAdmin(users: CharityMember[], locationId: number) {
+    const activeUsers = users.filter((user) => user.isActive === true);
+    return activeUsers.find(
+        (user) =>
+            user.role === 'LOCATION_ADMIN' &&
+            user.locations?.some((loc: any) => loc.id === locationId),
+    ) ?? activeUsers.find((user) =>
+        user.locations?.some((loc: any) => loc.id === locationId),
+    ) ?? null;
+}
 export default function MultiCharityManageSitesScreen() {
     const navigation = useNavigation<NavigationProp>();
     const { logout, currentProfile, authUser } = useAppContext();
@@ -70,28 +82,35 @@ export default function MultiCharityManageSitesScreen() {
     const [actionLoading, setActionLoading] = useState(false);
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
     const businessLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
+    const brandName =
+        authUser?.profile?.organisation?.branding ||
+        authUser?.profile?.organisation?.name ||
+        currentProfile.organization ||
+        'Charity';
+    const brandAddress =
+        authUser?.profile?.organisation?.address ||
+        currentProfile.address ||
+        'No address available';
 
     const loading = isFetchingLocations || isFetchingUsers;
 
     const sites = useMemo<Site[]>(() => {
         return locations.map((location: any) => {
-            const admin =
-                users.find((u) =>
-                    u.locations?.some((loc: any) => loc.id === location.id),
-                ) || null;
+            const admin = findLocationAdmin(users, location.id);
 
             return {
                 id: location.id,
                 tradingName: location.locationName,
                 address: location.address,
                 postCode: location.postcode,
-                contactName: admin ? `${admin.firstName} ${admin.lastName}` : 'No Admin',
-                email: admin?.email || '-',
-                mobile: admin?.mobile || '-',
+                contactName: admin ? `${admin.firstName} ${admin.lastName}`.trim() : 'No manager assigned',
+                email: admin?.email || location.contactEmail || '-',
+                mobile: admin?.mobile || location.contactMobile || '-',
                 latitude: location.latitude,
                 longitude: location.longitude,
                 radiusKm: location.pickupRadiusKm,
-                logoUrl: businessLogo || '',
+                logoUrl: location.logoUrl || businessLogo || null,
+                hasManager: !!admin,
             };
         });
     }, [locations, users, businessLogo]);
@@ -99,7 +118,7 @@ export default function MultiCharityManageSitesScreen() {
     const actions = [
         { label: 'Create Site', route: 'CreateCharitySite' },
         { label: 'View Analytics', route: 'CharitySiteAnalytics' },
-        { label: 'Your Profile', route: 'CharityAdminProfile' },
+        { label: 'Your Profile', route: 'Account' },
         {
             label: 'Contact Saveful',
             action: () => Linking.openURL('https://www.saveful.com/contact'),
@@ -121,48 +140,106 @@ export default function MultiCharityManageSitesScreen() {
         }
     };
 
-    React.useEffect(() => {
-        loadData().catch((e) =>
-            showErrorAlert(e, 'Could not load locations', 'Could not load locations'),
-        );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            loadData(true).catch((e) =>
+                showErrorAlert(e, 'Could not load locations', 'Could not load locations'),
+            );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, []),
+    );
 
-    if (loading) {
+    const renderSkeleton = () => (
+        <View style={styles.skeletonWrap}>
+            <View style={styles.skeletonHero}>
+                <Skeleton width="100%" height="100%" borderRadius={0} />
+            </View>
+
+            <View style={styles.skeletonTitle}>
+                <Skeleton width={wp(50)} height={normalize(24)} />
+            </View>
+
+            <View style={styles.actionGrid}>
+                {[1, 2, 3, 4].map((i) => (
+                    <View key={i} style={[styles.actionCard, styles.skeletonActionCard]}>
+                        <Skeleton width="60%" height={normalize(14)} />
+                    </View>
+                ))}
+            </View>
+
+            <View style={styles.skeletonTitle}>
+                <Skeleton width={wp(40)} height={normalize(24)} />
+            </View>
+
+            {[1, 2].map((i) => (
+                <View key={i} style={[styles.siteCard, styles.skeletonSiteCard]}>
+                    <View style={styles.siteHeader}>
+                        <View style={styles.siteLeft}>
+                            <Skeleton width={normalize(48)} height={normalize(48)} borderRadius={normalize(24)} />
+                            <View style={{ flex: 1, gap: normalize(6) }}>
+                                <Skeleton width="70%" height={normalize(18)} />
+                                <Skeleton width="90%" height={normalize(14)} />
+                                <Skeleton width="40%" height={normalize(14)} />
+                            </View>
+                        </View>
+                        <View style={{ gap: hp(0.7) }}>
+                            <Skeleton width={normalize(56)} height={normalize(32)} borderRadius={normalize(8)} />
+                            <Skeleton width={normalize(56)} height={normalize(32)} borderRadius={normalize(8)} />
+                        </View>
+                    </View>
+                </View>
+            ))}
+        </View>
+    );
+
+    if (loading && locations.length === 0) {
         return (
             <Screen backgroundColor={palette.creme}>
-                <View
-                    style={{
-                        flex: 1,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                    }}
-                >
-                    <AppText variant="bodyLarge">
-                        Loading locations...
-                    </AppText>
-                </View>
+                {renderSkeleton()}
             </Screen>
         );
     }
 
     return (
         <Screen backgroundColor={palette.creme}>
-            <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} >
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            >
 
                 {/* HERO HEADER */}
-                <ImageBackground
-                    source={require('../../../assets/placeholder/feed-bg.png')}
-                    style={styles.heroBg}
-                >
-                    <View style={styles.heroContent}>
-                        <AppText variant="h5" style={styles.businessName}>  {currentProfile.organization}</AppText>
+                <View style={styles.heroContainer}>
+                    <Image
+                        source={require('../../../assets/placeholder/kale-header.png')}
+                        style={styles.heroBg}
+                    />
 
-                        {businessLogo && (
-                            <Image source={{ uri: businessLogo }} style={styles.logoTopRight} />
-                        )}
+                    <View style={styles.topBar}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <AppText variant="h6" style={styles.whiteText}>
+                                {brandName}
+                            </AppText>
+
+                            <View style={styles.locationRow}>
+                                <Ionicons name="location-outline" size={normalize(24)} color="white" />
+                                <AppText variant="body" style={styles.location}>
+                                    {brandAddress}
+                                </AppText>
+                            </View>
+                        </View>
+
+                        <View style={styles.logoCircle}>
+                            {businessLogo ? (
+                                <Image source={{ uri: businessLogo }} style={styles.logoImage} />
+                            ) : (
+                                <AppText style={styles.logoFallback}>
+                                    {brandName[0] || 'S'}
+                                </AppText>
+                            )}
+                        </View>
                     </View>
-                </ImageBackground>
+                </View>
 
                 {/* ACTIONS */}
                 <AppText variant="subheading" style={styles.sectionTitle}>
@@ -212,12 +289,16 @@ export default function MultiCharityManageSitesScreen() {
                         <View style={styles.siteHeader}>
 
                             <View style={styles.siteLeft}>
-                                <Image source={site.logoUrl
-                                    ? { uri: site.logoUrl }
-                                    : require('../../../assets/intro/charity_logo.png')
-                                }
-                                    style={styles.siteLogo}
-                                />
+                                <View style={styles.siteLogoWrap}>
+                                    <Image
+                                        source={
+                                            site.logoUrl
+                                                ? { uri: site.logoUrl }
+                                                : require('../../../assets/intro/charity_logo.png')
+                                        }
+                                        style={styles.siteLogo}
+                                    />
+                                </View>
 
                                 <View style={{ flex: 1 }}>
                                     <AppText variant="bodyBold" style={styles.siteName}>
@@ -389,9 +470,10 @@ export default function MultiCharityManageSitesScreen() {
                                                                 setActionLoading(true);
                                                                 try {
                                                                     await deactivateLocation(site.id);
-                                                                    await loadData(true);
                                                                     setExpandedSite(null);
-                                                                    showSuccessAlert('Location removed successfully', 'Deleted');
+                                                                    setEditingSiteId(null);
+                                                                    showSuccessAlert('Site removed successfully', 'Deleted');
+                                                                    await loadData(true);
                                                                 } catch (err) {
                                                                     showErrorAlert(
                                                                         err,
@@ -432,41 +514,39 @@ export default function MultiCharityManageSitesScreen() {
                                             </AppText>
                                         )}
 
-                                        <View style={{ flexDirection: 'row', gap: wp(2.5), marginTop: hp(1.8), }}>
-                                            {/* ASSIGN MANAGER */}
-                                            <Pressable
-                                                style={[styles.saveBtn, {
-                                                    flex: 1,
-                                                    marginTop: 0,
-                                                    backgroundColor: palette.middlegreen,
-                                                },
-                                                ]}
-                                                onPress={() =>
-                                                    navigation.navigate(
-                                                        'CreateCharitySite',
+                                        <View style={{ flexDirection: 'row', gap: wp(2.5), marginTop: hp(1.8) }}>
+                                            {!site.hasManager ? (
+                                                <Pressable
+                                                    style={[
+                                                        styles.saveBtn,
                                                         {
-                                                            mode: 'manager',
+                                                            flex: 1,
+                                                            marginTop: 0,
+                                                            backgroundColor: palette.middlegreen,
+                                                        },
+                                                    ]}
+                                                    onPress={() =>
+                                                        navigation.navigate('CreateCharitySite', {
+                                                            mode: 'assign-manager',
                                                             siteId: site.id,
-                                                        }
-                                                    )
-                                                }
-                                            >
-                                                <AppText variant="bodyBold" style={{ color: 'white' }} >
-                                                    Assign Manager
-                                                </AppText>
-                                            </Pressable>
-
-                                            {/* REMOVE MANAGER */}
-                                            <Pressable
-                                                style={[
-                                                    styles.saveBtn,
-                                                    {
-                                                        flex: 1,
-                                                        marginTop: 0,
-                                                        backgroundColor: '#D9534F',
-                                                    },
-                                                ]}
-                                                onPress={() => {
+                                                        })
+                                                    }
+                                                >
+                                                    <AppText variant="bodyBold" style={{ color: 'white' }}>
+                                                        Assign manager
+                                                    </AppText>
+                                                </Pressable>
+                                            ) : (
+                                                <Pressable
+                                                    style={[
+                                                        styles.saveBtn,
+                                                        {
+                                                            flex: 1,
+                                                            marginTop: 0,
+                                                            backgroundColor: '#D9534F',
+                                                        },
+                                                    ]}
+                                                    onPress={() => {
                                                     Alert.alert(
                                                         'Remove Manager',
                                                         'Are you sure you want to remove this manager?',
@@ -483,22 +563,19 @@ export default function MultiCharityManageSitesScreen() {
                                                                     setActionLoading(true);
                                                                     try {
                                                                         await fetchUsers(true);
-                                                                        const admin = users.find((u) =>
-                                                                            u.locations?.some(
-                                                                                (loc: any) => loc.id === site.id,
-                                                                            ),
+                                                                        const admin = findLocationAdmin(
+                                                                            useCharityStore.getState().users,
+                                                                            site.id,
                                                                         );
 
-                                                                        if (!admin) {
-                                                                            Alert.alert('No manager assigned');
+                                                                        if (!admin?.id) {
+                                                                            Alert.alert('No manager assigned to this site');
                                                                             return;
                                                                         }
 
                                                                         await deleteUser(admin.id);
                                                                         await loadData(true);
-
                                                                         showSuccessAlert('Manager removed successfully');
-
                                                                     } catch (err: unknown) {
                                                                         showErrorAlert(
                                                                             err,
@@ -513,12 +590,12 @@ export default function MultiCharityManageSitesScreen() {
                                                         ]
                                                     );
                                                 }}
-                                            >
-                                                <AppText variant="bodyBold" style={{ color: 'white' }} >
-                                                    Remove Manager
-                                                </AppText>
-                                            </Pressable>
-
+                                                >
+                                                    <AppText variant="bodyBold" style={{ color: 'white' }}>
+                                                        Remove manager
+                                                    </AppText>
+                                                </Pressable>
+                                            )}
                                         </View>
                                     </>
                                 )}
@@ -565,27 +642,67 @@ export default function MultiCharityManageSitesScreen() {
 }
 
 const styles = StyleSheet.create({
-    heroBg: {
-        height: hp(18),
-        justifyContent: 'center',
+    scrollContent: {
+        paddingBottom: hp(8),
+        flexGrow: 1,
+    },
+    heroContainer: {
+        minHeight: hp(18),
+        width: '100%',
+        paddingTop: hp(2),
+        paddingHorizontal: wp(4),
+        position: 'relative',
         marginBottom: hp(2.5),
     },
-    logoTopRight: {
-        width: wp(30),
-        height: hp(10),
-        resizeMode: 'contain',
+    heroBg: {
+        width: '110%',
+        height: '120%',
         position: 'absolute',
-        right: wp(5),
     },
-    heroContent: {
+    topBar: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: wp(4),
+        gap: wp(3),
     },
-    businessName: {
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginTop: hp(0.8),
+        gap: wp(1),
+    },
+    whiteText: {
         color: 'white',
-        textAlign: 'center',
+        fontSize: normalize(20),
+    },
+    location: {
+        color: 'white',
+        opacity: 0.8,
+        flex: 1,
+        flexWrap: 'wrap',
+        fontSize: normalize(18),
+        paddingTop: hp(1),
+        justifyContent: 'center',
+    },
+    logoCircle: {
+        width: normalize(50),
+        height: normalize(50),
+        borderRadius: normalize(25),
+        flexShrink: 0,
+        backgroundColor: 'white',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    logoImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: normalize(25),
+    },
+    logoFallback: {
+        color: '#7B3FE4',
+        fontWeight: 'bold',
+        fontSize: normalize(18),
     },
     sectionTitle: {
         marginHorizontal: wp(6),
@@ -642,11 +759,22 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
     },
-    siteLogo: {
-        width: normalize(40),
-        height: normalize(40),
+    siteLogoWrap: {
+        width: normalize(48),
+        height: normalize(48),
+        borderRadius: normalize(24),
+        overflow: 'hidden',
         marginRight: wp(2.5),
-        resizeMode: 'contain',
+        backgroundColor: palette.white,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: palette.border,
+    },
+    siteLogo: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
     },
     siteIndex: {
         color: palette.primary,
@@ -705,5 +833,26 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#eee',
         paddingTop: hp(1.2),
+    },
+    skeletonWrap: {
+        paddingBottom: hp(4),
+    },
+    skeletonHero: {
+        height: hp(18),
+        width: '100%',
+        marginBottom: hp(2.5),
+        overflow: 'hidden',
+    },
+    skeletonTitle: {
+        alignItems: 'center',
+        marginBottom: hp(2),
+    },
+    skeletonActionCard: {
+        elevation: 0,
+        shadowOpacity: 0,
+    },
+    skeletonSiteCard: {
+        elevation: 0,
+        shadowOpacity: 0,
     },
 });

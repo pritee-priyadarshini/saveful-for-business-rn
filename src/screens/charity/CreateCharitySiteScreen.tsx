@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { GOOGLE_PLACES_API_KEY } from '@/config';
 import {
     View,
     ScrollView,
-    TextInput,
     Pressable,
     StyleSheet,
     Alert,
@@ -37,9 +36,12 @@ import { CharityMemberRole } from '@/services/charity.service';
 import { useCharityStore } from '@/store/charityStore';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
 import { InputField } from '@/components/InputField';
+import { Skeleton } from '@/components/Skeleton';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
-const { width, height } = Dimensions.get("window");
+const MIN_PASSWORD_LENGTH = 6;
+
+const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
 const hp = (p: number) => (height * p) / 100;
 const normalize = (size: number) => {
@@ -47,29 +49,39 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
+const inputProps = { compact: true as const, labelVariant: 'label' as const };
+
+function validateManagerPassword(password: string, confirmPassword: string): string | null {
+    if (!password) return 'Please enter a password.';
+    if (password.length < MIN_PASSWORD_LENGTH) {
+        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
+    if (!confirmPassword) return 'Please confirm the password.';
+    if (password !== confirmPassword) return 'Passwords do not match.';
+    return null;
+}
+
 export default function CreateCharitySiteScreen() {
     const navigation = useNavigation();
     const route = useRoute<any>();
+    const isAssignMode = route.params?.mode === 'assign-manager';
+    const assignSiteId = route.params?.siteId ?? route.params?.locationId ?? null;
+
     const {
         locations: storeLocations,
         fetchLocations,
         addLocation,
         addMember,
+        isFetchingLocations,
     } = useCharityStore();
-    useEffect(() => {
-        if (route.params?.mode === 'manager') {
-            setActiveTab('manager');
-            setSelectedLocationId(route.params.locationId);
-        }
-    }, []);
 
-    const [activeTab, setActiveTab] = useState<'site' | 'manager'>('site');
     const [loading, setLoading] = useState(false);
-    const [createdLocationId, setCreatedLocationId] = useState<number | null>(null);
     const locations = storeLocations;
-    const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
-    const [openLocationDropdown, setOpenLocationDropdown] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+    const assignSite = useMemo(
+        () => locations.find((site) => site.id === assignSiteId) ?? null,
+        [locations, assignSiteId],
+    );
+
     const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
     const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
     const [selectedAddress, setSelectedAddress] = useState('');
@@ -106,7 +118,7 @@ export default function CreateCharitySiteScreen() {
                     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
                 }
             },
-        })
+        }),
     ).current;
 
     const applyMapLocation = async (
@@ -160,14 +172,17 @@ export default function CreateCharitySiteScreen() {
             setGpsLoading(false);
         }
     };
+
     const [siteForm, setSiteForm] = useState({
         locationName: '',
         address: '',
         postcode: '',
-        adminContactName: '',
+        managerFirstName: '',
+        managerLastName: '',
         adminEmail: '',
         adminMobile: '',
         adminPassword: '',
+        adminConfirmPassword: '',
         radiusKm: '10',
         latitude: null as number | null,
         longitude: null as number | null,
@@ -178,16 +193,19 @@ export default function CreateCharitySiteScreen() {
         lastName: '',
         email: '',
         password: '',
+        confirmPassword: '',
         mobile: '',
-        role: 'LOCATION_ADMIN',
-        canClaimPickupsDirectly: true,
     });
 
     useEffect(() => {
-        fetchLocations();
-    }, [fetchLocations]);
+        if (isAssignMode) {
+            fetchLocations(true).catch(() => {});
+        }
+    }, [fetchLocations, isAssignMode]);
 
     useEffect(() => {
+        if (isAssignMode) return;
+
         (async () => {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status === 'granted') {
@@ -203,7 +221,7 @@ export default function CreateCharitySiteScreen() {
                 });
             }
         })();
-    }, []);
+    }, [isAssignMode]);
 
     const handleCreateLocation = async () => {
         if (loading) return;
@@ -212,53 +230,66 @@ export default function CreateCharitySiteScreen() {
                 locationName,
                 address,
                 postcode,
-                adminContactName,
+                managerFirstName,
+                managerLastName,
                 adminEmail,
                 adminMobile,
                 adminPassword,
+                adminConfirmPassword,
                 radiusKm,
                 latitude,
                 longitude,
             } = siteForm;
 
             if (
-                !locationName ||
-                !address ||
-                !postcode ||
-                !adminContactName ||
-                !adminEmail ||
-                !adminMobile ||
+                !locationName.trim() ||
+                !address.trim() ||
+                !postcode.trim() ||
+                !managerFirstName.trim() ||
+                !managerLastName.trim() ||
+                !adminEmail.trim() ||
+                !adminMobile.trim() ||
                 !adminPassword ||
                 !latitude ||
                 !longitude
             ) {
-                Alert.alert('Error', 'Fill all required fields');
+                Alert.alert('Error', 'Please fill all fields and set the site location on the map');
+                return;
+            }
+
+            const passwordError = validateManagerPassword(adminPassword, adminConfirmPassword);
+            if (passwordError) {
+                Alert.alert('Error', passwordError);
                 return;
             }
 
             setLoading(true);
-            const res = await addLocation({
-                locationName,
-                address,
-                postcode,
-                adminContactName,
-                adminEmail,
-                adminMobile,
+            await addLocation({
+                locationName: locationName.trim(),
+                address: address.trim(),
+                postcode: postcode.trim(),
+                adminContactName: `${managerFirstName.trim()} ${managerLastName.trim()}`,
+                adminEmail: adminEmail.trim().toLowerCase(),
+                adminMobile: adminMobile.trim(),
                 adminPassword,
-                radiusKm: Number(radiusKm),
+                radiusKm: Number(radiusKm) || 10,
                 latitude,
                 longitude,
             });
 
-            const locationId = res.data?.id || res.data?.location?.id;
-            setCreatedLocationId(locationId);
-            showSuccessAlert('Location created successfully');
-            await fetchLocations(true);
-            setSelectedLocationId(locationId);
-            setActiveTab('manager');
+            showSuccessAlert(
+                'Site and manager created. Login credentials were sent to the manager by email.',
+                'Done',
+                () => navigation.goBack(),
+            );
 
+            try {
+                await fetchLocations(true);
+            } catch {
+                // Non-fatal refresh after successful create.
+            }
         } catch (err: unknown) {
-            showErrorAlert(err, 'Could not create location', 'Failed to create location');
+            showErrorAlert(err, 'Could not create site', 'Failed to create site');
         } finally {
             setLoading(false);
         }
@@ -266,44 +297,45 @@ export default function CreateCharitySiteScreen() {
 
     const handleAssignManager = async () => {
         if (loading) return;
-        try {
-            const locationId = createdLocationId || selectedLocationId;
-            if (!locationId) {
-                Alert.alert('Error', 'Please select a location');
-                return;
-            }
-            const {
-                firstName,
-                lastName,
-                email,
-                password,
-                mobile,
-                role,
-                canClaimPickupsDirectly,
-            } = managerForm;
 
-            if (
-                !firstName ||
-                !lastName ||
-                !email ||
-                !password
-            ) {
-                Alert.alert('Error', 'Fill all required manager fields');
+        if (!assignSiteId || !assignSite) {
+            Alert.alert('Error', 'Could not find the selected site');
+            return;
+        }
+
+        try {
+            const { firstName, lastName, email, password, confirmPassword, mobile } = managerForm;
+
+            if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
+                Alert.alert('Error', 'Please fill all required manager fields');
                 return;
             }
+
+            const passwordError = validateManagerPassword(password, confirmPassword);
+            if (passwordError) {
+                Alert.alert('Error', passwordError);
+                return;
+            }
+
             setLoading(true);
             await addMember({
-                firstName,
-                lastName,
-                email,
+                firstName: firstName.trim(),
+                lastName: lastName.trim(),
+                email: email.trim().toLowerCase(),
                 password,
-                mobile,
-                role: CharityMemberRole.TEAM_MEMBER,
-                locationId,
-                canClaimPickupsDirectly,
+                mobile: mobile.trim(),
+                role: CharityMemberRole.LOCATION_ADMIN,
+                locationId: assignSiteId,
+                canClaimPickupsDirectly: true,
             });
 
-            showSuccessAlert('Manager assigned successfully', 'Done', () => navigation.goBack());
+            showSuccessAlert('Site manager assigned successfully', 'Done', () => navigation.goBack());
+
+            try {
+                await fetchLocations(true);
+            } catch {
+                // Non-fatal refresh after successful assign.
+            }
         } catch (err: unknown) {
             showErrorAlert(err, 'Could not assign manager', 'Failed to assign manager');
         } finally {
@@ -311,16 +343,155 @@ export default function CreateCharitySiteScreen() {
         }
     };
 
+    const renderLocationSection = () => (
+        <>
+            <AppText variant="bodyBold" style={styles.sectionHeading}>
+                Site location
+            </AppText>
+            <AppText variant="bodySmall" style={styles.sectionHint}>
+                Search or drop a pin so charities and drivers can find this site.
+            </AppText>
+
+            <View style={styles.locationPickerRow}>
+                <Pressable
+                    style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
+                    onPress={goToCurrentLocation}
+                    disabled={gpsLoading}
+                >
+                    <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
+                    <AppText style={styles.locationPickerBtnText}>
+                        {gpsLoading ? 'Getting location...' : 'Use my location'}
+                    </AppText>
+                </Pressable>
+                <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
+                    <Ionicons name="search" size={normalize(16)} color={palette.white} />
+                    <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>
+                        Search address
+                    </AppText>
+                </Pressable>
+            </View>
+
+            {selectedAddress ? (
+                <View style={styles.selectedAddressBox}>
+                    <Ionicons name="location" size={normalize(16)} color={palette.primary} />
+                    <AppText style={styles.selectedAddressText} numberOfLines={2}>
+                        {selectedAddress}
+                    </AppText>
+                    <Pressable
+                        onPress={() => {
+                            setSelectedAddress('');
+                            setMarker(null);
+                            setSiteForm((prev) => ({
+                                ...prev,
+                                latitude: null,
+                                longitude: null,
+                                address: '',
+                                postcode: '',
+                            }));
+                        }}
+                    >
+                        <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
+                    </Pressable>
+                </View>
+            ) : null}
+
+            <AppText style={styles.mapHintText}>Tap the map to fine-tune the pin</AppText>
+
+            <View style={styles.mapContainer}>
+                <OsmMapView
+                    style={styles.mapView}
+                    marker={marker}
+                    selectable
+                    initialCenter={mapCenter ?? undefined}
+                    onLocationSelect={(latitude, longitude) => {
+                        applyMapLocation(latitude, longitude);
+                    }}
+                />
+            </View>
+        </>
+    );
+
+    const renderManagerFields = (
+        values: {
+            firstName: string;
+            lastName: string;
+            email: string;
+            mobile: string;
+            password: string;
+            confirmPassword: string;
+        },
+        onChange: (key: string, value: string) => void,
+    ) => (
+        <>
+            <InputField
+                label="First name"
+                placeholder="Enter first name"
+                {...inputProps}
+                value={values.firstName}
+                onChangeText={(v) => onChange('firstName', v)}
+            />
+            <InputField
+                label="Last name"
+                placeholder="Enter last name"
+                {...inputProps}
+                value={values.lastName}
+                onChangeText={(v) => onChange('lastName', v)}
+            />
+            <InputField
+                label="Email"
+                placeholder="Enter email"
+                {...inputProps}
+                value={values.email}
+                onChangeText={(v) => onChange('email', v)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+            />
+            <InputField
+                label="Mobile"
+                placeholder="Enter mobile number"
+                {...inputProps}
+                value={values.mobile}
+                onChangeText={(v) => onChange('mobile', v)}
+                keyboardType="phone-pad"
+            />
+            <InputField
+                label="Password"
+                placeholder="Enter password"
+                {...inputProps}
+                value={values.password}
+                onChangeText={(v) => onChange('password', v)}
+                isPassword
+            />
+            <InputField
+                label="Confirm password"
+                placeholder="Re-enter password"
+                {...inputProps}
+                value={values.confirmPassword}
+                onChangeText={(v) => onChange('confirmPassword', v)}
+                isPassword
+            />
+        </>
+    );
+
+    const renderAssignSkeleton = () => (
+        <View style={styles.formCard}>
+            <Skeleton width="100%" height={normalize(72)} borderRadius={normalize(10)} />
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} width="100%" height={normalize(44)} borderRadius={normalize(10)} />
+            ))}
+            <Skeleton width="100%" height={normalize(48)} borderRadius={normalize(10)} />
+        </View>
+    );
+
     return (
         <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={normalize(20)}
         >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss} >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <Screen backgroundColor={palette.creme}>
-
-                    {/* LOCATION BOTTOM SHEET MODAL */}
                     <Modal
                         visible={showPlacesSearch}
                         transparent
@@ -334,20 +505,17 @@ export default function CreateCharitySiteScreen() {
                                     <Animated.View
                                         style={[styles.modalSheet, { transform: [{ translateY: slideAnim }] }]}
                                     >
-                                        {/* DRAG HANDLE */}
                                         <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
                                             <View style={styles.dragHandle} />
                                         </View>
 
-                                        {/* MODAL HEADER */}
                                         <View style={styles.modalHeader}>
-                                            <AppText style={styles.modalTitle}>Set Location</AppText>
+                                            <AppText style={styles.modalTitle}>Set location</AppText>
                                             <Pressable onPress={closeModal} style={styles.modalCloseBtn}>
                                                 <Ionicons name="close" size={normalize(22)} color={palette.text} />
                                             </Pressable>
                                         </View>
 
-                                        {/* SEARCH */}
                                         <View style={styles.modalSearchContainer}>
                                             <GooglePlacesAutocomplete
                                                 placeholder="Search charity address or place..."
@@ -358,7 +526,10 @@ export default function CreateCharitySiteScreen() {
                                                     const lng = details?.geometry?.location?.lng;
                                                     if (lat != null && lng != null) {
                                                         const addr = details?.formatted_address || data.description;
-                                                        const postcode = details?.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name || '';
+                                                        const postcode =
+                                                            details?.address_components?.find((c: any) =>
+                                                                c.types.includes('postal_code'),
+                                                            )?.long_name || '';
                                                         applyMapLocation(lat, lng, addr, postcode);
                                                     }
                                                     Keyboard.dismiss();
@@ -366,9 +537,25 @@ export default function CreateCharitySiteScreen() {
                                                 query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
                                                 styles={{
                                                     container: { flex: 0 },
-                                                    textInputContainer: { borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border },
-                                                    textInput: { height: normalize(46), color: palette.text, fontSize: normalize(14), marginBottom: 0, backgroundColor: palette.white },
-                                                    listView: { backgroundColor: palette.white, borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border, marginTop: normalize(4) },
+                                                    textInputContainer: {
+                                                        borderRadius: normalize(10),
+                                                        borderWidth: 1,
+                                                        borderColor: palette.border,
+                                                    },
+                                                    textInput: {
+                                                        height: normalize(46),
+                                                        color: palette.text,
+                                                        fontSize: normalize(14),
+                                                        marginBottom: 0,
+                                                        backgroundColor: palette.white,
+                                                    },
+                                                    listView: {
+                                                        backgroundColor: palette.white,
+                                                        borderRadius: normalize(10),
+                                                        borderWidth: 1,
+                                                        borderColor: palette.border,
+                                                        marginTop: normalize(4),
+                                                    },
                                                     row: { padding: normalize(12), backgroundColor: palette.white },
                                                     description: { fontSize: normalize(13), color: palette.text },
                                                 }}
@@ -378,7 +565,6 @@ export default function CreateCharitySiteScreen() {
                                             />
                                         </View>
 
-                                        {/* MAP PREVIEW */}
                                         <View style={styles.modalMapContainer}>
                                             <OsmMapView
                                                 style={styles.mapView}
@@ -392,14 +578,13 @@ export default function CreateCharitySiteScreen() {
                                             />
                                         </View>
 
-                                        {/* CONFIRM BUTTON */}
                                         <Pressable
                                             style={[styles.confirmBtn, !marker && styles.confirmBtnDisabled]}
                                             onPress={closeModal}
                                             disabled={!marker}
                                         >
                                             <AppText style={styles.confirmBtnText}>
-                                                {marker ? 'Confirm Location' : 'Select a location on the map'}
+                                                {marker ? 'Confirm location' : 'Select a location on the map'}
                                             </AppText>
                                         </Pressable>
                                     </Animated.View>
@@ -410,202 +595,131 @@ export default function CreateCharitySiteScreen() {
 
                     <ScrollView
                         keyboardShouldPersistTaps="always"
-                        contentContainerStyle={{ paddingBottom: hp(14), }}
+                        contentContainerStyle={styles.scrollContent}
                     >
-
-                        {/* HEADER */}
                         <ImageBackground
-                            source={require('../../../assets/placeholder/feed-bg.png')}
+                            source={require('../../../assets/placeholder/kale-header.png')}
                             style={styles.headerBg}
                         >
-                            <Pressable
-                                onPress={() => navigation.goBack()}
-                                style={styles.backBtn}
-                            >
+                            <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
                                 <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
                             </Pressable>
 
-                            <AppText variant='h5' style={styles.headerTitle} >
-                                Add Charity Site
+                            <AppText variant="h5" style={styles.headerTitle}>
+                                {isAssignMode ? 'Assign Site Manager' : 'Add Charity Site'}
+                            </AppText>
+                            <AppText variant="bodySmall" style={styles.headerSubtitle}>
+                                {isAssignMode
+                                    ? 'Add a manager to an existing site'
+                                    : 'Set up the site, location, and manager in one step'}
                             </AppText>
                         </ImageBackground>
 
-                        {/* TABS */}
-                        <View
-                            style={{
-                                flexDirection: 'row',
-                                margin: wp(4),
-                                gap: wp(2.5),
-                            }}
-                        >
-                            {[
-                                {
-                                    key: 'site',
-                                    label: 'Add Site',
-                                },
-                                {
-                                    key: 'manager',
-                                    label: 'Add Manager',
-                                },
-                            ].map((tab) => (
-                                <Pressable
-                                    key={tab.key}
-                                    onPress={() => {
-                                        if (tab.key === 'manager' && locations.length === 0 && !createdLocationId) {
-                                            Alert.alert('No locations available. Please create a location first.');
-                                            return;
-                                        }
+                        {isAssignMode ? (
+                            isFetchingLocations && !assignSite ? (
+                                renderAssignSkeleton()
+                            ) : (
+                            <View style={styles.formCard}>
+                                <View style={styles.siteBanner}>
+                                    <AppText variant="label" style={styles.siteBannerLabel}>
+                                        Site
+                                    </AppText>
+                                    <AppText variant="bodyBold">
+                                        {assignSite?.locationName || 'Loading site...'}
+                                    </AppText>
+                                    {assignSite?.address ? (
+                                        <AppText variant="bodySmall" style={styles.sectionHint}>
+                                            {assignSite.address}
+                                        </AppText>
+                                    ) : null}
+                                </View>
 
-                                        setActiveTab(tab.key as any);
-                                    }}
-                                    style={{
-                                        flex: 1,
-                                        padding: normalize(10),
-                                        borderRadius: normalize(20),
-                                        backgroundColor: activeTab === tab.key ? palette.primary : '#eee',
-                                        alignItems: 'center',
-                                    }}
+                                <AppText variant="bodyBold" style={styles.sectionHeading}>
+                                    Manager details
+                                </AppText>
+                                <AppText variant="bodySmall" style={styles.sectionHint}>
+                                    This person will manage pickups and day-to-day operations for this site.
+                                </AppText>
+
+                                {renderManagerFields(managerForm, (key, value) =>
+                                    setManagerForm({ ...managerForm, [key]: value }),
+                                )}
+
+                                <Pressable
+                                    style={[styles.createBtn, loading && { opacity: 0.65 }]}
+                                    disabled={loading || !assignSite}
+                                    onPress={handleAssignManager}
                                 >
-                                    <AppText style={{ color: activeTab === tab.key ? 'white' : palette.text, }} >
-                                        {tab.label}
+                                    <AppText style={styles.btnText}>
+                                        {loading ? 'Assigning...' : 'Assign manager'}
                                     </AppText>
                                 </Pressable>
-                            ))}
-                        </View>
+                            </View>
+                            )
+                        ) : (
+                            <View style={styles.formCard}>
+                                <AppText variant="bodyBold" style={styles.sectionHeading}>
+                                    Site details
+                                </AppText>
 
-                        {/* SITE TAB */}
-                        {activeTab === 'site' && (
-                            <>
-                                {[
-                                    {
-                                        key: 'locationName',
-                                        label: 'Site Name *',
-                                    },
-                                    {
-                                        key: 'address',
-                                        label: 'Site Address *',
-                                    },
-                                    {
-                                        key: 'postcode',
-                                        label: ' Site Postcode *',
-                                    },
-                                    {
-                                        key: 'adminContactName',
-                                        label: 'Site Manager Name *',
-                                    },
-                                    {
-                                        key: 'adminEmail',
-                                        label: 'Site Manager Email *',
-                                    },
-                                    {
-                                        key: 'adminMobile',
-                                        label: 'Site Manager Mobile *',
-                                    },
-                                    {
-                                        key: 'adminPassword',
-                                        label: 'Site Manager Password *',
-                                        secure: true,
-                                    },
-                                    {
-                                        key: 'radiusKm',
-                                        label: 'SitePickup Radius (km) *',
-                                    },
-                                ].map((field: any) => (
-                                    <View
-                                        key={field.key}
-                                        style={styles.fieldWrapper}
-                                    >
-                                        <AppText style={styles.label} >
-                                            {field.label}
-                                        </AppText>
+                                <InputField
+                                    label="Site name"
+                                    placeholder="Enter site name"
+                                    {...inputProps}
+                                    value={siteForm.locationName}
+                                    onChangeText={(v) => setSiteForm({ ...siteForm, locationName: v })}
+                                />
 
-                                        <View style={styles.inputWrapper}>
-                                            <TextInput
-                                                style={styles.inputFlex}
-                                                secureTextEntry={
-                                                    field.key === 'adminPassword' ? !showPassword : false
-                                                }
-                                                value={
-                                                    (siteForm as any)[
-                                                    field.key
-                                                    ]
-                                                }
-                                                onChangeText={(v) =>
-                                                    setSiteForm(
-                                                        {
-                                                            ...siteForm,
-                                                            [field.key]:
-                                                                v,
-                                                        }
-                                                    )
-                                                }
-                                            />
+                                <InputField
+                                    label="Postcode"
+                                    placeholder="Enter postcode"
+                                    {...inputProps}
+                                    value={siteForm.postcode}
+                                    onChangeText={(v) => setSiteForm({ ...siteForm, postcode: v })}
+                                />
 
-                                            {field.key ===
-                                                'adminPassword' && (
-                                                    <Pressable
-                                                        onPress={() =>
-                                                            setShowPassword(
-                                                                !showPassword
-                                                            )
-                                                        }
-                                                    >
-                                                        <Ionicons
-                                                            name={showPassword ? 'eye-off' : 'eye'}
-                                                            size={normalize(20)}
-                                                            color="#777"
-                                                        />
-                                                    </Pressable>
-                                                )}
-                                        </View>
-                                    </View>
-                                ))}
+                                <InputField
+                                    label="Pickup radius (km)"
+                                    placeholder="10"
+                                    {...inputProps}
+                                    value={siteForm.radiusKm}
+                                    onChangeText={(v) => setSiteForm({ ...siteForm, radiusKm: v })}
+                                    keyboardType="numeric"
+                                />
 
-                                {/* LOCATION PICKER */}
-                                <View style={styles.locationPickerRow}>
-                                    <Pressable
-                                        style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
-                                        onPress={goToCurrentLocation}
-                                        disabled={gpsLoading}
-                                    >
-                                        <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
-                                        <AppText style={styles.locationPickerBtnText}>
-                                            {gpsLoading ? 'Getting location...' : 'Use My Location'}
-                                        </AppText>
-                                    </Pressable>
-                                    <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openModal}>
-                                        <Ionicons name="search" size={normalize(16)} color={palette.white} />
-                                        <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
-                                    </Pressable>
-                                </View>
-                                {selectedAddress ? (
-                                    <View style={styles.selectedAddressBox}>
-                                        <Ionicons name="location" size={normalize(16)} color={palette.primary} />
-                                        <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
-                                        <Pressable onPress={() => {
-                                            setSelectedAddress('');
-                                            setMarker(null);
-                                            setSiteForm(prev => ({ ...prev, latitude: null, longitude: null, address: '', postcode: '' }));
-                                        }}>
-                                            <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
-                                        </Pressable>
-                                    </View>
-                                ) : null}
+                                {renderLocationSection()}
 
-                                {/* MAP */}
-                                <AppText style={styles.mapHintText}>Tap on map to fine-tune the pin</AppText>
+                                <AppText variant="bodyBold" style={styles.sectionHeading}>
+                                    Site manager
+                                </AppText>
+                                <AppText variant="bodySmall" style={styles.sectionHint}>
+                                    A manager account is created with the site. They will receive login details by email.
+                                </AppText>
 
-                                <View style={styles.mapContainer}>
-                                    <OsmMapView
-                                        style={styles.mapView}
-                                        marker={marker}
-                                        selectable
-                                        initialCenter={mapCenter ?? undefined}
-                                        onLocationSelect={(latitude, longitude) => {
-                                            applyMapLocation(latitude, longitude);
-                                        }}
-                                    />
-                                </View>
+                                {renderManagerFields(
+                                    {
+                                        firstName: siteForm.managerFirstName,
+                                        lastName: siteForm.managerLastName,
+                                        email: siteForm.adminEmail,
+                                        mobile: siteForm.adminMobile,
+                                        password: siteForm.adminPassword,
+                                        confirmPassword: siteForm.adminConfirmPassword,
+                                    },
+                                    (key, value) => {
+                                        const map: Record<string, keyof typeof siteForm> = {
+                                            firstName: 'managerFirstName',
+                                            lastName: 'managerLastName',
+                                            email: 'adminEmail',
+                                            mobile: 'adminMobile',
+                                            password: 'adminPassword',
+                                            confirmPassword: 'adminConfirmPassword',
+                                        };
+                                        const field = map[key];
+                                        if (field) {
+                                            setSiteForm({ ...siteForm, [field]: value });
+                                        }
+                                    },
+                                )}
 
                                 <Pressable
                                     style={[styles.createBtn, loading && { opacity: 0.65 }]}
@@ -613,152 +727,11 @@ export default function CreateCharitySiteScreen() {
                                     onPress={handleCreateLocation}
                                 >
                                     <AppText style={styles.btnText}>
-                                        {loading ? 'Creating...' : 'Create Site'}
+                                        {loading ? 'Creating site...' : 'Create site & manager'}
                                     </AppText>
                                 </Pressable>
-                            </>
+                            </View>
                         )}
-
-                        {/* MANAGER TAB */}
-                        {activeTab === 'manager' && (
-                            <>
-                                <View
-                                    style={{
-                                        marginHorizontal: wp(4),
-                                        marginBottom: hp(1.8),
-                                    }}
-                                >
-                                    <AppText variant="bodyBold">
-                                        Select Site *
-                                    </AppText>
-
-                                    <Pressable
-                                        onPress={() =>
-                                            setOpenLocationDropdown(
-                                                !openLocationDropdown
-                                            )
-                                        }
-                                        style={{
-                                            backgroundColor: palette.white,
-                                            borderRadius: normalize(10),
-                                            borderWidth: 1,
-                                            borderColor: palette.border,
-                                            padding: normalize(12),
-                                            marginTop: hp(0.6),
-                                            flexDirection: 'row',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                        }}
-                                    >
-                                        <AppText variant='bodySmall'>
-                                            {selectedLocationId
-                                                ? locations.find((s) =>
-                                                    s.id === selectedLocationId
-                                                )
-                                                    ?.locationName ||
-                                                'Selected Location'
-                                                : locations.length === 0
-                                                    ? 'No location added yet'
-                                                    : 'Select a location'}
-                                        </AppText>
-
-                                        <Ionicons name="chevron-down" size={normalize(18)} />
-                                    </Pressable>
-
-                                    {/* DROPDOWN */}
-                                    {openLocationDropdown && (
-                                        <View
-                                            style={{
-                                                backgroundColor: palette.white,
-                                                borderWidth: 1,
-                                                borderColor: palette.border,
-                                                borderRadius: normalize(10),
-                                                marginTop: hp(0.6),
-                                            }}
-                                        >
-                                            {locations.length === 0 ? (
-                                                <AppText
-                                                    style={{
-                                                        padding: normalize(12),
-                                                        color: '#888',
-                                                    }}
-                                                >
-                                                    No location added yet
-                                                </AppText>
-                                            ) : (
-                                                locations.map((site) => (
-                                                    <Pressable
-                                                        key={site.id}
-                                                        onPress={() => {
-                                                            setSelectedLocationId(site.id);
-                                                            setOpenLocationDropdown(false);
-                                                        }}
-                                                        style={{ padding: normalize(12), }}
-                                                    >
-                                                        <AppText variant='bodySmall'>
-                                                            {site.locationName}{' '}-{' '}{site.address}
-                                                        </AppText>
-                                                    </Pressable>
-                                                )
-                                                )
-                                            )}
-                                        </View>
-                                    )}
-                                </View>
-
-                                {[
-                                    {
-                                        key: 'firstName',
-                                        label: 'First Name *',
-                                    },
-                                    {
-                                        key: 'lastName',
-                                        label: 'Last Name *',
-                                    },
-                                    {
-                                        key: 'email',
-                                        label: 'Email *',
-                                    },
-                                    {
-                                        key: 'password',
-                                        label: 'Password *',
-                                        secure: true,
-                                    },
-                                    {
-                                        key: 'mobile',
-                                        label: 'Phone Number (Optional)',
-                                    },
-                                ].map((field: any) => (
-                                    <View
-                                        key={field.key}
-                                        style={styles.fieldWrapper}
-                                    >
-                                        <InputField
-                                            label={field.label}
-                                            value={(managerForm as any)[field.key]}
-                                            onChangeText={(v) =>
-                                                setManagerForm({
-                                                    ...managerForm,
-                                                    [field.key]: v,
-                                                })
-                                            }
-                                            isPassword={field.key === 'password'}
-                                            secureTextEntry={field.key === 'password'}
-                                        />
-                                    </View>
-                                ))}
-
-                                <Pressable
-                                    style={[styles.createBtn, loading && { opacity: 0.65 }]}
-                                    disabled={loading}
-                                    onPress={handleAssignManager}>
-                                    <AppText style={styles.btnText} >
-                                        {loading ? 'Assigning...' : 'Assign Manager'}
-                                    </AppText>
-                                </Pressable>
-                            </>
-                        )}
-
                     </ScrollView>
                 </Screen>
             </TouchableWithoutFeedback>
@@ -767,68 +740,74 @@ export default function CreateCharitySiteScreen() {
 }
 
 const styles = StyleSheet.create({
+    scrollContent: {
+        paddingBottom: hp(14),
+    },
     headerBg: {
-        height: hp(20),
+        height: hp(22),
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: hp(2.5),
+        paddingHorizontal: wp(8),
+        marginBottom: hp(2),
     },
-
     backBtn: {
         position: 'absolute',
         left: wp(4),
         top: hp(2.2),
     },
-
     headerTitle: {
         color: palette.white,
+        textAlign: 'center',
     },
-
-    fieldWrapper: {
-        marginVertical: hp(1),
+    headerSubtitle: {
+        color: palette.white,
+        opacity: 0.9,
+        textAlign: 'center',
+        marginTop: hp(0.8),
+    },
+    formCard: {
         marginHorizontal: wp(4),
-    },
-
-    label: {
-        marginBottom: hp(1),
-        color: '#555',
-    },
-
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'white',
-        borderRadius: normalize(10),
+        marginBottom: hp(2),
+        padding: wp(4),
+        borderRadius: normalize(12),
         borderWidth: 1,
         borderColor: palette.border,
-        paddingHorizontal: wp(2.5),
+        backgroundColor: palette.white,
+        gap: spacing.md,
     },
-
-    inputFlex: {
-        flex: 1,
+    siteBanner: {
+        padding: wp(3.5),
+        borderRadius: normalize(10),
+        backgroundColor: '#F4FAF6',
+        borderWidth: 1,
+        borderColor: '#D8EBDF',
+        gap: spacing.xs,
     },
-
+    siteBannerLabel: {
+        textTransform: 'none',
+        color: palette.stone,
+    },
+    sectionHeading: {
+        marginTop: hp(0.5),
+    },
+    sectionHint: {
+        color: palette.stone,
+    },
     createBtn: {
         backgroundColor: palette.middlegreen,
         padding: normalize(14),
-        marginHorizontal: wp(6),
         borderRadius: normalize(10),
         alignItems: 'center',
-        margin: hp(1.5),
+        marginTop: hp(0.5),
     },
-
     btnText: {
-        color: 'white',
+        color: palette.white,
+        fontWeight: '600',
     },
-
-    // ─── Location Picker ───────────────────────────────────────────
     locationPickerRow: {
         flexDirection: 'row',
-        marginHorizontal: wp(4),
-        marginTop: hp(2.5),
         gap: wp(2.5),
     },
-
     locationPickerBtn: {
         flex: 1,
         flexDirection: 'row',
@@ -841,86 +820,54 @@ const styles = StyleSheet.create({
         borderColor: palette.primary,
         backgroundColor: palette.primary + '15',
     },
-
     locationPickerBtnDisabled: {
         opacity: 0.7,
     },
-
     locationPickerBtnSearch: {
         backgroundColor: palette.primary,
         borderColor: palette.primary,
     },
-
     locationPickerBtnText: {
         fontSize: normalize(13),
         color: palette.primary,
         fontWeight: '500',
     },
-
     locationPickerBtnTextWhite: {
         color: palette.white,
     },
-
     selectedAddressBox: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: normalize(8),
-        marginHorizontal: wp(4),
-        marginTop: hp(1.5),
         padding: normalize(12),
         borderRadius: normalize(10),
         backgroundColor: palette.white,
         borderWidth: 1,
         borderColor: palette.border,
     },
-
     selectedAddressText: {
         flex: 1,
         fontSize: normalize(13),
         color: palette.text,
     },
-
-    // ─── Map ────────────────────────────────────────────────────────
     mapHintText: {
         textAlign: 'center',
-        marginTop: hp(1.5),
-        marginBottom: hp(0.5),
-        color: '#999',
+        color: palette.stone,
         fontSize: normalize(12),
     },
-
     mapContainer: {
         height: hp(28),
-        marginHorizontal: wp(4),
-        marginVertical: hp(1),
         borderRadius: normalize(12),
         overflow: 'hidden',
     },
-
     mapView: {
         flex: 1,
     },
-
-    mapPlaceholder: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: normalize(8),
-    },
-
-    mapPlaceholderText: {
-        color: '#aaa',
-        fontSize: normalize(12),
-    },
-
-    // ─── Bottom Sheet Modal ─────────────────────────────────────────
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.45)',
         justifyContent: 'flex-end',
     },
-
     modalSheet: {
         height: height * 0.72,
         backgroundColor: palette.white,
@@ -928,44 +875,37 @@ const styles = StyleSheet.create({
         borderTopRightRadius: normalize(20),
         overflow: 'hidden',
     },
-
     dragHandleArea: {
         alignItems: 'center',
         paddingVertical: normalize(10),
         backgroundColor: palette.white,
     },
-
     dragHandle: {
         width: normalize(40),
         height: normalize(4),
         borderRadius: normalize(2),
         backgroundColor: '#ddd',
     },
-
     modalHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: wp(4),
         paddingBottom: normalize(10),
     },
-
     modalTitle: {
         flex: 1,
         fontSize: normalize(16),
         fontWeight: '600',
         color: palette.text,
     },
-
     modalCloseBtn: {
         padding: normalize(4),
     },
-
     modalSearchContainer: {
         paddingHorizontal: wp(4),
         paddingBottom: normalize(8),
         zIndex: 10,
     },
-
     modalMapContainer: {
         flex: 1,
         marginHorizontal: wp(4),
@@ -973,7 +913,6 @@ const styles = StyleSheet.create({
         borderRadius: normalize(12),
         overflow: 'hidden',
     },
-
     confirmBtn: {
         backgroundColor: palette.middlegreen,
         padding: normalize(14),
@@ -983,11 +922,9 @@ const styles = StyleSheet.create({
         borderRadius: normalize(10),
         alignItems: 'center',
     },
-
     confirmBtnDisabled: {
         backgroundColor: '#bbb',
     },
-
     confirmBtnText: {
         color: palette.white,
         fontSize: normalize(15),
