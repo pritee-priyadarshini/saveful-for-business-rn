@@ -196,7 +196,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
   const [cancellingId, setCancellingId] = React.useState<number | null>(null);
   const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('active');
   const [showStatusDropdown, setShowStatusDropdown] = React.useState(false);
 
   useFocusEffect(

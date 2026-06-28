@@ -1,42 +1,40 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import {
   FlatList,
   Image,
   View,
   TouchableOpacity,
-  Dimensions,
-  ImageBackground,
   RefreshControl,
-  ActivityIndicator,
   StyleSheet,
+  Pressable,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
+import { Skeleton } from '../../components/Skeleton';
 import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
+import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 
 import { useAppContext } from '../../store/AppContext';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert } from '@/utils/apiError';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { mapDiscoverListing } from '../../services/foodListing.service';
 
 import { palette } from '../../theme/colors';
-import { useNavigation } from '@react-navigation/native';
 import { OsmMapView } from '@/components/OsmMapView';
+import { hp, normalize, wp } from '@/utils/responsive';
 
-const { width, height } = Dimensions.get("window");
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
+type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 
 export function CharityDiscoverScreen() {
-  const navigation = useNavigation<any>();
+  useTransparentStatusBar('light');
   const { currentProfile, authUser } = useAppContext();
   const {
     showBanner,
@@ -52,13 +50,13 @@ export function CharityDiscoverScreen() {
   const listRef = useRef<FlatList>(null);
 
   const {
-    people: { listings: rawListings, isFetching: loading },
+    people: { listings, isFetching: loading },
     fetchListings: storeFetchListings,
   } = useDiscoverStore();
 
-  const listings = rawListings;
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState<'list' | 'map'>('list');
+  const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
@@ -78,8 +76,6 @@ export function CharityDiscoverScreen() {
     }
   };
 
-  const availableListings = listings;
-
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -87,100 +83,144 @@ export function CharityDiscoverScreen() {
     return 'Good evening';
   }, []);
 
-  if (loading) {
+  const firstName = currentProfile.name?.split(' ')[0] || 'User';
+
+  const renderSkeleton = () => (
+    <View style={styles.skeletonWrap}>
+      <Skeleton width="100%" height={hp(18)} borderRadius={0} />
+      <Skeleton width={wp(55)} height={normalize(20)} style={styles.skeletonCenter} />
+      <View style={styles.skeletonToggleRow}>
+        <Skeleton width={wp(42)} height={normalize(40)} borderRadius={normalize(30)} />
+        <Skeleton width={wp(42)} height={normalize(40)} borderRadius={normalize(30)} />
+      </View>
+      {[1, 2].map((i) => (
+        <Skeleton
+          key={i}
+          width={wp(92)}
+          height={normalize(180)}
+          borderRadius={normalize(20)}
+          style={styles.skeletonCard}
+        />
+      ))}
+    </View>
+  );
+
+  if (loading && !refreshing && listings.length === 0) {
     return (
-      <Screen backgroundColor={palette.creme}>
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={palette.middlegreen} />
-        </View>
+      <Screen backgroundColor={palette.creme} transparentTop>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
+        {renderSkeleton()}
       </Screen>
     );
   }
 
-  const renderListing = ({ item }: any) => (
-    <TouchableOpacity activeOpacity={0.9} style={styles.card}>
-      <View style={styles.cardTop}>
-        <View>
-          <AppText variant="bodyBold">
+  const renderListing = ({ item }: { item: DiscoverListing }) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardTitleWrap}>
+          <AppText variant="bodyBold" numberOfLines={2}>
             {item.title}
           </AppText>
-          <AppText variant="bodyBold" style={styles.business}>
+          <AppText variant="bodySmall" style={styles.businessName} numberOfLines={1}>
             {item.businessName}
           </AppText>
         </View>
-
-        <View style={styles.distancePill}>
-          <AppText variant='label'>
-            📍 {item.distance}
+        <View style={styles.statusBadge}>
+          <AppText variant="caption" style={styles.statusBadgeText}>
+            {item.status}
           </AppText>
         </View>
       </View>
 
-      <View style={styles.infoRow}>
-        <View style={styles.infoBox}>
-          <AppText variant="caption">Quantity</AppText>
-          <AppText variant="bodySmall">{item.quantityKg}kg</AppText>
+      <View style={styles.locationRow}>
+        <Ionicons name="location-outline" size={normalize(16)} color={palette.middlegreen} />
+        <AppText variant="bodySmall" style={styles.locationText} numberOfLines={2}>
+          {item.pickupAddress}
+        </AppText>
+      </View>
+
+      <View style={styles.infoGrid}>
+        <View style={styles.infoCell}>
+          <AppText variant="caption" style={styles.infoLabel}>
+            Quantity
+          </AppText>
+          <AppText variant="bodyBold">{item.quantityKg}kg</AppText>
         </View>
 
-        <View style={styles.infoBox}>
-          <AppText variant="caption">Date</AppText>
-          <AppText variant="bodySmall">
-            {item.date || new Date().toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: '2-digit',
-              year: '2-digit',
-            })}
+        <View style={styles.infoCell}>
+          <AppText variant="caption" style={styles.infoLabel}>
+            Best before
+          </AppText>
+          <AppText variant="bodySmall" style={styles.infoValue}>
+            {item.bestBeforeLabel}
           </AppText>
         </View>
 
-        <View style={styles.infoBox}>
-          <AppText variant="caption">Time</AppText>
-          <AppText variant="bodySmall">
+        <View style={styles.infoCell}>
+          <AppText variant="caption" style={styles.infoLabel}>
+            Pickup window
+          </AppText>
+          <AppText variant="bodySmall" style={styles.infoValue} numberOfLines={2}>
             {item.pickupWindow}
           </AppText>
         </View>
       </View>
 
-      <View style={styles.footer}>
-        <AppText variant='bodySmall'>
-          Instructions: {item.storage}
-        </AppText>
+      <View style={styles.cardFooter}>
+        <View style={styles.storageRow}>
+          <Ionicons name="thermometer-outline" size={normalize(14)} color="#666" />
+          <AppText variant="caption" style={styles.storageText}>
+            {item.storage}
+          </AppText>
+        </View>
 
         <Button
           label="View Details"
-          style={styles.claimBtn}
-          onPress={() => navigation.navigate('Available', {
-            screen: 'CharityMap',
-          })}
+          size="compact"
+          style={styles.detailsBtn}
+          onPress={() => setSelectedListing(item)}
         />
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
-  /* HEADER */
   const Header = () => (
-    <View style={{ marginTop: -hp(1.8) }}>
-      {/* TOP ROW */}
-      <ImageBackground
-        source={require('../../../assets/placeholder/kale-header.png')}
-        style={[styles.headerBg, { width: '100%' }]}
-      >
-        <AppText variant="h6" style={styles.white}>
-          {currentProfile.organization || 'Your Organisation'}
+    <View>
+      <HeroHeader source={require('../../../assets/placeholder/kale-header.png')}>
+        <View style={[styles.topBar, { paddingTop: hp(2) }]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <AppText variant="h6" style={styles.whiteText}>
+              {currentProfile.organization || 'Your Organisation'}
+            </AppText>
+
+            <View style={styles.locationHeaderRow}>
+              <Ionicons name="location-outline" size={normalize(20)} color="white" />
+              <AppText variant="body" style={styles.headerLocation}>
+                {currentProfile.address || capturedAddress || 'No address available'}
+              </AppText>
+            </View>
+          </View>
+
+          <View style={styles.logoCircle}>
+            {currentProfile.logo ? (
+              <Image source={{ uri: currentProfile.logo }} style={styles.logoImage} />
+            ) : (
+              <AppText style={styles.logoFallback}>
+                {currentProfile.organization?.[0] || 'S'}
+              </AppText>
+            )}
+          </View>
+        </View>
+      </HeroHeader>
+
+      <View style={styles.welcomeSection}>
+        <AppText variant="h5">
+          {greeting}, {firstName}
         </AppText>
-
-        <View style={{ height: hp(3.5) }} />
-
-        <AppText variant="heading" style={styles.white}>
-          {greeting}, {currentProfile.name.split(' ')[0] || 'User'}
-        </AppText>
-
-        <View style={{ height: hp(0.7) }} />
-
-        <AppText variant="bodySmall" style={styles.white}>
+        <AppText variant="bodyLarge" style={styles.welcomeSub}>
           We are helping good food go further, together
         </AppText>
-      </ImageBackground>
+      </View>
 
       {showBanner && (
         <LocationRequiredBanner
@@ -203,59 +243,36 @@ export function CharityDiscoverScreen() {
           source={require('../../../assets/placeholder/Illustration.png')}
           style={styles.headingBg}
         />
-
         <AppText variant="heading" style={styles.headingText}>
           Surplus Food Near You
         </AppText>
       </View>
 
-      {/* TOGGLE */}
       <View style={styles.toggleWrapper}>
-        <TouchableOpacity
-          style={[
-            styles.toggleBtn,
-            viewMode === 'list' && styles.toggleActive,
-          ]}
+        <Pressable
+          style={[styles.toggleBtn, viewMode === 'list' && styles.toggleActive]}
           onPress={() => setViewMode('list')}
         >
-          <AppText variant='label'
-            style={
-              viewMode === 'list'
-                ? styles.toggleTextActive
-                : styles.toggleText
-            }
-          >
+          <AppText variant="label" style={viewMode === 'list' ? styles.toggleTextActive : styles.toggleText}>
             List
           </AppText>
-        </TouchableOpacity>
+        </Pressable>
 
-        <TouchableOpacity
-          style={[
-            styles.toggleBtn,
-            viewMode === 'map' && styles.toggleActive,
-          ]}
+        <Pressable
+          style={[styles.toggleBtn, viewMode === 'map' && styles.toggleActive]}
           onPress={() => setViewMode('map')}
         >
-          <AppText variant='label'
-            style={
-              viewMode === 'map'
-                ? styles.toggleTextActive
-                : styles.toggleText
-            }
-          >
+          <AppText variant="label" style={viewMode === 'map' ? styles.toggleTextActive : styles.toggleText}>
             Map
           </AppText>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <View style={styles.activeListingRow}>
-        <AppText variant='h7'>
-          Active Listings
-        </AppText>
-
+        <AppText variant="h7">Active Listings</AppText>
         <View style={styles.activeBadge}>
-          <AppText variant='h7' style={{ color: palette.white }}>
-            {availableListings.length}
+          <AppText variant="h7" style={{ color: palette.white }}>
+            {listings.length}
           </AppText>
         </View>
       </View>
@@ -263,19 +280,20 @@ export function CharityDiscoverScreen() {
   );
 
   const MapComponent = () => {
-    if (availableListings.length === 0) {
+    if (listings.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <AppText variant="h7">No surplus available</AppText>
+          <AppText variant="bodySmall">There are currently no food listings near you</AppText>
         </View>
       );
     }
 
     return (
-      <View style={[styles.mapContainer, { marginTop: hp(1.8) }]}>
+      <View style={styles.mapContainer}>
         <OsmMapView
           style={styles.map}
-          markers={availableListings.map((item) => ({
+          markers={listings.map((item) => ({
             latitude: item.lat,
             longitude: item.lng,
           }))}
@@ -284,19 +302,22 @@ export function CharityDiscoverScreen() {
         <View style={styles.cardListWrapper}>
           <FlatList
             ref={listRef}
-            data={availableListings}
+            data={listings}
             keyExtractor={(item) => item.id}
             renderItem={renderListing}
             horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mapCardList}
           />
         </View>
       </View>
     );
   };
 
-  /* RENDER */
   return (
-    <Screen scrollable={false} backgroundColor={palette.creme}>
+    <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+
       <LocationSetupModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -307,30 +328,32 @@ export function CharityDiscoverScreen() {
         searchPlaceholder="Search charity address or place..."
       />
 
+      <DiscoverListingDetailModal
+        visible={!!selectedListing}
+        listing={selectedListing}
+        onClose={() => setSelectedListing(null)}
+      />
+
       {viewMode === 'list' ? (
-        <FlatList
-          data={availableListings}
-          keyExtractor={(item) => item.id}
-          renderItem={renderListing}
-          ListHeaderComponent={Header}
+      <FlatList
+        data={listings}
+        keyExtractor={(item) => item.id}
+        renderItem={renderListing}
+        style={styles.list}
+        ListHeaderComponent={Header}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <AppText variant="h7">No surplus available</AppText>
-              <AppText variant="bodySmall">
-                There are currently no food listings near you
-              </AppText>
+              <AppText variant="bodySmall">There are currently no food listings near you</AppText>
             </View>
           )}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-            />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         />
       ) : (
         <FlatList
           data={[{ key: 'map' }]}
+          style={styles.list}
           renderItem={() => (
             <>
               <Header />
@@ -338,6 +361,7 @@ export function CharityDiscoverScreen() {
             </>
           )}
           keyExtractor={(item) => item.key}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         />
       )}
     </Screen>
@@ -345,25 +369,91 @@ export function CharityDiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-  headerBg: {
-    height: hp(22),
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 0,
+  list: {
+    flex: 1,
+    backgroundColor: palette.creme,
   },
 
-  white: {
+  listContent: {
+    paddingBottom: hp(3),
+  },
+
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: wp(4),
+  },
+
+  whiteText: {
     color: palette.white,
+    fontSize: normalize(20),
+  },
+
+  locationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: hp(0.8),
+    gap: wp(1),
+  },
+
+  headerLocation: {
+    color: palette.white,
+    opacity: 0.85,
+    flex: 1,
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
+  },
+
+  logoCircle: {
+    width: normalize(50),
+    height: normalize(50),
+    borderRadius: normalize(25),
+    marginLeft: wp(3),
+    backgroundColor: palette.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  logoFallback: {
+    color: '#7B3FE4',
+    fontWeight: 'bold',
+    fontSize: normalize(18),
+  },
+
+  welcomeSection: {
+    paddingHorizontal: wp(4),
+    paddingTop: hp(2),
+    gap: hp(0.6),
+    alignItems: 'center',
+  },
+
+  welcomeSub: {
+    color: '#666',
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
     textAlign: 'center',
+  },
+
+  locationCapturedPill: {
+    marginHorizontal: wp(4),
+    marginTop: hp(1),
+    borderRadius: normalize(10),
+    backgroundColor: '#ECF8F1',
+    padding: wp(2.5),
   },
 
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(4.5),
-    marginBottom: hp(4),
+    marginTop: hp(3),
+    marginBottom: hp(2.5),
+    paddingHorizontal: wp(5),
   },
 
   headingBg: {
@@ -377,19 +467,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  locationCapturedPill: {
-    marginHorizontal: wp(4),
-    marginTop: hp(1),
-    borderRadius: normalize(10),
-    backgroundColor: '#ECF8F1',
-    padding: wp(2.5),
-  },
-
   toggleWrapper: {
     flexDirection: 'row',
     backgroundColor: '#EDEDED',
     borderRadius: normalize(30),
-    marginTop: hp(1.8),
     marginHorizontal: wp(4),
     padding: normalize(4),
   },
@@ -419,17 +500,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: hp(1.8),
     marginHorizontal: wp(4),
+    marginBottom: hp(0.5),
   },
 
   activeBadge: {
     backgroundColor: palette.middlegreen,
-    color: palette.white,
-    height: hp(4.2),
-    width: wp(16),
+    minWidth: wp(12),
+    height: hp(4),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.5),
+    paddingHorizontal: wp(3),
     borderRadius: normalize(12),
   },
 
@@ -438,52 +518,118 @@ const styles = StyleSheet.create({
     marginTop: hp(1.5),
     padding: wp(4),
     borderRadius: normalize(20),
-    backgroundColor: palette.creme,
-    borderWidth: 1,
-    borderColor: palette.border,
+    backgroundColor: palette.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
 
-  cardTop: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: wp(2),
   },
 
-  business: {
-    opacity: 0.6,
-    marginTop: hp(0.2),
+  cardTitleWrap: {
+    flex: 1,
+    gap: hp(0.3),
   },
 
-  distancePill: {
-    backgroundColor: '#EFEAFE',
+  businessName: {
+    color: '#666',
+  },
+
+  statusBadge: {
+    backgroundColor: '#E8F3EC',
     paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.8),
+    paddingVertical: hp(0.5),
     borderRadius: normalize(12),
   },
 
-  infoRow: {
+  statusBadgeText: {
+    color: palette.middlegreen,
+    fontWeight: '600',
+  },
+
+  locationRow: {
     flexDirection: 'row',
-    gap: wp(2.5),
+    alignItems: 'flex-start',
+    gap: wp(1.5),
+    marginTop: hp(1.2),
+    paddingTop: hp(1.2),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F3F3',
+  },
+
+  locationText: {
+    flex: 1,
+    color: '#444',
+    lineHeight: normalize(18),
+  },
+
+  infoGrid: {
+    flexDirection: 'row',
+    gap: wp(2),
     marginTop: hp(1.5),
   },
 
-  infoBox: {
+  infoCell: {
     flex: 1,
-    backgroundColor: palette.radish,
-    padding: wp(2.5),
+    backgroundColor: palette.creme,
     borderRadius: normalize(14),
-    alignItems: 'center'
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2),
+    alignItems: 'center',
+    gap: hp(0.4),
   },
 
-  footer: {
+  infoLabel: {
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    fontSize: normalize(10),
+  },
+
+  infoValue: {
+    textAlign: 'center',
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
+  },
+
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: hp(1.5),
     alignItems: 'center',
+    marginTop: hp(1.5),
+    paddingTop: hp(1.2),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F3F3',
   },
 
-  claimBtn: {
+  storageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1),
+    flex: 1,
+    marginRight: wp(2),
+  },
+
+  storageText: {
+    color: '#666',
+    flex: 1,
+  },
+
+  detailsBtn: {
     backgroundColor: palette.middlegreen,
-    minWidth: wp(30),
+    minWidth: wp(32),
+    paddingHorizontal: wp(3),
   },
 
   mapContainer: {
@@ -492,15 +638,43 @@ const styles = StyleSheet.create({
 
   map: {
     height: hp(40),
+    marginHorizontal: wp(4),
+    borderRadius: normalize(16),
+    overflow: 'hidden',
   },
 
   cardListWrapper: {
     marginTop: hp(1),
   },
 
+  mapCardList: {
+    paddingHorizontal: wp(4),
+  },
+
   emptyContainer: {
     marginTop: hp(5),
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: wp(8),
+    gap: hp(0.8),
+  },
+
+  skeletonWrap: {
+    gap: hp(1.6),
+  },
+
+  skeletonCenter: {
+    alignSelf: 'center',
+    marginTop: hp(1),
+  },
+
+  skeletonToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+  },
+
+  skeletonCard: {
+    alignSelf: 'center',
   },
 });

@@ -10,6 +10,7 @@ type ButtonProps = {
   label: string;
   onPress?: () => void;
   variant?: 'primary' | 'secondary' | 'ghost';
+  size?: 'default' | 'compact';
   icon?: keyof typeof Ionicons.glyphMap;
   style?: ViewStyle;
   disabled?: boolean;
@@ -20,6 +21,7 @@ export function Button({
   label,
   onPress,
   variant = 'primary',
+  size = 'default',
   icon,
   style,
   disabled = false,
@@ -28,12 +30,14 @@ export function Button({
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
   const isDisabled = disabled || loading;
+  const isCompact = size === 'compact';
 
   return (
     <Pressable
       onPress={isDisabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.button,
+        isCompact && styles.compact,
         isPrimary && styles.primary,
         isSecondary && styles.secondary,
         variant === 'ghost' && styles.ghost,
@@ -62,7 +66,7 @@ export function Button({
       ) : null}
 
       <AppText
-        variant="bodyBold"
+        variant={isCompact ? 'label' : 'bodyBold'}
         color={
           isDisabled
             ? '#9E9E9E'
@@ -87,6 +91,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
+  },
+  compact: {
+    minHeight: 38,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
   },
   primary: {
     backgroundColor: palette.primary,
