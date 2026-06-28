@@ -30,7 +30,10 @@ import {
     getForgotPasswordErrorMessage,
     getForgotPasswordSuccessMessage,
 } from '@/utils/validation';
-import { getUserFriendlyErrorMessage } from '@/utils/apiError';
+import {
+    getOtpVerificationErrorMessage,
+    showSuccessAlert,
+} from '@/utils/apiError';
 
 export default function ForgotPasswordScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -39,6 +42,7 @@ export default function ForgotPasswordScreen() {
     const [email, setEmail] = useState('');
     const [firstName, setFirstName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [resending, setResending] = useState(false);
     const [formError, setFormError] = useState('');
     const [formInfo, setFormInfo] = useState('');
     const [codeSent, setCodeSent] = useState(false);
@@ -48,6 +52,8 @@ export default function ForgotPasswordScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
 
     const inputs = useRef<(TextInput | null)[]>([]);
+
+    const trimmedEmail = email.trim().toLowerCase();
 
     useEffect(() => {
         if (authUser?.profile?.user) {
@@ -74,8 +80,7 @@ export default function ForgotPasswordScreen() {
     };
 
     const handleSendCode = async () => {
-        if (loading) return;
-        const trimmedEmail = email.trim().toLowerCase();
+        if (loading || resending) return;
 
         if (!trimmedEmail) {
             setFormError('Please enter your email address.');
@@ -102,17 +107,58 @@ export default function ForgotPasswordScreen() {
             }
 
             setCodeSent(true);
+            setOtp(['', '', '', '', '', '']);
+            setPassword('');
+            setConfirmPassword('');
             setFormInfo(getForgotPasswordSuccessMessage(res.data?.message));
-        } catch (error: any) {
+        } catch (error: unknown) {
             setFormError(getForgotPasswordErrorMessage(error));
         } finally {
             setLoading(false);
         }
     };
 
+    const handleResendCode = async () => {
+        if (resending || loading) return;
+
+        if (!trimmedEmail) {
+            setFormError('Please enter your email address.');
+            return;
+        }
+
+        if (!isValidEmail(trimmedEmail)) {
+            setFormError('Please enter a valid email address.');
+            return;
+        }
+
+        setResending(true);
+        setFormError('');
+
+        try {
+            const res = await authService.forgotPassword(trimmedEmail);
+
+            if (res.data?.accountExists === false || res.data?.userExists === false) {
+                setFormError(getForgotPasswordErrorMessage({
+                    response: { status: 404, data: { message: 'not found' } },
+                }));
+                return;
+            }
+
+            setCodeSent(true);
+            setOtp(['', '', '', '', '', '']);
+            setPassword('');
+            setConfirmPassword('');
+            setFormInfo(getForgotPasswordSuccessMessage(res.data?.message));
+            showSuccessAlert('A new reset code was sent to your email.', 'Code resent');
+        } catch (error: unknown) {
+            setFormError(getForgotPasswordErrorMessage(error));
+        } finally {
+            setResending(false);
+        }
+    };
+
     const handleReset = async () => {
         if (loading) return;
-        const trimmedEmail = email.trim().toLowerCase();
         const enteredOtp = otp.join('');
 
         if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
@@ -153,7 +199,12 @@ export default function ForgotPasswordScreen() {
                 },
             ]);
         } catch (error: unknown) {
-            setFormError(getUserFriendlyErrorMessage(error, 'Something went wrong. Please try again.'));
+            setFormError(
+                getOtpVerificationErrorMessage(
+                    error,
+                    'Could not reset password. Please try again.',
+                ),
+            );
         } finally {
             setLoading(false);
         }
@@ -198,6 +249,7 @@ export default function ForgotPasswordScreen() {
                             setEmail(value);
                             setFormError('');
                             setFormInfo('');
+                            setCodeSent(false);
                         }}
                         editable={!authUser}
                         keyboardType="email-address"
@@ -207,8 +259,8 @@ export default function ForgotPasswordScreen() {
                     <Button
                         label={loading ? 'Sending...' : codeSent ? 'Resend Reset Code' : 'Send Reset Code'}
                         onPress={handleSendCode}
-                        loading={loading}
-                        disabled={loading}
+                        loading={loading && !resending}
+                        disabled={loading || resending}
                     />
 
                     {codeSent ? (
@@ -217,61 +269,79 @@ export default function ForgotPasswordScreen() {
                         </AppText>
                     ) : null}
 
-                    <View style={styles.otpContainer}>
-                        {otp.map((digit, index) => (
-                            <TextInput
-                                key={index}
-                                ref={(ref) => {
-                                    inputs.current[index] = ref;
+                    {codeSent ? (
+                        <>
+                            <AppText variant="label">
+                                Verification code
+                            </AppText>
+
+                            <View style={styles.otpContainer}>
+                                {otp.map((digit, index) => (
+                                    <TextInput
+                                        key={index}
+                                        ref={(ref) => {
+                                            inputs.current[index] = ref;
+                                        }}
+                                        style={styles.otpInput}
+                                        keyboardType="number-pad"
+                                        maxLength={1}
+                                        value={digit}
+                                        onChangeText={(t) => handleChange(t, index)}
+                                        onKeyPress={({ nativeEvent }) => {
+                                            if (nativeEvent.key === 'Backspace') {
+                                                handleBackspace(digit, index);
+                                            }
+                                        }}
+                                    />
+                                ))}
+                            </View>
+
+                            <Pressable
+                                style={styles.resendLink}
+                                onPress={handleResendCode}
+                                disabled={resending || loading}
+                            >
+                                <AppText variant="label" style={styles.resendLinkText}>
+                                    {resending ? 'Resending...' : 'Resend code'}
+                                </AppText>
+                            </Pressable>
+
+                            <InputField
+                                label="New Password"
+                                value={password}
+                                onChangeText={(value) => {
+                                    setPassword(value);
+                                    setFormError('');
                                 }}
-                                style={styles.otpInput}
-                                keyboardType="number-pad"
-                                maxLength={1}
-                                value={digit}
-                                onChangeText={(t) => handleChange(t, index)}
-                                onKeyPress={({ nativeEvent }) => {
-                                    if (nativeEvent.key === 'Backspace') {
-                                        handleBackspace(digit, index);
-                                    }
-                                }}
+                                secureTextEntry
+                                isPassword
                             />
-                        ))}
-                    </View>
 
-                    <InputField
-                        label="New Password"
-                        value={password}
-                        onChangeText={(value) => {
-                            setPassword(value);
-                            setFormError('');
-                        }}
-                        secureTextEntry
-                        isPassword
-                    />
+                            <InputField
+                                label="Confirm Password"
+                                value={confirmPassword}
+                                onChangeText={(value) => {
+                                    setConfirmPassword(value);
+                                    setFormError('');
+                                }}
+                                secureTextEntry
+                                isPassword
+                            />
 
-                    <InputField
-                        label="Confirm Password"
-                        value={confirmPassword}
-                        onChangeText={(value) => {
-                            setConfirmPassword(value);
-                            setFormError('');
-                        }}
-                        secureTextEntry
-                        isPassword
-                    />
+                            <Button
+                                label={loading ? 'Saving...' : 'Save New Password'}
+                                onPress={handleReset}
+                                loading={loading}
+                                disabled={loading}
+                            />
+                        </>
+                    ) : null}
 
                     {formError ? (
                         <AppText variant="bodySmall" style={styles.errorText}>
                             {formError}
                         </AppText>
                     ) : null}
-
-                    <Button
-                        label={loading ? 'Resetting...' : 'Save New Password'}
-                        onPress={handleReset}
-                        loading={loading}
-                        disabled={loading}
-                    />
                 </View>
             </Screen>
         </KeyboardAvoidingView>
@@ -320,6 +390,16 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontSize: 18,
         backgroundColor: palette.white,
+    },
+
+    resendLink: {
+        alignSelf: 'center',
+    },
+
+    resendLinkText: {
+        color: palette.primary,
+        textDecorationLine: 'underline',
+        textTransform: 'none',
     },
 
     errorText: {

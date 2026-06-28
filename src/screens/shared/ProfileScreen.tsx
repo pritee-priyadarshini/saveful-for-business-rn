@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { pickSquareImage } from '@/utils/pickSquareImage';
 import { Picker } from '@react-native-picker/picker';
 
 import { AppText } from '../../components/AppText';
@@ -66,15 +66,9 @@ export function ProfileScreen() {
 
   const pickImage = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled) {
-        setLogo(result.assets[0].uri);
+      const uri = await pickSquareImage();
+      if (uri) {
+        setLogo(uri);
       }
     } catch (error: any) {
       Alert.alert('Image selection failed', 'Please try again.');

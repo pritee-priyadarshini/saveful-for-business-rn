@@ -509,7 +509,7 @@ export function CreateListingScreen({ navigation }: any) {
 
                   <View style={styles.qtyWrap}>
                     <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, -0.5)}>
-                      <AppText variant="bodyBold" color={palette.stone}>
+                      <AppText variant="h6" color={palette.stone}>
                         -
                       </AppText>
                     </Pressable>
@@ -519,7 +519,7 @@ export function CreateListingScreen({ navigation }: any) {
                     </AppText>
 
                     <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, 0.5)}>
-                      <AppText variant="bodyBold" color={palette.stone}>
+                      <AppText variant="h6" color={palette.stone}>
                         +
                       </AppText>
                     </Pressable>
@@ -1116,9 +1116,9 @@ const styles = StyleSheet.create({
     height: normalize(22),
   },
   qtyBtn: {
-    width: wp(6.5),
-    height: wp(6.5),
-    borderRadius: normalize(8),
+    width: wp(12),
+    height: wp(12),
+    borderRadius: normalize(12),
     backgroundColor: '#E6E2F1',
     alignItems: 'center',
     justifyContent: 'center',

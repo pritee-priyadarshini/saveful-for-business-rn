@@ -14,7 +14,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { pickSquareImage } from '@/utils/pickSquareImage';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -191,15 +191,17 @@ function VenueTypeSelector({
   value,
   options,
   onChange,
+  optional = false,
 }: {
   label: string;
   value: string;
   options: { label: string; value: string }[];
   onChange: (value: string) => void;
+  optional?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const selectedOption = options.find((option) => option.value === value);
-  const displayLabel = selectedOption?.label || 'Select venue type';
+  const displayLabel = selectedOption?.label || (optional ? 'Select venue type (optional)' : 'Select venue type');
 
   return (
     <View style={styles.venueSelectorWrap}>
@@ -436,14 +438,10 @@ export function AuthScreen() {
 
   const updateLocationAddress = (addr: string) => {
     if (isRestaurant) {
-      if (!restaurantForm.businessAddress?.trim()) {
-        updateRestaurantField('businessAddress', addr);
-      }
+      updateRestaurantField('businessAddress', addr);
     } else if (isFarmer) {
-      if (!farmerForm.businessAddress?.trim()) {
-        updateFarmerField('businessAddress', addr);
-      }
-    } else if (!charityForm.charityAddress?.trim()) {
+      updateFarmerField('businessAddress', addr);
+    } else {
       updateCharityField('charityAddress', addr);
     }
   };
@@ -471,16 +469,8 @@ export function AuthScreen() {
 
   const pickImage = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (result.canceled) return;
-
-      const uri = result.assets[0].uri;
+      const uri = await pickSquareImage();
+      if (!uri) return;
 
       if (isFarmer) {
         updateFarmerField('logo', uri);
@@ -549,7 +539,9 @@ export function AuthScreen() {
         form.append('businessAddress', restaurantForm.businessAddress);
         form.append('registrationNumber', restaurantForm.registrationNumber);
         form.append('brandName', restaurantForm.branding);
-        form.append('venueType', restaurantForm.venueType);
+        if (restaurantForm.venueType.trim()) {
+          form.append('venueType', restaurantForm.venueType);
+        }
         form.append('orgType', mapRole(selectedRole));
         appendSignupRegion(form, restaurantForm.region);
         form.append('latitude', restaurantForm.latitude);
@@ -575,7 +567,9 @@ export function AuthScreen() {
         form.append('businessName', farmerForm.businessName);
         form.append('businessAddress', farmerForm.businessAddress);
         form.append('brandName', farmerForm.branding);
-        form.append('venueType', farmerForm.venueType);
+        if (farmerForm.venueType.trim()) {
+          form.append('venueType', farmerForm.venueType);
+        }
         form.append('orgType', 'FARMER_PRODUCER');
         appendSignupRegion(form, farmerForm.region);
         form.append('latitude', farmerForm.latitude);
@@ -602,7 +596,9 @@ export function AuthScreen() {
         form.append('businessName', farmerForm.businessName);
         form.append('address', farmerForm.businessAddress);
         form.append('brandName', farmerForm.branding);
-        form.append('venueType', farmerForm.venueType);
+        if (farmerForm.venueType.trim()) {
+          form.append('venueType', farmerForm.venueType);
+        }
         appendSignupRegion(form, farmerForm.region);
         form.append('latitude', farmerForm.latitude);
         form.append('longitude', farmerForm.longitude);
@@ -670,7 +666,7 @@ export function AuthScreen() {
     ? 'Organisation Details'
     : 'Charity Details';
 
-  const stepThreeTitle = isRestaurant || isFarmer ? 'Venue Type' : 'Pickup Radius';
+  const stepThreeTitle = isRestaurant || isFarmer ? 'Venue & Region' : 'Pickup & Region';
 
   const venueOptions = [
     { label: 'Bakery', value: 'BAKERY' },
@@ -776,18 +772,23 @@ export function AuthScreen() {
       if (!restaurantForm.registrationNumber.trim()) {
         return 'Please enter your business registration number.';
       }
+      if (!restaurantForm.latitude.trim() || !restaurantForm.longitude.trim()) {
+        return 'Please set your business location using Location Recommendation.';
+      }
     } else if (isFarmer) {
       if (!farmerForm.businessName.trim()) return 'Please enter your farm or business name.';
       if (!farmerForm.businessAddress.trim()) return 'Please enter your farm address.';
+      if (!farmerForm.latitude.trim() || !farmerForm.longitude.trim()) {
+        return 'Please set your farm location using Location Recommendation.';
+      }
     } else {
       if (!charityForm.charityName.trim()) return 'Please enter your charity name.';
       if (!charityForm.charityAddress.trim()) return 'Please enter your charity address.';
       if (!charityForm.registrationNumber.trim()) return 'Please enter your registration number.';
       if (!charityForm.postcodes.trim()) return 'Please enter your postcode.';
-    }
-
-    if (!isValidRegion(getCurrentRegion())) {
-      return 'Please select your operating region.';
+      if (!charityForm.latitude.trim() || !charityForm.longitude.trim()) {
+        return 'Please set your charity location using Location Recommendation.';
+      }
     }
 
     return null;
@@ -800,24 +801,11 @@ export function AuthScreen() {
       return 'Please select your operating region.';
     }
 
-    if (isRestaurant || isFarmer) {
-      const venueType = isFarmer ? farmerForm.venueType : restaurantForm.venueType;
-      if (!venueType.trim()) return 'Please select a venue type.';
+    if (isRestaurant && !restaurantForm.venueType.trim()) {
+      return 'Please select a venue type.';
+    }
 
-      const latitude = isFarmer ? farmerForm.latitude : restaurantForm.latitude;
-      const longitude = isFarmer ? farmerForm.longitude : restaurantForm.longitude;
-      if (!latitude.trim() || !longitude.trim()) {
-        return isRestaurant
-          ? 'Please set your business location before creating your account.'
-          : 'Please set your farm location before creating your account.';
-      }
-    } else {
-      if (!charityForm.postcodes.trim()) return 'Please enter your postcode.';
-
-      if (!charityForm.latitude.trim() || !charityForm.longitude.trim()) {
-        return 'Please set your charity location before creating your account.';
-      }
-
+    if (!isRestaurant && !isFarmer) {
       const radius = charityForm.pickupRadius.trim();
       if (radius && (Number.isNaN(Number(radius)) || Number(radius) <= 0)) {
         return 'Please enter a valid pickup radius in km.';
@@ -846,6 +834,56 @@ export function AuthScreen() {
     setFormError(null);
     setCurrentStep(3);
   };
+
+  const renderLocationRecommendationSection = () => (
+    <View style={styles.locationRecommendationSection}>
+      <AppText variant="label" style={styles.locationRecommendationTitle}>
+        Location Recommendation
+      </AppText>
+      <AppText variant="bodySmall" style={styles.locationRecommendationText}>
+        Verify your address with Google lookup so collectors can find you when picking up.
+      </AppText>
+
+      <View style={styles.locationPickerRow}>
+        <Pressable
+          style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
+          onPress={handleUseGpsLocation}
+          disabled={gpsLoading}
+        >
+          {gpsLoading ? (
+            <ActivityIndicator size="small" color={palette.kale} />
+          ) : (
+            <Ionicons name="locate" size={normalize(14)} color={palette.kale} />
+          )}
+          <AppText style={styles.locationPickerBtnText}>
+            {gpsLoading ? 'Getting location...' : 'Use My Location'}
+          </AppText>
+        </Pressable>
+
+        <Pressable
+          style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]}
+          onPress={openLocationModal}
+        >
+          <Ionicons name="search" size={normalize(14)} color={palette.white} />
+          <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>
+            Search Address
+          </AppText>
+        </Pressable>
+      </View>
+
+      {!!selectedAddress && (
+        <View style={styles.selectedAddressBox}>
+          <Ionicons name="checkmark-circle" size={normalize(16)} color={palette.middlegreen} />
+          <AppText style={styles.selectedAddressText} numberOfLines={2}>
+            {selectedAddress}
+          </AppText>
+          <Pressable onPress={clearSelectedLocation}>
+            <Ionicons name="close-circle" size={normalize(16)} color="#aaa" />
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false}>
@@ -1152,6 +1190,8 @@ export function AuthScreen() {
                     onChangeText={(v) => updateRestaurantField('businessName', v)}
                   />
 
+                  {renderLocationRecommendationSection()}
+
                   <InputField
                     label="Address"
                     placeholder="Enter address"
@@ -1178,6 +1218,8 @@ export function AuthScreen() {
                     onChangeText={(v) => updateFarmerField('businessName', v)}
                   />
 
+                  {renderLocationRecommendationSection()}
+
                   <InputField
                     label="Farm Address"
                     placeholder="Enter farm address"
@@ -1196,6 +1238,8 @@ export function AuthScreen() {
                     onChangeText={(v) => updateFarmerField('businessName', v)}
                   />
 
+                  {renderLocationRecommendationSection()}
+
                   <InputField
                     label="Farm Address"
                     placeholder="Enter farm address"
@@ -1213,6 +1257,9 @@ export function AuthScreen() {
                     value={charityForm.charityName}
                     onChangeText={(v) => updateCharityField('charityName', v)}
                   />
+
+                  {renderLocationRecommendationSection()}
+
                   <InputField
                     label="Address"
                     placeholder="Enter address"
@@ -1237,19 +1284,6 @@ export function AuthScreen() {
                   />
                 </>
               )}
-
-              <RegionSelector
-                value={getCurrentRegion()}
-                onChange={updateRegionField}
-              />
-
-              <View style={styles.regionInfoBanner}>
-                <Ionicons name="information-circle-outline" size={normalize(18)} color={palette.kale} />
-                <AppText variant="bodySmall" style={styles.regionInfoText}>
-                  Surplus will only be shown to charities and consumers registered in the same region.
-                  Pick the region where your organisation operates.
-                </AppText>
-              </View>
 
               <InputField
                 label="Branding"
@@ -1321,119 +1355,39 @@ export function AuthScreen() {
           {currentStep === 3 && (
             <View style={styles.formCard}>
               {(isRestaurant || isFarmer) ? (
-                <>
-                  <VenueTypeSelector
-                    label="Please select Venue Type"
-                    value={isFarmer ? farmerForm.venueType : restaurantForm.venueType}
-                    options={isFarmer ? farmerVenueOptions : venueOptions}
-                    onChange={(v) =>
-                      isFarmer
-                        ? updateFarmerField('venueType', v)
-                        : updateRestaurantField('venueType', v)
-                    }
-                  />
-
-                  <AppText variant="bodySmall" style={styles.locationHelpText}>
-                    {isRestaurant
-                      ? 'Set your business location so charities and collectors can find your surplus listings.'
-                      : 'Set your farm location for better matching.'}
-                  </AppText>
-
-                  <View style={styles.locationPickerRow}>
-                    <Pressable
-                      style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
-                      onPress={handleUseGpsLocation}
-                      disabled={gpsLoading}
-                    >
-                      {gpsLoading ? (
-                        <ActivityIndicator size="small" color={palette.kale} />
-                      ) : (
-                        <Ionicons name="locate" size={normalize(14)} color={palette.kale} />
-                      )}
-                      <AppText style={styles.locationPickerBtnText}>
-                        {gpsLoading ? 'Getting location...' : 'Use My Location'}
-                      </AppText>
-                    </Pressable>
-
-                    <Pressable
-                      style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]}
-                      onPress={openLocationModal}
-                    >
-                      <Ionicons name="search" size={normalize(14)} color={palette.white} />
-                      <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>
-                        Search Address
-                      </AppText>
-                    </Pressable>
-                  </View>
-
-                  {!!selectedAddress && (
-                    <View style={styles.selectedAddressBox}>
-                      <Ionicons name="checkmark-circle" size={normalize(16)} color={palette.middlegreen} />
-                      <AppText style={styles.selectedAddressText} numberOfLines={2}>
-                        {selectedAddress}
-                      </AppText>
-                      <Pressable onPress={clearSelectedLocation}>
-                        <Ionicons name="close-circle" size={normalize(16)} color="#aaa" />
-                      </Pressable>
-                    </View>
-                  )}
-                </>
+                <VenueTypeSelector
+                  label={isFarmer ? 'Please select Venue Type (optional)' : 'Please select Venue Type'}
+                  value={isFarmer ? farmerForm.venueType : restaurantForm.venueType}
+                  options={isFarmer ? farmerVenueOptions : venueOptions}
+                  optional={isFarmer}
+                  onChange={(v) =>
+                    isFarmer
+                      ? updateFarmerField('venueType', v)
+                      : updateRestaurantField('venueType', v)
+                  }
+                />
               ) : (
-                /* CHARITY FLOW: postcode, pickup radius, location */
-                <>
-                  <InputField
-                    label="Postcode"
-                    placeholder="Enter postcode"
-                    {...inputProps}
-                    value={charityForm.postcodes}
-                    onChangeText={(v) => updateCharityField('postcodes', v)}
-                  />
-
-                  <InputField
-                    label="Pickup Radius in Km (can change it later)"
-                    placeholder="50"
-                    {...inputProps}
-                    value={charityForm.pickupRadius}
-                    onChangeText={(v) => updateCharityField('pickupRadius', v)}
-                  />
-
-                  <AppText variant="caption" style={styles.locationHelpText}>
-                    Set your charity's location for better pickup matching.
-                  </AppText>
-
-                  <View style={styles.locationPickerRow}>
-                    <Pressable
-                      style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
-                      onPress={handleUseGpsLocation}
-                      disabled={gpsLoading}
-                    >
-                      {gpsLoading ? (
-                        <ActivityIndicator size="small" color={palette.primary} />
-                      ) : (
-                        <Ionicons name="locate" size={normalize(16)} color={palette.primary} />
-                      )}
-                      <AppText style={styles.locationPickerBtnText}>
-                        {gpsLoading ? 'Getting location...' : 'Use My Location'}
-                      </AppText>
-                    </Pressable>
-
-                    <Pressable style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]} onPress={openLocationModal}>
-                      <Ionicons name="search" size={normalize(16)} color={palette.white} />
-                      <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>Search Address</AppText>
-                    </Pressable>
-                  </View>
-
-                  {!!selectedAddress && (
-                    <View style={styles.selectedAddressBox}>
-                      <Ionicons name="checkmark-circle" size={normalize(18)} color={palette.middlegreen} />
-                      <AppText style={styles.selectedAddressText} numberOfLines={2}>{selectedAddress}</AppText>
-                      <Pressable onPress={clearSelectedLocation}>
-                        <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
-                      </Pressable>
-                    </View>
-                  )}
-                </>
+                <InputField
+                  label="Pickup Radius in Km (can change it later)"
+                  placeholder="50"
+                  {...inputProps}
+                  value={charityForm.pickupRadius}
+                  onChangeText={(v) => updateCharityField('pickupRadius', v)}
+                />
               )}
+
+              <RegionSelector
+                value={getCurrentRegion()}
+                onChange={updateRegionField}
+              />
+
+              <View style={styles.regionInfoBanner}>
+                <Ionicons name="information-circle-outline" size={normalize(18)} color={palette.kale} />
+                <AppText variant="bodySmall" style={styles.regionInfoText}>
+                  Surplus will only be shown to charities and consumers registered in the same region.
+                  Pick the region where your organisation operates.
+                </AppText>
+              </View>
 
               <FormErrorBanner message={formError} />
 
@@ -1851,6 +1805,25 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: palette.kale,
     borderColor: palette.kale,
+  },
+
+  locationRecommendationSection: {
+    gap: hp(0.8),
+    marginTop: hp(0.5),
+    padding: wp(3),
+    borderRadius: normalize(12),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    backgroundColor: palette.white,
+  },
+
+  locationRecommendationTitle: {
+    color: palette.kale,
+  },
+
+  locationRecommendationText: {
+    opacity: 0.75,
+    lineHeight: normalize(18),
   },
 
   locationHelpText: {

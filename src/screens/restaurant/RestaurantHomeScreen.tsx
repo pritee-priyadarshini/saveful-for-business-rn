@@ -61,6 +61,10 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const firstName = currentProfile.name?.split(' ')[0] || 'User';
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const isFirstTimeUser =
+    impact.kgSaved === 0 &&
+    impact.collectionsCompleted === 0 &&
+    impact.co2SavedKg === 0;
 
   useEffect(() => {
     fetchBusinessImpact().catch((e) =>
@@ -194,7 +198,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
         {/* WELCOME */}
         <View style={styles.welcomeSection}>
           <AppText variant="h5">
-            Welcome back, {firstName}
+            {isFirstTimeUser ? `Welcome, ${firstName}` : `Welcome back, ${firstName}`}
           </AppText>
 
           <AppText variant="bodyLarge" style={styles.welcomeSub}>
@@ -255,10 +259,12 @@ export function RestaurantHomeScreen({ navigation }: any) {
             </View>
 
             {/* ICON */}
-            <Image
-              source={impactData[activeIndex].icon}
-              style={styles.impactIcon}
-            />
+            <View style={styles.impactIconCircle}>
+              <Image
+                source={impactData[activeIndex].icon}
+                style={styles.impactIcon}
+              />
+            </View>
 
             <AppText
               variant="h8"
@@ -474,10 +480,19 @@ const styles = StyleSheet.create({
     color: 'white',
   },
 
+  impactIconCircle: {
+    width: wp(20),
+    height: wp(20),
+    borderRadius: 999,
+    backgroundColor: "#cefad0",
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   impactIcon: {
-    width: wp(25),
-    height: wp(25),
-    maxHeight: normalize(100),
+    width: wp(12),
+    height: wp(12),
+    maxHeight: normalize(64),
     resizeMode: 'contain',
   },
   valuePill: {

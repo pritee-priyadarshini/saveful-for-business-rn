@@ -11,9 +11,11 @@ import {
     KeyboardAvoidingView,
     ScrollView,
     TextInput,
+    Pressable,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
 import { Screen } from '../../components/Screen';
@@ -21,6 +23,7 @@ import { AppText } from '../../components/AppText';
 import { InputField } from '../../components/InputField';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
+import { Ionicons } from '@expo/vector-icons';
 
 import type { AuthStackParamList } from '../../navigation/types';
 import { authService } from '../../services/auth.service';
@@ -35,6 +38,7 @@ import {
 import {
     extractApiMessage,
     getUserFriendlyErrorMessage,
+    getOtpVerificationErrorMessage,
     showSuccessAlert,
 } from '@/utils/apiError';
 import { isAxiosError } from 'axios';
@@ -53,6 +57,7 @@ const normalize = (size: number) => {
 
 export function SignInScreen() {
     const { setAuthUser, setRole } = useAppContext();
+    const insets = useSafeAreaInsets();
 
     const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
 
@@ -67,8 +72,8 @@ export function SignInScreen() {
     const inputs = useRef<(TextInput | null)[]>([]);
 
     const [loading, setLoading] = useState(false);
+    const [resending, setResending] = useState(false);
 
-    const [secure, setSecure] = useState(true);
     const [error, setError] = useState('');
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -227,6 +232,45 @@ export function SignInScreen() {
         }
     };
 
+    const handleResendCode = async () => {
+        if (resending || loading) return;
+        setError('');
+
+        if (!trimmedEmail) {
+            setError('Please enter your email address.');
+            return;
+        }
+
+        if (!isValidEmail(trimmedEmail)) {
+            setError('Please enter a valid email address.');
+            return;
+        }
+
+        setResending(true);
+        try {
+            const res = await authService.forgotPassword(trimmedEmail);
+
+            if (res.data?.accountExists === false || res.data?.userExists === false) {
+                setError(getForgotPasswordErrorMessage({
+                    response: { status: 404, data: { message: 'not found' } },
+                }));
+                return;
+            }
+
+            setOtp(['', '', '', '', '', '']);
+            setNewPassword('');
+            setConfirmPassword('');
+            showSuccessAlert(
+                getForgotPasswordSuccessMessage(res.data?.message),
+                'Code resent',
+            );
+        } catch (e: unknown) {
+            setError(getForgotPasswordErrorMessage(e));
+        } finally {
+            setResending(false);
+        }
+    };
+
     const handleReset = async () => {
         try {
             if (loading) return;
@@ -265,7 +309,10 @@ export function SignInScreen() {
 
         } catch (e: unknown) {
             setError(
-                getUserFriendlyErrorMessage(e, 'Could not reset password. Please try again.'),
+                getOtpVerificationErrorMessage(
+                    e,
+                    'Could not reset password. Please try again.',
+                ),
             );
         } finally {
             setLoading(false);
@@ -295,6 +342,17 @@ export function SignInScreen() {
             style={styles.background}
             resizeMode="cover"
         >
+            <Pressable
+                style={[styles.topBackButton, { top: insets.top + hp(1), left: wp(4) }]}
+                onPress={() => navigation.navigate('Welcome')}
+                hitSlop={12}
+            >
+                <Ionicons name="chevron-back" size={normalize(22)} color={palette.white} />
+                <AppText variant="bodyBold" style={styles.topBackButtonText}>
+                    Back
+                </AppText>
+            </Pressable>
+
             <Screen scrollable={false} backgroundColor="transparent">
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -306,16 +364,6 @@ export function SignInScreen() {
                         bounces={false}
                     >
                         <View style={styles.container}>
-
-                            {/* LOGO */}
-                            {/* <View style={styles.top}>
-                                <Image
-                                    source={require('../../../assets/intro/logo.png')}
-                                    style={styles.logo}
-                                    resizeMode="contain"
-                                />
-                            </View> */}
-
 
                             {/* FORM */}
                             <View style={styles.form}>
@@ -394,11 +442,14 @@ export function SignInScreen() {
                                 {/* RESET MODE */}
                                 {mode === 'reset' && (
                                     <>
-                                        <AppText variant='label' >
-                                            Enter your verification code
+                                        <AppText variant='bodySmall' style={styles.subText}>
+                                            Enter the code sent to {trimmedEmail || 'your email'} and choose a new password.
                                         </AppText>
-                                        <View style={{ flexDirection: 'row', gap: 6 }}>
 
+                                        <AppText variant='label'>
+                                            Verification code
+                                        </AppText>
+                                        <View style={styles.otpRow}>
                                             {otp.map((d, i) => (
                                                 <TextInput
                                                     key={i}
@@ -418,6 +469,16 @@ export function SignInScreen() {
                                                 />
                                             ))}
                                         </View>
+
+                                        <Pressable
+                                            style={styles.resendButton}
+                                            onPress={handleResendCode}
+                                            disabled={resending || loading}
+                                        >
+                                            <AppText variant="label" style={styles.resendText}>
+                                                {resending ? 'Resending...' : 'Resend code'}
+                                            </AppText>
+                                        </Pressable>
 
                                         <InputField
                                             label="New Password"
@@ -480,6 +541,19 @@ export function SignInScreen() {
                                     </TouchableOpacity>
                                 )}
 
+                                {mode === 'login' && (
+                                    <View style={styles.signUpRow}>
+                                        <AppText variant="bodySmall" style={styles.signUpPrompt}>
+                                            Don't have an account?
+                                        </AppText>
+                                        <Pressable onPress={() => navigation.navigate('RoleSelectionMain')}>
+                                            <AppText variant="bodySmall" style={styles.signUpLink}>
+                                                Sign up here
+                                            </AppText>
+                                        </Pressable>
+                                    </View>
+                                )}
+
                             </View>
                         </View>
                     </ScrollView>
@@ -496,6 +570,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
+        paddingTop: hp(6),
     },
     container: {
         flex: 1,
@@ -558,6 +633,21 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
+    otpRow: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+
+    resendButton: {
+        alignSelf: 'center',
+    },
+
+    resendText: {
+        color: palette.primary,
+        textDecorationLine: 'underline',
+        fontSize: normalize(14),
+    },
+
     subText: {
         textAlign: 'center',
         color: palette.textMuted,
@@ -576,5 +666,41 @@ const styles = StyleSheet.create({
     backText: {
         color: palette.primary,
         fontSize: normalize(13),
+    },
+
+    topBackButton: {
+        position: 'absolute',
+        zIndex: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1),
+        paddingVertical: hp(0.8),
+        paddingHorizontal: wp(3),
+        borderRadius: normalize(20),
+        backgroundColor: 'rgba(75, 33, 118, 0.85)',
+    },
+
+    topBackButtonText: {
+        color: palette.white,
+        fontSize: normalize(14),
+    },
+
+    signUpRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: wp(1),
+    },
+
+    signUpPrompt: {
+        color: palette.textMuted,
+        fontSize: normalize(14),
+    },
+
+    signUpLink: {
+        color: palette.primary,
+        fontSize: normalize(14),
+        textDecorationLine: 'underline',
     },
 });

@@ -48,7 +48,16 @@ function humanizeRawMessage(message: string): string {
   if (lower.includes('invalid otp') || lower.includes('invalid code')) {
     return 'That code is incorrect. Please check and try again.';
   }
-  if (lower.includes('expired')) {
+  if (lower.includes('invalid reset code')) {
+    return 'That code is incorrect. Please check and try again.';
+  }
+  if (
+    lower.includes('reset code has expired') ||
+    lower.includes('otp expired') ||
+    lower.includes('code expired') ||
+    lower.includes('verification code expired') ||
+    lower.includes('verification code has expired')
+  ) {
     return 'This code has expired. Please request a new one.';
   }
   if (lower.includes('not found') || lower.includes('no account') || lower.includes('no user')) {
@@ -152,6 +161,20 @@ export function showErrorAlert(
   fallback?: string,
 ) {
   Alert.alert(title, getUserFriendlyErrorMessage(error, fallback));
+}
+
+export function getOtpVerificationErrorMessage(
+  error: unknown,
+  fallback = 'That code is incorrect. Please check and try again.',
+): string {
+  const message = getUserFriendlyErrorMessage(error, fallback);
+  const lower = message.toLowerCase();
+
+  if (lower.includes('session has expired') || lower.includes('sign in again')) {
+    return fallback;
+  }
+
+  return message;
 }
 
 export function showSuccessAlert(

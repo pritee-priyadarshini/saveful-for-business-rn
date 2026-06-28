@@ -510,13 +510,13 @@ export function CreateFarmListingScreen({ navigation }: any) {
                   </View>
                   <View style={styles.qtyWrap}>
                     <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, -0.5)}>
-                      <AppText variant="bodyBold" color={palette.stone}>-</AppText>
+                      <AppText variant="h6" color={palette.stone}>-</AppText>
                     </Pressable>
                     <AppText variant="bodyBold" color={palette.midgray} style={styles.qtyValue}>
                       {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
                     </AppText>
                     <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, 0.5)}>
-                      <AppText variant="bodyBold" color={palette.stone}>+</AppText>
+                      <AppText variant="h6" color={palette.stone}>+</AppText>
                     </Pressable>
                   </View>
                 </View>
@@ -1139,9 +1139,9 @@ const styles = StyleSheet.create({
     marginLeft: wp(1.5),
   },
   qtyBtn: {
-    width: wp(6.5),
-    height: wp(6.5),
-    borderRadius: normalize(8),
+    width: wp(12),
+    height: wp(12),
+    borderRadius: normalize(12),
     backgroundColor: '#F9E0C0',
     alignItems: 'center',
     justifyContent: 'center',

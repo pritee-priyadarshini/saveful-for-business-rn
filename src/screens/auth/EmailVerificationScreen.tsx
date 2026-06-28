@@ -19,7 +19,7 @@ import { AuthStackParamList } from '../../navigation/types';
 import { palette } from '../../theme/colors';
 import { useAppContext } from '@/store/AppContext';
 import { authService } from '@/services/auth.service';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { showErrorAlert, showSuccessAlert, getOtpVerificationErrorMessage } from '@/utils/apiError';
 import {
   buildAuthUserFromProfile,
   resolveUserRole,
@@ -54,10 +54,30 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-
-  const emailFromRoute = route.params?.email?.trim().toLowerCase();
+  const [verificationEmail, setVerificationEmail] = useState('');
 
   const inputs = useRef<Array<TextInput | null>>([]);
+
+  const resolveVerificationEmail = () => {
+    const fromRoute = route.params?.email?.trim().toLowerCase();
+    const fromForm = (
+      isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email
+    )?.trim().toLowerCase();
+
+    return verificationEmail || fromRoute || fromForm || '';
+  };
+
+  useEffect(() => {
+    const resolved = resolveVerificationEmail();
+    if (resolved) {
+      setVerificationEmail(resolved);
+    }
+  }, [
+    route.params?.email,
+    restaurantForm.email,
+    farmerForm.email,
+    charityForm.email,
+  ]);
 
   const handleVerify = async () => {
     if (loading) return;
@@ -65,10 +85,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       setLoading(true);
 
       const enteredOtp = otp.join('');
-      const email = (
-        emailFromRoute
-        || (isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email)
-      ).trim().toLowerCase();
+      const email = resolveVerificationEmail();
 
       if (!email) {
         Alert.alert('Missing email', 'Please enter your email to verify.');
@@ -92,7 +109,14 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
 
       setShowSuccess(true);
     } catch (error: unknown) {
-      showErrorAlert(error, 'Verification failed', 'That code is incorrect. Please check and try again.');
+      showErrorAlert(
+        error,
+        'Verification failed',
+        getOtpVerificationErrorMessage(
+          error,
+          'That code is incorrect. Please check and try again.',
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -114,11 +138,10 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (resending) return;
 
-    const email = emailFromRoute
-      || (isRestaurant ? restaurantForm.email : isFarmer ? farmerForm.email : charityForm.email);
+    const email = resolveVerificationEmail();
 
     if (!email) {
       Alert.alert('Missing email', 'Please enter your email to resend the code.');
@@ -126,22 +149,23 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
     }
 
     setResending(true);
-    authService
-      .resendVerification(email)
-      .then(() => {
-        showSuccessAlert(
-          'Please check your inbox / spam folder.',
-          'Verification code sent',
-        );
-      })
-      .catch((error: unknown) => {
-        showErrorAlert(error, 'Resend failed', 'We could not resend the code. Please try again.');
-      })
-      .finally(() => setResending(false));
+    try {
+      await authService.sendVerificationOtp(email);
+      setVerificationEmail(email);
+      setOtp(['', '', '', '', '', '']);
+      showSuccessAlert(
+        `A new verification code was sent to ${email}. Please check your inbox / spam folder.`,
+        'Verification code sent',
+      );
+    } catch (error: unknown) {
+      showErrorAlert(error, 'Resend failed', 'We could not resend the code. Please try again.');
+    } finally {
+      setResending(false);
+    }
   };
 
   useEffect(() => {
-    if (route.params?.autoResend) {
+    if (route.params?.autoResend && resolveVerificationEmail()) {
       handleResend();
     }
   }, [route.params?.autoResend]);
@@ -166,6 +190,11 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
             <AppText variant='bodyLarge' style={styles.subText}>
               A 6-digit OTP has been sent to your email. Please enter it to confirm your account and proceed with Saveful for Business.
             </AppText>
+            {verificationEmail ? (
+              <AppText variant="bodySmall" style={styles.emailHint}>
+                Sent to: {verificationEmail}
+              </AppText>
+            ) : null}
           </View>
 
           {/* OTP */}
@@ -320,6 +349,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.6,
     fontSize: normalize(14),
+  },
+
+  emailHint: {
+    textAlign: 'center',
+    color: palette.primary,
+    fontSize: normalize(13),
   },
 
   otpContainer: {
