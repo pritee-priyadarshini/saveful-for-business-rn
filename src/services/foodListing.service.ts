@@ -275,6 +275,10 @@ export function invalidateListingDetail(listingId: number) {
   listingDetailCache.delete(listingId);
 }
 
+export function clearListingDetailCache() {
+  listingDetailCache.clear();
+}
+
 export type DiscoverAudience = 'people' | 'animal';
 
 function isAvailableListingStatus(status: unknown) {

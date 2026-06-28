@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
+  Alert,
   FlatList,
   StyleSheet,
   TouchableOpacity,
@@ -16,12 +17,17 @@ import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
+import {
+  ClaimConfirmModal,
+  type ClaimLineItem,
+} from '../../components/ClaimConfirmModal';
+import type { ClaimMode } from '../../services/claims.service';
 import { palette } from '../../theme/colors';
 import { useAppContext } from '../../store/AppContext';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { fetchListingDetail, mapDiscoverListing } from '../../services/foodListing.service';
+import { fetchListingDetail, mapDiscoverListing, type FoodItem, invalidateListingDetail, clearListingDetailCache } from '../../services/foodListing.service';
 import {
   haversineDistanceKm,
   normalizeAuthProfile,
@@ -35,9 +41,15 @@ type ClaimState = Record<string, number>;
 type QuantityOrder = 'asc' | 'desc';
 
 type ClaimFoodItem = {
-  id: string;
+  foodItemId: number;
   name: string;
   quantityKg: number;
+};
+
+type PendingClaim = {
+  listing: DiscoverListing;
+  claimMode: ClaimMode;
+  items: ClaimLineItem[];
 };
 
 const QTY_STEP = 0.5;
@@ -50,24 +62,46 @@ function formatKg(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function toClaimFoodItems(listing: DiscoverListing, detail?: { foodItems?: any[] }): ClaimFoodItem[] {
-  if (detail?.foodItems?.length) {
-    return detail.foodItems
-      .map((foodItem, index) => ({
-        id: String(foodItem.id ?? `${listing.listingId}-${index}`),
+function toClaimFoodItems(
+  listing: DiscoverListing,
+  detail?: { foodItems?: FoodItem[] },
+): ClaimFoodItem[] {
+  const source: FoodItem[] = detail?.foodItems?.length
+    ? detail.foodItems
+    : (listing.foodItems as FoodItem[])?.length
+      ? (listing.foodItems as FoodItem[])
+      : [];
+
+  if (!source.length) return [];
+
+  return source
+    .map((foodItem, index) => {
+      const foodItemId = Number(foodItem.id);
+      return {
+        foodItemId,
         name: foodItem.name || foodItem.category || `Item ${index + 1}`,
         quantityKg: foodItem.remainingQtyKg ?? foodItem.totalQtyKg ?? 0,
-      }))
-      .filter((foodItem) => foodItem.quantityKg > 0);
-  }
+      };
+    })
+    .filter(
+      (foodItem) =>
+        foodItem.quantityKg > 0 && Number.isFinite(foodItem.foodItemId) && foodItem.foodItemId > 0,
+    );
+}
 
-  return [
-    {
-      id: `${listing.id}-surplus`,
-      name: 'Surplus Food',
-      quantityKg: listing.quantityKg,
-    },
-  ];
+function getAvailableKg(listing: DiscoverListing, claimItems: ClaimFoodItem[]) {
+  if (claimItems.length) {
+    return roundKg(claimItems.reduce((sum, item) => sum + item.quantityKg, 0));
+  }
+  return roundKg(listing.remainingQtyKg ?? listing.quantityKg);
+}
+
+async function loadListingFoodItems(
+  listing: DiscoverListing,
+  options?: { refresh?: boolean },
+): Promise<ClaimFoodItem[]> {
+  const detail = await fetchListingDetail(listing.listingId, options);
+  return toClaimFoodItems(listing, detail);
 }
 
 export function CharityMapScreen({ navigation }: any) {
@@ -88,9 +122,40 @@ export function CharityMapScreen({ navigation }: any) {
   const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
   const [expandedClaimSections, setExpandedClaimSections] = useState<Record<string, boolean>>({});
   const [activeClaimItemByListing, setActiveClaimItemByListing] = useState<
-    Record<string, string | null>
+    Record<string, number | null>
   >({});
+  const [pendingClaim, setPendingClaim] = useState<PendingClaim | null>(null);
+  const pendingClaimRef = useRef<PendingClaim | null>(null);
   const fetchedListingIds = useRef(new Set<string>());
+  const listingSnapshotRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    pendingClaimRef.current = pendingClaim;
+  }, [pendingClaim]);
+
+  const applyFoodItems = useCallback((listingId: string, items: ClaimFoodItem[]) => {
+    setFoodItemsByListing((prev) => ({ ...prev, [listingId]: items }));
+  }, []);
+
+  const refreshListingFoodItems = useCallback(
+    async (listing: DiscoverListing, options?: { refresh?: boolean }) => {
+      setLoadingFoodItems((prev) => ({ ...prev, [listing.id]: true }));
+
+      try {
+        const items = await loadListingFoodItems(listing, options);
+        applyFoodItems(listing.id, items);
+      } catch {
+        applyFoodItems(listing.id, toClaimFoodItems(listing));
+      } finally {
+        setLoadingFoodItems((prev) => {
+          const next = { ...prev };
+          delete next[listing.id];
+          return next;
+        });
+      }
+    },
+    [applyFoodItems],
+  );
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
@@ -101,38 +166,34 @@ export function CharityMapScreen({ navigation }: any) {
 
   useEffect(() => {
     listings.forEach((listing) => {
-      if (fetchedListingIds.current.has(listing.id)) return;
+      const snapshot = `${listing.remainingQtyKg ?? listing.quantityKg}:${listing.statusRaw}`;
+      const snapshotChanged = listingSnapshotRef.current[listing.id] !== snapshot;
+      listingSnapshotRef.current[listing.id] = snapshot;
+
+      const seeded = toClaimFoodItems(listing);
+      if (seeded.length) {
+        applyFoodItems(listing.id, seeded);
+      }
+
+      const needsFetch = !fetchedListingIds.current.has(listing.id) || snapshotChanged;
+      if (!needsFetch) return;
+
       fetchedListingIds.current.add(listing.id);
 
-      setLoadingFoodItems((prev) => ({ ...prev, [listing.id]: true }));
+      if (snapshotChanged) {
+        invalidateListingDetail(listing.listingId);
+      }
 
-      fetchListingDetail(listing.listingId)
-        .then((detail) => {
-          setFoodItemsByListing((prev) => ({
-            ...prev,
-            [listing.id]: toClaimFoodItems(listing, detail),
-          }));
-        })
-        .catch(() => {
-          setFoodItemsByListing((prev) => ({
-            ...prev,
-            [listing.id]: toClaimFoodItems(listing),
-          }));
-        })
-        .finally(() => {
-          setLoadingFoodItems((prev) => {
-            const next = { ...prev };
-            delete next[listing.id];
-            return next;
-          });
-        });
+      refreshListingFoodItems(listing, { refresh: snapshotChanged });
     });
-  }, [listings]);
+  }, [listings, applyFoodItems, refreshListingFoodItems]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       fetchedListingIds.current.clear();
+      listingSnapshotRef.current = {};
+      clearListingDetailCache();
       setFoodItemsByListing({});
       setClaimState({});
       await storeFetchListings('people', true);
@@ -143,11 +204,11 @@ export function CharityMapScreen({ navigation }: any) {
     }
   }, [storeFetchListings]);
 
-  const getKey = (listingId: string, foodItemId: string) => `${listingId}-${foodItemId}`;
+  const getKey = (listingId: string, foodItemId: number) => `${listingId}-${foodItemId}`;
 
   const updateQty = (
     listingId: string,
-    foodItemId: string,
+    foodItemId: number,
     maxQty: number,
     delta: number,
   ) => {
@@ -165,36 +226,111 @@ export function CharityMapScreen({ navigation }: any) {
   const getTotalSelected = (listingId: string) =>
     roundKg(
       Object.entries(claimState)
-        .filter(([key]) => key.startsWith(listingId))
+        .filter(([key]) => key.startsWith(`${listingId}-`))
         .reduce((sum, [, qty]) => sum + qty, 0),
     );
 
-  const buildPayload = (listing: DiscoverListing, claimItems: ClaimFoodItem[]) =>
-    claimItems
-      .map((item) => {
-        const key = getKey(listing.id, item.id);
-        const qty = claimState[key] || 0;
-        if (qty > 0) {
+  const buildPartialClaimItems = useCallback(
+    (listing: DiscoverListing, claimItems: ClaimFoodItem[]): ClaimLineItem[] =>
+      claimItems
+        .map((item) => {
+          const qty = claimState[getKey(listing.id, item.foodItemId)] || 0;
+          if (qty <= 0) return null;
           return {
-            foodItemId: item.id,
+            foodItemId: item.foodItemId,
             name: item.name,
-            claimedQty: roundKg(qty),
+            qtyKg: roundKg(qty),
           };
-        }
-        return null;
-      })
-      .filter(Boolean);
+        })
+        .filter((item): item is ClaimLineItem => item !== null),
+    [claimState],
+  );
 
-  const buildListingForConfirm = (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => ({
-    ...listing,
-    quantityKg: claimItems.reduce((sum, item) => sum + item.quantityKg, 0) || listing.quantityKg,
-    businessName: listing.businessName,
-    suburb: listing.pickupAddress,
-    pickupDate: listing.bestBeforeLabel,
-    pickupTime: listing.pickupWindow,
-    storage: listing.storage,
-    items: claimItems,
-  });
+  const openPartialClaim = useCallback(
+    (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
+      const items = buildPartialClaimItems(listing, claimItems);
+      if (!items.length) {
+        Alert.alert(
+          'Select quantities',
+          'Use the + / − buttons to choose how much of each food item you want to claim.',
+        );
+        return;
+      }
+
+      setPendingClaim({
+        listing,
+        claimMode: 'PARTIAL',
+        items,
+      });
+    },
+    [buildPartialClaimItems],
+  );
+
+  const openFullClaim = useCallback(
+    (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
+      if (!claimItems.length) {
+        Alert.alert(
+          'Items not ready',
+          'Food items are still loading. Please wait a moment and try again.',
+        );
+        return;
+      }
+
+      setPendingClaim({
+        listing,
+        claimMode: 'FULL',
+        items: claimItems.map((item) => ({
+          foodItemId: item.foodItemId,
+          name: item.name,
+          qtyKg: item.quantityKg,
+        })),
+      });
+    },
+    [],
+  );
+
+  const handleClaimSuccess = useCallback(
+    async (listingId: string) => {
+      const claimedListing = pendingClaimRef.current?.listing;
+
+      setClaimState((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (key.startsWith(`${listingId}-`)) delete next[key];
+        });
+        return next;
+      });
+
+      fetchedListingIds.current.delete(listingId);
+      delete listingSnapshotRef.current[listingId];
+      setFoodItemsByListing((prev) => {
+        const next = { ...prev };
+        delete next[listingId];
+        return next;
+      });
+
+      if (claimedListing) {
+        invalidateListingDetail(claimedListing.listingId);
+      }
+
+      try {
+        await storeFetchListings('people', true);
+
+        if (claimedListing) {
+          await refreshListingFoodItems(claimedListing, { refresh: true });
+          fetchedListingIds.current.add(listingId);
+        }
+      } catch (e) {
+        showErrorAlert(e, 'Claim submitted', 'Could not refresh listings');
+      }
+
+      Alert.alert(
+        'Claim submitted',
+        'The restaurant will review and confirm your claim soon.',
+      );
+    },
+    [storeFetchListings, refreshListingFoodItems],
+  );
 
   const charityCoords = useMemo(() => {
     const profile = normalizeAuthProfile(authUser);
@@ -290,6 +426,18 @@ export function CharityMapScreen({ navigation }: any) {
       <Screen backgroundColor={palette.creme} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
         {renderSkeleton()}
+
+        <ClaimConfirmModal
+          visible={!!pendingClaim}
+          listing={pendingClaim?.listing ?? null}
+          claimMode={pendingClaim?.claimMode ?? 'PARTIAL'}
+          items={pendingClaim?.items ?? []}
+          onClose={() => setPendingClaim(null)}
+          onSuccess={() => {
+            const claim = pendingClaimRef.current;
+            if (claim) handleClaimSuccess(claim.listing.id);
+          }}
+        />
       </Screen>
     );
   }
@@ -298,7 +446,7 @@ export function CharityMapScreen({ navigation }: any) {
     setExpandedClaimSections((prev) => ({ ...prev, [listingId]: !prev[listingId] }));
   };
 
-  const toggleActiveClaimItem = (listingId: string, foodItemId: string) => {
+  const toggleActiveClaimItem = (listingId: string, foodItemId: number) => {
     setActiveClaimItemByListing((prev) => ({
       ...prev,
       [listingId]: prev[listingId] === foodItemId ? null : foodItemId,
@@ -307,7 +455,7 @@ export function CharityMapScreen({ navigation }: any) {
 
   const getSelectedSummary = (listingId: string, claimItems: ClaimFoodItem[]) => {
     const selectedCount = claimItems.filter(
-      (item) => (claimState[getKey(listingId, item.id)] || 0) > 0,
+      (item) => (claimState[getKey(listingId, item.foodItemId)] || 0) > 0,
     ).length;
     const totalSelected = getTotalSelected(listingId);
     return { selectedCount, totalSelected };
@@ -318,13 +466,13 @@ export function CharityMapScreen({ navigation }: any) {
     item: ClaimFoodItem,
     compact = false,
   ) => {
-    const key = getKey(listing.id, item.id);
+    const key = getKey(listing.id, item.foodItemId);
     const qty = claimState[key] || 0;
 
     return (
       <View style={[styles.stepper, compact && styles.stepperCompact]}>
         <Pressable
-          onPress={() => updateQty(listing.id, item.id, item.quantityKg, -QTY_STEP)}
+          onPress={() => updateQty(listing.id, item.foodItemId, item.quantityKg, -QTY_STEP)}
           style={styles.stepBtn}
           hitSlop={6}
         >
@@ -341,7 +489,7 @@ export function CharityMapScreen({ navigation }: any) {
         </View>
 
         <Pressable
-          onPress={() => updateQty(listing.id, item.id, item.quantityKg, QTY_STEP)}
+          onPress={() => updateQty(listing.id, item.foodItemId, item.quantityKg, QTY_STEP)}
           style={styles.stepBtn}
           hitSlop={6}
         >
@@ -421,14 +569,14 @@ export function CharityMapScreen({ navigation }: any) {
         {isExpanded && (
           <View style={styles.claimItemList}>
             {claimItems.map((claimItem) => {
-              const itemQty = claimState[getKey(listing.id, claimItem.id)] || 0;
-              const isActive = activeItemId === claimItem.id;
+              const itemQty = claimState[getKey(listing.id, claimItem.foodItemId)] || 0;
+              const isActive = activeItemId === claimItem.foodItemId;
 
               return (
-                <View key={claimItem.id} style={styles.claimItemBlock}>
+                <View key={claimItem.foodItemId} style={styles.claimItemBlock}>
                   <Pressable
                     style={[styles.claimItemRow, isActive && styles.claimItemRowActive]}
-                    onPress={() => toggleActiveClaimItem(listing.id, claimItem.id)}
+                    onPress={() => toggleActiveClaimItem(listing.id, claimItem.foodItemId)}
                   >
                     <View style={styles.claimItemMeta}>
                       <AppText variant="label" numberOfLines={1} style={styles.itemName}>
@@ -461,6 +609,7 @@ export function CharityMapScreen({ navigation }: any) {
     const isLoadingItems = loadingFoodItems[item.id];
     const totalSelected = getTotalSelected(item.id);
     const hasSelection = totalSelected > 0;
+    const availableKg = getAvailableKg(item, claimItems);
 
     return (
       <View style={styles.card}>
@@ -492,7 +641,7 @@ export function CharityMapScreen({ navigation }: any) {
             <AppText variant="caption" style={styles.infoLabel}>
               Quantity
             </AppText>
-            <AppText variant="bodyBold">{formatKg(item.quantityKg)} kg</AppText>
+            <AppText variant="bodyBold">{formatKg(availableKg)} kg</AppText>
           </View>
 
           <View style={styles.infoCell}>
@@ -539,12 +688,7 @@ export function CharityMapScreen({ navigation }: any) {
             size="compact"
             disabled={!hasSelection || isLoadingItems}
             style={styles.flexBtn}
-            onPress={() => {
-              navigation.navigate('ClaimConfirm', {
-                listing: buildListingForConfirm(item, claimItems),
-                payload: buildPayload(item, claimItems),
-              });
-            }}
+            onPress={() => openPartialClaim(item, claimItems)}
           />
 
           <Button
@@ -552,16 +696,7 @@ export function CharityMapScreen({ navigation }: any) {
             size="compact"
             disabled={isLoadingItems || claimItems.length === 0}
             style={styles.flexBtn}
-            onPress={() =>
-              navigation.navigate('ClaimConfirm', {
-                listing: buildListingForConfirm(item, claimItems),
-                payload: claimItems.map((claimItem) => ({
-                  foodItemId: claimItem.id,
-                  name: claimItem.name,
-                  claimedQty: claimItem.quantityKg,
-                })),
-              })
-            }
+            onPress={() => openFullClaim(item, claimItems)}
           />
         </View>
       </View>
@@ -638,6 +773,18 @@ export function CharityMapScreen({ navigation }: any) {
         visible={!!selectedListing}
         listing={selectedListing}
         onClose={() => setSelectedListing(null)}
+      />
+
+      <ClaimConfirmModal
+        visible={!!pendingClaim}
+        listing={pendingClaim?.listing ?? null}
+        claimMode={pendingClaim?.claimMode ?? 'PARTIAL'}
+        items={pendingClaim?.items ?? []}
+        onClose={() => setPendingClaim(null)}
+        onSuccess={() => {
+          const claim = pendingClaimRef.current;
+          if (claim) handleClaimSuccess(claim.listing.id);
+        }}
       />
 
       <FlatList

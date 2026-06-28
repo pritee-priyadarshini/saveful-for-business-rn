@@ -23,6 +23,7 @@ import { estimateMealsSaved, getListingAudience, getListingStatusLabel, isAnimal
 import { showErrorAlert } from '../../utils/apiError';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
+import { fetchListingDetail } from '../../services/foodListing.service';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -129,6 +130,26 @@ function getTotalKg(listing: any) {
   );
 }
 
+function getRemainingKg(listing: any) {
+  if (listing?.remainingQtyKg != null) return Number(listing.remainingQtyKg);
+  return (listing?.foodItems || []).reduce(
+    (sum: number, item: any) => sum + Number(item.remainingQtyKg ?? item.totalQtyKg ?? 0),
+    0,
+  );
+}
+
+function getClaimedKg(listing: any) {
+  return Math.max(0, getTotalKg(listing) - getRemainingKg(listing));
+}
+
+function formatKg(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function isListingPartial(listing: any) {
+  return resolveListingStatus(listing) === 'PARTIAL';
+}
+
 function formatPickupDate(value?: string | null) {
   if (!value) return '—';
   const date = new Date(value);
@@ -192,6 +213,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
   } = useListingsStore();
 
   const [modalVisible, setModalVisible] = React.useState(false);
+  const [modalLoading, setModalLoading] = React.useState(false);
   const [selectedItems, setSelectedItems] = React.useState<any[]>([]);
   const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
   const [cancellingId, setCancellingId] = React.useState<number | null>(null);
@@ -272,10 +294,24 @@ export function RestaurantListingsScreen({ navigation }: any) {
     );
   };
 
-  const openItemsModal = (detail: any) => {
-    setSelectedItems(detail.foodItems || []);
-    setSelectedListingStatus(detail.status);
+  const openItemsModal = async (listing: any) => {
+    const status = resolveListingStatus(listing);
+    setSelectedItems(listing.foodItems || []);
+    setSelectedListingStatus(status);
     setModalVisible(true);
+
+    if (status !== 'PARTIAL') return;
+
+    setModalLoading(true);
+    try {
+      const detail = await fetchListingDetail(listing.id, { refresh: true });
+      setSelectedItems(detail.foodItems || []);
+      setSelectedListingStatus(resolveListingStatus(detail));
+    } catch {
+      // Keep the listing snapshot already shown.
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   const renderFilterChip = (
@@ -361,6 +397,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const collected = isListingCollected(item);
     const expired = isListingExpired(item);
     const active = isListingActive(item);
+    const partial = isListingPartial(item);
     const statusLabel = getListingStatusLabel(item);
     const statusBadgeStyle = expired
       ? { backgroundColor: '#FFF1D6', color: palette.warning }
@@ -421,6 +458,17 @@ export function RestaurantListingsScreen({ navigation }: any) {
           </AppText>
         ) : null}
 
+        {partial ? (
+          <Pressable style={styles.partialNotice} onPress={() => openItemsModal(item)}>
+            <Ionicons name="information-circle-outline" size={normalize(16)} color="#B8860B" />
+            <AppText variant="bodySmall" style={styles.partialNoticeText}>
+              Partially claimed — {formatKg(getClaimedKg(item))} kg claimed,{' '}
+              {formatKg(getRemainingKg(item))} kg remaining. Tap to view breakdown.
+            </AppText>
+            <Ionicons name="chevron-forward" size={normalize(16)} color="#B8860B" />
+          </Pressable>
+        ) : null}
+
         <View style={styles.metaSection}>
           <View style={styles.metaTopRow}>
             {renderMetaBox(
@@ -432,7 +480,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 onPress={() => openItemsModal(item)}
               >
                 <AppText variant="bodyBold" style={styles.viewDetailsBtnText} numberOfLines={1} ellipsizeMode="tail">
-                  View
+                  {partial ? 'Breakdown' : 'View'}
                 </AppText>
               </Pressable>,
             )}
@@ -679,71 +727,126 @@ export function RestaurantListingsScreen({ navigation }: any) {
         <View style={styles.modalWrap}>
           <View style={styles.modalCard}>
             <View style={styles.modalTopBar}>
-              <AppText variant="h6">Listed Food</AppText>
+              <AppText variant="h6">
+                {selectedListingStatus === 'PARTIAL' ? 'Claim breakdown' : 'Listed Food'}
+              </AppText>
               <Pressable style={styles.closeIconBtn} onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={normalize(20)} color={palette.black} />
               </Pressable>
             </View>
 
-            <View style={styles.modalHeaderRow}>
-              <AppText variant="bodyBold" style={{ flex: 2 }}>
-                Item Name
+            {selectedListingStatus === 'PARTIAL' && (
+              <AppText variant="bodySmall" style={styles.modalSubtitle}>
+                See how much has been claimed and what is still available per food item.
               </AppText>
-              <AppText variant="bodyBold" style={styles.modalCol}>
-                Available
-              </AppText>
-              {selectedListingStatus !== 'ACTIVE' && (
-                <AppText variant="bodyBold" style={styles.modalCol}>
-                  Claimed
-                </AppText>
-              )}
-            </View>
-
-            {selectedItems?.length ? (
-              selectedItems.map((foodItem, idx) => {
-                const totalQty = Number(foodItem.totalQtyKg || 0);
-                const remainingQty = Number(foodItem.remainingQtyKg || 0);
-                const claimedQty = totalQty - remainingQty;
-
-                return (
-                  <View key={`${foodItem.name || foodItem.category}-${idx}`} style={styles.modalItemRow}>
-                    <AppText variant="bodyBold" style={{ flex: 2 }}>
-                      {foodItem.name || foodItem.category}
-                    </AppText>
-                    <AppText variant="bodySmall" style={styles.modalCol}>
-                      {totalQty} kg
-                    </AppText>
-                    {selectedListingStatus !== 'ACTIVE' && (
-                      <AppText variant="bodySmall" style={styles.modalCol}>
-                        {claimedQty} kg
-                      </AppText>
-                    )}
-                  </View>
-                );
-              })
-            ) : (
-              <View style={{ paddingVertical: hp(1.6) }}>
-                <AppText variant="bodySmall">No items available</AppText>
-              </View>
             )}
 
-            <View style={{ marginTop: hp(2), gap: hp(1) }}>
-              <AppText variant="bodyBold">
-                Total Quantity:{' '}
-                {selectedItems.reduce((sum, foodItem) => sum + Number(foodItem.totalQtyKg || 0), 0)} kg
-              </AppText>
-              {selectedListingStatus !== 'ACTIVE' && (
-                <AppText variant="bodyBold">
-                  Total Claimed:{' '}
-                  {selectedItems.reduce(
-                    (sum, foodItem) =>
-                      sum + (Number(foodItem.totalQtyKg || 0) - Number(foodItem.remainingQtyKg || 0)),
-                    0,
-                  )}{' '}
-                  kg
-                </AppText>
-              )}
-            </View>
+            {modalLoading ? (
+              <View style={styles.modalLoadingWrap}>
+                <AppText variant="bodySmall">Loading latest quantities…</AppText>
+              </View>
+            ) : (
+              <>
+                <View style={styles.modalHeaderRow}>
+                  <AppText variant="bodyBold" style={styles.modalColName}>
+                    Item Name
+                  </AppText>
+                  {selectedListingStatus === 'PARTIAL' ? (
+                    <>
+                      <AppText variant="bodyBold" style={styles.modalCol}>
+                        Claimed
+                      </AppText>
+                      <AppText variant="bodyBold" style={styles.modalCol}>
+                        Remaining
+                      </AppText>
+                    </>
+                  ) : (
+                    <AppText variant="bodyBold" style={styles.modalCol}>
+                      Listed
+                    </AppText>
+                  )}
+                </View>
+
+                {selectedItems?.length ? (
+                  selectedItems.map((foodItem, idx) => {
+                    const totalQty = Number(foodItem.totalQtyKg || 0);
+                    const remainingQty = Number(foodItem.remainingQtyKg ?? totalQty);
+                    const claimedQty = Math.max(0, totalQty - remainingQty);
+
+                    return (
+                      <View key={`${foodItem.name || foodItem.category}-${idx}`} style={styles.modalItemRow}>
+                        <AppText variant="bodyBold" style={styles.modalColName}>
+                          {foodItem.name || foodItem.category}
+                        </AppText>
+                        {selectedListingStatus === 'PARTIAL' ? (
+                          <>
+                            <AppText variant="bodySmall" style={[styles.modalCol, styles.modalClaimedText]}>
+                              {formatKg(claimedQty)} kg
+                            </AppText>
+                            <AppText variant="bodySmall" style={[styles.modalCol, styles.modalRemainingText]}>
+                              {formatKg(remainingQty)} kg
+                            </AppText>
+                          </>
+                        ) : (
+                          <AppText variant="bodySmall" style={styles.modalCol}>
+                            {formatKg(totalQty)} kg
+                          </AppText>
+                        )}
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={{ paddingVertical: hp(1.6) }}>
+                    <AppText variant="bodySmall">No items available</AppText>
+                  </View>
+                )}
+
+                <View style={styles.modalTotals}>
+                  {selectedListingStatus === 'PARTIAL' ? (
+                    <>
+                      <AppText variant="bodyBold">
+                        Total claimed:{' '}
+                        {formatKg(
+                          selectedItems.reduce(
+                            (sum, foodItem) =>
+                              sum +
+                              Math.max(
+                                0,
+                                Number(foodItem.totalQtyKg || 0) -
+                                  Number(foodItem.remainingQtyKg ?? foodItem.totalQtyKg ?? 0),
+                              ),
+                            0,
+                          ),
+                        )}{' '}
+                        kg
+                      </AppText>
+                      <AppText variant="bodyBold">
+                        Total remaining:{' '}
+                        {formatKg(
+                          selectedItems.reduce(
+                            (sum, foodItem) =>
+                              sum + Number(foodItem.remainingQtyKg ?? foodItem.totalQtyKg ?? 0),
+                            0,
+                          ),
+                        )}{' '}
+                        kg
+                      </AppText>
+                    </>
+                  ) : (
+                    <AppText variant="bodyBold">
+                      Total Quantity:{' '}
+                      {formatKg(
+                        selectedItems.reduce(
+                          (sum, foodItem) => sum + Number(foodItem.totalQtyKg || 0),
+                          0,
+                        ),
+                      )}{' '}
+                      kg
+                    </AppText>
+                  )}
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -1175,6 +1278,52 @@ const styles = StyleSheet.create({
   modalCol: {
     flex: 1,
     textAlign: 'center',
+  },
+
+  modalColName: {
+    flex: 2,
+  },
+
+  modalClaimedText: {
+    color: '#B8860B',
+  },
+
+  modalRemainingText: {
+    color: palette.kale,
+  },
+
+  modalSubtitle: {
+    color: palette.midgray,
+    lineHeight: normalize(18),
+  },
+
+  modalLoadingWrap: {
+    paddingVertical: hp(3),
+    alignItems: 'center',
+  },
+
+  modalTotals: {
+    marginTop: hp(0.5),
+    gap: hp(0.8),
+  },
+
+  partialNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    marginTop: hp(1),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    backgroundColor: '#FFF8E1',
+    borderWidth: 1,
+    borderColor: '#E8C547',
+    borderRadius: normalize(12),
+  },
+
+  partialNoticeText: {
+    flex: 1,
+    color: '#8A6D1D',
+    lineHeight: normalize(18),
   },
 
   modalWrap: {

@@ -6,7 +6,6 @@ import { useAppContext } from '../store/AppContext';
 import { AuthStack } from './AuthStack';
 import { RoleTabs } from './RoleTabs';
 
-import { ClaimConfirmationScreen } from '../screens/charity/ClaimConfirmationScreen';
 import { CharityHistoryScreen } from '../screens/charity/CharityHistoryScreen';
 import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
 
@@ -31,7 +30,6 @@ export type RootStackParamList = {
   Tabs: undefined;
   CharityHistory: undefined;
   FarmerHistory: undefined;
-  ClaimConfirm: undefined;
   CharityPostCollectSurvey: undefined;
   RestaurantPlan: undefined;
   //ManageAccess: undefined;
@@ -165,7 +163,6 @@ export function AppNavigator() {
           {/* GLOBAL */}
           <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />
           <RootStack.Screen name="FarmerHistory" component={FarmerHistoryScreen} />
-          <RootStack.Screen name="ClaimConfirm" component={ClaimConfirmationScreen} />
           <RootStack.Screen name="RestaurantPlan" component={RestaurantPlansScreen} />
           <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
           <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
