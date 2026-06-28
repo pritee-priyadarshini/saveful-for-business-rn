@@ -1,30 +1,36 @@
 import React from 'react';
-import { Pressable, StyleSheet, View, Image, ImageBackground, Dimensions, Platform } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { FullBleedBackground } from '../../components/FullBleedBackground';
 import { AuthStackParamList } from '../../navigation/types';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
 export function WelcomeScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
+  useTransparentStatusBar('light');
+
   return (
-    <ImageBackground
-      source={require('../../../assets/intro/splash_logo.png')}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      <Screen backgroundColor="transparent" contentStyle={styles.content}>
+    <FullBleedBackground source={require('../../../assets/intro/splash_logo.png')}>
+      <Screen
+        backgroundColor="transparent"
+        scrollable={false}
+        transparentTop
+        contentStyle={{
+          ...styles.content,
+          paddingTop: insets.top + hp(2),
+          paddingBottom: insets.bottom + hp(2),
+        }}
+      >
+        <StatusBar style="light" translucent backgroundColor="transparent" />
 
         <View style={styles.topSection}>
 
@@ -77,21 +83,15 @@ export function WelcomeScreen({ navigation }: Props) {
         </View>
 
       </Screen>
-    </ImageBackground>
+    </FullBleedBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-
   content: {
     flexGrow: 1,
     justifyContent: 'space-between',
     paddingHorizontal: wp(6),
-    paddingTop: hp(4),
-    paddingBottom: hp(4),
   },
 
   topSection: {

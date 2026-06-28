@@ -17,6 +17,8 @@ import {
 import { pickSquareImage } from '@/utils/pickSquareImage';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { InputField } from '../../components/InputField';
@@ -36,14 +38,10 @@ import { fetchCurrentLocation } from '@/utils/currentLocation';
 import { getUserFriendlyErrorMessage } from '@/utils/apiError';
 import { REGION_OPTIONS, getRegionLabel, appendSignupRegion, isValidRegion } from '@/data/regions';
 import type { Region } from '@/types';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+const { height } = Dimensions.get('window');
 
 type NavProp = NativeStackNavigationProp<AuthStackParamList>;
 
@@ -278,6 +276,9 @@ function FormErrorBanner({ message }: { message: string | null }) {
 }
 
 export function AuthScreen() {
+  const insets = useSafeAreaInsets();
+  useTransparentStatusBar('dark');
+
   const {
     restaurantForm,
     charityForm,
@@ -886,7 +887,8 @@ export function AuthScreen() {
   );
 
   return (
-    <Screen backgroundColor={palette.creme} scrollable={false}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
       <View style={[styles.topAccent, { backgroundColor: palette.middlegreen }]} />
       <LocationSetupModal
         visible={showPlacesSearch}
@@ -914,6 +916,7 @@ export function AuthScreen() {
           contentContainerStyle={[
             styles.newContent,
             {
+              paddingTop: insets.top + hp(1),
               paddingBottom: keyboardVisible
                 ? keyboardHeight + hp(3)
                 : hp(6),
@@ -1897,7 +1900,6 @@ const styles = StyleSheet.create({
 
   newContent: {
     paddingHorizontal: wp(4.5),
-    paddingTop: hp(1),
     paddingBottom: hp(4),
     flexGrow: 1,
   },

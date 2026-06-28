@@ -3,10 +3,8 @@ import {
     View,
     TouchableOpacity,
     StyleSheet,
-    ImageBackground,
     Image,
     Alert,
-    Dimensions,
     Platform,
     KeyboardAvoidingView,
     ScrollView,
@@ -16,9 +14,11 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 
 import { Screen } from '../../components/Screen';
+import { FullBleedBackground } from '../../components/FullBleedBackground';
 import { AppText } from '../../components/AppText';
 import { InputField } from '../../components/InputField';
 import { useAppContext } from '../../store/AppContext';
@@ -46,18 +46,13 @@ import {
     buildAuthUserFromProfile,
     resolveUserRole,
 } from '@/utils/authSession';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-    const scale = width / 375;
-    return Math.round(size * scale);
-};
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 
 export function SignInScreen() {
     const { setAuthUser, setRole } = useAppContext();
     const insets = useSafeAreaInsets();
+    useTransparentStatusBar('light');
 
     const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
 
@@ -337,11 +332,7 @@ export function SignInScreen() {
     };
 
     return (
-        <ImageBackground
-            source={require('../../../assets/intro/splash_logo.png')}
-            style={styles.background}
-            resizeMode="cover"
-        >
+        <FullBleedBackground source={require('../../../assets/intro/splash_logo.png')}>
             <Pressable
                 style={[styles.topBackButton, { top: insets.top + hp(1), left: wp(4) }]}
                 onPress={() => navigation.navigate('Welcome')}
@@ -353,7 +344,8 @@ export function SignInScreen() {
                 </AppText>
             </Pressable>
 
-            <Screen scrollable={false} backgroundColor="transparent">
+            <Screen scrollable={false} backgroundColor="transparent" transparentTop>
+                <StatusBar style="light" translucent backgroundColor="transparent" />
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={{ flex: 1 }}
@@ -559,14 +551,11 @@ export function SignInScreen() {
                     </ScrollView>
                 </KeyboardAvoidingView>
             </Screen>
-        </ImageBackground >
+        </FullBleedBackground>
     );
 }
 
 const styles = StyleSheet.create({
-    background: {
-        flex: 1,
-    },
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',

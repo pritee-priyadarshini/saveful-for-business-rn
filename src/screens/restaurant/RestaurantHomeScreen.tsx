@@ -5,12 +5,13 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
@@ -18,19 +19,13 @@ import { useAppContext } from '../../store/AppContext';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { showErrorAlert } from '@/utils/apiError';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 
 import { palette } from '@/theme/colors';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { hp, normalize, wp } from '@/utils/responsive';
 
 export function RestaurantHomeScreen({ navigation }: any) {
-
+  useTransparentStatusBar('light');
   const { currentProfile } = useAppContext();
   const {
     showBanner,
@@ -124,7 +119,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
   );
 
   return (
-    <Screen backgroundColor={palette.creme}>
+    <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <LocationSetupModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -135,7 +131,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
         searchPlaceholder="Search business address..."
       />
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {showBanner && (
           <LocationRequiredBanner
             description="Set your business location so charities can find your surplus listings and pickups work correctly."
@@ -158,14 +154,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
           <>
 
         {/* HERO */}
-        <View style={styles.heroContainer}>
-          <Image
-            source={require('../../../assets/placeholder/kale-header.png')}
-            style={styles.heroBg}
-          />
-
-          {/* TOP ROW */}
-          <View style={styles.topBar}>
+        <HeroHeader source={require('../../../assets/placeholder/kale-header.png')}>
+          <View style={[styles.topBar, { paddingTop: hp(2) }]}>
             <View style={{ flex: 1, minWidth: 0 }}>
               <AppText variant="h6" style={styles.whiteText} >
                 {currentProfile.organization}
@@ -179,7 +169,6 @@ export function RestaurantHomeScreen({ navigation }: any) {
               </View>
             </View>
 
-            {/* LOGO */}
             <View style={styles.logoCircle}>
               {currentProfile.logo ? (
                 <Image
@@ -193,7 +182,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
               )}
             </View>
           </View>
-        </View>
+        </HeroHeader>
 
         {/* WELCOME */}
         <View style={styles.welcomeSection}>
@@ -318,21 +307,6 @@ const styles = StyleSheet.create({
   container: {
     paddingBottom: hp(3),
     gap: hp(2),
-  },
-
-  heroContainer: {
-    height: hp(18),
-    width: '100%',
-    paddingTop: hp(2),
-    paddingRight: wp(4),
-    overflow: 'hidden',
-    position: 'relative',
-  },
-
-  heroBg: {
-    width: '110%',
-    height: '120%',
-    position: 'absolute',
   },
 
   topBar: {

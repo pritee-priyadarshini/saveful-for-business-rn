@@ -1,30 +1,34 @@
 import React from 'react';
-import { StyleSheet, View, Image, Pressable, Dimensions } from 'react-native';
+import { StyleSheet, View, Image, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
-
 type Props = NativeStackScreenProps<AuthStackParamList, 'TeamInvite'>;
 
 export function TeamInviteScreen({ navigation }: Props) {
+    const insets = useSafeAreaInsets();
+    useTransparentStatusBar('dark');
     const inviteCode = '123456';
 
     return (
-        <Screen backgroundColor={palette.restaurantBackground} contentStyle={styles.container}>
+        <Screen
+            backgroundColor={palette.restaurantBackground}
+            transparentTop
+            contentStyle={{
+                ...styles.container,
+                paddingTop: insets.top + spacing.lg,
+            }}
+        >
+            <StatusBar style="dark" translucent backgroundColor="transparent" />
 
             <View style={styles.content}>
 

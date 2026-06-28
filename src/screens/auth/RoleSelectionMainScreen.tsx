@@ -1,27 +1,22 @@
 import React from 'react';
 import {
-	Dimensions,
 	Image,
-	ImageBackground,
 	Pressable,
 	StyleSheet,
 	View,
+	ScrollView,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../store/AppContext';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-	const scale = width / 375;
-	return Math.round(size * scale);
-};
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelectionMain'>;
 
@@ -60,6 +55,7 @@ const roleCards = [
 
 export function RoleSelectionMainScreen({ navigation }: Props) {
 	const { setRole, setRoleFlow } = useAppContext();
+	useTransparentStatusBar('light');
 
 	const onContinue = (role: (typeof roleCards)[number]['role']) => {
 		setRoleFlow(role === 'charity_single' ? 'consumer' : 'producer');
@@ -68,16 +64,19 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 	};
 
 	return (
-		<Screen backgroundColor={palette.creme} scrollable contentStyle={styles.screenContent}>
-			<ImageBackground
+		<Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+			<StatusBar style="light" translucent backgroundColor="transparent" />
+			<ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+			<HeroHeader
 				source={require('../../../assets/placeholder/kale-headera.png')}
-				resizeMode="cover"
-				style={styles.header}
+				height={hp(16)}
+				padContentRight={false}
+				contentStyle={styles.headerContent}
 			>
 				<AppText variant="h5" color={palette.white} style={styles.headerText}>
 					HOW WILL YOU USE SAVEFUL FOR BUSINESS?
 				</AppText>
-			</ImageBackground>
+			</HeroHeader>
 
 			<View style={styles.content}>
 				<AppText variant="bodyBold" color={palette.primary} style={styles.subtitle}>
@@ -128,6 +127,7 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 					</View>
 				))}
 			</View>
+			</ScrollView>
 		</Screen>
 	);
 }
@@ -139,8 +139,7 @@ const styles = StyleSheet.create({
 		paddingBottom: hp(2.5),
 	},
 
-	header: {
-		height: hp(16),
+	headerContent: {
 		justifyContent: 'center',
 		alignItems: 'center',
 		paddingHorizontal: wp(6),

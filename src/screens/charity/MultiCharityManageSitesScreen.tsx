@@ -9,13 +9,14 @@ import {
     Alert,
     TextInput,
     RefreshControl,
-    Dimensions,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { useAppContext } from '@/store/AppContext';
@@ -24,14 +25,8 @@ import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
-
-const { width, height } = Dimensions.get("window");
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'MultiCharityManageSites'>;
 
@@ -61,6 +56,7 @@ function findLocationAdmin(users: CharityMember[], locationId: number) {
     ) ?? null;
 }
 export default function MultiCharityManageSitesScreen() {
+    useTransparentStatusBar('light');
     const navigation = useNavigation<NavigationProp>();
     const { logout, currentProfile, authUser } = useAppContext();
     const {
@@ -194,14 +190,16 @@ export default function MultiCharityManageSitesScreen() {
 
     if (loading && locations.length === 0) {
         return (
-            <Screen backgroundColor={palette.creme}>
+            <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+                <StatusBar style="light" translucent backgroundColor="transparent" />
                 {renderSkeleton()}
             </Screen>
         );
     }
 
     return (
-        <Screen backgroundColor={palette.creme}>
+        <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+            <StatusBar style="light" translucent backgroundColor="transparent" />
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
@@ -209,13 +207,11 @@ export default function MultiCharityManageSitesScreen() {
             >
 
                 {/* HERO HEADER */}
-                <View style={styles.heroContainer}>
-                    <Image
-                        source={require('../../../assets/placeholder/kale-header.png')}
-                        style={styles.heroBg}
-                    />
-
-                    <View style={styles.topBar}>
+                <HeroHeader
+                    source={require('../../../assets/placeholder/kale-header.png')}
+                    style={{ marginBottom: hp(2.5) }}
+                >
+                    <View style={[styles.topBar, { paddingTop: hp(2) }]}>
                         <View style={{ flex: 1, minWidth: 0 }}>
                             <AppText variant="h6" style={styles.whiteText}>
                                 {brandName}
@@ -239,7 +235,7 @@ export default function MultiCharityManageSitesScreen() {
                             )}
                         </View>
                     </View>
-                </View>
+                </HeroHeader>
 
                 {/* ACTIONS */}
                 <AppText variant="subheading" style={styles.sectionTitle}>
@@ -646,24 +642,12 @@ const styles = StyleSheet.create({
         paddingBottom: hp(8),
         flexGrow: 1,
     },
-    heroContainer: {
-        minHeight: hp(18),
-        width: '100%',
-        paddingTop: hp(2),
-        paddingHorizontal: wp(4),
-        position: 'relative',
-        marginBottom: hp(2.5),
-    },
-    heroBg: {
-        width: '110%',
-        height: '120%',
-        position: 'absolute',
-    },
     topBar: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
         gap: wp(3),
+        paddingLeft: wp(4),
     },
     locationRow: {
         flexDirection: 'row',

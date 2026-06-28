@@ -4,38 +4,33 @@ import {
   View,
   TextInput,
   Pressable,
-  ImageBackground,
   Modal,
   Alert,
-  Dimensions,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { AuthStackParamList } from '../../navigation/types';
 import { palette } from '../../theme/colors';
 import { useAppContext } from '@/store/AppContext';
 import { authService } from '@/services/auth.service';
 import { showErrorAlert, showSuccessAlert, getOtpVerificationErrorMessage } from '@/utils/apiError';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 import {
   buildAuthUserFromProfile,
   resolveUserRole,
 } from '@/utils/authSession';
 
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
 export function EmailVerificationScreen({ navigation, route }: Props) {
+  useTransparentStatusBar('light');
 
   const {
     selectedRole,
@@ -172,18 +167,20 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
 
   return (
     <>
-      <Screen backgroundColor={palette.creme} contentStyle={styles.container}>
+      <Screen scrollable={false} backgroundColor={palette.creme} transparentTop contentStyle={styles.container}>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
 
         <View style={styles.content}>
-          <ImageBackground
+          <HeroHeader
             source={require('../../../assets/placeholder/feed-bg.png')}
-            style={styles.headerBg}
-            resizeMode="cover"
+            height={hp(20)}
+            padContentRight={false}
+            contentStyle={styles.headerContent}
           >
             <AppText variant="h5" color={palette.white} style={styles.heading}>
               Verify your email Id
             </AppText>
-          </ImageBackground>
+          </HeroHeader>
 
           {/* HEADING */}
           <View style={styles.textBlock}>
@@ -305,12 +302,9 @@ const styles = StyleSheet.create({
   container: {
   },
 
-  headerBg: {
-    width: '100%',
-    height: hp(20),
+  headerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: hp(2),
   },
 
   content: {

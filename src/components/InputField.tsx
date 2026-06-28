@@ -6,6 +6,7 @@ import { AppText } from './AppText';
 import { palette } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+import { scaleFont } from '../theme/fontScale';
 
 type LabelVariant = keyof typeof typography;
 
@@ -124,13 +125,14 @@ const styles = StyleSheet.create({
 
   input: {
     minHeight: 52,
-    borderRadius: 16, 
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.surface,
     paddingHorizontal: spacing.md,
-    paddingRight: 45, 
+    paddingRight: 45,
     color: palette.text,
+    fontSize: scaleFont(16),
   },
 
   inputCompact: {
@@ -139,7 +141,7 @@ const styles = StyleSheet.create({
     borderColor: '#D9D9D9',
     backgroundColor: palette.white,
     paddingHorizontal: 14,
-    fontSize: 14,
+    fontSize: scaleFont(14),
   },
 
   eye: {

@@ -5,35 +5,30 @@ import {
   Pressable,
   StyleSheet,
   Image,
-  ImageBackground,
   Linking,
   Alert,
-  Dimensions,
   RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { useAppContext } from '@/store/AppContext';
 import { useSitesStore } from '@/store/sitesStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert } from '@/utils/apiError';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'ManageSites'>;
 
 export default function ManageSitesScreen() {
+  useTransparentStatusBar('light');
   const navigation = useNavigation<NavigationProp>();
   const { logout } = useAppContext();
   const {
@@ -150,8 +145,10 @@ export default function ManageSitesScreen() {
   );
 
   return (
-    <Screen backgroundColor={palette.creme}>
+    <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -166,9 +163,9 @@ export default function ManageSitesScreen() {
         ) : (
           <>
             {/* HERO */}
-            <ImageBackground
+            <HeroHeader
               source={require('../../../assets/placeholder/feed-bg.png')}
-              style={styles.heroBg}
+              contentStyle={styles.heroContentWrap}
             >
               <View style={styles.heroContent}>
                 <AppText variant="h5" style={styles.businessName}>
@@ -182,7 +179,7 @@ export default function ManageSitesScreen() {
                   />
                 )}
               </View>
-            </ImageBackground>
+            </HeroHeader>
 
             {/* ACTIONS */}
             <AppText variant="subheading" style={styles.sectionTitle}>
@@ -342,8 +339,7 @@ export default function ManageSitesScreen() {
 
 const styles = StyleSheet.create({
 
-  heroBg: {
-    height: hp(18),
+  heroContentWrap: {
     justifyContent: 'center',
     marginBottom: hp(2),
   },

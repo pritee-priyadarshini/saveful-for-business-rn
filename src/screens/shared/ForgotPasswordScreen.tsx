@@ -5,15 +5,17 @@ import {
     StyleSheet,
     TextInput,
     View,
-    ImageBackground,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { InputField } from '../../components/InputField';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useNavigation } from '@react-navigation/native';
@@ -34,8 +36,11 @@ import {
     getOtpVerificationErrorMessage,
     showSuccessAlert,
 } from '@/utils/apiError';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp } from '@/utils/responsive';
 
 export default function ForgotPasswordScreen() {
+    useTransparentStatusBar('light');
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
     const { authUser } = useAppContext();
 
@@ -215,19 +220,26 @@ export default function ForgotPasswordScreen() {
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <Screen scrollable backgroundColor={palette.creme}>
-                <ImageBackground
+            <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+                <StatusBar style="light" translucent backgroundColor="transparent" />
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <HeroHeader
                     source={require('../../../assets/placeholder/feed-bg.png')}
-                    style={styles.headerBg}
+                    height={hp(20)}
+                    padContentRight={false}
+                    contentStyle={styles.headerContent}
                 >
-                    <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+                    <Pressable
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
                         <Ionicons name="arrow-back" size={26} color={palette.white} />
                     </Pressable>
 
                     <AppText variant="h5" color={palette.white}>
                         Reset Password
                     </AppText>
-                </ImageBackground>
+                </HeroHeader>
 
                 <View style={styles.content}>
                     <AppText variant="heading" style={styles.title}>
@@ -343,22 +355,22 @@ export default function ForgotPasswordScreen() {
                         </AppText>
                     ) : null}
                 </View>
+                </ScrollView>
             </Screen>
         </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
-    headerBg: {
-        height: 160,
+    headerContent: {
         justifyContent: 'center',
         alignItems: 'center',
     },
 
     backButton: {
         position: 'absolute',
-        top: 20,
         left: 15,
+        top: hp(1.5),
     },
 
     content: {

@@ -1,21 +1,17 @@
 import React, { useEffect, useMemo } from 'react';
-import { Pressable, StyleSheet, View, Dimensions,Image } from 'react-native';
+import { Pressable, StyleSheet, View, Image, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../store/AppContext';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelection'>;
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -64,6 +60,8 @@ const charityOptions = [
 
 export function RoleSelectionScreen({ navigation }: Props) {
   const { selectedRole, setRole, roleFlow } = useAppContext();
+  const insets = useSafeAreaInsets();
+  useTransparentStatusBar('dark');
 
   useEffect(() => {
     if (!selectedRole) {
@@ -108,10 +106,12 @@ export function RoleSelectionScreen({ navigation }: Props) {
   };
 
   return (
-    <Screen backgroundColor={viewModel.bg} scrollable contentStyle={styles.screenContent}>
+    <Screen backgroundColor={viewModel.bg} scrollable={false} transparentTop contentStyle={styles.screenContent}>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <ScrollView contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false}>
       <View style={[styles.topAccent, { backgroundColor: viewModel.accent }]} />
 
-      <View style={styles.headerWrap}>
+      <View style={[styles.headerWrap, { paddingTop: insets.top + hp(2) }]}>
         <AppText variant="h3" color={palette.black} style={styles.title}>
           Tell us about your organisation
         </AppText>
@@ -146,12 +146,17 @@ export function RoleSelectionScreen({ navigation }: Props) {
           </Pressable>
         ))}
       </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   screenContent: {
+    flex: 1,
+  },
+
+  scrollInner: {
     flexGrow: 1,
     paddingBottom: hp(3),
   },
@@ -164,7 +169,6 @@ const styles = StyleSheet.create({
   headerWrap: {
     alignItems: 'center',
     paddingHorizontal: wp(8),
-    paddingTop: hp(4.2),
   },
 
   title: {

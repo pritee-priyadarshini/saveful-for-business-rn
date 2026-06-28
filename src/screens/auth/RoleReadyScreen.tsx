@@ -1,23 +1,21 @@
 import React from 'react';
 import {
-  Dimensions,
-  ImageBackground,
   Pressable,
   StyleSheet,
   View,
+  ScrollView,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { AuthStackParamList } from '../../navigation/types';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => Math.round(size * (width / 375));
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleReady'>;
 
@@ -41,15 +39,18 @@ const nextSteps = [
 ];
 
 export function RoleReadyScreen({ navigation }: Props) {
+  useTransparentStatusBar('light');
+
   return (
-    <Screen backgroundColor={palette.creme} scrollable contentStyle={styles.screenContent}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop contentStyle={styles.screenContent}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <ScrollView contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false}>
       <View style={[styles.topAccent, { backgroundColor: palette.middlegreen }]} />
-      <ImageBackground
+      <HeroHeader
         source={require('../../../assets/intro/confetti-bg.png')}
-        resizeMode="cover"
-        style={styles.hero}
-      >
-      </ImageBackground>
+        padContentRight={false}
+        contentStyle={styles.heroContent}
+      />
 
       <View style={styles.mainCard}>
         <View style={styles.titleBlock}>
@@ -93,24 +94,25 @@ export function RoleReadyScreen({ navigation }: Props) {
           <Ionicons name="arrow-forward" size={normalize(20)} color={palette.white} />
         </Pressable>
       </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   screenContent: {
+    flex: 1,
+    backgroundColor: palette.creme,
+  },
+  scrollInner: {
     flexGrow: 1,
     paddingBottom: hp(3),
-    backgroundColor: palette.creme,
   },
   topAccent: {
     width: '100%',
     height: hp(0.35),
   },
-  hero: {
-    width: '100%',
-    height: hp(18),
-    alignItems: 'center',
+  heroContent: {
     justifyContent: 'flex-end',
     paddingBottom: hp(3),
   },
