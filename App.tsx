@@ -8,7 +8,7 @@ import { AppProvider } from './src/store/AppContext';
 import { useAuthStore } from './src/store/authStore';
 import { palette } from './src/theme/colors';
 import { useFonts } from 'expo-font';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { SplashScreen } from './src/screens/SplashScreen';
 
 export default function App() {
@@ -29,6 +29,7 @@ export default function App() {
 
     ...Ionicons.font,
     ...MaterialCommunityIcons.font,
+    ...MaterialIcons.font,
   });
 
   if (fontError) {

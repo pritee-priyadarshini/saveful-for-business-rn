@@ -532,7 +532,7 @@ export function AuthScreen() {
       if (isRestaurant) {
         form.append('firstName', restaurantForm.firstName);
         form.append('lastName', restaurantForm.lastName);
-        form.append('email', restaurantForm.email);
+        form.append('email', restaurantForm.email.trim().toLowerCase());
         form.append('password', restaurantForm.password);
         appendSignupMobileFields(form, restaurantForm);
 
@@ -561,7 +561,7 @@ export function AuthScreen() {
       } else if (isFarmerProducer) {
         form.append('firstName', farmerForm.firstName);
         form.append('lastName', farmerForm.lastName);
-        form.append('email', farmerForm.email);
+        form.append('email', farmerForm.email.trim().toLowerCase());
         form.append('password', farmerForm.password);
         appendSignupMobileFields(form, farmerForm, 'mobileNumber');
 
@@ -589,7 +589,7 @@ export function AuthScreen() {
       } else if (isFarmerConsumer) {
         form.append('firstName', farmerForm.firstName);
         form.append('lastName', farmerForm.lastName);
-        form.append('email', farmerForm.email);
+        form.append('email', farmerForm.email.trim().toLowerCase());
         form.append('password', farmerForm.password);
         appendSignupMobileFields(form, farmerForm);
 

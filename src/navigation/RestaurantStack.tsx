@@ -6,6 +6,7 @@ import { EditListingScreen } from '@/screens/restaurant/EditListingScreen';
 import { ListingConfirmationScreen } from '@/screens/restaurant/ListingConfirmationScreen';
 import CollectionHistoryScreen from '@/screens/restaurant/CollectionHistoryScreen';
 import{ SurplusScreen } from '@/screens/restaurant/SurplusScreen';
+import { palette } from '@/theme/colors';
 
 
 type RestaurantStackParamList = {
@@ -23,7 +24,13 @@ const Stack = createNativeStackNavigator<RestaurantStackParamList>();
 
 export function RestaurantStack() {
   return (
-    <Stack.Navigator initialRouteName="RestaurantListings" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      initialRouteName="RestaurantListings"
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: palette.creme },
+      }}
+    >
       <Stack.Screen name="RestaurantListings" component={RestaurantListingsScreen} />
       <Stack.Screen name="CreateListing" component={CreateListingScreen} />
       <Stack.Screen name="CreateFarmListing" component={CreateFarmListingScreen} />

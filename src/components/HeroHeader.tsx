@@ -8,14 +8,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { hp, wp } from '@/utils/responsive';
+import { hp } from '@/utils/responsive';
 
 type HeroHeaderProps = PropsWithChildren<{
   source: ImageSourcePropType;
   height?: number;
   contentStyle?: ViewStyle;
   style?: ViewStyle;
-  /** When false, content spans full width (e.g. centered titles). Default true. */
+  /** @deprecated Ignored — content padding is controlled via contentStyle */
   padContentRight?: boolean;
 }>;
 
@@ -25,7 +25,6 @@ export function HeroHeader({
   children,
   contentStyle,
   style,
-  padContentRight = true,
 }: HeroHeaderProps) {
   const insets = useSafeAreaInsets();
 
@@ -33,7 +32,6 @@ export function HeroHeader({
     <View
       style={[
         styles.container,
-        padContentRight && styles.containerPaddedRight,
         { height: height + insets.top },
         style,
       ]}
@@ -48,20 +46,14 @@ export function HeroHeader({
 
 const styles = StyleSheet.create({
   container: {
-    top: wp(-1),
     width: '100%',
     overflow: 'hidden',
     position: 'relative',
   },
-  containerPaddedRight: {
-    paddingRight: wp(4),
-  },
   bg: {
-    width: '110%',
-    height: '120%',
-    position: 'absolute',
-    left: '-5%',
-    top: 0,
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
   content: {
     flex: 1,

@@ -4,31 +4,25 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Dimensions,
   Image,
-  TouchableOpacity,
   ImageSourcePropType,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
-
 import { LineChart } from 'react-native-chart-kit';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useAppContext } from '../../store/AppContext';
 
-import { restaurantImpact } from '../../data/mockData';
 import { palette } from '@/theme/colors';
-import { Ionicons } from '@expo/vector-icons';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
-const chartWidth = width - wp(8) - wp(7);
+import { hp, normalize, wp } from '@/utils/responsive';
 
 const ANALYTICS_ICONS = {
   redistributed: require('../../../assets/placeholder/veggie_basket_icon.png'),
@@ -86,15 +80,21 @@ const TIME_RANGES: { key: TimeRange; label: string }[] = [
 ];
 
 const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = [
-  { key: 'foodRedistributed', label: 'Food redistributed', suffix: 'kg' },
-  { key: 'mealsCreated', label: 'Meals created' },
-  { key: 'co2Avoided', label: 'CO2 Avoided', suffix: 'kg' },
-  { key: 'collectionsCompleted', label: 'Collections Completed' },
+  { key: 'foodRedistributed', label: 'Food', suffix: 'kg' },
+  { key: 'mealsCreated', label: 'Meals' },
+  { key: 'co2Avoided', label: 'CO₂', suffix: 'kg' },
+  { key: 'collectionsCompleted', label: 'Collections' },
 ];
 
 const TREND_DATA: Record<
   TimeRange,
-  { labels: string[]; foodRedistributed: number[]; mealsCreated: number[]; co2Avoided: number[]; collectionsCompleted: number[] }
+  {
+    labels: string[];
+    foodRedistributed: number[];
+    mealsCreated: number[];
+    co2Avoided: number[];
+    collectionsCompleted: number[];
+  }
 > = {
   week: {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -119,7 +119,46 @@ const TREND_DATA: Record<
   },
 };
 
+const cardShadow = Platform.select({
+  ios: {
+    shadowColor: palette.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+  },
+  android: {
+    elevation: 3,
+  },
+});
+
+const chartConfig = {
+  backgroundGradientFrom: palette.white,
+  backgroundGradientTo: palette.white,
+  decimalPlaces: 0,
+  color: () => palette.kale,
+  labelColor: () => palette.midgray,
+  fillShadowGradientFrom: palette.middlegreen,
+  fillShadowGradientTo: palette.white,
+  fillShadowGradientFromOpacity: 0.3,
+  fillShadowGradientToOpacity: 0.01,
+  strokeWidth: 2,
+  propsForDots: {
+    r: '5',
+    strokeWidth: '0',
+    stroke: palette.kale,
+    fill: palette.kale,
+  },
+  propsForBackgroundLines: {
+    strokeDasharray: '4 4',
+    stroke: '#D8E8DC',
+    strokeWidth: 1,
+  },
+};
+
 export function RestaurantAnalyticsScreen({ navigation }: any) {
+  useTransparentStatusBar('light');
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { currentProfile } = useAppContext();
 
   const [range, setRange] = React.useState<TimeRange>('week');
@@ -127,14 +166,15 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
 
   const filtered = TREND_DATA[range];
   const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
+  const chartWidth = width - wp(10) - wp(8);
 
-  const renderMetricCard = (icon: ImageSourcePropType, value: string, label: string) => (
+  const renderMetricCard = (icon: ImageSourcePropType, value: string, label: string, accent = palette.kale) => (
     <View style={styles.metricCard}>
-      <View style={styles.metricIconWrap}>
+      <View style={[styles.metricIconWrap, { backgroundColor: accent === palette.orange ? '#FFF3E4' : '#E8F3EC' }]}>
         <Image source={icon} style={styles.metricIcon} resizeMode="contain" />
       </View>
       <View style={styles.metricContent}>
-        <AppText variant="h8" style={styles.metricValue} numberOfLines={1}>
+        <AppText variant="bodyBold" style={[styles.metricValue, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit>
           {value}
         </AppText>
         <AppText variant="caption" style={styles.metricLabel} numberOfLines={2}>
@@ -151,8 +191,8 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
     });
 
     return (
-      <>
-        <AppText variant="h8" style={styles.sectionTitle}>
+      <View style={styles.section}>
+        <AppText variant="bodyBold" style={styles.sectionTitle}>
           {title}
         </AppText>
 
@@ -174,12 +214,12 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             {renderMetricCard(
               ANALYTICS_ICONS.co2,
               `${formatNumber(stats.co2AvoidedKg)} kg`,
-              'Total CO2 avoided',
+              'CO₂ avoided',
             )}
             {renderMetricCard(
               ANALYTICS_ICONS.money,
               `$${formatNumber(stats.foodSavedMoney)}`,
-              'Total Food Saved',
+              'Food saved',
             )}
           </View>
 
@@ -187,410 +227,386 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             {renderMetricCard(
               ANALYTICS_ICONS.collections,
               formatNumber(stats.collectionsCompleted),
-              'Collections completed',
+              'Collections',
             )}
             {renderMetricCard(
               ANALYTICS_ICONS.charities,
               formatNumber(stats.charitiesSupported),
-              'Charities Supported',
+              'Charities',
             )}
           </View>
 
           <View style={styles.impactSplitRow}>
-            <View style={styles.peopleImpactCard}>
-              <View style={styles.impactBadgePeople}>
-                <Image source={ANALYTICS_ICONS.people} style={styles.impactBadgeIcon} resizeMode="contain" />
-                <AppText variant="caption" style={styles.impactBadgeTextPeople}>
-                  For People
+            <View style={[styles.splitCard, styles.peopleSplitCard]}>
+              <View style={[styles.splitCardHeader, { backgroundColor: '#F0F8F3' }]}>
+                <Image source={ANALYTICS_ICONS.people} style={styles.splitBadgeIcon} resizeMode="contain" />
+                <AppText variant="caption" style={styles.splitBadgeTextPeople}>
+                  For people
                 </AppText>
               </View>
-
-              <View style={styles.impactValueRow}>
-                <Image source={ANALYTICS_ICONS.foodPeople} style={styles.impactFoodIcon} resizeMode="contain" />
-                <AppText variant="h8" style={styles.peopleValue}>
-                  {formatNumber(stats.peopleKg)} kg
-                </AppText>
-              </View>
-
-              <AppText variant="caption" style={styles.impactSubLabel}>
-                Food donated
-              </AppText>
-
-              <View style={styles.progressRow}>
-                <View style={styles.progressTrackPeople}>
-                  <View style={[styles.progressFillPeople, progressFillStyles.people]} />
+              <View style={styles.splitCardBody}>
+                <View style={styles.impactValueRow}>
+                  <Image source={ANALYTICS_ICONS.foodPeople} style={styles.impactFoodIcon} resizeMode="contain" />
+                  <AppText variant="bodyBold" style={styles.peopleValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {formatNumber(stats.peopleKg)} kg
+                  </AppText>
                 </View>
-                <AppText variant="caption" style={styles.percentText}>
-                  {stats.peoplePercent}%
+                <AppText variant="caption" style={styles.impactSubLabel}>
+                  Food donated
                 </AppText>
+                <View style={styles.progressRow}>
+                  <View style={styles.progressTrackPeople}>
+                    <View style={[styles.progressFillPeople, progressFillStyles.people]} />
+                  </View>
+                  <AppText variant="caption" style={styles.percentText}>
+                    {stats.peoplePercent}%
+                  </AppText>
+                </View>
               </View>
             </View>
 
-            <View style={styles.animalsImpactCard}>
-              <View style={styles.impactBadgeAnimals}>
-                <Image source={ANALYTICS_ICONS.animals} style={styles.impactBadgeIcon} resizeMode="contain" />
-                <AppText variant="caption" style={styles.impactBadgeTextAnimals}>
-                  For Animals
+            <View style={[styles.splitCard, styles.animalsSplitCard]}>
+              <View style={[styles.splitCardHeader, { backgroundColor: '#FFF6EC' }]}>
+                <Image source={ANALYTICS_ICONS.animals} style={styles.splitBadgeIcon} resizeMode="contain" />
+                <AppText variant="caption" style={styles.splitBadgeTextAnimals}>
+                  For animals
                 </AppText>
               </View>
-
-              <View style={styles.impactValueRow}>
-                <Image source={ANALYTICS_ICONS.foodAnimals} style={styles.impactFoodIcon} resizeMode="contain" />
-                <AppText variant="h8" style={styles.animalsValue}>
-                  {formatNumber(stats.animalKg)} kg
-                </AppText>
-              </View>
-
-              <AppText variant="caption" style={styles.impactSubLabel}>
-                Feed provided
-              </AppText>
-
-              <View style={styles.progressRow}>
-                <View style={styles.progressTrackAnimals}>
-                  <View style={[styles.progressFillAnimals, progressFillStyles.animals]} />
+              <View style={styles.splitCardBody}>
+                <View style={styles.impactValueRow}>
+                  <Image source={ANALYTICS_ICONS.foodAnimals} style={styles.impactFoodIcon} resizeMode="contain" />
+                  <AppText variant="bodyBold" style={styles.animalsValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {formatNumber(stats.animalKg)} kg
+                  </AppText>
                 </View>
-                <AppText variant="caption" style={styles.percentText}>
-                  {stats.animalPercent}%
+                <AppText variant="caption" style={styles.impactSubLabel}>
+                  Feed provided
                 </AppText>
+                <View style={styles.progressRow}>
+                  <View style={styles.progressTrackAnimals}>
+                    <View style={[styles.progressFillAnimals, progressFillStyles.animals]} />
+                  </View>
+                  <AppText variant="caption" style={styles.percentText}>
+                    {stats.animalPercent}%
+                  </AppText>
+                </View>
               </View>
             </View>
           </View>
 
-          <View style={styles.ratingRow}>
-            <View style={styles.ratingCard}>
-              <View style={styles.metricIconWrap}>
-                <Image source={ANALYTICS_ICONS.rating} style={styles.ratingIcon} resizeMode="contain" />
-              </View>
-              <View style={styles.metricContent}>
-                <AppText variant="h8" style={styles.metricValue}>
-                  {stats.rating}/5
-                </AppText>
-                <AppText variant="caption" style={styles.metricLabel}>
-                  Rating
-                </AppText>
-              </View>
+          <View style={styles.ratingCard}>
+            <View style={[styles.metricIconWrap, { backgroundColor: '#FFF8E8' }]}>
+              <Image source={ANALYTICS_ICONS.rating} style={styles.ratingIcon} resizeMode="contain" />
+            </View>
+            <View style={styles.metricContent}>
+              <AppText variant="bodyBold" style={styles.metricValue}>
+                {stats.rating}/5
+              </AppText>
+              <AppText variant="caption" style={styles.metricLabel}>
+                Collection rating
+              </AppText>
             </View>
           </View>
         </View>
-      </>
+      </View>
+    );
+  };
+
+  const renderTimeChip = (key: TimeRange, label: string) => {
+    const active = range === key;
+    return (
+      <Pressable
+        key={key}
+        onPress={() => setRange(key)}
+        style={[styles.filterChip, active ? styles.filterChipActive : styles.filterChipInactive]}
+      >
+        <AppText
+          variant="bodyBold"
+          style={[styles.filterChipText, { color: active ? palette.white : palette.stone }]}
+        >
+          {label}
+        </AppText>
+      </Pressable>
+    );
+  };
+
+  const renderMetricChip = (key: ImpactMetric, label: string) => {
+    const active = selectedMetric === key;
+    return (
+      <Pressable
+        key={key}
+        onPress={() => setSelectedMetric(key)}
+        style={[styles.metricChip, active ? styles.filterChipActive : styles.filterChipInactive]}
+      >
+        <AppText
+          variant="bodyBold"
+          style={[styles.filterChipText, { color: active ? palette.white : palette.stone }]}
+        >
+          {label}
+        </AppText>
+      </Pressable>
     );
   };
 
   return (
-    <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container}>
-
-        <View style={styles.heroContainer}>
-          <Image
-            source={require('../../../assets/placeholder/kale-header.png')}
-            style={styles.heroBg}
-            resizeMode="cover"
-          />
-
+    <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(2) }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <HeroHeader
+          source={require('../../../assets/placeholder/kale-header.png')}
+          height={hp(20)}
+        >
+       
           <View style={styles.heroContent}>
-            <View style={styles.topBar}>
-              <View style={styles.topBarLeft}>
-                <AppText
-                  variant="h6"
-                  style={styles.brandText}
-                  numberOfLines={2}
-                  ellipsizeMode="tail"
-                >
-                  {(currentProfile.organization || 'SAVEFUL').toUpperCase()}
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroTextBlock}>
+                <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                  {currentProfile.organization || 'Your business'}
                 </AppText>
-
-                <View style={styles.locationRow}>
-                  <Ionicons name="location-outline" size={normalize(20)} color={palette.white} />
-                  <AppText
-                    variant="body"
-                    style={styles.location}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {(currentProfile.address || restaurantImpact.siteAddress).toUpperCase()}
-                  </AppText>
-                </View>
+                <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                  Your insights
+                </AppText>
+                <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
+                  See the difference your surplus makes
+                </AppText>
               </View>
 
-              <View style={styles.logoCircle}>
-                {currentProfile.logo ? (
-                  <Image
-                    source={{ uri: currentProfile.logo }}
-                    style={styles.logoImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <AppText style={styles.logoFallback}>
-                    {currentProfile.organization?.[0] || 'S'}
-                  </AppText>
-                )}
+              <View style={styles.heroIconCircle}>
+                <Ionicons name="bar-chart" size={normalize(26)} color={palette.eggplant} />
               </View>
             </View>
 
-            <View style={styles.headerCenter}>
-              <AppText variant="h4" style={styles.heroTitle} numberOfLines={1}>
-                YOUR DASHBOARD
-              </AppText>
-              <AppText variant="caption" style={styles.heroSubtitle} numberOfLines={1}>
-                HELP GOOD FOOD GO FURTHER 🍲
+            <View style={styles.heroStatsPill}>
+              <Ionicons name="leaf-outline" size={normalize(14)} color={palette.white} />
+              <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
+                {formatNumber(MONTHLY_STATS.mealsCreated)} meals · {formatNumber(MONTHLY_STATS.redistributedKg)} kg this month
               </AppText>
             </View>
           </View>
-        </View>
+        </HeroHeader>
 
-        <View style={styles.topSection}>
+        <View style={styles.mainContent}>
           <Pressable
-            style={styles.createBtn}
-            onPress={() =>
-              navigation.navigate('Listings', { screen: 'CreateListing' })
-            }
+            style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('Listings', { screen: 'CreateListing' })}
           >
-            <AppText variant="bodyBold" style={styles.createText}>
-              + CREATE NEW LISTING
-            </AppText>
-            <Ionicons
-              name="arrow-forward"
-              size={normalize(18)}
-              color={palette.white}
-              style={styles.createArrow}
-            />
+            <View style={styles.createBtnLeft}>
+              <View style={styles.createBtnIconWrap}>
+                <Ionicons name="add" size={normalize(20)} color={palette.white} />
+              </View>
+              <AppText variant="bodyBold" style={styles.createBtnText}>
+                Create new listing
+              </AppText>
+            </View>
+            <View style={styles.createBtnArrow}>
+              <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+            </View>
           </Pressable>
 
           {renderImpactMetricsSection('This month', MONTHLY_STATS)}
-        </View>
 
-        {/* IMPACT OVER TIME */}
-        <View style={styles.impactOverTimeSection}>
-          <AppText variant="h8" style={styles.impactOverTimeTitle}>
-            Impact over time
-          </AppText>
+          <View style={styles.chartCard}>
+            <AppText variant="bodyBold" style={styles.sectionTitle}>
+              Impact over time
+            </AppText>
 
-          <View style={styles.timeFilterRow}>
-            {TIME_RANGES.map(({ key, label }) => {
-              const isActive = range === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => setRange(key)}
-                  activeOpacity={0.8}
-                  style={[styles.timeFilterPill, isActive && styles.filterPillActive]}
-                >
-                  <AppText style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                    {label}
-                  </AppText>
-                </TouchableOpacity>
-              );
-            })}
+            <View style={styles.filterRow}>
+              {TIME_RANGES.map(({ key, label }) => renderTimeChip(key, label))}
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.metricFilterRow}
+            >
+              {IMPACT_METRICS.map(({ key, label }) => renderMetricChip(key, label))}
+            </ScrollView>
+
+            <View style={styles.chartContainer}>
+              <LineChart
+                key={`${range}-${selectedMetric}`}
+                data={{
+                  labels: filtered.labels,
+                  datasets: [{ data: filtered[selectedMetric] }],
+                }}
+                width={chartWidth}
+                height={hp(24)}
+                yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
+                yLabelsOffset={4}
+                chartConfig={chartConfig}
+                bezier
+                fromZero
+                segments={4}
+                withInnerLines
+                withOuterLines={false}
+                withVerticalLines
+                withHorizontalLines
+                style={styles.chart}
+              />
+            </View>
           </View>
 
-          <View style={styles.metricFilterRow}>
-            {IMPACT_METRICS.map(({ key, label }) => {
-              const isActive = selectedMetric === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => setSelectedMetric(key)}
-                  activeOpacity={0.8}
-                  style={[styles.metricFilterPill, isActive && styles.filterPillActive]}
-                >
-                  <AppText
-                    style={[styles.metricFilterPillText, isActive && styles.filterPillTextActive]}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
-                  >
-                    {label}
-                  </AppText>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.chartContainer}>
-            <LineChart
-              key={`${range}-${selectedMetric}`}
-              data={{
-                labels: filtered.labels,
-                datasets: [{ data: filtered[selectedMetric] }],
-              }}
-              width={chartWidth + wp(5)}
-              height={hp(26)}
-              yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
-              yLabelsOffset={4}
-              chartConfig={chartConfig}
-              bezier
-              fromZero
-              segments={4}
-              withInnerLines
-              withOuterLines={false}
-              withVerticalLines
-              withHorizontalLines
-              style={styles.chart}
-            />
-          </View>
-        </View>
-
-        {/* LIFETIME IMPACT */}
-        <View style={styles.lifetimeSection}>
           {renderImpactMetricsSection('Lifetime impact', LIFETIME_STATS)}
         </View>
-
       </ScrollView>
     </Screen>
   );
 }
 
-const chartConfig = {
-  backgroundGradientFrom: palette.white,
-  backgroundGradientTo: palette.white,
-  decimalPlaces: 0,
-  color: () => palette.kale,
-  labelColor: () => palette.midgray,
-  fillShadowGradientFrom: palette.middlegreen,
-  fillShadowGradientTo: palette.white,
-  fillShadowGradientFromOpacity: 0.3,
-  fillShadowGradientToOpacity: 0.01,
-  strokeWidth: 2,
-  propsForDots: {
-    r: '6',
-    strokeWidth: '0',
-    stroke: palette.kale,
-    fill: palette.kale,
-  },
-  propsForBackgroundLines: {
-    strokeDasharray: '4 4',
-    stroke: '#D8E8DC',
-    strokeWidth: 1,
-  },
-};
-
 const styles = StyleSheet.create({
   container: {
-    gap: hp(2),
-    paddingBottom: hp(4),
+    flexGrow: 1,
+    marginTop: -hp(2),
   },
-  heroContainer: {
-    minHeight: hp(22),
-    width: '100%',
-    paddingTop: hp(2),
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroBg: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
+
   heroContent: {
-    zIndex: 1,
     flex: 1,
-    paddingHorizontal: wp(4),
-    paddingBottom: hp(1.2),
+    paddingHorizontal: wp(5),
+    justifyContent: 'flex-end',
+    paddingBottom: hp(3),
+    gap: hp(1.2),
   },
-  topBar: {
+
+  heroTopRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: wp(2),
+    gap: wp(3),
   },
-  topBarLeft: {
+
+  heroTextBlock: {
     flex: 1,
+    gap: hp(0.3),
     minWidth: 0,
-    paddingRight: wp(1),
+    paddingBottom: hp(0.2),
   },
-  brandText: {
-    color: palette.white,
-    fontSize: normalize(18),
-    lineHeight: normalize(22),
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'none',
+    letterSpacing: 0.3,
+    fontSize: normalize(13),
   },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: hp(0.6),
-    gap: wp(1.5),
-  },
-  location: {
-    color: palette.white,
-    opacity: 0.9,
-    flex: 1,
-    minWidth: 0,
-    lineHeight: normalize(18),
-    textTransform: 'uppercase',
-  },
-  logoCircle: {
-    width: normalize(48),
-    height: normalize(48),
-    borderRadius: normalize(24),
-    flexShrink: 0,
-    backgroundColor: palette.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  logoFallback: {
-    color: palette.primary,
-    fontWeight: 'bold',
-    fontSize: normalize(18),
-  },
-  headerCenter: {
-    alignItems: 'center',
-    marginTop: hp(1.4),
-    gap: hp(0.4),
-  },
+
   heroTitle: {
     color: palette.white,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    textTransform: 'none',
+    fontSize: normalize(30),
+    lineHeight: normalize(38),
   },
+
   heroSubtitle: {
-    color: palette.white,
-    textAlign: 'center',
-    opacity: 0.95,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'none',
+    fontSize: normalize(15),
+    lineHeight: normalize(22),
   },
-  topSection: {
-    paddingHorizontal: wp(4),
-    gap: hp(1.5),
-    marginTop: -hp(2.5),
+
+  heroIconCircle: {
+    width: normalize(52),
+    height: normalize(52),
+    borderRadius: normalize(26),
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: palette.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+      android: { elevation: 3 },
+    }),
+  },
+
+  heroStatsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: wp(1.5),
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(20),
+    maxWidth: '100%',
+  },
+
+  heroStatsText: {
+    color: palette.white,
+    flexShrink: 1,
+    textTransform: 'none',
+    fontSize: normalize(13),
+  },
+
+  mainContent: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    gap: hp(2),
+    paddingBottom: hp(1),
   },
 
   createBtn: {
-    backgroundColor: palette.kale,
-    paddingVertical: hp(1.5),
-    paddingHorizontal: wp(4),
-    borderRadius: normalize(8),
+    backgroundColor: palette.eggplant,
+    borderRadius: normalize(16),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(5),
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...Platform.select({
+      ios: {
+        shadowColor: palette.eggplant,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.28,
+        shadowRadius: 10,
+      },
+      android: { elevation: 5 },
+    }),
+  },
+
+  createBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+
+  createBtnIconWrap: {
+    width: normalize(32),
+    height: normalize(32),
+    borderRadius: normalize(16),
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  createText: {
+  createBtnText: {
     color: palette.white,
     textTransform: 'none',
-    letterSpacing: 0.3,
+    fontSize: normalize(17),
   },
-  createArrow: {
-    position: 'absolute',
-    right: wp(4),
+
+  createBtnArrow: {
+    width: normalize(28),
+    height: normalize(28),
+    borderRadius: normalize(14),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  section: {
+    gap: hp(1.4),
   },
 
   sectionTitle: {
-    color: palette.black,
+    fontSize: normalize(18),
     textTransform: 'none',
-    marginTop: hp(0.5),
-  },
-
-  lifetimeSection: {
-    paddingHorizontal: wp(4),
-    gap: hp(1.5),
+    color: palette.black,
+    letterSpacing: 0.2,
   },
 
   metricsGrid: {
@@ -599,7 +615,7 @@ const styles = StyleSheet.create({
 
   metricsRow: {
     flexDirection: 'row',
-    gap: wp(2.5),
+    gap: wp(2),
   },
 
   metricCard: {
@@ -608,120 +624,113 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     borderRadius: normalize(16),
     borderWidth: 1,
-    borderColor: palette.middlegreen,
-    paddingVertical: hp(1.4),
+    borderColor: palette.strokecream,
+    paddingVertical: hp(1.6),
     paddingHorizontal: wp(2.5),
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2),
+    minHeight: normalize(72),
+    ...cardShadow,
   },
+
   metricIconWrap: {
     width: normalize(36),
     height: normalize(36),
     borderRadius: normalize(18),
-    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
+
   metricIcon: {
-    width: normalize(28),
-    height: normalize(28),
+    width: normalize(24),
+    height: normalize(24),
   },
+
   metricContent: {
     flex: 1,
     minWidth: 0,
+    gap: hp(0.2),
   },
+
   metricValue: {
     color: palette.kale,
     textTransform: 'none',
-    letterSpacing: 0,
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
   },
 
   metricLabel: {
     color: palette.midgray,
     textTransform: 'none',
-    marginTop: hp(0.2),
-
-    letterSpacing: 0,
+    fontSize: normalize(12),
+    lineHeight: normalize(18),
   },
 
   impactSplitRow: {
     flexDirection: 'row',
-    gap: wp(2.5),
+    gap: wp(2),
   },
 
-  peopleImpactCard: {
+  splitCard: {
     flex: 1,
     minWidth: 0,
     backgroundColor: palette.white,
-    borderRadius: normalize(12),
-    borderWidth: normalize(1),
-    borderColor: palette.middlegreen,
-    paddingVertical: hp(1.4),
-    paddingHorizontal: wp(2.5),
+    borderRadius: normalize(16),
+    borderWidth: 1,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+
+  peopleSplitCard: {
+    borderColor: '#C8E0D2',
+  },
+
+  animalsSplitCard: {
+    borderColor: '#FDDBB0',
+  },
+
+  splitCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+  },
+
+  splitCardBody: {
+    paddingHorizontal: wp(3),
+    paddingBottom: hp(1.2),
     gap: hp(0.4),
   },
 
-  animalsImpactCard: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: palette.white,
-    borderRadius: normalize(12),
-    borderWidth: normalize(1),
-    borderColor: palette.orange,
-    paddingVertical: hp(1.4),
-    paddingHorizontal: wp(2.5),
-    gap: hp(0.4),
-  },
-
-  impactBadgePeople: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: wp(1.5),
-    backgroundColor: palette.white,
-    borderWidth: normalize(1),
-    borderColor: palette.kale,
-    borderRadius: normalize(8),
-    paddingVertical: hp(0.4),
-    paddingHorizontal: wp(2),
-  },
-
-  impactBadgeAnimals: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: wp(1.5),
-    backgroundColor: palette.white,
-    borderWidth: normalize(1),
-    borderColor: palette.orange,
-    borderRadius: normalize(8),
-    paddingVertical: hp(0.4),
-    paddingHorizontal: wp(2),
-  },
-
-  impactBadgeIcon: {
+  splitBadgeIcon: {
     width: normalize(16),
     height: normalize(16),
   },
 
-  impactBadgeTextPeople: {
+  splitBadgeTextPeople: {
     color: palette.kale,
     textTransform: 'none',
-    letterSpacing: 0,
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
+    fontWeight: '600',
   },
 
-  impactBadgeTextAnimals: {
+  splitBadgeTextAnimals: {
     color: palette.orange,
     textTransform: 'none',
-    letterSpacing: 0,
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
+    fontWeight: '600',
   },
 
   impactValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.5),
-    marginTop: hp(0.6),
+    marginTop: hp(0.2),
   },
 
   impactFoodIcon: {
@@ -732,29 +741,36 @@ const styles = StyleSheet.create({
   peopleValue: {
     color: palette.kale,
     textTransform: 'none',
+    fontSize: normalize(16),
+    lineHeight: normalize(22),
+    flexShrink: 1,
   },
 
   animalsValue: {
     color: palette.orange,
     textTransform: 'none',
+    fontSize: normalize(16),
+    lineHeight: normalize(22),
+    flexShrink: 1,
   },
 
   impactSubLabel: {
-    color: palette.black,
+    color: palette.midgray,
     textTransform: 'none',
-    letterSpacing: 0,
     fontSize: normalize(12),
+    lineHeight: normalize(17),
   },
 
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2),
+    marginTop: hp(0.3),
   },
 
   progressTrackPeople: {
     flex: 1,
-    height: hp(0.9),
+    height: hp(0.8),
     backgroundColor: '#D8E8DC',
     borderRadius: normalize(100),
     overflow: 'hidden',
@@ -768,7 +784,7 @@ const styles = StyleSheet.create({
 
   progressTrackAnimals: {
     flex: 1,
-    height: hp(0.9),
+    height: hp(0.8),
     backgroundColor: '#F8DEC8',
     borderRadius: normalize(100),
     overflow: 'hidden',
@@ -782,28 +798,26 @@ const styles = StyleSheet.create({
 
   percentText: {
     color: palette.midgray,
-    fontSize: normalize(11),
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
     textTransform: 'none',
-    minWidth: wp(8),
+    minWidth: wp(9),
     textAlign: 'right',
   },
 
-  ratingRow: {
-    flexDirection: 'row',
-  },
-
   ratingCard: {
-    flex: 1,
-    maxWidth: '48.5%',
+    alignSelf: 'flex-start',
+    minWidth: '48%',
     backgroundColor: palette.white,
-    borderRadius: normalize(12),
-    borderWidth: normalize(1),
-    borderColor: '#E0E0E0',
+    borderRadius: normalize(16),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
     paddingVertical: hp(1.4),
-    paddingHorizontal: wp(2.5),
+    paddingHorizontal: wp(3),
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2),
+    ...cardShadow,
   },
 
   ratingIcon: {
@@ -811,170 +825,76 @@ const styles = StyleSheet.create({
     height: normalize(24),
   },
 
-  emptyStateBox: {
-    marginHorizontal: wp(4),
-    padding: wp(4),
-    borderRadius: normalize(16),
-    backgroundColor: '#EEE7FF',
-    alignItems: 'center',
-    gap: hp(1),
-  },
-
-  smallBtn: {
-    marginTop: hp(1),
-    backgroundColor: palette.eggplant,
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1),
-    borderRadius: normalize(12),
-  },
-
-  smallBtnText: {
-    color: palette.white,
-    fontSize: normalize(14),
-  },
-
-  listingBox: {
-    marginHorizontal: wp(4),
-    padding: wp(4),
+  chartCard: {
+    backgroundColor: palette.white,
     borderRadius: normalize(20),
     borderWidth: 1,
-    borderColor: palette.black,
-    backgroundColor: palette.creme,
-    gap: hp(2),
-  },
-
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
-  status: {
-    backgroundColor: '#EEE7FF',
-    paddingHorizontal: wp(2),
-    paddingVertical: hp(0.5),
-    borderRadius: normalize(14),
-  },
-
-  detailsRow: {
-    flexDirection: 'row',
-    gap: wp(4),
-    alignItems: 'center',
-  },
-
-  image: {
-    width: normalize(50),
-    height: normalize(50),
-    borderRadius: normalize(12),
-  },
-
-  impactOverTimeSection: {
-    marginHorizontal: wp(4),
-    backgroundColor: palette.creme,
-    borderRadius: normalize(16),
-    paddingHorizontal: wp(3.5),
-    paddingTop: hp(2),
-    paddingBottom: hp(1.2),
+    borderColor: palette.strokecream,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.8),
     gap: hp(1.2),
+    ...cardShadow,
   },
 
-  impactOverTimeTitle: {
-    color: palette.black,
-    textTransform: 'none',
-    letterSpacing: 0,
-
-  },
-
-  timeFilterRow: {
+  filterRow: {
     flexDirection: 'row',
-    width: '100%',
     gap: wp(2),
   },
 
   metricFilterRow: {
     flexDirection: 'row',
-    width: '100%',
-    gap: wp(1),
+    gap: wp(2),
+    paddingVertical: hp(0.2),
   },
 
-  timeFilterPill: {
+  filterChip: {
     flex: 1,
-    paddingVertical: hp(0.85),
-    borderRadius: normalize(8),
-    backgroundColor: palette.white,
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(20),
     borderWidth: 1,
-    borderColor: palette.kale,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: normalize(38),
   },
-  metricFilterPill: {
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: wp(1),
-    paddingVertical: hp(0.85),
-    borderRadius: normalize(8),
-    backgroundColor: palette.white,
+
+  metricChip: {
+    paddingVertical: hp(0.9),
+    paddingHorizontal: wp(4),
+    borderRadius: normalize(20),
     borderWidth: 1,
-    borderColor: palette.kale,
-    alignItems: 'center',
+    minHeight: normalize(36),
     justifyContent: 'center',
   },
 
-  filterPillActive: {
+  filterChipActive: {
     backgroundColor: palette.eggplant,
     borderColor: palette.eggplant,
   },
 
-  filterPillText: {
-    color: palette.kale,
-    textTransform: 'none',
-    letterSpacing: 0,
-    fontSize: normalize(14),
-    lineHeight: normalize(16),
-    fontFamily: 'Saveful-SemiBold',
-    textAlign: 'center',
+  filterChipInactive: {
+    backgroundColor: palette.white,
+    borderColor: palette.strokecream,
   },
 
-  metricFilterPillText: {
-    color: palette.kale,
-    textTransform: 'none',
-    letterSpacing: 0,
+  filterChipText: {
     fontSize: normalize(13),
-    lineHeight: normalize(16),
-    fontFamily: 'Saveful-SemiBold',
-    textAlign: 'center',
-  },
-
-  filterPillTextActive: {
-    color: palette.white,
+    lineHeight: normalize(18),
+    textTransform: 'none',
   },
 
   chartContainer: {
     width: '100%',
     overflow: 'hidden',
-    marginTop: hp(0.5),
-  },
-
-  section: {
-    marginHorizontal: wp(4),
-    gap: hp(1),
-  },
-
-  pill: {
-    backgroundColor: palette.middlegreen,
-    paddingVertical: hp(1.2),
-    paddingHorizontal: wp(5),
-    borderRadius: normalize(30),
-    marginTop: hp(0.5),
-  },
-
-  pillText: {
-    color: palette.white,
-    textAlign: 'center',
-    fontSize: normalize(18),
+    alignItems: 'center',
   },
 
   chart: {
     borderRadius: normalize(12),
-    marginLeft: -wp(5),
+    marginLeft: -wp(2),
+  },
+
+  pressed: {
+    opacity: 0.82,
   },
 });

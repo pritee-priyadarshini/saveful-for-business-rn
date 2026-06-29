@@ -7,40 +7,47 @@ import {
   Image,
   Modal,
   Alert,
-  Dimensions,
-  ImageBackground,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 
 import { palette } from '@/theme/colors';
+import { hp, normalize, wp } from '@/utils/responsive';
 import { ListingStatus } from '@/types';
-import { estimateMealsSaved, getListingAudience, getListingStatusLabel, isAnimalListing, isListingActive, isListingCancelled, isListingCollected, isListingExpired, isPeopleListing, resolveListingStatus } from '../../utils/foodListing';
+import {
+  estimateMealsSaved,
+  getListingAudience,
+  getListingStatusLabel,
+  isAnimalListing,
+  isListingActive,
+  isListingCancelled,
+  isListingCollected,
+  isListingExpired,
+  isPeopleListing,
+  resolveListingStatus,
+} from '../../utils/foodListing';
 import { showErrorAlert } from '../../utils/apiError';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
 import { fetchListingDetail } from '../../services/foodListing.service';
 
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
 type MetaBoxLayout = 'half' | 'centered';
-
 type ListingFilter = 'all' | 'people' | 'animals';
 type StatusFilter = 'all' | 'active' | 'expired' | 'collected' | 'cancelled';
 
 const STATUS_FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
   { key: 'active', label: 'Active' },
+  { key: 'all', label: 'All' },
   { key: 'expired', label: 'Expired' },
   { key: 'collected', label: 'Collected' },
   { key: 'cancelled', label: 'Cancelled' },
@@ -77,9 +84,9 @@ type ListingTheme = {
 const PEOPLE_THEME: ListingTheme = {
   accent: palette.kale,
   statusBg: '#D8EBDF',
-  bannerBg: '#E8F3EC',
+  bannerBg: '#F0F8F3',
   cardBg: palette.white,
-  border: palette.kale,
+  border: '#C8E0D2',
   categoryLabel: 'For People',
   categoryIcon: require('../../../assets/placeholder/people_icon.png'),
   notification: 'Nearby charities have been notified',
@@ -88,9 +95,9 @@ const PEOPLE_THEME: ListingTheme = {
 const ANIMAL_THEME: ListingTheme = {
   accent: palette.orange,
   statusBg: '#FFE8CC',
-  bannerBg: '#FFF3E4',
-  cardBg: '#FFFAF4',
-  border: palette.orange,
+  bannerBg: '#FFF6EC',
+  cardBg: palette.white,
+  border: '#FDDBB0',
   categoryLabel: 'For Animals',
   categoryIcon: require('../../../assets/placeholder/cow_front.png'),
   notification: 'Nearby farms have been notified',
@@ -163,7 +170,7 @@ function formatPickupTime(from?: string | null, to?: string | null) {
       .toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
       .replace(' ', '')
       .toLowerCase();
-  return `${fmt(new Date(from))} - ${fmt(new Date(to))}`;
+  return `${fmt(new Date(from))} – ${fmt(new Date(to))}`;
 }
 
 function formatCollectedOn(listing: any) {
@@ -188,11 +195,11 @@ function formatCollectedOn(listing: any) {
 
 function buildInstructions(listing: any) {
   const parts = [
-    listing?.needsRefrigeration && 'NEEDS REFRIGERATION',
-    listing?.needsReheating && 'NEEDS REHEATING',
-    (listing?.containsAllergens || (listing?.allergens?.length ?? 0) > 0) && 'CONTAINS ALLERGENS',
+    listing?.needsRefrigeration && 'Needs refrigeration',
+    listing?.needsReheating && 'Needs reheating',
+    (listing?.containsAllergens || (listing?.allergens?.length ?? 0) > 0) && 'Contains allergens',
   ].filter(Boolean);
-  return parts.length ? parts.join(', ') : 'NO SPECIAL INSTRUCTIONS';
+  return parts.length ? parts.join(' · ') : 'No special instructions';
 }
 
 function getImpactText(listing: any) {
@@ -200,11 +207,25 @@ function getImpactText(listing: any) {
   if (getListingAudience(listing) === 'animal') {
     return `${Math.round(totalKg)} kg feed diverted from landfill`;
   }
-  return `${estimateMealsSaved(totalKg)} meals created`;
+  return `~${estimateMealsSaved(totalKg)} meals created`;
 }
 
+const cardShadow = Platform.select({
+  ios: {
+    shadowColor: palette.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+  },
+  android: {
+    elevation: 3,
+  },
+});
+
 export function RestaurantListingsScreen({ navigation }: any) {
-  const { authUser } = useAppContext();
+  useTransparentStatusBar('light');
+  const insets = useSafeAreaInsets();
+  const { authUser, currentProfile } = useAppContext();
   const {
     siteListings: listings,
     isFetchingSite: loading,
@@ -219,7 +240,6 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [cancellingId, setCancellingId] = React.useState<number | null>(null);
   const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('active');
-  const [showStatusDropdown, setShowStatusDropdown] = React.useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -238,15 +258,16 @@ export function RestaurantListingsScreen({ navigation }: any) {
     () => listings.filter((l) => isAnimalListing(l)).length,
     [listings],
   );
+  const activeCount = useMemo(
+    () => listings.filter((l) => isListingActive(l)).length,
+    [listings],
+  );
 
   const filteredListings = useMemo(() => {
     let result = listings;
-
     if (listingFilter === 'people') result = result.filter((l) => isPeopleListing(l));
     else if (listingFilter === 'animals') result = result.filter((l) => isAnimalListing(l));
-
     result = result.filter((listing) => matchesStatusFilter(listing, statusFilter));
-
     if (statusFilter === 'all') {
       return [...result].sort((a, b) => {
         const orderDiff =
@@ -259,16 +280,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
         );
       });
     }
-
     return result;
   }, [listings, listingFilter, statusFilter]);
 
-  const selectedStatusLabel =
-    STATUS_FILTER_OPTIONS.find((option) => option.key === statusFilter)?.label ?? 'All';
-
   const handleCancelListing = (id: number) => {
     if (cancellingId !== null) return;
-
     Alert.alert(
       'Cancel Listing',
       'Are you sure you want to cancel this listing? This cannot be undone.',
@@ -281,7 +297,6 @@ export function RestaurantListingsScreen({ navigation }: any) {
             if (cancellingId !== null) return;
             setCancellingId(id);
             try {
-              // storeCancelListing cancels then force-refetches the store
               await storeCancelListing(id);
             } catch (error: unknown) {
               showErrorAlert(error, 'Could not cancel listing', 'Failed to cancel listing');
@@ -299,9 +314,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
     setSelectedItems(listing.foodItems || []);
     setSelectedListingStatus(status);
     setModalVisible(true);
-
     if (status !== 'PARTIAL') return;
-
     setModalLoading(true);
     try {
       const detail = await fetchListingDetail(listing.id, { refresh: true });
@@ -314,46 +327,71 @@ export function RestaurantListingsScreen({ navigation }: any) {
     }
   };
 
-  const renderFilterChip = (
+  const renderAudienceChip = (
     key: ListingFilter,
     label: string,
     count: number,
-    accent?: string,
     icon?: any,
+    accent?: string,
   ) => {
     const active = listingFilter === key;
-    const isPeople = key === 'people';
-    const isAnimals = key === 'animals';
-
     return (
       <Pressable
         key={key}
         onPress={() => setListingFilter(key)}
         style={[
-          styles.filterChip,
-          styles.audienceFilterChip,
-          active && key === 'all' && styles.filterChipAllActive,
-          active && isPeople && { borderColor: palette.kale, backgroundColor: palette.white },
-          active && isAnimals && { borderColor: palette.orange, backgroundColor: palette.white },
-          !active && styles.filterChipInactive,
+          styles.audienceChip,
+          active
+            ? [styles.audienceChipActive, accent ? { borderColor: accent } : {}]
+            : styles.audienceChipInactive,
         ]}
       >
-        {icon ? (
-          <Image source={icon} style={styles.filterChipIcon} resizeMode="contain" />
-        ) : null}
+        {icon && (
+          <Image source={icon} style={styles.audienceChipIcon} resizeMode="contain" />
+        )}
         <AppText
           variant="bodyBold"
           numberOfLines={1}
-          ellipsizeMode="tail"
           style={[
-            styles.filterChipText,
-            active && key === 'all' && { color: palette.midgray },
-            active && isPeople && { color: palette.kale },
-            active && isAnimals && { color: palette.orange },
-            !active && { color: palette.stone },
+            styles.audienceChipText,
+            active ? { color: accent || palette.midgray } : { color: palette.stone },
           ]}
         >
-          {label} ({count})
+          {label}{count > 0 ? ` (${count})` : ''}
+        </AppText>
+      </Pressable>
+    );
+  };
+
+  const renderStatusChip = (key: StatusFilter, label: string) => {
+    const active = statusFilter === key;
+    const accentMap: Record<StatusFilter, string> = {
+      active: palette.kale,
+      all: palette.midgray,
+      expired: palette.warning,
+      collected: palette.eggplant,
+      cancelled: palette.danger,
+    };
+    const accent = accentMap[key];
+    return (
+      <Pressable
+        key={key}
+        onPress={() => setStatusFilter(key)}
+        style={[
+          styles.statusChip,
+          active
+            ? { backgroundColor: accent, borderColor: accent }
+            : styles.statusChipInactive,
+        ]}
+      >
+        <AppText
+          variant="bodyBold"
+          style={[
+            styles.statusChipText,
+            { color: active ? palette.white : palette.stone },
+          ]}
+        >
+          {label}
         </AppText>
       </Pressable>
     );
@@ -366,18 +404,15 @@ export function RestaurantListingsScreen({ navigation }: any) {
     content: React.ReactNode,
     layout: MetaBoxLayout = 'half',
   ) => {
-    const themeStyles = isAnimal ? metaThemeStyles.animal : metaThemeStyles.people;
-    const layoutStyle = layout === 'centered' ? styles.metaBoxCentered : styles.metaBoxHalf;
-
+    const iconBg = isAnimal ? '#FFE8CC' : '#D8EBDF';
     return (
-      <View style={[styles.metaBox, themeStyles.metaBox, layoutStyle]}>
-        <View style={[styles.metaIconWrap, themeStyles.metaIconCircle]}>
+      <View style={[styles.metaBox, layout === 'centered' ? styles.metaBoxFull : styles.metaBoxHalf]}>
+        <View style={[styles.metaIconWrap, { backgroundColor: iconBg }]}>
           <Image source={icon} style={styles.metaIconImage} resizeMode="contain" />
         </View>
         <View style={styles.metaItemContent}>
           <AppText
             variant="bodyBold"
-            color={palette.black}
             style={styles.metaLabelText}
             numberOfLines={1}
             ellipsizeMode="tail"
@@ -393,377 +428,359 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const renderListingCard = (item: any) => {
     const theme = getListingTheme(item);
     const isAnimal = getListingAudience(item) === 'animal';
-    const metaTheme = isAnimal ? metaThemeStyles.animal : metaThemeStyles.people;
     const collected = isListingCollected(item);
     const expired = isListingExpired(item);
     const active = isListingActive(item);
     const partial = isListingPartial(item);
     const statusLabel = getListingStatusLabel(item);
-    const statusBadgeStyle = expired
-      ? { backgroundColor: '#FFF1D6', color: palette.warning }
-      : { backgroundColor: theme.statusBg, color: theme.accent };
+
+    const statusConfig = expired
+      ? { bg: '#FFF1D6', color: palette.warning }
+      : collected
+      ? { bg: '#EEF7F2', color: palette.kale }
+      : partial
+      ? { bg: '#FFF8E1', color: '#B8860B' }
+      : { bg: theme.statusBg, color: theme.accent };
+
+    const viewBtnBg = isAnimal ? palette.orange : palette.kale;
 
     return (
-      <View
-        key={item.id}
-        style={[
-          styles.listingCard,
-          { borderColor: theme.border, backgroundColor: theme.cardBg },
-        ]}
-      >
-        {/* Top row: status + category + collected */}
-        <View style={styles.cardTopRow}>
-          <View style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
-            <AppText variant="bodyBold" style={{ color: statusBadgeStyle.color }}>
+      <View key={item.id} style={[styles.listingCard, { borderColor: theme.border }]}>
+
+        {/* Card header strip */}
+        <View style={[styles.cardHeader, { backgroundColor: theme.bannerBg }]}>
+          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+            <AppText variant="caption" style={[styles.statusBadgeText, { color: statusConfig.color }]}>
               {statusLabel}
             </AppText>
           </View>
-
-          <View style={styles.cardTopRight}>
-            <View style={[styles.categoryBadge, { borderColor: theme.accent }]}>
-              <Image source={theme.categoryIcon} style={styles.categoryIcon} resizeMode="contain" />
-              <AppText variant="bodyBold" style={{ color: theme.accent }}>
-                {theme.categoryLabel}
-              </AppText>
-            </View>
-
-            {collected ? (
-              <View style={styles.collectedWrap}>
-                <View style={[styles.collectedIcon, { backgroundColor: theme.accent }]}>
-                  <Ionicons name="checkmark" size={normalize(14)} color={palette.white} />
-                </View>
-                <AppText variant="bodyBold" style={{ color: theme.accent }}>
-                  Collected
-                </AppText>
-              </View>
-            ) : null}
-
-            {expired ? (
-              <View style={styles.collectedWrap}>
-                <View style={[styles.collectedIcon, { backgroundColor: palette.warning }]}>
-                  <Ionicons name="time-outline" size={normalize(14)} color={palette.white} />
-                </View>
-                <AppText variant="bodyBold" style={{ color: palette.warning }}>
-                  Expired
-                </AppText>
-              </View>
-            ) : null}
+          <View style={styles.categoryBadge}>
+            <Image source={theme.categoryIcon} style={styles.categoryIcon} resizeMode="contain" />
+            <AppText variant="caption" style={[styles.categoryLabel, { color: theme.accent }]}>
+              {theme.categoryLabel}
+            </AppText>
           </View>
         </View>
 
-        {/* Notification */}
-        {active ? (
-          <AppText variant="bodySmall" color={palette.midgray} style={styles.notificationText}>
-            📍 {theme.notification}
-          </AppText>
-        ) : null}
+        <View style={styles.cardBody}>
+          {/* Notification / status message */}
+          {active && (
+            <View style={styles.notificationRow}>
+              <Ionicons name="location" size={normalize(13)} color={theme.accent} />
+              <AppText variant="caption" style={[styles.notificationText, { color: theme.accent }]}>
+                {theme.notification}
+              </AppText>
+            </View>
+          )}
 
-        {partial ? (
-          <Pressable style={styles.partialNotice} onPress={() => openItemsModal(item)}>
-            <Ionicons name="information-circle-outline" size={normalize(16)} color="#B8860B" />
-            <AppText variant="bodySmall" style={styles.partialNoticeText}>
-              Partially claimed — {formatKg(getClaimedKg(item))} kg claimed,{' '}
-              {formatKg(getRemainingKg(item))} kg remaining. Tap to view breakdown.
-            </AppText>
-            <Ionicons name="chevron-forward" size={normalize(16)} color="#B8860B" />
-          </Pressable>
-        ) : null}
+          {/* Partial claim notice */}
+          {partial && (
+            <Pressable style={styles.partialNotice} onPress={() => openItemsModal(item)}>
+              <Ionicons name="information-circle-outline" size={normalize(15)} color="#B8860B" />
+              <AppText variant="caption" style={styles.partialNoticeText}>
+                Partially claimed — {formatKg(getClaimedKg(item))} kg taken,{' '}
+                {formatKg(getRemainingKg(item))} kg remaining
+              </AppText>
+              <Ionicons name="chevron-forward" size={normalize(14)} color="#B8860B" />
+            </Pressable>
+          )}
 
-        <View style={styles.metaSection}>
-          <View style={styles.metaTopRow}>
+          {/* Meta grid */}
+          <View style={styles.metaSection}>
+            <View style={styles.metaTopRow}>
+              {renderMetaBox(
+                isAnimal,
+                META_ICONS.items,
+                'Items',
+                <Pressable
+                  style={[styles.viewDetailsBtn, { backgroundColor: viewBtnBg }]}
+                  onPress={() => openItemsModal(item)}
+                >
+                  <AppText variant="caption" style={styles.viewDetailsBtnText}>
+                    {partial ? 'Breakdown' : 'View all'}
+                  </AppText>
+                </Pressable>,
+              )}
+
+              {renderMetaBox(
+                isAnimal,
+                META_ICONS.calendar,
+                collected ? 'Collected on' : expired ? 'Expired on' : 'Pickup date',
+                <AppText
+                  variant="caption"
+                  style={styles.metaValueText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {collected
+                    ? formatCollectedOn(item)
+                    : expired
+                    ? formatExpiredOn(item)
+                    : formatPickupDate(item.pickupFromTime || item.createdAt)}
+                </AppText>,
+              )}
+            </View>
+
             {renderMetaBox(
               isAnimal,
-              META_ICONS.items,
-              'Items',
-              <Pressable
-                style={[styles.viewDetailsBtn, metaTheme.viewDetailsBtn]}
-                onPress={() => openItemsModal(item)}
-              >
-                <AppText variant="bodyBold" style={styles.viewDetailsBtnText} numberOfLines={1} ellipsizeMode="tail">
-                  {partial ? 'Breakdown' : 'View'}
-                </AppText>
-              </Pressable>,
-            )}
-
-            {renderMetaBox(
-              isAnimal,
-              META_ICONS.calendar,
-              collected ? 'Collected on' : expired ? 'Expired on' : 'Pickup Date',
+              collected ? META_ICONS.impact : META_ICONS.time,
+              collected ? 'Impact' : 'Pickup time',
               <AppText
-                variant="bodySmall"
-                color={palette.midgray}
+                variant="caption"
                 style={styles.metaValueText}
-                numberOfLines={1}
+                numberOfLines={2}
                 ellipsizeMode="tail"
               >
                 {collected
-                  ? formatCollectedOn(item)
-                  : expired
-                    ? formatExpiredOn(item)
-                    : formatPickupDate(item.pickupFromTime || item.createdAt)}
+                  ? getImpactText(item)
+                  : formatPickupTime(item.pickupFromTime, item.pickupByTime)}
               </AppText>,
+              'centered',
             )}
           </View>
 
-          {renderMetaBox(
-            isAnimal,
-            collected ? META_ICONS.impact : META_ICONS.time,
-            collected ? 'Impact' : 'Pickup Time',
-            <AppText
-              variant="bodySmall"
-              color={palette.midgray}
-              style={styles.metaValueText}
-              numberOfLines={2}
-              ellipsizeMode="tail"
-            >
-              {collected
-                ? getImpactText(item)
-                : formatPickupTime(item.pickupFromTime, item.pickupByTime)}
-            </AppText>,
-            'centered',
+          {/* Instructions */}
+          {active && (
+            <View style={[styles.instructionsBanner, { backgroundColor: theme.bannerBg, borderColor: theme.border }]}>
+              <Ionicons name="information-circle-outline" size={normalize(13)} color={theme.accent} />
+              <AppText variant="caption" style={[styles.instructionsText, { color: theme.accent }]}>
+                {buildInstructions(item)}
+              </AppText>
+            </View>
+          )}
+
+          {/* Action buttons */}
+          {active && (
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+                onPress={() => navigation.navigate('EditListing', { listingId: Number(item.id) })}
+              >
+                <Ionicons name="create-outline" size={normalize(15)} color={palette.white} />
+                <AppText variant="bodyBold" style={styles.actionBtnText}>
+                  Edit
+                </AppText>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.actionBtn,
+                  styles.cancelBtn,
+                  cancellingId !== null && { opacity: 0.6 },
+                ]}
+                disabled={cancellingId !== null}
+                onPress={() => handleCancelListing(item.id)}
+              >
+                <Ionicons name="close-circle-outline" size={normalize(15)} color={palette.white} />
+                <AppText variant="bodyBold" style={styles.actionBtnText}>
+                  {cancellingId === item.id ? 'Cancelling…' : 'Cancel'}
+                </AppText>
+              </Pressable>
+            </View>
           )}
         </View>
-
-        {/* Instructions banner */}
-        {active ? (
-          <View style={[styles.instructionsBanner, { backgroundColor: theme.bannerBg }]}>
-            <AppText variant="caption" color={palette.black} style={styles.instructionsText}>
-              INSTRUCTIONS: {buildInstructions(item)}
-            </AppText>
-          </View>
-        ) : null}
-
-        {/* Edit / Cancel */}
-        {active ? (
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.outlineBtn, { borderColor: theme.accent }]}
-              onPress={() => navigation.navigate('EditListing', { listingId: Number(item.id) })}
-            >
-              <Ionicons name="create-outline" size={normalize(16)} color={palette.white} />
-              <AppText variant="bodyBold" style={{ color: palette.white }}>
-                Edit Listing
-              </AppText>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.outlineBtn,
-                styles.cancelOutlineBtn,
-                (cancellingId !== null) && { opacity: 0.65 },
-              ]}
-              disabled={cancellingId !== null}
-              onPress={() => handleCancelListing(item.id)}
-            >
-              <Ionicons name="close-circle-outline" size={normalize(16)} color={palette.white} />
-              <AppText variant="bodyBold" style={{ color: palette.white }}>
-                {cancellingId === item.id ? 'Cancelling...' : 'Cancel Listing'}
-              </AppText>
-            </Pressable>
-          </View>
-        ) : null}
       </View>
     );
   };
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
-      <Skeleton width="100%" height={hp(14)} borderRadius={0} />
-      <View style={styles.skeletonCenter}>
-        <Skeleton width={wp(70)} height={normalize(18)} />
-      </View>
-      <Skeleton width={wp(88)} height={normalize(48)} borderRadius={normalize(12)} style={{ alignSelf: 'center' }} />
-      <Skeleton width={wp(88)} height={normalize(48)} borderRadius={normalize(12)} style={{ alignSelf: 'center' }} />
-      <Skeleton width={wp(55)} height={normalize(20)} style={{ marginLeft: wp(4), marginTop: hp(1) }} />
-      <View style={[styles.filterRow, { paddingHorizontal: wp(4) }]}>
-        <Skeleton width="32%" height={normalize(36)} borderRadius={normalize(8)} />
-        <Skeleton width="32%" height={normalize(36)} borderRadius={normalize(8)} />
-        <Skeleton width="32%" height={normalize(36)} borderRadius={normalize(8)} />
-      </View>
-      <View style={[styles.statusDropdownRow, { paddingHorizontal: wp(4) }]}>
-        <Skeleton width={wp(18)} height={normalize(16)} />
-        <Skeleton width="100%" height={normalize(44)} borderRadius={normalize(8)} style={{ flex: 1 }} />
-      </View>
-      {[1, 2].map((i) => (
-        <View key={i} style={[styles.skeletonCard, { marginHorizontal: wp(4) }]}>
-          <View style={styles.skeletonRowBetween}>
-            <Skeleton width={wp(22)} height={normalize(28)} borderRadius={normalize(6)} />
-            <Skeleton width={wp(35)} height={normalize(28)} borderRadius={normalize(8)} />
-          </View>
-          <Skeleton width="100%" height={normalize(14)} />
-          <View style={styles.skeletonMetaSection}>
-            <View style={styles.skeletonMetaTopRow}>
-              <View style={styles.skeletonMetaHalf}>
-                <Skeleton width="100%" height={normalize(56)} borderRadius={normalize(8)} />
+      <Skeleton width="100%" height={hp(20)} borderRadius={0} />
+      <View style={styles.skeletonContent}>
+        <Skeleton width={wp(55)} height={normalize(18)} borderRadius={normalize(6)} />
+        <Skeleton width="100%" height={normalize(56)} borderRadius={normalize(16)} />
+        <Skeleton width="100%" height={normalize(52)} borderRadius={normalize(16)} />
+        <Skeleton width={wp(40)} height={normalize(18)} borderRadius={normalize(6)} />
+        <View style={styles.skeletonChipRow}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} width={wp(26)} height={normalize(34)} borderRadius={normalize(20)} />
+          ))}
+        </View>
+        <View style={styles.skeletonChipRow}>
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} width={wp(18)} height={normalize(32)} borderRadius={normalize(20)} />
+          ))}
+        </View>
+        {[1, 2].map((i) => (
+          <View key={i} style={styles.skeletonCard}>
+            <Skeleton width="100%" height={normalize(40)} borderRadius={0} />
+            <View style={{ padding: wp(4), gap: hp(1.2) }}>
+              <Skeleton width="70%" height={normalize(14)} />
+              <View style={styles.skeletonMetaRow}>
+                <Skeleton width="48%" height={normalize(56)} borderRadius={normalize(10)} />
+                <Skeleton width="48%" height={normalize(56)} borderRadius={normalize(10)} />
               </View>
-              <View style={styles.skeletonMetaHalf}>
-                <Skeleton width="100%" height={normalize(56)} borderRadius={normalize(8)} />
+              <Skeleton width="100%" height={normalize(56)} borderRadius={normalize(10)} />
+              <Skeleton width="100%" height={normalize(32)} borderRadius={normalize(10)} />
+              <View style={styles.skeletonMetaRow}>
+                <Skeleton width="48%" height={normalize(40)} borderRadius={normalize(12)} />
+                <Skeleton width="48%" height={normalize(40)} borderRadius={normalize(12)} />
               </View>
             </View>
-            <Skeleton width="100%" height={normalize(56)} borderRadius={normalize(8)} style={styles.skeletonMetaCentered} />
           </View>
-          <Skeleton width="100%" height={normalize(32)} borderRadius={normalize(8)} />
-          <View style={styles.skeletonRowBetween}>
-            <Skeleton width={wp(38)} height={normalize(40)} borderRadius={normalize(10)} />
-            <Skeleton width={wp(38)} height={normalize(40)} borderRadius={normalize(10)} />
-          </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
 
   return (
-    <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(2) }]}
+        showsVerticalScrollIndicator={false}
+      >
         {loading ? (
           renderSkeleton()
         ) : (
           <>
-          <ImageBackground
-            source={require('../../../assets/placeholder/kale-headera.png')}
-            style={styles.headerBg}
-            resizeMode="cover"
-          >
-            <AppText variant="h4" style={styles.headerTitle}> Your Listings </AppText>
-          </ImageBackground>
-
-
-            <View style={styles.subHeaderContainer}>
-              <AppText variant="h7" style={styles.heroSubText}>
-                TRACK YOUR SURPLUS AND IMPACT
-              </AppText>
-            </View>
-
-            <Pressable style={styles.createBtn} onPress={() => navigation.navigate('Surplus')}>
-              <AppText variant="bodyBold" style={styles.createText}>
-                + Create new listing
-              </AppText>
-              <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} style={{ marginLeft: wp(35) }} />
-            </Pressable>
-
-            <Pressable
-              style={styles.historyBtn}
-              onPress={() => navigation.navigate('CollectionHistory')}
+            <HeroHeader
+              source={require('../../../assets/placeholder/kale-header.png')}
+              height={hp(20)}
             >
-              <Ionicons name="time-outline" size={normalize(20)} color={palette.kale} />
-              <AppText variant="bodyBold" style={styles.historyText}>
-                See collection history
-              </AppText>
-              <Ionicons name="chevron-forward" size={normalize(18)} color={palette.kale} />
-            </Pressable>
+             
+              <View style={styles.heroContent}>
+                <View style={styles.heroTopRow}>
+                  <View style={styles.heroTextBlock}>
+                    <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                      {currentProfile.organization || 'Your business'}
+                    </AppText>
+                    <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                      Your listings
+                    </AppText>
+                    <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
+                      Track surplus food, pickups, and your impact
+                    </AppText>
+                  </View>
 
-            <View style={styles.section}>
-              <AppText variant="h8" style={styles.sectionTitle}>
-                YOUR LISTINGS TODAY
-              </AppText>
+                  <View style={styles.heroIconCircle}>
+                    <Image
+                      source={META_ICONS.items}
+                      style={styles.heroIconImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                </View>
 
-              <View style={styles.filterRow}>
-                {renderFilterChip('all', 'All', listings.length)}
-                {renderFilterChip('people', 'For People', peopleCount, palette.kale, PEOPLE_THEME.categoryIcon)}
-                {renderFilterChip('animals', 'For Animals', animalCount, palette.orange, ANIMAL_THEME.categoryIcon)}
-              </View>
-
-              <View style={styles.statusDropdownRow}>
-                <AppText variant="bodyBold" style={styles.statusDropdownLabel}>
-                  Status
-                </AppText>
-                <Pressable
-                  style={styles.statusDropdown}
-                  onPress={() => setShowStatusDropdown(true)}
-                >
-                  <AppText variant="bodyBold" style={styles.statusDropdownValue}>
-                    {selectedStatusLabel}
-                  </AppText>
-                  <Ionicons name="chevron-down" size={normalize(16)} color={palette.black} />
-                </Pressable>
-              </View>
-
-              {filteredListings.length === 0 ? (
-                <View style={styles.emptyWrap}>
-                  <AppText variant="body1" color={palette.stone} style={{ textAlign: 'center' }}>
-                    No listings to show
+                <View style={styles.heroStatsPill}>
+                  <Ionicons name="layers-outline" size={normalize(14)} color={palette.white} />
+                  <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
+                    {activeCount} active · {listings.length} total
                   </AppText>
                 </View>
-              ) : (
-                filteredListings.map(renderListingCard)
-              )}
+              </View>
+            </HeroHeader>
+
+            <View style={styles.mainContent}>
+              {/* CTA cards */}
+              <Pressable
+                style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
+                onPress={() => navigation.navigate('Surplus')}
+              >
+                <View style={styles.createBtnLeft}>
+                  <View style={styles.createBtnIconWrap}>
+                    <Ionicons name="add" size={normalize(20)} color={palette.white} />
+                  </View>
+                  <AppText variant="bodyBold" style={styles.createBtnText}>
+                    Create new listing
+                  </AppText>
+                </View>
+                <View style={styles.createBtnArrow}>
+                  <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.historyBtn, pressed && styles.pressed]}
+                onPress={() => navigation.navigate('CollectionHistory')}
+              >
+                <View style={styles.historyBtnLeft}>
+                  <Ionicons name="time-outline" size={normalize(18)} color={palette.eggplant} />
+                  <AppText variant="bodyBold" style={styles.historyBtnText}>
+                    Collection history
+                  </AppText>
+                </View>
+                <Ionicons name="chevron-forward" size={normalize(16)} color={palette.eggplant} />
+              </Pressable>
+
+              {/* Listings section */}
+              <View style={styles.section}>
+                {/* Audience filter */}
+                <View style={styles.filterRow}>
+                  {renderAudienceChip('all', 'All', listings.length)}
+                  {renderAudienceChip('people', 'People', peopleCount, PEOPLE_THEME.categoryIcon, palette.kale)}
+                  {renderAudienceChip('animals', 'Animals', animalCount, ANIMAL_THEME.categoryIcon, palette.orange)}
+                </View>
+
+                {/* Status filter */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.statusFilterRow}
+                >
+                  {STATUS_FILTER_OPTIONS.map((o) => renderStatusChip(o.key, o.label))}
+                </ScrollView>
+
+                {/* Listings */}
+                {filteredListings.length === 0 ? (
+                  <View style={styles.emptyWrap}>
+                    <Ionicons name="file-tray-outline" size={normalize(36)} color={palette.strokecream} />
+                    <AppText variant="bodySmall" color={palette.stone} style={styles.emptyText}>
+                      No listings match this filter
+                    </AppText>
+                    <Pressable onPress={() => { setListingFilter('all'); setStatusFilter('all'); }}>
+                      <AppText variant="bodyBold" color={palette.kale} style={styles.emptyReset}>
+                        Clear filters
+                      </AppText>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={styles.listingsGap}>
+                    {filteredListings.map(renderListingCard)}
+                  </View>
+                )}
+              </View>
             </View>
           </>
         )}
       </ScrollView>
 
-      <Modal visible={showStatusDropdown} transparent animationType="fade" onRequestClose={() => setShowStatusDropdown(false)}>
-        <View style={styles.statusDropdownModalRoot}>
-          <Pressable style={styles.statusDropdownBackdrop} onPress={() => setShowStatusDropdown(false)} />
-          <View style={styles.statusDropdownList}>
-            {STATUS_FILTER_OPTIONS.map((option) => {
-              const selected = statusFilter === option.key;
-              return (
-                <Pressable
-                  key={option.key}
-                  style={[styles.statusDropdownItem, selected && styles.statusDropdownItemSelected]}
-                  onPress={() => {
-                    setStatusFilter(option.key);
-                    setShowStatusDropdown(false);
-                  }}
-                >
-                  <AppText
-                    variant="bodyBold"
-                    style={[styles.statusDropdownItemText, selected && styles.statusDropdownItemTextSelected]}
-                  >
-                    {option.label}
-                  </AppText>
-                  {selected ? (
-                    <Ionicons name="checkmark" size={normalize(16)} color={palette.kale} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      </Modal>
-
+      {/* Items modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalWrap}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
           <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
             <View style={styles.modalTopBar}>
-              <AppText variant="h6">
-                {selectedListingStatus === 'PARTIAL' ? 'Claim breakdown' : 'Listed Food'}
+              <AppText variant="h6" style={styles.modalTitle}>
+                {selectedListingStatus === 'PARTIAL' ? 'Claim breakdown' : 'Listed food'}
               </AppText>
               <Pressable style={styles.closeIconBtn} onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={normalize(20)} color={palette.black} />
+                <Ionicons name="close" size={normalize(18)} color={palette.black} />
               </Pressable>
             </View>
 
             {selectedListingStatus === 'PARTIAL' && (
-              <AppText variant="bodySmall" style={styles.modalSubtitle}>
-                See how much has been claimed and what is still available per food item.
+              <AppText variant="caption" style={styles.modalSubtitle}>
+                How much has been claimed and what is still available per item.
               </AppText>
             )}
 
             {modalLoading ? (
               <View style={styles.modalLoadingWrap}>
-                <AppText variant="bodySmall">Loading latest quantities…</AppText>
+                <AppText variant="caption" color={palette.stone} style={styles.modalLoadingText}>Loading latest quantities…</AppText>
               </View>
             ) : (
               <>
                 <View style={styles.modalHeaderRow}>
-                  <AppText variant="bodyBold" style={styles.modalColName}>
-                    Item Name
-                  </AppText>
+                  <AppText variant="bodyBold" style={styles.modalColName}>Item</AppText>
                   {selectedListingStatus === 'PARTIAL' ? (
                     <>
-                      <AppText variant="bodyBold" style={styles.modalCol}>
-                        Claimed
-                      </AppText>
-                      <AppText variant="bodyBold" style={styles.modalCol}>
-                        Remaining
-                      </AppText>
+                      <AppText variant="bodyBold" style={styles.modalCol}>Claimed</AppText>
+                      <AppText variant="bodyBold" style={styles.modalCol}>Remaining</AppText>
                     </>
                   ) : (
-                    <AppText variant="bodyBold" style={styles.modalCol}>
-                      Listed
-                    </AppText>
+                    <AppText variant="bodyBold" style={styles.modalCol}>Quantity</AppText>
                   )}
                 </View>
 
@@ -772,7 +789,6 @@ export function RestaurantListingsScreen({ navigation }: any) {
                     const totalQty = Number(foodItem.totalQtyKg || 0);
                     const remainingQty = Number(foodItem.remainingQtyKg ?? totalQty);
                     const claimedQty = Math.max(0, totalQty - remainingQty);
-
                     return (
                       <View key={`${foodItem.name || foodItem.category}-${idx}`} style={styles.modalItemRow}>
                         <AppText variant="bodyBold" style={styles.modalColName}>
@@ -796,53 +812,46 @@ export function RestaurantListingsScreen({ navigation }: any) {
                     );
                   })
                 ) : (
-                  <View style={{ paddingVertical: hp(1.6) }}>
-                    <AppText variant="bodySmall">No items available</AppText>
+                  <View style={styles.modalEmptyWrap}>
+                    <AppText variant="caption" color={palette.stone} style={styles.modalEmptyText}>No items available</AppText>
                   </View>
                 )}
 
+                <View style={styles.modalDivider} />
                 <View style={styles.modalTotals}>
                   {selectedListingStatus === 'PARTIAL' ? (
                     <>
-                      <AppText variant="bodyBold">
-                        Total claimed:{' '}
-                        {formatKg(
-                          selectedItems.reduce(
-                            (sum, foodItem) =>
-                              sum +
-                              Math.max(
-                                0,
-                                Number(foodItem.totalQtyKg || 0) -
-                                  Number(foodItem.remainingQtyKg ?? foodItem.totalQtyKg ?? 0),
-                              ),
-                            0,
-                          ),
-                        )}{' '}
-                        kg
-                      </AppText>
-                      <AppText variant="bodyBold">
-                        Total remaining:{' '}
-                        {formatKg(
-                          selectedItems.reduce(
-                            (sum, foodItem) =>
-                              sum + Number(foodItem.remainingQtyKg ?? foodItem.totalQtyKg ?? 0),
-                            0,
-                          ),
-                        )}{' '}
-                        kg
-                      </AppText>
+                      <View style={styles.modalTotalRow}>
+                        <AppText variant="bodyBold" color={palette.stone}>Total claimed</AppText>
+                        <AppText variant="bodyBold" style={styles.modalClaimedText}>
+                          {formatKg(
+                            selectedItems.reduce(
+                              (sum, fi) =>
+                                sum + Math.max(0, Number(fi.totalQtyKg || 0) - Number(fi.remainingQtyKg ?? fi.totalQtyKg ?? 0)),
+                              0,
+                            ),
+                          )} kg
+                        </AppText>
+                      </View>
+                      <View style={styles.modalTotalRow}>
+                        <AppText variant="bodyBold" color={palette.stone}>Total remaining</AppText>
+                        <AppText variant="bodyBold" style={styles.modalRemainingText}>
+                          {formatKg(
+                            selectedItems.reduce(
+                              (sum, fi) => sum + Number(fi.remainingQtyKg ?? fi.totalQtyKg ?? 0),
+                              0,
+                            ),
+                          )} kg
+                        </AppText>
+                      </View>
                     </>
                   ) : (
-                    <AppText variant="bodyBold">
-                      Total Quantity:{' '}
-                      {formatKg(
-                        selectedItems.reduce(
-                          (sum, foodItem) => sum + Number(foodItem.totalQtyKg || 0),
-                          0,
-                        ),
-                      )}{' '}
-                      kg
-                    </AppText>
+                    <View style={styles.modalTotalRow}>
+                      <AppText variant="bodyBold" color={palette.stone}>Total quantity</AppText>
+                      <AppText variant="bodyBold">
+                        {formatKg(selectedItems.reduce((sum, fi) => sum + Number(fi.totalQtyKg || 0), 0))} kg
+                      </AppText>
+                    </View>
                   )}
                 </View>
               </>
@@ -856,245 +865,291 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
+    flexGrow: 1,
+    marginTop: -hp(1),
+  },
+
+  heroContent: {
+    flex: 1,
+    paddingHorizontal: wp(5),
+    justifyContent: 'flex-end',
     paddingBottom: hp(3),
-    gap: hp(1.4),
+    gap: hp(1.2),
   },
 
-  headerBg: {
-    width: '100%',
-    height: hp(14),
-    justifyContent: 'center',
-    alignItems: 'center',
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: wp(3),
   },
 
-  headerTitle: {
+  heroTextBlock: {
+    flex: 1,
+    gap: hp(0.3),
+    minWidth: 0,
+    paddingBottom: hp(0.2),
+  },
+
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'none',
+    letterSpacing: 0.3,
+    fontSize: normalize(13),
+  },
+
+  heroTitle: {
     color: palette.white,
-    textAlign: 'center',
-    fontSize: normalize(24),
-    letterSpacing: 0.5,
+    textTransform: 'none',
+    fontSize: normalize(30),
+    lineHeight: normalize(38),
   },
 
-  subHeaderContainer: {
-    alignItems: 'center',
-    paddingHorizontal: wp(4),
-    marginTop: hp(0.5),
-  },
-
-  heroSubText: {
-    color: palette.black,
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'none',
+    fontSize: normalize(15),
     lineHeight: normalize(22),
-    textAlign: 'center',
-    textTransform: 'uppercase',
+  },
+
+  heroIconCircle: {
+    width: normalize(52),
+    height: normalize(52),
+    borderRadius: normalize(26),
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: palette.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+
+  heroIconImage: {
+    width: normalize(30),
+    height: normalize(30),
+  },
+
+  heroStatsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: wp(1.5),
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(20),
+    maxWidth: '100%',
+  },
+
+  heroStatsText: {
+    color: palette.white,
+    flexShrink: 1,
+    textTransform: 'none',
+    fontSize: normalize(13),
+  },
+
+  mainContent: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    gap: hp(1.8),
+    paddingBottom: hp(1),
   },
 
   createBtn: {
-    backgroundColor: palette.middlegreen,
-    paddingVertical: hp(1.5),
-    borderRadius: normalize(12),
-    marginHorizontal: wp(6),
+    backgroundColor: palette.eggplant,
+    borderRadius: normalize(16),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(5),
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: wp(2),
+    justifyContent: 'space-between',
+    ...Platform.select({
+      ios: {
+        shadowColor: palette.eggplant,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.28,
+        shadowRadius: 10,
+      },
+      android: { elevation: 5 },
+    }),
   },
 
-  createText: {
+  createBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+
+  createBtnIconWrap: {
+    width: normalize(32),
+    height: normalize(32),
+    borderRadius: normalize(16),
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  createBtnText: {
     color: palette.white,
     textTransform: 'none',
-    alignSelf: 'center',
+    fontSize: normalize(17),
+  },
+
+  createBtnArrow: {
+    width: normalize(28),
+    height: normalize(28),
+    borderRadius: normalize(14),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   historyBtn: {
     backgroundColor: palette.white,
-    borderWidth: normalize(1),
-    borderColor: palette.kale,
-    paddingVertical: hp(1.4),
-    paddingHorizontal: wp(4),
-    borderRadius: normalize(12),
-    marginHorizontal: wp(6),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    borderRadius: normalize(16),
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(5),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(2.5),
+    justifyContent: 'space-between',
+    ...cardShadow,
   },
 
-  historyText: {
-    color: palette.kale,
-    flex: 1,
+  historyBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+
+  historyBtnText: {
+    color: palette.eggplant,
     textTransform: 'none',
+    fontSize: normalize(17),
   },
 
   section: {
-    gap: hp(1.2),
-    marginTop: hp(0.5),
-  },
-
-  sectionTitle: {
-    marginHorizontal: wp(4),
-    fontSize: normalize(18),
-    textTransform: 'none',
+    gap: hp(1.4),
   },
 
   filterRow: {
     flexDirection: 'row',
-    flexWrap: 'nowrap',
-    gap: wp(1.5),
-    paddingHorizontal: wp(4),
-    width: '100%',
+    gap: wp(2),
   },
 
-  audienceFilterChip: {
+  audienceChip: {
     flex: 1,
-    minWidth: 0,
-    justifyContent: 'center',
-    paddingHorizontal: wp(2),
-  },
-
-  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1),
-    paddingHorizontal: wp(4.5),
-    paddingVertical: hp(0.7),
-    borderRadius: normalize(8),
-    borderWidth: normalize(1),
+    justifyContent: 'center',
+    gap: wp(1.5),
+    paddingVertical: hp(1.15),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(10),
+    borderWidth: 1,
+    minHeight: normalize(40),
   },
 
-  filterChipInactive: {
-    backgroundColor: '#EFEFEF',
-    borderColor: '#D8D8D8',
+  audienceChipActive: {
+    backgroundColor: palette.white,
+    ...cardShadow,
   },
 
-  filterChipAllActive: {
-    backgroundColor: '#EFEFEF',
-    borderColor: '#B8B8B8',
+  audienceChipInactive: {
+    backgroundColor: 'transparent',
+    borderColor: palette.strokecream,
   },
 
-  filterChipIcon: {
-    width: normalize(16),
-    height: normalize(16),
+  audienceChipIcon: {
+    width: normalize(17),
+    height: normalize(17),
   },
 
-  filterChipText: {
+  audienceChipText: {
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
     textTransform: 'none',
-    fontSize: normalize(11),
     flexShrink: 1,
   },
 
-  statusDropdownRow: {
+  statusFilterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(3),
+    gap: wp(2),
+    paddingVertical: hp(0.3),
+  },
+
+  statusChip: {
+    paddingVertical: hp(0.95),
     paddingHorizontal: wp(4),
-    width: '100%',
-  },
-
-  statusDropdownLabel: {
-    textTransform: 'none',
-    color: palette.black,
-    minWidth: wp(14),
-  },
-
-  statusDropdown: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: wp(3.5),
-    paddingVertical: hp(1),
-    borderRadius: normalize(8),
-    borderWidth: normalize(1),
-    borderColor: '#D9D9D9',
-    backgroundColor: palette.white,
-  },
-
-  statusDropdownValue: {
-    textTransform: 'none',
-    color: palette.black,
-  },
-
-  statusDropdownModalRoot: {
-    flex: 1,
+    borderRadius: normalize(20),
+    borderWidth: 1,
+    minHeight: normalize(36),
     justifyContent: 'center',
-    paddingHorizontal: wp(8),
   },
 
-  statusDropdownBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-
-  statusDropdownList: {
+  statusChipInactive: {
     backgroundColor: palette.white,
-    borderRadius: normalize(12),
-    overflow: 'hidden',
-    borderWidth: normalize(1),
-    borderColor: '#E8E8E8',
+    borderColor: palette.strokecream,
   },
 
-  statusDropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1.4),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EFEFEF',
-  },
-
-  statusDropdownItemSelected: {
-    backgroundColor: '#F4FAF6',
-  },
-
-  statusDropdownItemText: {
+  statusChipText: {
+    fontSize: normalize(14),
+    lineHeight: normalize(19),
     textTransform: 'none',
-    color: palette.black,
   },
 
-  statusDropdownItemTextSelected: {
-    color: palette.kale,
-  },
-
-  emptyWrap: {
-    paddingVertical: hp(4),
-    paddingHorizontal: wp(4),
+  listingsGap: {
+    gap: hp(1.8),
   },
 
   listingCard: {
-    marginHorizontal: wp(4),
-    borderRadius: normalize(12),
-    borderWidth: normalize(1),
-    padding: wp(3.5),
-    gap: hp(1.2),
+    borderRadius: normalize(20),
+    borderWidth: 1,
+    backgroundColor: palette.white,
+    overflow: 'hidden',
+    ...cardShadow,
   },
 
-  cardTopRow: {
+  cardHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
     gap: wp(2),
+    minHeight: normalize(40),
   },
 
   statusBadge: {
     paddingHorizontal: wp(3),
-    paddingVertical: hp(0.5),
+    paddingVertical: hp(0.55),
     borderRadius: normalize(6),
   },
 
-  cardTopRight: {
-    alignItems: 'flex-end',
-    gap: hp(0.6),
-    flexShrink: 1,
+  statusBadgeText: {
+    fontWeight: '700',
+    textTransform: 'none',
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
   },
 
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.5),
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.4),
-    borderRadius: normalize(8),
-    borderWidth: normalize(1),
     backgroundColor: palette.white,
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.55),
+    borderRadius: normalize(8),
   },
 
   categoryIcon: {
@@ -1102,23 +1157,50 @@ const styles = StyleSheet.create({
     height: normalize(18),
   },
 
-  collectedWrap: {
+  categoryLabel: {
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    fontWeight: '600',
+    textTransform: 'none',
+  },
+
+  cardBody: {
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1.2),
+    paddingBottom: hp(1.6),
+    gap: hp(1.2),
+  },
+
+  notificationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.5),
   },
 
-  collectedIcon: {
-    width: normalize(22),
-    height: normalize(22),
-    borderRadius: normalize(11),
-    alignItems: 'center',
-    justifyContent: 'center',
+  notificationText: {
+    fontSize: normalize(14),
+    textTransform: 'none',
+    flexShrink: 1,
   },
 
-  notificationText: {
+  partialNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    backgroundColor: '#FFFBF0',
+    borderWidth: 1,
+    borderColor: '#EDDBA0',
+    borderRadius: normalize(12),
+  },
+
+  partialNoticeText: {
+    flex: 1,
+    color: '#8A6D1D',
+    lineHeight: normalize(20),
     textTransform: 'none',
-    lineHeight: normalize(18),
+    fontSize: normalize(13),
   },
 
   metaSection: {
@@ -1127,28 +1209,18 @@ const styles = StyleSheet.create({
 
   metaTopRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: wp(1.5),
+    gap: wp(2),
   },
 
   metaBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 0,
-    borderWidth: normalize(0.5),
-    borderRadius: normalize(8),
-    backgroundColor: palette.white,
-    paddingHorizontal: wp(2),
-    paddingVertical: hp(0.7),
-    gap: wp(1.5),
-  },
-
-  metaBoxPeople: {
-    borderColor: '#D9D9D9',
-  },
-
-  metaBoxAnimal: {
-    borderColor: '#D9D9D9',
+    backgroundColor: '#F8F8F8',
+    borderRadius: normalize(10),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(1.1),
+    gap: wp(2),
+    minHeight: normalize(56),
   },
 
   metaBoxHalf: {
@@ -1156,132 +1228,240 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 
-  metaBoxCentered: {
+  metaBoxFull: {
     width: '100%',
-    marginLeft: 'auto',
-    marginRight: 'auto',
   },
 
   metaIconWrap: {
-    width: normalize(30),
-    height: normalize(30),
-    borderRadius: normalize(15),
+    width: normalize(28),
+    height: normalize(28),
+    borderRadius: normalize(14),
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
 
-  metaIconCirclePeople: {
-    backgroundColor: '#D8EBDF',
-  },
-
-  metaIconCircleAnimal: {
-    backgroundColor: '#FFE8CC',
-  },
-
   metaIconImage: {
-    width: normalize(20),
-    height: normalize(20),
+    width: normalize(18),
+    height: normalize(18),
   },
 
   metaItemContent: {
     flex: 1,
     minWidth: 0,
-    justifyContent: 'center',
-    gap: hp(0.35),
+    gap: hp(0.3),
   },
 
   metaLabelText: {
-    fontSize: normalize(12),
-    lineHeight: normalize(15),
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
     textTransform: 'none',
+    color: palette.midgray,
   },
 
   metaValueText: {
-    fontSize: normalize(12),
-    lineHeight: normalize(15),
+    fontSize: normalize(14),
     textTransform: 'none',
+    color: palette.black,
+    lineHeight: normalize(20),
     flexShrink: 1,
   },
 
   viewDetailsBtn: {
     alignSelf: 'flex-start',
-    borderRadius: normalize(999),
-    maxWidth: '100%',
-    paddingHorizontal: wp(4.5),
-    paddingVertical: hp(0.75),
-  },
-
-  viewDetailsBtnPeople: {
-    backgroundColor: palette.kale,
-  },
-
-  viewDetailsBtnAnimal: {
-    backgroundColor: palette.orange,
+    borderRadius: normalize(20),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.55),
+    minHeight: normalize(28),
+    justifyContent: 'center',
   },
 
   viewDetailsBtnText: {
     color: palette.white,
-    fontSize: normalize(12),
-    lineHeight: normalize(13),
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    fontWeight: '700',
     textTransform: 'none',
   },
 
   instructionsBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2),
     paddingHorizontal: wp(3),
-    paddingVertical: hp(0.8),
-    borderRadius: normalize(8),
-    borderWidth: normalize(1),
-    borderColor: palette.middlegreen,
+    paddingVertical: hp(0.9),
+    borderRadius: normalize(10),
+    borderWidth: 1,
   },
 
   instructionsText: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    flex: 1,
+    fontSize: normalize(14),
+    textTransform: 'none',
+    lineHeight: normalize(19),
   },
 
   actionRow: {
     flexDirection: 'row',
     gap: wp(2.5),
-    marginTop: hp(0.2),
+    marginTop: hp(0.4),
   },
 
-  outlineBtn: {
+  actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: wp(1.2),
-    paddingVertical: hp(1),
-    borderRadius: normalize(10),
-    borderWidth: normalize(1),
-    backgroundColor: palette.middlegreen,
+    gap: wp(1.5),
+    paddingVertical: hp(1.1),
+    borderRadius: normalize(12),
   },
 
-  cancelOutlineBtn: {
-    backgroundColor: '#FF0000',
-    borderColor: palette.chilli,
+  cancelBtn: {
+    backgroundColor: palette.danger,
+  },
+
+  actionBtnText: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(15),
+  },
+
+  emptyWrap: {
+    paddingVertical: hp(5),
+    alignItems: 'center',
+    gap: hp(1.2),
+  },
+
+  emptyText: {
+    textAlign: 'center',
+    textTransform: 'none',
+    fontSize: normalize(15),
+    lineHeight: normalize(22),
+  },
+
+  emptyReset: {
+    textTransform: 'none',
+    fontSize: normalize(15),
+    marginTop: hp(0.4),
+  },
+
+  pressed: {
+    opacity: 0.82,
+  },
+
+  // Skeleton
+  skeletonWrap: {
+    flex: 1,
+  },
+
+  skeletonContent: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    gap: hp(1.6),
+  },
+
+  skeletonChipRow: {
+    flexDirection: 'row',
+    gap: wp(2),
+  },
+
+  skeletonCard: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(20),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+  },
+
+  skeletonMetaRow: {
+    flexDirection: 'row',
+    gap: wp(2),
+  },
+
+  // Modal
+  modalWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+
+  modalCard: {
+    backgroundColor: palette.white,
+    paddingHorizontal: wp(5),
+    paddingTop: hp(1),
+    paddingBottom: hp(4),
+    borderTopLeftRadius: normalize(28),
+    borderTopRightRadius: normalize(28),
+    gap: hp(1.4),
+  },
+
+  modalHandle: {
+    width: wp(10),
+    height: normalize(4),
+    borderRadius: normalize(2),
+    backgroundColor: palette.strokecream,
+    alignSelf: 'center',
+    marginBottom: hp(0.5),
+  },
+
+  modalTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  modalTitle: {
+    textTransform: 'none',
+    fontSize: normalize(20),
+  },
+
+  closeIconBtn: {
+    width: normalize(34),
+    height: normalize(34),
+    borderRadius: normalize(17),
+    backgroundColor: '#EBEBEB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  modalSubtitle: {
+    color: palette.stone,
+    fontSize: normalize(14),
+    lineHeight: normalize(20),
+    textTransform: 'none',
+    marginTop: -hp(0.5),
   },
 
   modalHeaderRow: {
     flexDirection: 'row',
-    paddingBottom: hp(1),
-    borderBottomWidth: 1,
-    borderColor: palette.border,
+    paddingBottom: hp(0.8),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: palette.strokecream,
   },
 
   modalItemRow: {
     flexDirection: 'row',
-    paddingVertical: hp(0.6),
+    paddingVertical: hp(0.7),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F0F0F0',
   },
 
   modalCol: {
     flex: 1,
     textAlign: 'center',
+    textTransform: 'none',
+    fontSize: normalize(14),
   },
 
   modalColName: {
     flex: 2,
+    textTransform: 'none',
+    fontSize: normalize(14),
   },
 
   modalClaimedText: {
@@ -1292,9 +1472,9 @@ const styles = StyleSheet.create({
     color: palette.kale,
   },
 
-  modalSubtitle: {
-    color: palette.midgray,
-    lineHeight: normalize(18),
+  modalEmptyWrap: {
+    paddingVertical: hp(2),
+    alignItems: 'center',
   },
 
   modalLoadingWrap: {
@@ -1302,110 +1482,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  modalLoadingText: {
+    fontSize: normalize(14),
+    textTransform: 'none',
+  },
+
+  modalEmptyText: {
+    fontSize: normalize(14),
+    textTransform: 'none',
+  },
+
+  modalDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: palette.strokecream,
+    marginVertical: hp(0.4),
+  },
+
   modalTotals: {
-    marginTop: hp(0.5),
     gap: hp(0.8),
   },
 
-  partialNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2),
-    marginTop: hp(1),
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1),
-    backgroundColor: '#FFF8E1',
-    borderWidth: 1,
-    borderColor: '#E8C547',
-    borderRadius: normalize(12),
-  },
-
-  partialNoticeText: {
-    flex: 1,
-    color: '#8A6D1D',
-    lineHeight: normalize(18),
-  },
-
-  modalWrap: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-
-  modalCard: {
-    backgroundColor: palette.white,
-    padding: wp(5),
-    borderTopLeftRadius: normalize(26),
-    borderTopRightRadius: normalize(24),
-    gap: hp(1.6),
-    paddingBottom: hp(4),
-  },
-
-  modalTopBar: {
+  modalTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: hp(1),
-  },
-
-  closeIconBtn: {
-    width: normalize(36),
-    height: normalize(36),
-    borderRadius: normalize(18),
-    backgroundColor: '#dadbdd',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  skeletonWrap: {
-    gap: hp(1.4),
-  },
-
-  skeletonCenter: {
-    alignItems: 'center',
-    marginTop: hp(0.5),
-  },
-
-  skeletonCard: {
-    backgroundColor: palette.white,
-    borderRadius: normalize(12),
-    padding: hp(1.6),
-    gap: hp(1.2),
-    borderWidth: normalize(1),
-    borderColor: '#E0E0E0',
-  },
-
-  skeletonRowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
-  skeletonMetaSection: {
-    gap: hp(0.8),
-  },
-
-  skeletonMetaTopRow: {
-    flexDirection: 'row',
-    gap: wp(1.5),
-  },
-
-  skeletonMetaHalf: {
-    flex: 1,
-  },
-
-  skeletonMetaCentered: {
-    alignSelf: 'center',
+    fontSize: normalize(15),
   },
 });
-
-const metaThemeStyles = {
-  people: {
-    metaBox: styles.metaBoxPeople,
-    metaIconCircle: styles.metaIconCirclePeople,
-    viewDetailsBtn: styles.viewDetailsBtnPeople,
-  },
-  animal: {
-    metaBox: styles.metaBoxAnimal,
-    metaIconCircle: styles.metaIconCircleAnimal,
-    viewDetailsBtn: styles.viewDetailsBtnAnimal,
-  },
-};

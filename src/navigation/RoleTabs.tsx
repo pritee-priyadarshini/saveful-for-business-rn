@@ -1,8 +1,9 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { BottomTabNavigationOptions} from '@react-navigation/bottom-tabs';
-
+import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
+import { Platform, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CharityAnalyticsScreen } from '../screens/charity/CharityAnalyticsScreen';
 import { CharityDiscoverScreen } from '../screens/charity/CharityDiscoverScreen';
@@ -16,58 +17,89 @@ import { palette } from '../theme/colors';
 import { RestaurantStack } from './RestaurantStack';
 import { CharityStack } from './CharityStack';
 import { RestaurantUpdatesScreen } from '@/screens/restaurant/RestaurantUpdatesScreen';
-import { Dimensions } from 'react-native';
 import { FarmerStack } from './FarmerStack';
 import { FarmerAnalyticsScreen } from '@/screens/farmer/FarmerAnalyticsScreen';
 import { FarmerUpdatesScreen } from '@/screens/farmer/FarmerUpdatesScreen';
 import { FarmerHomeScreen } from '@/screens/farmer/FarmerHomeScreen';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { normalize } from '@/utils/responsive';
 
 const RestaurantTab = createBottomTabNavigator<RestaurantTabsParamList>();
 const CharityTab = createBottomTabNavigator<CharityTabsParamList>();
 const FarmerTab = createBottomTabNavigator<FarmerTabsParamList>();
 
-const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
-  Home: 'home-outline',
-  Listings: 'basket-outline',
-  Insights: 'bar-chart-outline',
-  Plans: 'card-outline',
-  Account: 'person-outline',
-  Available: 'search-outline',
-  Impact: 'pulse-outline',
-  Updates: 'notifications-outline',
+const TAB_ICON_SIZE = normalize(26);
+const TAB_BAR_CONTENT_HEIGHT = normalize(58);
+
+const iconMap: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled: keyof typeof Ionicons.glyphMap }> = {
+  Home: { outline: 'home-outline', filled: 'home' },
+  Listings: { outline: 'basket-outline', filled: 'basket' },
+  Insights: { outline: 'bar-chart-outline', filled: 'bar-chart' },
+  Plans: { outline: 'card-outline', filled: 'card' },
+  Account: { outline: 'person-outline', filled: 'person' },
+  Available: { outline: 'search-outline', filled: 'search' },
+  Impact: { outline: 'pulse-outline', filled: 'pulse' },
+  Updates: { outline: 'notifications-outline', filled: 'notifications' },
 };
 
-const screenOptions = ({ route }: any): BottomTabNavigationOptions => ({
-  headerShown: false,
-  tabBarActiveTintColor: palette.primary,
-  tabBarInactiveTintColor: palette.textMuted,
-  tabBarStyle: {
-    height: hp(10),
-    paddingBottom: hp(2),
-    backgroundColor: palette.surface,
-    borderTopColor: palette.strokecream,
-  },
-  tabBarLabelStyle: {
-    fontFamily: 'Saveful-SemiBold',
-    fontSize: normalize(11),
-    textTransform: 'uppercase' as const,
-    paddingBottom: hp(1),
-  },
-  tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-    <Ionicons color={color} name={iconMap[route.name as keyof typeof iconMap]} size={size} />
-  ),
-});
+function useTabScreenOptions(): ({ route }: { route: { name: string } }) => BottomTabNavigationOptions {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? normalize(6) : 0);
+
+  return ({ route }) => {
+    const icons = iconMap[route.name];
+
+    return {
+      headerShown: false,
+      tabBarActiveTintColor: palette.primary,
+      tabBarInactiveTintColor: palette.textMuted,
+      tabBarStyle: {
+        height: TAB_BAR_CONTENT_HEIGHT + bottomInset,
+        paddingTop: normalize(6),
+        paddingBottom: bottomInset,
+        backgroundColor: palette.creme,
+        borderTopColor: palette.strokecream,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        ...Platform.select({
+          ios: {
+            shadowColor: palette.black,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 6,
+          },
+          android: {
+            elevation: 8,
+          },
+        }),
+      },
+      tabBarItemStyle: {
+        paddingVertical: 0,
+        marginTop: 0,
+      },
+      tabBarLabelStyle: {
+        fontFamily: 'Saveful-SemiBold',
+        fontSize: normalize(11),
+        lineHeight: normalize(15),
+        marginTop: normalize(3),
+        marginBottom: 0,
+        letterSpacing: 0.2,
+      },
+      tabBarIcon: ({ color, focused }) => (
+        <Ionicons
+          color={color}
+          name={focused && icons ? icons.filled : icons?.outline ?? 'ellipse-outline'}
+          size={TAB_ICON_SIZE}
+        />
+      ),
+      sceneContainerStyle: {
+        backgroundColor: palette.background,
+      },
+    };
+  };
+}
 
 export function RoleTabs() {
   const { selectedRole } = useAppContext();
+  const screenOptions = useTabScreenOptions();
 
   if (
     selectedRole === 'charity_single' ||

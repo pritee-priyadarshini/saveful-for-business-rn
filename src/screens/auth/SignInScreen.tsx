@@ -1,695 +1,1132 @@
+
 import React, { useRef, useState } from 'react';
 import {
-    View,
-    TouchableOpacity,
-    StyleSheet,
-    Image,
-    Alert,
-    Platform,
-    KeyboardAvoidingView,
-    ScrollView,
-    TextInput,
-    Pressable,
+  View,
+  StyleSheet,
+  Image,
+  Keyboard,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+  TextInput,
+  Pressable,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
-
-import { Screen } from '../../components/Screen';
-import { FullBleedBackground } from '../../components/FullBleedBackground';
-import { AppText } from '../../components/AppText';
-import { InputField } from '../../components/InputField';
-import { useAppContext } from '../../store/AppContext';
-import { palette } from '../../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 
+import { Screen } from '../../components/Screen';
+import { AppText } from '../../components/AppText';
+import { InputField } from '../../components/InputField';
+import { SavefulModal } from '../../components/SavefulModal';
+import { useAppContext } from '../../store/AppContext';
+import { palette } from '../../theme/colors';
 import type { AuthStackParamList } from '../../navigation/types';
 import { authService } from '../../services/auth.service';
 import {
-    isValidEmail,
-    isValidPassword,
-    MIN_PASSWORD_LENGTH,
-    passwordsMatch,
-    getForgotPasswordErrorMessage,
-    getForgotPasswordSuccessMessage,
+  isValidEmail,
+  isValidPassword,
+  MIN_PASSWORD_LENGTH,
+  passwordsMatch,
+  getForgotPasswordErrorMessage,
+  getForgotPasswordSuccessMessage,
 } from '@/utils/validation';
 import {
-    extractApiMessage,
-    getUserFriendlyErrorMessage,
-    getOtpVerificationErrorMessage,
-    showSuccessAlert,
+  extractApiMessage,
+  getUserFriendlyErrorMessage,
+  getOtpVerificationErrorMessage,
+  showSuccessAlert,
 } from '@/utils/apiError';
 import { isAxiosError } from 'axios';
 import {
-    buildAuthUserFromProfile,
-    resolveUserRole,
+  buildAuthUserFromProfile,
+  resolveUserRole,
 } from '@/utils/authSession';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize, wp } from '@/utils/responsive';
 
-export function SignInScreen() {
-    const { setAuthUser, setRole } = useAppContext();
-    const insets = useSafeAreaInsets();
-    useTransparentStatusBar('light');
+type Mode = 'login' | 'forgot';
 
-    const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+const valueProps = [
+  {
+    image: require('../../../assets/intro/welcome_reduce_waste.png'),
+    label: 'Reduce waste',
+  },
+  {
+    image: require('../../../assets/intro/welcome_feed_communities.png'),
+    label: 'Feed communities',
+  },
+  {
+    image: require('../../../assets/intro/welcome_connect_locally.png'),
+    label: 'Connect locally',
+  },
+];
 
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+const MODE_COPY: Record<Mode, { title: string; subtitle: string }> = {
+  login: {
+    title: 'Welcome back',
+    subtitle: 'Sign in to manage your surplus food listings.',
+  },
+  forgot: {
+    title: 'Forgot password?',
+    subtitle: 'Enter your registered email and we’ll send a verification code.',
+  },
+};
 
-    const [mode, setMode] = useState<'login' | 'forgot' | 'reset'>('login');
-    const [otp, setOtp] = useState(['', '', '', '', '', '']);
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
+function FormErrorBanner({ message }: { message: string }) {
+  if (!message) return null;
 
-    const inputs = useRef<(TextInput | null)[]>([]);
+  return (
+    <View style={styles.errorBanner}>
+      <Ionicons name="alert-circle-outline" size={normalize(16)} color={palette.validation} />
+      <AppText variant="bodySmall" style={styles.errorBannerText}>
+        {message}
+      </AppText>
+    </View>
+  );
+}
 
-    const [loading, setLoading] = useState(false);
-    const [resending, setResending] = useState(false);
+function PrimaryButton({
+  label,
+  onPress,
+  disabled = false,
+  showArrow = false,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  showArrow?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      style={({ pressed }) => [
+        styles.primaryButton,
+        disabled && styles.primaryButtonDisabled,
+        pressed && !disabled && styles.buttonPressed,
+      ]}
+    >
+      <AppText variant="bodyBold" style={styles.primaryButtonText}>
+        {label}
+      </AppText>
+      {showArrow ? (
+        <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+      ) : null}
+    </Pressable>
+  );
+}
 
-    const [error, setError] = useState('');
+type ResetPasswordModalFieldsProps = {
+  step: 1 | 2;
+  onStepChange: (step: 1 | 2) => void;
+  otp: string[];
+  inputs: React.MutableRefObject<(TextInput | null)[]>;
+  newPassword: string;
+  confirmPassword: string;
+  loading: boolean;
+  resending: boolean;
+  onOtpChange: (text: string, index: number) => void;
+  onOtpBackspace: (digit: string, index: number) => void;
+  onResendCode: () => void;
+  onNewPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
+  onReset: () => void;
+  onCancel: () => void;
+  onSetError: (message: string) => void;
+  onClearError: () => void;
+};
 
-    const trimmedEmail = email.trim().toLowerCase();
+function ResetPasswordModalFields({
+  step,
+  onStepChange,
+  otp,
+  inputs,
+  newPassword,
+  confirmPassword,
+  loading,
+  resending,
+  onOtpChange,
+  onOtpBackspace,
+  onResendCode,
+  onNewPasswordChange,
+  onConfirmPasswordChange,
+  onReset,
+  onCancel,
+  onSetError,
+  onClearError,
+}: ResetPasswordModalFieldsProps) {
+  const handleOtpInput = (text: string, index: number) => {
+    onOtpChange(text, index);
+    const nextDigit = text.replace(/[^0-9]/g, '');
+    const nextOtp = [...otp];
+    nextOtp[index] = nextDigit;
 
-    const switchMode = (next: 'login' | 'forgot' | 'reset') => {
-        setMode(next);
-        setError('');
-        if (next === 'login') {
-            setOtp(['', '', '', '', '', '']);
-            setNewPassword('');
-            setConfirmPassword('');
-        }
-    };
+    if (nextOtp.join('').length === 6) {
+      onClearError();
+      Keyboard.dismiss();
+      setTimeout(() => onStepChange(2), 280);
+    }
+  };
 
-    const handleLogin = async () => {
-        try {
-            if (loading) return;
-            setError('');
-            if (!trimmedEmail || !password) {
-                setError('Please enter email and password.');
-                return;
-            }
+  const handleContinueFromOtp = () => {
+    if (otp.join('').length !== 6) {
+      onSetError('Please enter the 6-digit verification code.');
+      return;
+    }
+    onClearError();
+    Keyboard.dismiss();
+    onStepChange(2);
+  };
 
-            if (!isValidEmail(trimmedEmail)) {
-                setError('Please enter a valid email address.');
-                return;
-            }
+  return (
+    <View style={styles.modalFields}>
+      <View style={styles.stepIndicator}>
+        <View style={styles.stepItem}>
+          <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]}>
+            <AppText variant="bodyBold" style={[styles.stepDotText, step >= 1 && styles.stepDotTextActive]}>
+              1
+            </AppText>
+          </View>
+          <AppText variant="caption" color={step === 1 ? palette.primary : palette.textMuted} style={styles.stepLabel}>
+            Verify code
+          </AppText>
+        </View>
 
-            // DEMO FARMER LOGIN
-            if (
-                email.trim().toLowerCase() === 'farmer@saveful.com' &&
-                password === '123456'
-            ) {
-                setAuthUser({
-                    id: 'demo-farmer',
-                    firstName: 'Demo',
-                    lastName: 'Farmer',
-                    email: 'farmer@saveful.com',
-                    accessToken: 'demo-token',
-                    orgType: 'FARMER',
-                    orgRole: 'OWNER',
-                    siteRole: null,
-                    profile: {
-                        user: {
-                            firstName: 'Demo',
-                            lastName: 'Farmer',
-                            email: 'farmer@saveful.com',
-                            phoneNumber: '9999999999',
-                            createdAt: new Date().toISOString(),
-                        },
-                        organisation: {
-                            name: 'Green Valley Farm',
-                            address: 'Demo Farm Address',
-                            logoUrl: '',
-                            type: 'FARMER',
-                        },
-                        role: {
-                            orgRole: 'OWNER',
-                            siteRole: null,
-                        },
-                        sites: [],
-                    },
-                } as any);
+        <View style={[styles.stepLine, step >= 2 && styles.stepLineActive]} />
 
-                return;
-            }
+        <View style={styles.stepItem}>
+          <View style={[styles.stepDot, step >= 2 && styles.stepDotActive]}>
+            <AppText variant="bodyBold" style={[styles.stepDotText, step >= 2 && styles.stepDotTextActive]}>
+              2
+            </AppText>
+          </View>
+          <AppText variant="caption" color={step === 2 ? palette.primary : palette.textMuted} style={styles.stepLabel}>
+            New password
+          </AppText>
+        </View>
+      </View>
 
+      {step === 1 ? (
+        <>
+          <View style={styles.otpSection}>
+            <AppText variant="label" style={styles.otpLabel}>
+              Enter verification code
+            </AppText>
+            <View style={styles.otpRow}>
+              {otp.map((digit, index) => (
+                <TextInput
+                  key={index}
+                  ref={(ref) => {
+                    inputs.current[index] = ref;
+                  }}
+                  style={[styles.otpInput, digit ? styles.otpInputFilled : null]}
+                  maxLength={1}
+                  keyboardType="number-pad"
+                  value={digit}
+                  onChangeText={(t) => handleOtpInput(t, index)}
+                  onKeyPress={({ nativeEvent }) => {
+                    if (nativeEvent.key === 'Backspace') {
+                      onOtpBackspace(digit, index);
+                    }
+                  }}
+                />
+              ))}
+            </View>
 
-            
-            setLoading(true);
-
-            const res = await authService.login(trimmedEmail, password);
-            const data = res.data;
-
-            await SecureStore.setItemAsync('accessToken', data.accessToken);
-
-            try {
-                const profileRes = await authService.profile();
-                const authUser = buildAuthUserFromProfile(
-                    profileRes.data,
-                    data.accessToken,
-                    data.siteAccess,
-                );
-                setRole(resolveUserRole(authUser));
-                setAuthUser(authUser);
-            } catch (profileError) {
-                await SecureStore.deleteItemAsync('accessToken');
-                throw profileError;
-            }
-
-        } catch (error: unknown) {
-            const status = isAxiosError(error) ? error.response?.status : undefined;
-            const apiMessage = isAxiosError(error)
-                ? extractApiMessage(error.response?.data)
-                : null;
-            const isUnverified =
-                status === 403 &&
-                typeof apiMessage === 'string' &&
-                apiMessage.toLowerCase().includes('verify');
-
-            if (isUnverified) {
-                navigation.navigate('EmailVerification', {
-                    email: trimmedEmail,
-                    autoResend: true,
-                });
-                return;
-            }
-
-            setError(
-                getUserFriendlyErrorMessage(
-                    error,
-                    'Email or password is incorrect. Please try again.',
-                ),
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSendCode = async () => {
-        try {
-            if (loading) return;
-            setError('');
-
-            if (!trimmedEmail) {
-                setError('Please enter your email address.');
-                return;
-            }
-
-            if (!isValidEmail(trimmedEmail)) {
-                setError('Please enter a valid email address.');
-                return;
-            }
-
-            setLoading(true);
-
-            const res = await authService.forgotPassword(trimmedEmail);
-
-            if (res.data?.accountExists === false || res.data?.userExists === false) {
-                setError(getForgotPasswordErrorMessage({
-                    response: { status: 404, data: { message: 'not found' } },
-                }));
-                return;
-            }
-
-            Alert.alert('Check your email', getForgotPasswordSuccessMessage(res.data?.message));
-            setOtp(['', '', '', '', '', '']);
-            setNewPassword('');
-            setConfirmPassword('');
-            setMode('reset');
-
-        } catch (e: unknown) {
-            setError(getForgotPasswordErrorMessage(e));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleResendCode = async () => {
-        if (resending || loading) return;
-        setError('');
-
-        if (!trimmedEmail) {
-            setError('Please enter your email address.');
-            return;
-        }
-
-        if (!isValidEmail(trimmedEmail)) {
-            setError('Please enter a valid email address.');
-            return;
-        }
-
-        setResending(true);
-        try {
-            const res = await authService.forgotPassword(trimmedEmail);
-
-            if (res.data?.accountExists === false || res.data?.userExists === false) {
-                setError(getForgotPasswordErrorMessage({
-                    response: { status: 404, data: { message: 'not found' } },
-                }));
-                return;
-            }
-
-            setOtp(['', '', '', '', '', '']);
-            setNewPassword('');
-            setConfirmPassword('');
-            showSuccessAlert(
-                getForgotPasswordSuccessMessage(res.data?.message),
-                'Code resent',
-            );
-        } catch (e: unknown) {
-            setError(getForgotPasswordErrorMessage(e));
-        } finally {
-            setResending(false);
-        }
-    };
-
-    const handleReset = async () => {
-        try {
-            if (loading) return;
-            setError('');
-            const enteredOtp = otp.join('');
-
-            if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
-                setError('Please enter a valid email address.');
-                return;
-            }
-
-            if (enteredOtp.length !== 6) {
-                setError('Please enter the 6-digit verification code.');
-                return;
-            }
-
-            if (!isValidPassword(newPassword)) {
-                setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-                return;
-            }
-
-            if (!passwordsMatch(newPassword, confirmPassword)) {
-                setError('Passwords do not match. Please re-enter.');
-                return;
-            }
-
-            setLoading(true);
-
-            await authService.resetPassword(trimmedEmail, enteredOtp, newPassword);
-
-            showSuccessAlert(
-                'Password reset successful. You can sign in now.',
-                'Success',
-                () => switchMode('login'),
-            );
-
-        } catch (e: unknown) {
-            setError(
-                getOtpVerificationErrorMessage(
-                    e,
-                    'Could not reset password. Please try again.',
-                ),
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleOtpChange = (text: string, index: number) => {
-        const next = [...otp];
-        next[index] = text.replace(/[^0-9]/g, '');
-        setOtp(next);
-        setError('');
-
-        if (text && index < 5) {
-            inputs.current[index + 1]?.focus();
-        }
-    };
-
-    const handleOtpBackspace = (digit: string, index: number) => {
-        if (!digit && index > 0) {
-            inputs.current[index - 1]?.focus();
-        }
-    };
-
-    return (
-        <FullBleedBackground source={require('../../../assets/intro/splash_logo.png')}>
             <Pressable
-                style={[styles.topBackButton, { top: insets.top + hp(1), left: wp(4) }]}
-                onPress={() => navigation.navigate('Welcome')}
-                hitSlop={12}
+              onPress={onResendCode}
+              disabled={resending || loading}
+              style={styles.resendButton}
             >
-                <Ionicons name="chevron-back" size={normalize(22)} color={palette.white} />
-                <AppText variant="bodyBold" style={styles.topBackButtonText}>
-                    Back
-                </AppText>
+              <AppText variant="bodySmall" color={palette.primary} style={styles.resendText}>
+                {resending ? 'Resending...' : 'Resend code'}
+              </AppText>
             </Pressable>
+          </View>
 
-            <Screen scrollable={false} backgroundColor="transparent" transparentTop>
-                <StatusBar style="light" translucent backgroundColor="transparent" />
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={{ flex: 1 }}
-                >
-                    <ScrollView
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                        bounces={false}
+          <PrimaryButton label="Continue" onPress={handleContinueFromOtp} showArrow />
+
+          <Pressable
+            onPress={onCancel}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          >
+            <AppText variant="bodyBold" color={palette.primary} style={styles.secondaryButtonText}>
+              Cancel
+            </AppText>
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <InputField
+            label="New password"
+            placeholder="Enter new password"
+            compact
+            labelVariant="label"
+            value={newPassword}
+            secureTextEntry
+            isPassword
+            onChangeText={onNewPasswordChange}
+          />
+
+          <InputField
+            label="Confirm password"
+            placeholder="Re-enter new password"
+            compact
+            labelVariant="label"
+            value={confirmPassword}
+            secureTextEntry
+            isPassword
+            onChangeText={onConfirmPasswordChange}
+          />
+
+          <PrimaryButton
+            label={loading ? 'Resetting...' : 'Reset password'}
+            onPress={onReset}
+            disabled={loading}
+          />
+
+          <Pressable
+            onPress={() => {
+              onClearError();
+              onStepChange(1);
+            }}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          >
+            <AppText variant="bodyBold" color={palette.primary} style={styles.secondaryButtonText}>
+              Back
+            </AppText>
+          </Pressable>
+        </>
+      )}
+    </View>
+  );
+}
+
+export function SignInScreen() {
+  const { setAuthUser, setRole } = useAppContext();
+  const insets = useSafeAreaInsets();
+  useTransparentStatusBar('dark');
+
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<Mode>('login');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const inputs = useRef<(TextInput | null)[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [error, setError] = useState('');
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetStep, setResetStep] = useState<1 | 2>(1);
+
+  const trimmedEmail = email.trim().toLowerCase();
+  const copy = MODE_COPY[mode];
+
+  const closeResetModal = () => {
+    setResetModalVisible(false);
+    setResetError('');
+    setResetStep(1);
+    setOtp(['', '', '', '', '', '']);
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError('');
+    closeResetModal();
+  };
+
+  const handleLogin = async () => {
+    try {
+      if (loading) return;
+      setError('');
+      if (!trimmedEmail || !password) {
+        setError('Please enter email and password.');
+        return;
+      }
+
+      if (!isValidEmail(trimmedEmail)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+
+      if (
+        email.trim().toLowerCase() === 'farmer@saveful.com' &&
+        password === '123456'
+      ) {
+        setAuthUser({
+          id: 'demo-farmer',
+          firstName: 'Demo',
+          lastName: 'Farmer',
+          email: 'farmer@saveful.com',
+          accessToken: 'demo-token',
+          orgType: 'FARMER',
+          orgRole: 'OWNER',
+          siteRole: null,
+          profile: {
+            user: {
+              firstName: 'Demo',
+              lastName: 'Farmer',
+              email: 'farmer@saveful.com',
+              phoneNumber: '9999999999',
+              createdAt: new Date().toISOString(),
+            },
+            organisation: {
+              name: 'Green Valley Farm',
+              address: 'Demo Farm Address',
+              logoUrl: '',
+              type: 'FARMER',
+            },
+            role: {
+              orgRole: 'OWNER',
+              siteRole: null,
+            },
+            sites: [],
+          },
+        } as any);
+
+        return;
+      }
+
+      setLoading(true);
+
+      const res = await authService.login(trimmedEmail, password);
+      const data = res.data;
+
+      await SecureStore.setItemAsync('accessToken', data.accessToken);
+
+      try {
+        const profileRes = await authService.profile();
+        const authUser = buildAuthUserFromProfile(
+          profileRes.data,
+          data.accessToken,
+          data.siteAccess,
+        );
+        setRole(resolveUserRole(authUser));
+        setAuthUser(authUser);
+      } catch (profileError) {
+        await SecureStore.deleteItemAsync('accessToken');
+        throw profileError;
+      }
+    } catch (loginError: unknown) {
+      const status = isAxiosError(loginError) ? loginError.response?.status : undefined;
+      const apiMessage = isAxiosError(loginError)
+        ? extractApiMessage(loginError.response?.data)
+        : null;
+      const isUnverified =
+        status === 403 &&
+        typeof apiMessage === 'string' &&
+        apiMessage.toLowerCase().includes('verify');
+
+      if (isUnverified) {
+        navigation.navigate('EmailVerification', {
+          email: trimmedEmail,
+          autoResend: true,
+        });
+        return;
+      }
+
+      setError(
+        getUserFriendlyErrorMessage(
+          loginError,
+          'Email or password is incorrect. Please try again.',
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendCode = async () => {
+    try {
+      if (loading) return;
+      setError('');
+
+      if (!trimmedEmail) {
+        setError('Please enter your email address.');
+        return;
+      }
+
+      if (!isValidEmail(trimmedEmail)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+
+      setLoading(true);
+
+      const res = await authService.forgotPassword(trimmedEmail);
+
+      if (res.data?.accountExists === false || res.data?.userExists === false) {
+        setError(getForgotPasswordErrorMessage({
+          response: { status: 404, data: { message: 'not found' } },
+        }));
+        return;
+      }
+
+      setOtp(['', '', '', '', '', '']);
+      setNewPassword('');
+      setConfirmPassword('');
+      setResetError('');
+      setResetStep(1);
+      setMode('login');
+      setResetModalVisible(true);
+    } catch (e: unknown) {
+      setError(getForgotPasswordErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resending || loading) return;
+    setResetError('');
+
+    if (!trimmedEmail) {
+      setResetError('Please enter your email address.');
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setResetError('Please enter a valid email address.');
+      return;
+    }
+
+    setResending(true);
+    try {
+      const res = await authService.forgotPassword(trimmedEmail);
+
+      if (res.data?.accountExists === false || res.data?.userExists === false) {
+        setResetError(getForgotPasswordErrorMessage({
+          response: { status: 404, data: { message: 'not found' } },
+        }));
+        return;
+      }
+
+      setOtp(['', '', '', '', '', '']);
+      setNewPassword('');
+      setConfirmPassword('');
+      showSuccessAlert(
+        getForgotPasswordSuccessMessage(res.data?.message),
+        'Code resent',
+      );
+    } catch (e: unknown) {
+      setResetError(getForgotPasswordErrorMessage(e));
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      if (loading) return;
+      setResetError('');
+      const enteredOtp = otp.join('');
+
+      if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+        setResetError('Please enter a valid email address.');
+        return;
+      }
+
+      if (enteredOtp.length !== 6) {
+        setResetError('Please enter the 6-digit verification code.');
+        return;
+      }
+
+      if (!isValidPassword(newPassword)) {
+        setResetError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+        return;
+      }
+
+      if (!passwordsMatch(newPassword, confirmPassword)) {
+        setResetError('Passwords do not match. Please re-enter.');
+        return;
+      }
+
+      setLoading(true);
+
+      await authService.resetPassword(trimmedEmail, enteredOtp, newPassword);
+
+      closeResetModal();
+      showSuccessAlert(
+        'Password reset successful. You can sign in now.',
+        'Success',
+      );
+    } catch (e: unknown) {
+      setResetError(
+        getOtpVerificationErrorMessage(
+          e,
+          'Could not reset password. Please try again.',
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (text: string, index: number) => {
+    const next = [...otp];
+    next[index] = text.replace(/[^0-9]/g, '');
+    setOtp(next);
+    setResetError('');
+
+    if (text && index < 5) {
+      inputs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpBackspace = (digit: string, index: number) => {
+    if (!digit && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  };
+
+  return (
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <View style={styles.topAccent} />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            (mode === 'login' || mode === 'forgot') && styles.scrollContentCentered,
+            {
+              paddingTop: insets.top + hp(3.5),
+              paddingBottom: insets.bottom + hp(2.5),
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Pressable
+            style={styles.backRow}
+            onPress={() => {
+              if (resetModalVisible) {
+                closeResetModal();
+                return;
+              }
+              if (mode === 'login') {
+                navigation.navigate('Welcome');
+              } else {
+                switchMode('login');
+              }
+            }}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={normalize(20)} color={palette.kale} />
+            <AppText variant="bodyBold" style={styles.backRowText}>
+              {mode === 'login' ? 'Back' : 'Back to sign in'}
+            </AppText>
+          </Pressable>
+
+          <View style={styles.formShell}>
+            {mode === 'login' ? (
+              <View style={styles.iconRow}>
+                {valueProps.map((item) => (
+                  <View key={item.label} style={styles.iconItem}>
+                    <Image source={item.image} style={styles.valuePropImage} resizeMode="contain" />
+                    <AppText variant="caption" color={palette.textMuted} style={styles.iconLabel}>
+                      {item.label}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.formCard}>
+              <View style={styles.formHeaderBand}>
+                <Image
+                  source={require('../../../assets/intro/logo.png')}
+                  style={styles.formLogo}
+                  resizeMode="contain"
+                />
+                <AppText variant="h6" color={palette.primary} style={styles.formTitle}>
+                  {copy.title}
+                </AppText>
+                <AppText variant="bodySmall" color={palette.textMuted} style={styles.formSubtitle}>
+                  {copy.subtitle}
+                </AppText>
+              </View>
+
+              <View style={styles.fieldsPanel}>
+                <InputField
+                  label="Email address"
+                  placeholder="your@email.com"
+                  compact
+                  labelVariant="label"
+                  value={email}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    setError('');
+                  }}
+                />
+
+                {mode === 'login' ? (
+                  <>
+                    <InputField
+                      label="Password"
+                      placeholder="Enter your password"
+                      compact
+                      labelVariant="label"
+                      value={password}
+                      secureTextEntry
+                      isPassword
+                      onChangeText={(t) => {
+                        setPassword(t);
+                        setError('');
+                      }}
+                    />
+
+                    <Pressable
+                      onPress={() => switchMode('forgot')}
+                      style={styles.forgotLinkWrap}
+                      hitSlop={4}
                     >
-                        <View style={styles.container}>
+                      <AppText variant="bodySmall" color={palette.primary} style={styles.forgotLink}>
+                        Forgot password?
+                      </AppText>
+                    </Pressable>
+                  </>
+                ) : null}
 
-                            {/* FORM */}
-                            <View style={styles.form}>
-                                <AppText variant="subheading" style={styles.title}>
-                                    {mode === 'login' && 'Welcome Back'}
-                                    {mode === 'forgot' && 'Forgot Password'}
-                                    {mode === 'reset' && 'Reset Password'}
-                                </AppText>
+                <FormErrorBanner message={error} />
 
-                                {/* EMAIL */}
-                                <InputField
-                                    label="Email Address *"
-                                    placeholder="your@email.com"
-                                    value={email}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    onChangeText={(text) => {
-                                        setEmail(text);
-                                        setError('');
-                                    }}
-                                />
+                {mode === 'login' ? (
+                  <PrimaryButton
+                    label={loading ? 'Signing in...' : 'Sign in'}
+                    onPress={handleLogin}
+                    disabled={loading}
+                    showArrow
+                  />
+                ) : null}
 
-                                {/* LOGIN MODE */}
-                                {mode === 'login' && (
-                                    <>
-                                        <InputField
-                                            label="Password *"
-                                            value={password}
-                                            secureTextEntry
-                                            isPassword
-                                            onChangeText={(t) => {
-                                                setPassword(t);
-                                                setError('');
-                                            }}
-                                        />
+                {mode === 'forgot' ? (
+                  <>
+                    <PrimaryButton
+                      label={loading ? 'Sending...' : 'Send verification code'}
+                      onPress={handleSendCode}
+                      disabled={loading}
+                    />
+                    <Pressable
+                      onPress={() => switchMode('login')}
+                      style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+                    >
+                      <AppText variant="bodyBold" color={palette.primary} style={styles.secondaryButtonText}>
+                        Back to sign in
+                      </AppText>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
 
-                                        <TouchableOpacity onPress={() => switchMode('forgot')}>
-                                            <AppText variant="caption">
-                                                Forgot Password?
-                                            </AppText>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
+              {mode === 'login' ? (
+                <View style={styles.signUpFooter}>
+                  <AppText variant="bodySmall" color={palette.textMuted} style={styles.signUpPrompt}>
+                    Don&apos;t have an account?
+                  </AppText>
+                  <Pressable onPress={() => navigation.navigate('RoleSelectionMain')} hitSlop={8}>
+                    <AppText variant="bodyBold" color={palette.primary} style={styles.signUpLink}>
+                      Sign up
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-                                {/* FORGOT MODE */}
-                                {mode === 'forgot' && (
-                                    <>
-                                        {/* SUBTEXT */}
-                                        <AppText variant='bodySmall' style={styles.subText}>
-                                            Enter your registered email address. We’ll send you a verification code to reset your password.
-                                        </AppText>
-
-                                        {/* SEND CODE */}
-                                        <TouchableOpacity
-                                            style={styles.button}
-                                            onPress={handleSendCode}
-                                            disabled={loading}
-                                        >
-                                            <AppText variant='label' style={styles.buttonText}>
-                                                {loading ? 'Sending...' : 'Send Verification Code'}
-                                            </AppText>
-                                        </TouchableOpacity>
-
-                                        {/* BACK TO SIGN IN */}
-                                        <TouchableOpacity
-                                            style={styles.backToLogin}
-                                            onPress={() => switchMode('login')}
-                                        >
-                                            <AppText variant='label' style={styles.backText}>
-                                                Back to Sign In
-                                            </AppText>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
-
-                                {/* RESET MODE */}
-                                {mode === 'reset' && (
-                                    <>
-                                        <AppText variant='bodySmall' style={styles.subText}>
-                                            Enter the code sent to {trimmedEmail || 'your email'} and choose a new password.
-                                        </AppText>
-
-                                        <AppText variant='label'>
-                                            Verification code
-                                        </AppText>
-                                        <View style={styles.otpRow}>
-                                            {otp.map((d, i) => (
-                                                <TextInput
-                                                    key={i}
-                                                    ref={(r) => {
-                                                        inputs.current[i] = r;
-                                                    }}
-                                                    style={styles.otp}
-                                                    maxLength={1}
-                                                    keyboardType="number-pad"
-                                                    value={d}
-                                                    onChangeText={(t) => handleOtpChange(t, i)}
-                                                    onKeyPress={({ nativeEvent }) => {
-                                                        if (nativeEvent.key === 'Backspace') {
-                                                            handleOtpBackspace(d, i);
-                                                        }
-                                                    }}
-                                                />
-                                            ))}
-                                        </View>
-
-                                        <Pressable
-                                            style={styles.resendButton}
-                                            onPress={handleResendCode}
-                                            disabled={resending || loading}
-                                        >
-                                            <AppText variant="label" style={styles.resendText}>
-                                                {resending ? 'Resending...' : 'Resend code'}
-                                            </AppText>
-                                        </Pressable>
-
-                                        <InputField
-                                            label="New Password"
-                                            value={newPassword}
-                                            secureTextEntry
-                                            isPassword
-                                            onChangeText={(value) => {
-                                                setNewPassword(value);
-                                                setError('');
-                                            }}
-                                        />
-
-                                        <InputField
-                                            label="Confirm Password"
-                                            value={confirmPassword}
-                                            secureTextEntry
-                                            isPassword
-                                            onChangeText={(value) => {
-                                                setConfirmPassword(value);
-                                                setError('');
-                                            }}
-                                        />
-
-                                        <TouchableOpacity
-                                            style={styles.button}
-                                            onPress={handleReset}
-                                            disabled={loading}
-                                        >
-                                            <AppText style={styles.buttonText}>
-                                                {loading ? 'Resetting...' : 'Reset Password'}
-                                            </AppText>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={styles.backToLogin}
-                                            onPress={() => switchMode('login')}
-                                        >
-                                            <AppText variant="label" style={styles.backText}>
-                                                Back to Sign In
-                                            </AppText>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
-
-                                {/* ERROR */}
-                                {error ? (
-                                    <AppText style={styles.error}>{error}</AppText>
-                                ) : null}
-
-                                {/* LOGIN BUTTON */}
-                                {mode === 'login' && (
-                                    <TouchableOpacity
-                                        style={[styles.button, loading && { opacity: 0.65 }]}
-                                        onPress={handleLogin}
-                                        disabled={loading}
-                                    >
-                                        <AppText style={styles.buttonText}>
-                                            {loading ? 'Signing In...' : 'Sign In'}
-                                        </AppText>
-                                    </TouchableOpacity>
-                                )}
-
-                                {mode === 'login' && (
-                                    <View style={styles.signUpRow}>
-                                        <AppText variant="bodySmall" style={styles.signUpPrompt}>
-                                            Don't have an account?
-                                        </AppText>
-                                        <Pressable onPress={() => navigation.navigate('RoleSelectionMain')}>
-                                            <AppText variant="bodySmall" style={styles.signUpLink}>
-                                                Sign up here
-                                            </AppText>
-                                        </Pressable>
-                                    </View>
-                                )}
-
-                            </View>
-                        </View>
-                    </ScrollView>
-                </KeyboardAvoidingView>
-            </Screen>
-        </FullBleedBackground>
-    );
+      <SavefulModal
+        visible={resetModalVisible}
+        onClose={closeResetModal}
+        title={resetStep === 1 ? 'Verify your code' : 'Set new password'}
+        subtitle={
+          resetStep === 1
+            ? trimmedEmail
+              ? `Enter the 6-digit code sent to ${trimmedEmail}.`
+              : 'Enter the 6-digit code from your email.'
+            : 'Choose a secure password for your account.'
+        }
+        error={resetError}
+      >
+        <ResetPasswordModalFields
+          step={resetStep}
+          onStepChange={(step) => {
+            setResetError('');
+            setResetStep(step);
+          }}
+          otp={otp}
+          inputs={inputs}
+          newPassword={newPassword}
+          confirmPassword={confirmPassword}
+          loading={loading}
+          resending={resending}
+          onOtpChange={handleOtpChange}
+          onOtpBackspace={handleOtpBackspace}
+          onResendCode={handleResendCode}
+          onNewPasswordChange={(value) => {
+            setNewPassword(value);
+            setResetError('');
+          }}
+          onConfirmPasswordChange={(value) => {
+            setConfirmPassword(value);
+            setResetError('');
+          }}
+          onReset={handleReset}
+          onCancel={closeResetModal}
+          onSetError={setResetError}
+          onClearError={() => setResetError('')}
+        />
+      </SavefulModal>
+    </Screen>
+  );
 }
 
 const styles = StyleSheet.create({
-    scrollContent: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        paddingTop: hp(6),
-    },
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        padding: wp(6),
-    },
-    top: {
-        alignItems: 'center',
-        marginBottom: hp(23),
-    },
-    logo: {
-        width: wp(50),
-        height: hp(10),
-    },
-    form: {
-        borderColor: palette.border,
-        borderWidth: 1,
-        backgroundColor: palette.white,
-        borderRadius: normalize(20),
-        padding: wp(6),
-        gap: hp(2),
-        marginBottom: -hp(20),
-        marginTop: -hp(10),
-    },
-    title: {
-        textAlign: 'center',
-        fontSize: normalize(20),
-    },
-    passwordHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: hp(0.5),
-    },
-    eye: {
-        position: 'absolute',
-        right: wp(3),
-        top: hp(4),
-    },
-    button: {
-        backgroundColor: palette.primary,
-        padding: hp(1.8),
-        borderRadius: normalize(14),
-        alignItems: 'center',
-    },
-    buttonText: {
-        color: palette.white,
-        fontSize: normalize(16),
-    },
-    error: {
-        color: palette.danger,
-        textAlign: 'center',
-        fontSize: normalize(12),
-    },
+  topAccent: {
+    width: '100%',
+    height: hp(0.35),
+    backgroundColor: palette.middlegreen,
+  },
 
-    otp: {
-        flex: 1,
-        height: 50,
-        borderWidth: 1,
-        borderRadius: 10,
-        textAlign: 'center',
-    },
+  keyboardView: {
+    flex: 1,
+  },
 
-    otpRow: {
-        flexDirection: 'row',
-        gap: 6,
-    },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: wp(5),
+    gap: hp(1.2),
+  },
 
-    resendButton: {
-        alignSelf: 'center',
-    },
+  scrollContentCentered: {
+    justifyContent: 'center',
+  },
 
-    resendText: {
-        color: palette.primary,
-        textDecorationLine: 'underline',
-        fontSize: normalize(14),
-    },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: wp(0.5),
+    paddingVertical: hp(0.3),
+    marginBottom: hp(0.5),
+  },
 
-    subText: {
-        textAlign: 'center',
-        color: palette.textMuted,
-        fontSize: normalize(13),
-        lineHeight: normalize(15),
-        marginBottom: hp(1),
-    },
+  backRowText: {
+    color: palette.kale,
+    textTransform: 'none',
+    fontSize: normalize(15),
+  },
 
-    backToLogin: {
-        backgroundColor: palette.radish,
-        padding: hp(1.8),
-        borderRadius: normalize(14),
-        alignItems: 'center',
-    },
+  formShell: {
+    flex: 1,
+    gap: hp(1.8),
+    marginTop: hp(1.5),
+  },
 
-    backText: {
-        color: palette.primary,
-        fontSize: normalize(13),
-    },
+  iconRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(2),
+    gap: wp(2),
+  },
 
-    topBackButton: {
-        position: 'absolute',
-        zIndex: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: wp(1),
-        paddingVertical: hp(0.8),
-        paddingHorizontal: wp(3),
-        borderRadius: normalize(20),
-        backgroundColor: 'rgba(75, 33, 118, 0.85)',
-    },
+  iconItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: hp(0.5),
+  },
 
-    topBackButtonText: {
-        color: palette.white,
-        fontSize: normalize(14),
-    },
+  valuePropImage: {
+    width: normalize(72),
+    height: normalize(72),
+  },
 
-    signUpRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: wp(1),
-    },
+  iconLabel: {
+    textAlign: 'center',
+    fontSize: normalize(10),
+    lineHeight: normalize(13),
+    letterSpacing: 0.3,
+  },
 
-    signUpPrompt: {
-        color: palette.textMuted,
-        fontSize: normalize(14),
-    },
+  formCard: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(24),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: palette.black,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
 
-    signUpLink: {
-        color: palette.primary,
-        fontSize: normalize(14),
-        textDecorationLine: 'underline',
-    },
+  formHeaderBand: {
+    alignItems: 'center',
+    gap: hp(0.6),
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    paddingBottom: hp(2),
+    backgroundColor: palette.creme,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.strokecream,
+  },
+
+  formLogo: {
+    width: wp(36),
+    height: hp(5),
+  },
+
+  formTitle: {
+    textAlign: 'center',
+    fontSize: normalize(24),
+    lineHeight: normalize(30),
+    textTransform: 'none',
+  },
+
+  formSubtitle: {
+    textAlign: 'center',
+    fontSize: normalize(14),
+    lineHeight: normalize(20),
+    textTransform: 'none',
+    maxWidth: wp(72),
+  },
+
+  fieldsPanel: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    paddingBottom: hp(2.2),
+    gap: hp(1.3),
+  },
+
+  forgotLinkWrap: {
+    alignSelf: 'flex-end',
+    marginTop: -hp(0.4),
+  },
+
+  forgotLink: {
+    textTransform: 'none',
+    textDecorationLine: 'underline',
+    fontSize: normalize(13),
+  },
+
+  modalFields: {
+    gap: hp(1.6),
+  },
+
+  stepIndicator: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: wp(2),
+    paddingBottom: hp(0.5),
+  },
+
+  stepItem: {
+    alignItems: 'center',
+    gap: hp(0.5),
+    width: wp(24),
+  },
+
+  stepDot: {
+    width: normalize(32),
+    height: normalize(32),
+    borderRadius: normalize(16),
+    borderWidth: 2,
+    borderColor: palette.strokecream,
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  stepDotActive: {
+    borderColor: palette.kale,
+    backgroundColor: palette.kale,
+  },
+
+  stepDotText: {
+    fontSize: normalize(14),
+    color: palette.textMuted,
+    textTransform: 'none',
+  },
+
+  stepDotTextActive: {
+    color: palette.white,
+  },
+
+  stepLabel: {
+    textAlign: 'center',
+    fontSize: normalize(10),
+    letterSpacing: 0.3,
+  },
+
+  stepLine: {
+    width: wp(12),
+    height: 2,
+    backgroundColor: palette.strokecream,
+    marginTop: normalize(15),
+  },
+
+  stepLineActive: {
+    backgroundColor: palette.kale,
+  },
+
+  otpSection: {
+    gap: hp(0.8),
+  },
+
+  otpLabel: {
+    textTransform: 'none',
+    color: palette.black,
+    fontSize: normalize(16),
+  },
+
+  otpRow: {
+    flexDirection: 'row',
+    gap: wp(1.5),
+  },
+
+  otpInput: {
+    flex: 1,
+    height: normalize(48),
+    borderWidth: 1,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    textAlign: 'center',
+    fontSize: normalize(18),
+    color: palette.text,
+  },
+
+  otpInputFilled: {
+    borderColor: palette.kale,
+    backgroundColor: '#F4FAF6',
+  },
+
+  resendButton: {
+    alignSelf: 'center',
+    paddingVertical: hp(0.4),
+  },
+
+  resendText: {
+    textTransform: 'none',
+    textDecorationLine: 'underline',
+    fontSize: normalize(13),
+  },
+
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2),
+    backgroundColor: '#FFF0EE',
+    borderWidth: 1,
+    borderColor: palette.validation,
+    borderRadius: normalize(10),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.2),
+  },
+
+  errorBannerText: {
+    flex: 1,
+    color: palette.validation,
+    textTransform: 'none',
+    lineHeight: normalize(18),
+  },
+
+  primaryButton: {
+    backgroundColor: palette.eggplant,
+    minHeight: normalize(52),
+    paddingVertical: hp(1.6),
+    paddingHorizontal: wp(5),
+    borderRadius: normalize(14),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2),
+    marginTop: hp(0.4),
+    ...Platform.select({
+      ios: {
+        shadowColor: palette.eggplant,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+
+  primaryButtonDisabled: {
+    opacity: 0.65,
+  },
+
+  primaryButtonText: {
+    color: palette.white,
+    fontSize: normalize(16),
+    textTransform: 'none',
+  },
+
+  secondaryButton: {
+    minHeight: normalize(48),
+    paddingVertical: hp(1.4),
+    borderRadius: normalize(14),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    backgroundColor: palette.creme,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  secondaryButtonText: {
+    textTransform: 'none',
+    fontSize: normalize(15),
+  },
+
+  signUpFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: wp(1.5),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(5),
+    borderTopWidth: 1,
+    borderTopColor: palette.strokecream,
+    backgroundColor: '#FAFAF5',
+  },
+
+  signUpPrompt: {
+    fontSize: normalize(14),
+    textTransform: 'none',
+  },
+
+  signUpLink: {
+    fontSize: normalize(14),
+    textTransform: 'none',
+    textDecorationLine: 'underline',
+  },
+
+  buttonPressed: {
+    opacity: 0.85,
+  },
 });

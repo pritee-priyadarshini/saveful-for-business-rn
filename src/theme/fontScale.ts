@@ -8,5 +8,5 @@ export function scaleLineHeight(fontSize: number, lineHeight?: number) {
   if (lineHeight != null) {
     return Math.round(lineHeight * FONT_SCALE);
   }
-  return Math.round(fontSize * FONT_SCALE * 1.12);
+  return Math.round(fontSize * FONT_SCALE * 1.32);
 }
