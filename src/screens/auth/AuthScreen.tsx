@@ -36,7 +36,7 @@ import { COUNTRY_CODES, findCountryByIso, appendSignupMobileFields } from '@/dat
 import type { CountryCode } from '@/data/countryCodes';
 import { fetchCurrentLocation } from '@/utils/currentLocation';
 import { getUserFriendlyErrorMessage } from '@/utils/apiError';
-import { REGION_OPTIONS, getRegionLabel, appendSignupRegion, isValidRegion } from '@/data/regions';
+import { REGION_OPTIONS, getRegionLabel, appendSignupRegionAndCoordinates, isValidRegion } from '@/data/regions';
 import type { Region } from '@/types';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -537,16 +537,19 @@ export function AuthScreen() {
         appendSignupMobileFields(form, restaurantForm);
 
         form.append('businessName', restaurantForm.businessName);
-        form.append('businessAddress', restaurantForm.businessAddress);
+        form.append('businessAddress', restaurantForm.businessAddress.trim());
         form.append('registrationNumber', restaurantForm.registrationNumber);
         form.append('brandName', restaurantForm.branding);
         if (restaurantForm.venueType.trim()) {
           form.append('venueType', restaurantForm.venueType);
         }
         form.append('orgType', mapRole(selectedRole));
-        appendSignupRegion(form, restaurantForm.region);
-        form.append('latitude', restaurantForm.latitude);
-        form.append('longitude', restaurantForm.longitude);
+        appendSignupRegionAndCoordinates(
+          form,
+          restaurantForm.region,
+          restaurantForm.latitude,
+          restaurantForm.longitude,
+        );
 
         if (restaurantForm.logo) {
           form.append('logo', {
@@ -566,15 +569,18 @@ export function AuthScreen() {
         appendSignupMobileFields(form, farmerForm, 'mobileNumber');
 
         form.append('businessName', farmerForm.businessName);
-        form.append('businessAddress', farmerForm.businessAddress);
+        form.append('businessAddress', farmerForm.businessAddress.trim());
         form.append('brandName', farmerForm.branding);
+        form.append('orgType', 'FARMER_PRODUCER');
         if (farmerForm.venueType.trim()) {
           form.append('venueType', farmerForm.venueType);
         }
-        form.append('orgType', 'FARMER_PRODUCER');
-        appendSignupRegion(form, farmerForm.region);
-        form.append('latitude', farmerForm.latitude);
-        form.append('longitude', farmerForm.longitude);
+        appendSignupRegionAndCoordinates(
+          form,
+          farmerForm.region,
+          farmerForm.latitude,
+          farmerForm.longitude,
+        );
 
         if (farmerForm.logo) {
           form.append('logo', {
@@ -595,14 +601,17 @@ export function AuthScreen() {
 
         form.append('farmName', farmerForm.businessName);
         form.append('businessName', farmerForm.businessName);
-        form.append('address', farmerForm.businessAddress);
+        form.append('address', farmerForm.businessAddress.trim());
         form.append('brandName', farmerForm.branding);
         if (farmerForm.venueType.trim()) {
           form.append('venueType', farmerForm.venueType);
         }
-        appendSignupRegion(form, farmerForm.region);
-        form.append('latitude', farmerForm.latitude);
-        form.append('longitude', farmerForm.longitude);
+        appendSignupRegionAndCoordinates(
+          form,
+          farmerForm.region,
+          farmerForm.latitude,
+          farmerForm.longitude,
+        );
 
         if (farmerForm.logo) {
           form.append('logo', {
@@ -622,15 +631,18 @@ export function AuthScreen() {
         appendSignupMobileFields(form, charityForm);
 
         form.append('charityName', charityForm.charityName);
-        form.append('charityAddress', charityForm.charityAddress);
+        form.append('charityAddress', charityForm.charityAddress.trim());
         form.append('registrationNumber', charityForm.registrationNumber);
         form.append('brandName', charityForm.branding);
         form.append('charityType', mapRole(selectedRole));
-        form.append('pickupPostCode', charityForm.postcodes);
-        form.append('pickupRadiusKm', charityForm.pickupRadius || '5');
-        appendSignupRegion(form, charityForm.region);
-        form.append('latitude', charityForm.latitude);
-        form.append('longitude', charityForm.longitude);
+        form.append('pickupPostCode', charityForm.postcodes.trim());
+        form.append('pickupRadiusKm', String(Number(charityForm.pickupRadius) || 5));
+        appendSignupRegionAndCoordinates(
+          form,
+          charityForm.region,
+          charityForm.latitude,
+          charityForm.longitude,
+        );
 
         if (charityForm.logo) {
           form.append('logo', {

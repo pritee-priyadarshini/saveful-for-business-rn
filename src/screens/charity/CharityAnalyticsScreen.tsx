@@ -15,10 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { Skeleton } from '../../components/Skeleton';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
-import { charityProfile } from '../../data/mockData';
+import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
+import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { palette } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -39,28 +41,31 @@ const ANALYTICS_ICONS = {
   rating: require('../../../assets/placeholder/rating_icon.png'),
 };
 
-const MONTHLY_STATS = {
-  foodRecoveredKg: 1300,
-  mealsCreated: 2340,
-  co2AvoidedKg: 6400,
-  collectionsCompleted: 18,
-  rating: 4.5,
-};
-
-const LIFETIME_STATS = {
-  foodRecoveredKg: 4800,
-  mealsCreated: 2340,
-  co2AvoidedKg: 9600,
-  collectionsCompleted: 123,
-  rating: 4.5,
-};
-
-type ImpactStats = typeof MONTHLY_STATS;
-
 const formatNumber = (value: number) => value.toLocaleString('en-US');
 
 type TimeRange = 'week' | 'month' | 'year';
 type ImpactMetric = 'foodRecovered' | 'mealsCreated' | 'co2Avoided' | 'collectionsCompleted';
+
+const METRIC_TO_CHART: Record<ImpactMetric, ChartMetricKey> = {
+  foodRecovered: 'food',
+  mealsCreated: 'meals',
+  co2Avoided: 'co2',
+  collectionsCompleted: 'collections',
+};
+
+function formatRating(rating: number | null): string {
+  return rating != null ? `${rating}/5` : '—';
+}
+
+function toCharityStats(stats: ImpactDisplayStats) {
+  return {
+    foodRecoveredKg: stats.redistributedKg,
+    mealsCreated: stats.mealsCreated,
+    co2AvoidedKg: stats.co2AvoidedKg,
+    collectionsCompleted: stats.collectionsCompleted,
+    rating: stats.rating,
+  };
+}
 
 const TIME_RANGES: { key: TimeRange; label: string }[] = [
   { key: 'week', label: 'Week' },
@@ -75,39 +80,6 @@ const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = 
   { key: 'collectionsCompleted', label: 'Collections Completed' },
 ];
 
-const TREND_DATA: Record<
-  TimeRange,
-  {
-    labels: string[];
-    foodRecovered: number[];
-    mealsCreated: number[];
-    co2Avoided: number[];
-    collectionsCompleted: number[];
-  }
-> = {
-  week: {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    foodRecovered: [120, 180, 140, 260, 220, 340, 400],
-    mealsCreated: [20, 45, 30, 78, 58, 118, 150],
-    co2Avoided: [90, 130, 100, 190, 170, 260, 330],
-    collectionsCompleted: [1, 2, 3, 4, 5, 7, 8],
-  },
-  month: {
-    labels: ['W1', 'W2', 'W3', 'W4'],
-    foodRecovered: [800, 1100, 1400, 1800],
-    mealsCreated: [150, 220, 180, 300],
-    co2Avoided: [500, 700, 900, 1200],
-    collectionsCompleted: [12, 18, 24, 30],
-  },
-  year: {
-    labels: ['21', '22', '23', '24', '25'],
-    foodRecovered: [6000, 7200, 8400, 9800, 11200],
-    mealsCreated: [500, 700, 650, 900, 1200],
-    co2Avoided: [4200, 5100, 6200, 7700, 9200],
-    collectionsCompleted: [90, 110, 130, 150, 180],
-  },
-};
-
 export function CharityAnalyticsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentProfile } = useAppContext();
@@ -115,11 +87,21 @@ export function CharityAnalyticsScreen() {
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('mealsCreated');
 
-  const filtered = TREND_DATA[range];
-  const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
+  const {
+    loading,
+    monthStats,
+    lifetimeStats,
+    getChartSeries,
+    isMultiSite,
+  } = useImpactAnalytics({ chartPeriod: range });
 
-  const organization = currentProfile.organization || charityProfile.organization;
-  const address = currentProfile.address || charityProfile.address;
+  const chartSeries = getChartSeries(METRIC_TO_CHART[selectedMetric]);
+  const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
+  const monthDisplay = toCharityStats(monthStats);
+  const lifetimeDisplay = toCharityStats(lifetimeStats);
+
+  const organization = currentProfile.organization || 'Your charity';
+  const address = currentProfile.address || '';
   const logoInitial = organization?.[0] || 'S';
 
   const renderMetricCard = (icon: ImageSourcePropType, value: string, label: string) => (
@@ -138,7 +120,7 @@ export function CharityAnalyticsScreen() {
     </View>
   );
 
-  const renderImpactMetricsSection = (title: string, stats: ImpactStats) => (
+  const renderImpactMetricsSection = (title: string, stats: ReturnType<typeof toCharityStats>) => (
     <>
       <AppText variant="h8" style={styles.sectionTitle}>
         {title}
@@ -178,7 +160,7 @@ export function CharityAnalyticsScreen() {
             </View>
             <View style={styles.metricContent}>
               <AppText variant="h8" style={styles.metricValue}>
-                {stats.rating}/5
+                {formatRating(stats.rating)}
               </AppText>
               <AppText variant="caption" style={styles.metricLabel}>
                 Rating
@@ -189,6 +171,21 @@ export function CharityAnalyticsScreen() {
       </View>
     </>
   );
+
+  if (loading) {
+    return (
+      <Screen backgroundColor={palette.creme}>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+          <Skeleton width="100%" height={hp(22)} borderRadius={0} />
+          <View style={{ padding: wp(5), gap: hp(1.5) }}>
+            <Skeleton width="100%" height={normalize(48)} borderRadius={normalize(12)} />
+            <Skeleton width="100%" height={hp(24)} borderRadius={normalize(12)} />
+            <Skeleton width="100%" height={hp(30)} borderRadius={normalize(12)} />
+          </View>
+        </ScrollView>
+      </Screen>
+    );
+  }
 
   return (
     <Screen backgroundColor={palette.creme}>
@@ -232,6 +229,11 @@ export function CharityAnalyticsScreen() {
               <AppText variant="h4" style={styles.heroTitle}>
                 YOUR DASHBOARD
               </AppText>
+              {isMultiSite ? (
+                <AppText variant="caption" style={styles.multiSiteHint}>
+                  Combined impact across all sites
+                </AppText>
+              ) : null}
             </View>
           </View>
         </View>
@@ -246,7 +248,7 @@ export function CharityAnalyticsScreen() {
         </Pressable>
 
         <View style={styles.topSection}>
-          {renderImpactMetricsSection('This month', MONTHLY_STATS)}
+          {renderImpactMetricsSection('This month', monthDisplay)}
         </View>
 
         <View style={styles.impactOverTimeSection}>
@@ -299,8 +301,8 @@ export function CharityAnalyticsScreen() {
             <LineChart
               key={`${range}-${selectedMetric}`}
               data={{
-                labels: filtered.labels,
-                datasets: [{ data: filtered[selectedMetric] }],
+                labels: chartSeries.labels,
+                datasets: [{ data: chartSeries.values }],
               }}
               width={chartWidth + wp(5)}
               height={hp(26)}
@@ -320,7 +322,7 @@ export function CharityAnalyticsScreen() {
         </View>
 
         <View style={styles.lifetimeSection}>
-          {renderImpactMetricsSection('Lifetime impact', LIFETIME_STATS)}
+          {renderImpactMetricsSection('Lifetime impact', lifetimeDisplay)}
         </View>
       </ScrollView>
     </Screen>
@@ -434,6 +436,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingTop: hp(0.5),
+  },
+  multiSiteHint: {
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    marginTop: hp(0.5),
   },
   topSection: {
 

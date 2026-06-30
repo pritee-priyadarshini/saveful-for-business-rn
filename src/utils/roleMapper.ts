@@ -4,6 +4,7 @@ export function mapRole(role: string) {
     restaurant_multi: 'BUSINESS_MULTI',
     charity_single: 'CHARITY_SINGLE',
     charity_multi: 'CHARITY_MULTI',
+    farm_business: 'FARMER_PRODUCER',
   };
 
   return map[role];

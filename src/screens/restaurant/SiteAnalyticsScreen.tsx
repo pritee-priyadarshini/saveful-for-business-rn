@@ -1,64 +1,67 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
   Pressable,
   StyleSheet,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { Skeleton } from '../../components/Skeleton';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
+import { useSitesStore } from '@/store/sitesStore';
+import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
+import { getSiteDisplayName } from '@/utils/impactSites';
 
 export default function SiteAnalyticsScreen() {
   const navigation = useNavigation();
-
-  const sites = [
-    {
-      id: '1',
-      name: 'Burger King - DN Regalia , BBSR',
-      analytics: {
-        redistributedKg: 4800,
-        peopleKg: 3600,
-        collections: 123,
-        charities: 4,
-        rating: 4.5,
-      },
-    },
-    {
-      id: '2',
-      name: 'Burger King - Esplanade , BBSR',
-      analytics: {
-        redistributedKg: 3200,
-        peopleKg: 2100,
-        collections: 84,
-        charities: 3,
-        rating: 4.7,
-      },
-    },
-  ];
-
-  const [selectedSite, setSelectedSite] = useState(sites[0]);
+  const { sites, sitesWithManagers, fetchOrganisation } = useSitesStore();
+  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const analytics = selectedSite.analytics;
-  const redistributedKg = analytics.redistributedKg;
 
-  // 420g = 1 meal
-  const mealsCreated = Math.floor((redistributedKg * 1000) / 420);
+  useEffect(() => {
+    void fetchOrganisation();
+  }, [fetchOrganisation]);
 
-  // ₹200 per meal
-  const moneySaved = mealsCreated * 1.5;
+  const siteOptions = useMemo(() => {
+    if (sitesWithManagers.length > 0) {
+      return sitesWithManagers.map((site) => ({
+        id: site.id,
+        name: site.tradingName || getSiteDisplayName(site),
+      }));
+    }
+    return (sites ?? []).map((site: any) => ({
+      id: Number(site.id),
+      name: getSiteDisplayName(site),
+    }));
+  }, [sites, sitesWithManagers]);
 
-  // 1kg food waste ≈ 2.5kg CO₂e
-  const co2Avoided = redistributedKg * 2.5;
+  useEffect(() => {
+    if (selectedSiteId == null && siteOptions.length > 0) {
+      setSelectedSiteId(siteOptions[0].id);
+    }
+  }, [siteOptions, selectedSiteId]);
 
-  const peopleKg = analytics.peopleKg;
-  const animalKg = redistributedKg - peopleKg;
-  const peoplePercent = Math.round((peopleKg / redistributedKg) * 100);
-  const animalPercent = 100 - peoplePercent;
+  const selectedSite = siteOptions.find((site) => site.id === selectedSiteId) ?? siteOptions[0];
+  const { loading, lifetimeStats } = useImpactAnalytics({
+    siteId: selectedSite?.id ?? null,
+    chartPeriod: 'month',
+  });
+
+  const redistributedKg = lifetimeStats.redistributedKg;
+  const mealsCreated = lifetimeStats.mealsCreated;
+  const moneySaved = lifetimeStats.foodSavedMoney;
+  const co2Avoided = lifetimeStats.co2AvoidedKg;
+  const peopleKg = lifetimeStats.peopleKg;
+  const animalKg = lifetimeStats.animalKg;
+  const peoplePercent = lifetimeStats.peoplePercent;
+  const animalPercent = lifetimeStats.animalPercent;
+  const ratingLabel = lifetimeStats.rating != null ? `${lifetimeStats.rating}/5` : '—';
 
   return (
     <Screen backgroundColor={palette.creme}>
@@ -88,6 +91,13 @@ export default function SiteAnalyticsScreen() {
         {/* SITE SELECTOR */}
 
         <View style={styles.contentWrapper}>
+          {!selectedSite ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={palette.kale} />
+              <AppText variant="bodySmall" style={styles.loadingText}>Loading sites...</AppText>
+            </View>
+          ) : (
+            <>
           <Pressable
             style={styles.dropdown}
             onPress={() => setShowDropdown(!showDropdown)}
@@ -102,12 +112,12 @@ export default function SiteAnalyticsScreen() {
 
           {showDropdown && (
             <View style={styles.dropdownList}>
-              {sites.map((site) => (
+              {siteOptions.map((site) => (
                 <Pressable
                   key={site.id}
                   style={styles.dropdownItem}
                   onPress={() => {
-                    setSelectedSite(site);
+                    setSelectedSiteId(site.id);
                     setShowDropdown(false);
                   }}
                 >
@@ -116,6 +126,15 @@ export default function SiteAnalyticsScreen() {
               ))}
             </View>
           )}
+
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <Skeleton width="100%" height={90} borderRadius={14} />
+              <Skeleton width="100%" height={90} borderRadius={14} />
+              <Skeleton width="100%" height={120} borderRadius={14} />
+            </View>
+          ) : (
+            <>
 
           {/* OVERVIEW */}
 
@@ -189,7 +208,7 @@ export default function SiteAnalyticsScreen() {
 
               <View>
                 <AppText variant="bodyBold" style={styles.greenValue} >
-                  {analytics.collections}
+                  {lifetimeStats.collectionsCompleted}
                 </AppText>
 
                 <AppText variant="bodySmall" style={styles.cardLabel} >
@@ -203,7 +222,7 @@ export default function SiteAnalyticsScreen() {
 
               <View>
                 <AppText variant="bodyBold" style={styles.greenValue}  >
-                  {analytics.charities}
+                  {lifetimeStats.partnersSupported}
                 </AppText>
 
                 <AppText variant="bodySmall" style={styles.cardLabel} >
@@ -286,7 +305,7 @@ export default function SiteAnalyticsScreen() {
 
             <View>
               <AppText variant="bodyBold" style={styles.greenValue}>                
-                {analytics.rating}/5
+                {ratingLabel}
               </AppText>
 
               <AppText variant="bodySmall" style={styles.cardLabel} >
@@ -294,6 +313,10 @@ export default function SiteAnalyticsScreen() {
               </AppText>
             </View>
           </View>
+            </>
+          )}
+            </>
+          )}
         </View>
       </ScrollView>
     </Screen>
@@ -524,5 +547,15 @@ const styles = StyleSheet.create({
     height: 20,
     resizeMode: 'contain',
     marginRight: 8,
+  },
+
+  loadingWrap: {
+    marginTop: 16,
+    gap: 12,
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    color: palette.textMuted,
   },
 });

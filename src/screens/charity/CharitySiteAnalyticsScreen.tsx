@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -6,13 +6,18 @@ import {
   StyleSheet,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { Skeleton } from '../../components/Skeleton';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
+import { useCharityStore } from '@/store/charityStore';
+import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
+import { getSiteDisplayName } from '@/utils/impactSites';
 
 const { width, height } = Dimensions.get("window");
 const wp = (p: number) => (width * p) / 100;
@@ -24,57 +29,41 @@ const normalize = (size: number) => {
 
 export default function CharitySiteAnalyticsScreen() {
   const navigation = useNavigation();
-
-  const sites = [
-    {
-      id: '1',
-      name: 'Kindness Welfare Association - Patrapada',
-      analytics: {
-        foodReceivedKg: 210,
-        collections: 60,
-        activeDonors: 12,
-        rating: 4.8,
-        utilisationRate: 96,
-        successRate: 98,
-      },
-    },
-    {
-      id: '2',
-      name: 'Kindness Welfare Association - Baramunda',
-      analytics: {
-        foodReceivedKg: 150,
-        collections: 40,
-        activeDonors: 9,
-        rating: 4.5,
-        utilisationRate: 92,
-        successRate: 95,
-      },
-    },
-    {
-      id: '3',
-      name: 'Kindness Welfare Association - Rasulgarh',
-      analytics: {
-        foodReceivedKg: 95,
-        collections: 28,
-        activeDonors: 6,
-        rating: 4.2,
-        utilisationRate: 90,
-        successRate: 91,
-      },
-    },
-  ];
-
-  const [selectedSite, setSelectedSite] = useState(sites[0]);
+  const { locations, fetchLocations } = useCharityStore();
+  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const analytics = selectedSite.analytics;
-  const foodReceivedKg = analytics.foodReceivedKg;
-  const mealsCreated = Math.round( foodReceivedKg / 0.42 );
-  const co2Avoided = Math.round( foodReceivedKg * 2.5);
-  const beneficiariesServed = Math.round( mealsCreated * 0.8);
-  const foodValueSaved = mealsCreated * 200;
-  const siteHealth = Math.round(( analytics.successRate + analytics.utilisationRate) / 2
+  useEffect(() => {
+    void fetchLocations();
+  }, [fetchLocations]);
+
+  const siteOptions = useMemo(
+    () =>
+      locations.map((location: any) => ({
+        id: Number(location.id),
+        name: getSiteDisplayName(location),
+      })),
+    [locations],
   );
+
+  useEffect(() => {
+    if (selectedSiteId == null && siteOptions.length > 0) {
+      setSelectedSiteId(siteOptions[0].id);
+    }
+  }, [siteOptions, selectedSiteId]);
+
+  const selectedSite = siteOptions.find((site) => site.id === selectedSiteId) ?? siteOptions[0];
+  const { loading, lifetimeStats } = useImpactAnalytics({
+    siteId: selectedSite?.id ?? null,
+    chartPeriod: 'month',
+  });
+
+  const foodReceivedKg = lifetimeStats.redistributedKg;
+  const mealsCreated = lifetimeStats.mealsCreated;
+  const co2Avoided = Math.round(lifetimeStats.co2AvoidedKg);
+  const beneficiariesServed = mealsCreated;
+  const foodValueSaved = Math.round(lifetimeStats.foodSavedMoney);
+  const ratingLabel = lifetimeStats.rating != null ? `${lifetimeStats.rating}/5` : '—';
 
   return (
     <Screen backgroundColor={palette.creme}>
@@ -100,14 +89,19 @@ export default function CharitySiteAnalyticsScreen() {
           <AppText variant='h5' style={styles.headerTitle}> CHARITY SITE ANALYTICS </AppText>
         </View>
         <View style={styles.contentWrapper}>
-
-        {/* DROPDOWN */}
+        {!selectedSite ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={palette.kale} />
+            <AppText variant="bodySmall">Loading sites...</AppText>
+          </View>
+        ) : (
+          <>
         <Pressable
           style={styles.dropdown}
           onPress={() => setShowDropdown(!showDropdown)}
         >
           <AppText variant='bodyLarge'>
-            {selectedSite ? selectedSite.name : 'Select Site'}
+            {selectedSite.name}
           </AppText>
 
           <Ionicons name="chevron-down" size={normalize(18)} />
@@ -115,12 +109,12 @@ export default function CharitySiteAnalyticsScreen() {
 
         {showDropdown && (
           <View style={styles.dropdownList}>
-            {sites.map((site) => (
+            {siteOptions.map((site) => (
               <Pressable
                 key={site.id}
                 style={styles.dropdownItem}
                 onPress={() => {
-                  setSelectedSite(site);
+                  setSelectedSiteId(site.id);
                   setShowDropdown(false);
                 }}
               >
@@ -129,6 +123,14 @@ export default function CharitySiteAnalyticsScreen() {
             ))}
           </View>
         )}
+
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <Skeleton width="100%" height={90} borderRadius={14} />
+            <Skeleton width="100%" height={90} borderRadius={14} />
+          </View>
+        ) : (
+          <>
 
           <AppText variant="subheading" style={styles.sectionTitle}  > Overview </AppText>
 
@@ -190,7 +192,7 @@ export default function CharitySiteAnalyticsScreen() {
             <View style={styles.analyticsCard}>
               <Image source={require('../../../assets/placeholder/single_site.png')} style={styles.cardIcon} />
               <View>
-                <AppText variant="bodyBold" style={styles.greenValue} >{analytics.activeDonors} </AppText>
+                <AppText variant="bodyBold" style={styles.greenValue} >{lifetimeStats.partnersSupported} </AppText>
                 <AppText variant="bodySmall" style={styles.cardLabel} > Active Donors </AppText>
               </View>
             </View>
@@ -201,59 +203,31 @@ export default function CharitySiteAnalyticsScreen() {
             <View style={styles.analyticsCard}>
               <Image source={require('../../../assets/placeholder/truck_icon.png')} style={styles.cardIcon} />
               <View>
-                <AppText variant="bodyBold" style={styles.greenValue}>{analytics.collections}</AppText>
+                <AppText variant="bodyBold" style={styles.greenValue}>{lifetimeStats.collectionsCompleted}</AppText>
                 <AppText variant="bodySmall" style={styles.cardLabel}> Collections </AppText>
               </View>
             </View>
 
             <View style={styles.analyticsCard}>
-              <Image source={require('../../../assets/placeholder/charity_green.png')} style={styles.cardIcon} />
+              <Image source={require('../../../assets/placeholder/rating_icon.png')} style={styles.cardIcon} />
               <View>
-                <AppText variant="bodyBold" style={styles.greenValue}>{analytics.utilisationRate}% </AppText>
-                <AppText variant="bodySmall" style={styles.cardLabel}> Utilisation Rate </AppText>
+                <AppText variant="bodyBold" style={styles.greenValue}>{ratingLabel}</AppText>
+                <AppText variant="bodySmall" style={styles.cardLabel}> Collection rating </AppText>
               </View>
             </View>
           </View>
 
-          {/* COLLECTION SUCCESS */}
-
-          <View style={styles.healthCard}>
-            <View style={styles.healthHeader}>
-              <Image source={require('../../../assets/placeholder/truck_icon.png')} style={styles.healthIcon} />
-              <AppText variant="bodyBold" style={styles.healthTitle}> Collection Success Rate </AppText>
-            </View>
-
-            <AppText variant="h5" style={styles.healthValue} > {analytics.successRate}% </AppText>
-
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill,{width: `${analytics.successRate}%`,},]}/>
-            </View>
-          </View>
-
-          {/* SITE HEALTH */}
-          <View style={styles.healthCard}>
-            <View style={styles.healthHeader}>
-              <Image source={require('../../../assets/placeholder/single_charity.png')} style={styles.healthIcon} />
-              <AppText variant="bodyBold" style={styles.healthTitle} > Site Health Score </AppText>
-            </View>
-
-            <AppText variant="h5" style={styles.healthValue} > {siteHealth}% </AppText>
-
-            <View style={styles.progressTrack}>
-              <View style={[ styles.progressFill, { width: `${siteHealth}%`, }, ]} />
-            </View>
-
-            <AppText variant="bodySmall" style={styles.healthDescription} > Based on utilisation and collection success </AppText>
-          </View>
-
-          {/* RATING */}
           <View style={styles.ratingCard}>
             <Image source={require('../../../assets/placeholder/rating_icon.png')} style={styles.ratingIcon} />
             <View>
-              <AppText variant="bodyBold" style={styles.greenValue} > {analytics.rating}/5 </AppText>
-              <AppText variant="bodySmall" style={styles.cardLabel} > Site Rating </AppText>
+              <AppText variant="bodyBold" style={styles.greenValue} > {ratingLabel} </AppText>
+              <AppText variant="bodySmall" style={styles.cardLabel} > Lifetime site rating </AppText>
             </View>
           </View>
+          </>
+        )}
+          </>
+        )}
 
         </View>
       </ScrollView>
@@ -457,5 +431,11 @@ const styles = StyleSheet.create({
     height: normalize(42),
     resizeMode: 'contain',
     marginRight: wp(3),
+  },
+
+  loadingWrap: {
+    marginTop: hp(2),
+    gap: hp(1.5),
+    alignItems: 'center',
   },
 });

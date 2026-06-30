@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
@@ -19,7 +19,8 @@ import { Skeleton } from '../../components/Skeleton';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
-import { charityProfile } from '../../data/mockData';
+import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
+import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { palette } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -40,28 +41,31 @@ const ANALYTICS_ICONS = {
   rating: require('../../../assets/placeholder/rating_icon.png'),
 };
 
-const MONTHLY_STATS = {
-  feedCollectedKg: 1300,
-  mealsCreated: 2340,
-  co2AvoidedKg: 6400,
-  collectionsCompleted: 18,
-  rating: 4.5,
-};
-
-const LIFETIME_STATS = {
-  feedCollectedKg: 4800,
-  mealsCreated: 5740,
-  co2AvoidedKg: 9600,
-  collectionsCompleted: 123,
-  rating: 4.5,
-};
-
-type ImpactStats = typeof MONTHLY_STATS;
-
 const formatNumber = (value: number) => value.toLocaleString('en-US');
 
 type TimeRange = 'week' | 'month' | 'year';
 type ImpactMetric = 'feedCollected' | 'mealsCreated' | 'co2Avoided' | 'collectionsCompleted';
+
+const METRIC_TO_CHART: Record<ImpactMetric, ChartMetricKey> = {
+  feedCollected: 'food',
+  mealsCreated: 'meals',
+  co2Avoided: 'co2',
+  collectionsCompleted: 'collections',
+};
+
+function formatRating(rating: number | null): string {
+  return rating != null ? `${rating}/5` : '—';
+}
+
+function toFarmerStats(stats: ImpactDisplayStats) {
+  return {
+    feedCollectedKg: stats.redistributedKg,
+    mealsCreated: stats.mealsCreated,
+    co2AvoidedKg: stats.co2AvoidedKg,
+    collectionsCompleted: stats.collectionsCompleted,
+    rating: stats.rating,
+  };
+}
 
 const TIME_RANGES: { key: TimeRange; label: string }[] = [
   { key: 'week', label: 'Week' },
@@ -76,51 +80,29 @@ const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = 
   { key: 'collectionsCompleted', label: 'Collections Completed' },
 ];
 
-const TREND_DATA: Record<
-  TimeRange,
-  {
-    labels: string[];
-    feedCollected: number[];
-    mealsCreated: number[];
-    co2Avoided: number[];
-    collectionsCompleted: number[];
-  }
-> = {
-  week: {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    feedCollected: [120, 180, 140, 260, 220, 340, 400],
-    mealsCreated: [20, 45, 30, 78, 58, 118, 150],
-    co2Avoided: [90, 130, 100, 190, 170, 260, 330],
-    collectionsCompleted: [1, 2, 3, 4, 5, 7, 8],
-  },
-  month: {
-    labels: ['W1', 'W2', 'W3', 'W4'],
-    feedCollected: [800, 1100, 1400, 1800],
-    mealsCreated: [150, 220, 180, 300],
-    co2Avoided: [500, 700, 900, 1200],
-    collectionsCompleted: [12, 18, 24, 30],
-  },
-  year: {
-    labels: ['21', '22', '23', '24', '25'],
-    feedCollected: [6000, 7200, 8400, 9800, 11200],
-    mealsCreated: [500, 700, 650, 900, 1200],
-    co2Avoided: [4200, 5100, 6200, 7700, 9200],
-    collectionsCompleted: [90, 110, 130, 150, 180],
-  },
-};
-
 export function FarmerAnalyticsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentProfile } = useAppContext();
-  const [loading, setLoading] = useState(true);
 
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('feedCollected');
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 900);
-    return () => clearTimeout(timer);
-  }, []);
+  const {
+    loading,
+    monthStats,
+    lifetimeStats,
+    getChartSeries,
+    isMultiSite,
+  } = useImpactAnalytics({ chartPeriod: range });
+
+  const chartSeries = getChartSeries(METRIC_TO_CHART[selectedMetric]);
+  const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
+  const monthDisplay = toFarmerStats(monthStats);
+  const lifetimeDisplay = toFarmerStats(lifetimeStats);
+
+  const organization = currentProfile.organization || 'Your farm';
+  const address = currentProfile.address || '';
+  const logoInitial = organization?.[0] || 'S';
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
@@ -146,13 +128,6 @@ export function FarmerAnalyticsScreen() {
     );
   }
 
-  const filtered = TREND_DATA[range];
-  const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
-
-  const organization = currentProfile.organization || charityProfile.organization;
-  const address = currentProfile.address || charityProfile.address;
-  const logoInitial = organization?.[0] || 'S';
-
   const renderMetricCard = (icon: ImageSourcePropType, value: string, label: string) => (
     <View style={styles.metricCard}>
       <View style={styles.metricIconWrap}>
@@ -169,7 +144,7 @@ export function FarmerAnalyticsScreen() {
     </View>
   );
 
-  const renderImpactMetricsSection = (title: string, stats: ImpactStats) => (
+  const renderImpactMetricsSection = (title: string, stats: ReturnType<typeof toFarmerStats>) => (
     <>
       <AppText variant="h8" style={styles.sectionTitle}>
         {title}
@@ -209,7 +184,7 @@ export function FarmerAnalyticsScreen() {
             </View>
             <View style={styles.metricContent}>
               <AppText variant="h8" style={styles.metricValue}>
-                {stats.rating}/5
+                {formatRating(stats.rating)}
               </AppText>
               <AppText variant="caption" style={styles.metricLabel}>
                 Rating
@@ -277,7 +252,7 @@ export function FarmerAnalyticsScreen() {
         </Pressable>
 
         <View style={styles.topSection}>
-          {renderImpactMetricsSection('This month', MONTHLY_STATS)}
+          {renderImpactMetricsSection('This month', monthDisplay)}
         </View>
 
         <View style={styles.impactOverTimeSection}>
@@ -330,8 +305,8 @@ export function FarmerAnalyticsScreen() {
             <LineChart
               key={`${range}-${selectedMetric}`}
               data={{
-                labels: filtered.labels,
-                datasets: [{ data: filtered[selectedMetric] }],
+                labels: chartSeries.labels,
+                datasets: [{ data: chartSeries.values }],
               }}
               width={chartWidth + wp(5)}
               height={hp(26)}
@@ -351,7 +326,7 @@ export function FarmerAnalyticsScreen() {
         </View>
 
         <View style={styles.lifetimeSection}>
-          {renderImpactMetricsSection('Lifetime impact', LIFETIME_STATS)}
+          {renderImpactMetricsSection('Lifetime impact', lifetimeDisplay)}
         </View>
       </ScrollView>
     </Screen>

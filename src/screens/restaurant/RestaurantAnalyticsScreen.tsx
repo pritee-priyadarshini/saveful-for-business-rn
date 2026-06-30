@@ -18,8 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
+import { Skeleton } from '../../components/Skeleton';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { useAppContext } from '../../store/AppContext';
+import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -38,40 +41,21 @@ const ANALYTICS_ICONS = {
   rating: require('../../../assets/placeholder/rating_icon.png'),
 };
 
-const MONTHLY_STATS = {
-  redistributedKg: 1300,
-  mealsCreated: 2340,
-  co2AvoidedKg: 6400,
-  foodSavedMoney: 1240,
-  collectionsCompleted: 18,
-  charitiesSupported: 4,
-  peopleKg: 900,
-  animalKg: 400,
-  peoplePercent: 71,
-  animalPercent: 29,
-  rating: 4.5,
-};
-
-const LIFETIME_STATS = {
-  redistributedKg: 4800,
-  mealsCreated: 2340,
-  co2AvoidedKg: 9600,
-  foodSavedMoney: 11240,
-  collectionsCompleted: 123,
-  charitiesSupported: 4,
-  peopleKg: 3600,
-  animalKg: 1200,
-  peoplePercent: 71,
-  animalPercent: 29,
-  rating: 4.5,
-};
-
-type ImpactStats = typeof MONTHLY_STATS;
-
 const formatNumber = (value: number) => value.toLocaleString('en-US');
 
 type TimeRange = 'week' | 'month' | 'year';
 type ImpactMetric = 'foodRedistributed' | 'mealsCreated' | 'co2Avoided' | 'collectionsCompleted';
+
+const METRIC_TO_CHART: Record<ImpactMetric, ChartMetricKey> = {
+  foodRedistributed: 'food',
+  mealsCreated: 'meals',
+  co2Avoided: 'co2',
+  collectionsCompleted: 'collections',
+};
+
+function formatRating(rating: number | null): string {
+  return rating != null ? `${rating}/5` : '—';
+}
 
 const TIME_RANGES: { key: TimeRange; label: string }[] = [
   { key: 'week', label: 'Week' },
@@ -85,39 +69,6 @@ const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = 
   { key: 'co2Avoided', label: 'CO₂', suffix: 'kg' },
   { key: 'collectionsCompleted', label: 'Collections' },
 ];
-
-const TREND_DATA: Record<
-  TimeRange,
-  {
-    labels: string[];
-    foodRedistributed: number[];
-    mealsCreated: number[];
-    co2Avoided: number[];
-    collectionsCompleted: number[];
-  }
-> = {
-  week: {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    foodRedistributed: [12, 28, 18, 45, 32, 68, 85],
-    mealsCreated: [20, 45, 30, 78, 58, 118, 150],
-    co2Avoided: [10, 22, 15, 38, 28, 55, 72],
-    collectionsCompleted: [1, 2, 1, 3, 2, 4, 5],
-  },
-  month: {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr'],
-    foodRedistributed: [180, 240, 210, 320],
-    mealsCreated: [150, 220, 180, 300],
-    co2Avoided: [90, 140, 120, 200],
-    collectionsCompleted: [8, 12, 10, 18],
-  },
-  year: {
-    labels: ['2020', '2021', '2022', '2023', '2024', '2025'],
-    foodRedistributed: [420, 580, 540, 720, 680, 950],
-    mealsCreated: [500, 700, 650, 900, 850, 1200],
-    co2Avoided: [300, 450, 400, 600, 550, 800],
-    collectionsCompleted: [45, 62, 58, 78, 72, 95],
-  },
-};
 
 const cardShadow = Platform.select({
   ios: {
@@ -164,7 +115,15 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('mealsCreated');
 
-  const filtered = TREND_DATA[range];
+  const {
+    loading,
+    monthStats,
+    lifetimeStats,
+    getChartSeries,
+    isMultiSite,
+  } = useImpactAnalytics({ chartPeriod: range });
+
+  const chartSeries = getChartSeries(METRIC_TO_CHART[selectedMetric]);
   const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
   const chartWidth = width - wp(10) - wp(8);
 
@@ -184,11 +143,12 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
     </View>
   );
 
-  const renderImpactMetricsSection = (title: string, stats: ImpactStats) => {
+  const renderImpactMetricsSection = (title: string, stats: ImpactDisplayStats) => {
     const progressFillStyles = StyleSheet.create({
       people: { width: `${stats.peoplePercent}%` },
       animals: { width: `${stats.animalPercent}%` },
     });
+    const partnersLabel = stats.mode === 'RECEIVER' ? 'Donors' : 'Charities';
 
     return (
       <View style={styles.section}>
@@ -231,8 +191,8 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             )}
             {renderMetricCard(
               ANALYTICS_ICONS.charities,
-              formatNumber(stats.charitiesSupported),
-              'Charities',
+              formatNumber(stats.partnersSupported),
+              partnersLabel,
             )}
           </View>
 
@@ -300,7 +260,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             </View>
             <View style={styles.metricContent}>
               <AppText variant="bodyBold" style={styles.metricValue}>
-                {stats.rating}/5
+                {formatRating(stats.rating)}
               </AppText>
               <AppText variant="caption" style={styles.metricLabel}>
                 Collection rating
@@ -348,6 +308,22 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
     );
   };
 
+  if (loading) {
+    return (
+      <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(2) }]}>
+          <Skeleton width="100%" height={hp(20)} borderRadius={0} />
+          <View style={{ padding: wp(5), gap: hp(1.5) }}>
+            <Skeleton width="100%" height={normalize(52)} borderRadius={normalize(14)} />
+            <Skeleton width="100%" height={hp(28)} borderRadius={normalize(14)} />
+            <Skeleton width="100%" height={hp(32)} borderRadius={normalize(14)} />
+          </View>
+        </ScrollView>
+      </Screen>
+    );
+  }
+
   return (
     <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
@@ -382,7 +358,8 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             <View style={styles.heroStatsPill}>
               <Ionicons name="leaf-outline" size={normalize(14)} color={palette.white} />
               <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
-                {formatNumber(MONTHLY_STATS.mealsCreated)} meals · {formatNumber(MONTHLY_STATS.redistributedKg)} kg this month
+                {isMultiSite ? 'All sites · ' : ''}
+                {formatNumber(monthStats.mealsCreated)} meals · {formatNumber(monthStats.redistributedKg)} kg this month
               </AppText>
             </View>
           </View>
@@ -406,7 +383,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             </View>
           </Pressable>
 
-          {renderImpactMetricsSection('This month', MONTHLY_STATS)}
+          {renderImpactMetricsSection('This month', monthStats)}
 
           <View style={styles.chartCard}>
             <AppText variant="bodyBold" style={styles.sectionTitle}>
@@ -429,8 +406,8 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
               <LineChart
                 key={`${range}-${selectedMetric}`}
                 data={{
-                  labels: filtered.labels,
-                  datasets: [{ data: filtered[selectedMetric] }],
+                  labels: chartSeries.labels,
+                  datasets: [{ data: chartSeries.values }],
                 }}
                 width={chartWidth}
                 height={hp(24)}
@@ -449,7 +426,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             </View>
           </View>
 
-          {renderImpactMetricsSection('Lifetime impact', LIFETIME_STATS)}
+          {renderImpactMetricsSection('Lifetime impact', lifetimeStats)}
         </View>
       </ScrollView>
     </Screen>

@@ -4,32 +4,16 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 export const authService = {
   registerBusiness: (data: FormData) =>
-    api.post('/auth/register/business', data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }),
+    api.post('/auth/register/business', data),
 
   registerCharity: (data: FormData) =>
-    api.post('/auth/register/charity', data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }),
+    api.post('/auth/register/charity', data),
 
   registerFarmerProducer: (data: FormData) =>
-    api.post('/auth/register/farmer-producer', data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }),
+    api.post('/auth/register/farmer-producer', data),
 
   registerFarmerConsumer: (data: FormData) =>
-    api.post('/auth/register/farmer-consumer', data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }),
+    api.post('/auth/register/farmer-consumer', data),
 
   verifyEmail: (email: string, otp: string) =>
     api.post('/auth/verify-email', { email: email.trim().toLowerCase(), otp }),

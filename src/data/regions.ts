@@ -41,3 +41,29 @@ export function appendSignupRegion(form: FormData, region: string): void {
   }
   form.append('region', normalized);
 }
+
+/** Append validated latitude/longitude for NestJS `@Type(() => Number)` parsing. */
+export function appendSignupCoordinates(
+  form: FormData,
+  latitude: string,
+  longitude: string,
+): void {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('Please set a valid location before signing up.');
+  }
+  form.append('latitude', String(lat));
+  form.append('longitude', String(lng));
+}
+
+/** Region + coordinates — required on all signup flows. */
+export function appendSignupRegionAndCoordinates(
+  form: FormData,
+  region: string,
+  latitude: string,
+  longitude: string,
+): void {
+  appendSignupRegion(form, region);
+  appendSignupCoordinates(form, latitude, longitude);
+}

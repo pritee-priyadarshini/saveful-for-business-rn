@@ -24,6 +24,12 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
 
+  // Let React Native set multipart boundary; a bare `multipart/form-data` header drops fields.
+  if (config.data instanceof FormData) {
+    config.headers.delete('Content-Type');
+    config.transformRequest = [(data) => data];
+  }
+
   const method = (config.method ?? 'get').toUpperCase();
   const base = config.baseURL ?? '';
   const path = config.url ?? '';

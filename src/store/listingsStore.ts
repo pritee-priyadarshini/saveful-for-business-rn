@@ -8,7 +8,11 @@ import {
 } from '../services/foodListing.service';
 import { useAuthStore } from './authStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
-import { isAnimalListing, isPeopleListing } from '../utils/foodListing';
+import {
+  isAnimalListing,
+  isPeopleListing,
+  sortListingsByNewest,
+} from '../utils/foodListing';
 import type { RelistAudience } from '../utils/listingRelist';
 
 
@@ -78,7 +82,7 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
 
       const { listings: all } = normalized;
       set({
-        siteListings: all,
+        siteListings: sortListingsByNewest(all),
         siteLastFetched: Date.now(),
       });
     } catch (error: unknown) {
@@ -108,7 +112,7 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
         limit: 200,
       });
       const { listings: all } = normalizeListingsResponse(res);
-      set({ orgListings: all, orgLastFetched: Date.now() });
+      set({ orgListings: sortListingsByNewest(all), orgLastFetched: Date.now() });
     } catch (error: unknown) {
       const message = getUserFriendlyErrorMessage(error, 'Failed to load listing history');
       set({ error: message });

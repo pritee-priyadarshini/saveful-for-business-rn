@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { isAxiosError } from 'axios';
-import { BusinessImpact, dashboardService } from '../services/dashboard.service';
+import { BusinessImpact } from '../services/dashboard.service';
+import { fetchAggregatedSiteImpact } from '../utils/impactData';
+import { resolveAccessibleSiteIds } from '../utils/impactSites';
 import { useAuthStore } from './authStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
 
@@ -42,26 +43,30 @@ export const useDashboardStore = create<DashboardState & DashboardActions>((set,
 
     set({ isFetching: true, error: null });
     try {
-      const res = await dashboardService.getBusinessImpact();
-      if (res.data) {
+      const siteIds = await resolveAccessibleSiteIds(authUser);
+      if (siteIds.length === 0) {
+        set({ lastFetched: Date.now() });
+        return;
+      }
+
+      const impact = await fetchAggregatedSiteImpact(siteIds, 'month');
+      if (impact) {
         set({
           businessImpact: {
-            ...res.data,
-            collectionsCompleted:
-              res.data.collectionsCompleted ?? res.data.charitiesSupported ?? 0,
+            kgSaved: impact.totals.redistributedKg,
+            charitiesSupported: impact.totals.partnersSupported,
+            collectionsCompleted: impact.totals.collectionsCompleted,
+            co2SavedKg: impact.totals.co2AvoidedKg,
+            moneySaved: impact.totals.totalFoodSavedUsd,
+            currency: 'USD',
           },
           lastFetched: Date.now(),
         });
       }
     } catch (error: unknown) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        console.log('[Dashboard] Impact data not yet available (404)');
-        set({ lastFetched: Date.now() });
-      } else {
-        const message = getUserFriendlyErrorMessage(error, 'Failed to load impact data');
-        set({ error: message });
-        throw new Error(message);
-      }
+      const message = getUserFriendlyErrorMessage(error, 'Failed to load impact data');
+      set({ error: message });
+      throw new Error(message);
     } finally {
       set({ isFetching: false });
     }

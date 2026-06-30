@@ -25,6 +25,7 @@ import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 import { ListingStatus } from '@/types';
 import {
+  compareListingsByNewest,
   estimateMealsSaved,
   getListingAudience,
   getListingStatusLabel,
@@ -244,7 +245,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
   useFocusEffect(
     React.useCallback(() => {
       if (!authUser?.accessToken) return;
-      fetchSiteListings().catch((e) =>
+      fetchSiteListings(true).catch((e) =>
         showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
       );
     }, [authUser?.accessToken, fetchSiteListings]),
@@ -274,13 +275,10 @@ export function RestaurantListingsScreen({ navigation }: any) {
           LISTING_STATUS_PRIORITY[resolveListingStatus(a)] -
           LISTING_STATUS_PRIORITY[resolveListingStatus(b)];
         if (orderDiff !== 0) return orderDiff;
-        return (
-          new Date(b.updatedAt || b.createdAt || 0).getTime() -
-          new Date(a.updatedAt || a.createdAt || 0).getTime()
-        );
+        return compareListingsByNewest(a, b);
       });
     }
-    return result;
+    return [...result].sort(compareListingsByNewest);
   }, [listings, listingFilter, statusFilter]);
 
   const handleCancelListing = (id: number) => {

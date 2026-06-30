@@ -111,3 +111,15 @@ export function isListingExpired(listing: any): boolean {
 export function isListingCancelled(listing: any): boolean {
   return resolveListingStatus(listing) === 'CANCELLED';
 }
+
+/** Newest listings first (createdAt, then id). */
+export function compareListingsByNewest(a: any, b: any): number {
+  const aMs = new Date(a.createdAt || a.updatedAt || 0).getTime();
+  const bMs = new Date(b.createdAt || b.updatedAt || 0).getTime();
+  if (bMs !== aMs) return bMs - aMs;
+  return Number(b.id || 0) - Number(a.id || 0);
+}
+
+export function sortListingsByNewest<T>(listings: T[]): T[] {
+  return [...listings].sort(compareListingsByNewest);
+}
