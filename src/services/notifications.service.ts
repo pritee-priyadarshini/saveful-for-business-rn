@@ -3,6 +3,7 @@ import api from './api';
 export type PushPlatform = 'ios' | 'android';
 export type PushTokenType = 'fcm' | 'expo' | 'apns';
 export type PushTokenMode = 'prod' | 'dev';
+export type PushTargetApp = 'business' | 'driver';
 
 export type RegisterPushTokenPayload = {
   token: string;
@@ -12,6 +13,7 @@ export type RegisterPushTokenPayload = {
   appVersion?: string;
   appBuild?: string;
   appBundle?: string;
+  targetApp?: PushTargetApp;
 };
 
 // Admin — send
@@ -50,9 +52,9 @@ export const notificationsService = {
   unregisterToken: (token: string) =>
     api.delete('/notifications/token', { data: { token } }),
 
-  /** Unregister all tokens for the current user (full account logout). */
-  unregisterAllTokens: () =>
-    api.delete('/notifications/tokens/all'),
+  /** Unregister all tokens for the current user on this app (logout). */
+  unregisterAllTokens: (targetApp: PushTargetApp = 'business') =>
+    api.delete('/notifications/tokens/all', { params: { targetApp } }),
 
   /** Queue a notification for delivery. Platform admin only. */
   send: (data: SendNotificationPayload) =>
