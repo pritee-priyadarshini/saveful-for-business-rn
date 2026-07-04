@@ -23,14 +23,17 @@ import { useSitesStore } from '@/store/sitesStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { hp, normalize, wp } from '@/utils/responsive';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'ManageSites'>;
 
 export default function ManageSitesScreen() {
   useTransparentStatusBar('light');
+  const safeBottomPadding = useSafeBottomPadding(hp(4));
   const navigation = useNavigation<NavigationProp>();
-  const { logout } = useAppContext();
+  const { logout, currentProfile } = useAppContext();
   const {
     organisation,
     sitesWithManagers: sites,
@@ -149,6 +152,7 @@ export default function ManageSitesScreen() {
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: safeBottomPadding }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -168,9 +172,18 @@ export default function ManageSitesScreen() {
               contentStyle={styles.heroContentWrap}
             >
               <View style={styles.heroContent}>
-                <AppText variant="h5" style={styles.businessName}>
-                  {organisation?.name || 'Business'}
-                </AppText>
+                <View style={styles.heroTextBlock}>
+                  <AppText variant="h5" style={styles.businessName}>
+                    {organisation?.name || 'Business'}
+                  </AppText>
+
+                  <HeaderAddressRow
+                    address={organisation?.address || currentProfile.address || ''}
+                    iconSize={normalize(18)}
+                    style={styles.heroAddressRow}
+                    textStyle={styles.heroAddressText}
+                  />
+                </View>
 
                 {organisation?.logoUrl && (
                   <Image
@@ -233,7 +246,7 @@ export default function ManageSitesScreen() {
                         {site.tradingName}
                       </AppText>
 
-                      <AppText variant="bodySmall">
+                      <AppText variant="bodySmall" numberOfLines={2} ellipsizeMode="tail">
                         {site.address}
                       </AppText>
 
@@ -356,13 +369,30 @@ const styles = StyleSheet.create({
   heroContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: wp(4),
+    gap: wp(3),
+  },
+
+  heroTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
 
   businessName: {
     color: 'white',
     fontSize: normalize(24),
+  },
+
+  heroAddressRow: {
+    marginTop: hp(0.8),
+  },
+
+  heroAddressText: {
+    color: 'white',
+    fontSize: normalize(14),
+    lineHeight: normalize(19),
+    opacity: 0.9,
   },
 
   logo: {

@@ -8,7 +8,12 @@ import {
   ImageBackground,
   Dimensions,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
@@ -24,6 +29,7 @@ import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -42,6 +48,9 @@ const PROTECTED_ROLES = new Set(['LOCATION_ADMIN', 'HEAD_OFFICE_ADMIN']);
 export default function FarmerManageAccessScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
+  const safeBottomPadding = useSafeBottomPadding(hp(4));
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { locationId } = route.params as {
     locationId?: number;
     orgType: 'charity' | 'restaurant' | 'farmer';
@@ -67,6 +76,17 @@ export default function FarmerManageAccessScreen() {
       showErrorAlert(e, 'Could not load team', 'Could not load team members'),
     );
   }, [fetchUsers]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const emptyForm = {
     firstName: '',
@@ -248,8 +268,22 @@ export default function FarmerManageAccessScreen() {
   }
 
   return (
-    <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={insets.top + normalize(20)}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <Screen backgroundColor={palette.creme}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[
+              styles.container,
+              {
+                paddingBottom: safeBottomPadding + (keyboardVisible ? hp(3) : 0),
+              },
+            ]}
+          >
         <ImageBackground
           source={require('../../../assets/placeholder/kale-header.png')}
           style={styles.headerBg}
@@ -280,6 +314,10 @@ export default function FarmerManageAccessScreen() {
             <AppText
               variant="bodyBold"
               style={[styles.tabText, activeTab === 'user' && styles.activeTabText]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              ellipsizeMode="tail"
             >
               Add User
             </AppText>
@@ -295,6 +333,10 @@ export default function FarmerManageAccessScreen() {
             <AppText
               variant="bodyBold"
               style={[styles.tabText, activeTab === 'driver' && styles.activeTabText]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              ellipsizeMode="tail"
             >
               Add Driver
             </AppText>
@@ -446,15 +488,17 @@ export default function FarmerManageAccessScreen() {
             </View>
           ))
         )}
-      </ScrollView>
-    </Screen>
+          </ScrollView>
+        </Screen>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     gap: hp(2),
-    paddingBottom: hp(4),
+    flexGrow: 1,
   },
   headerBg: {
     height: hp(20),
@@ -478,12 +522,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: wp(2.5),
     marginHorizontal: wp(4),
+    marginBottom: hp(2),
+    paddingBottom: hp(0.5),
   },
   tabPill: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2.5),
     borderRadius: normalize(999),
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: palette.border,
@@ -494,6 +543,8 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: palette.black,
+    textAlign: 'center',
+    width: '100%',
   },
   activeTabText: {
     color: palette.white,

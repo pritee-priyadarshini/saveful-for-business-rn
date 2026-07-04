@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
@@ -24,6 +23,7 @@ import { PostPickupSurveyModal } from './components/postPickupSurveyModal';
 import { estimateMealsSaved } from '../../utils/foodListing';
 import { hp, normalize, wp } from '@/utils/responsive';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAppContext } from '../../store/AppContext';
 
 const DETAIL_ICONS = {
@@ -173,7 +173,7 @@ function renderCardHeadline(primary: string, secondary: string) {
 
 export function RestaurantUpdatesScreen() {
   useTransparentStatusBar('light');
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useBottomTabPadding(hp(3));
   const { currentProfile } = useAppContext();
 
   const [loading, setLoading] = useState(true);
@@ -602,7 +602,7 @@ export function RestaurantUpdatesScreen() {
       <FlatList
         data={sections}
         keyExtractor={(item) => item.title}
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(3) }]}
+        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>

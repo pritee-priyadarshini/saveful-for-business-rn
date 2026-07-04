@@ -21,6 +21,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
+import { HeaderAddressRow } from '@/components/HeaderAddressRow';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { palette } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -83,6 +85,7 @@ const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = 
 export function CharityAnalyticsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentProfile } = useAppContext();
+  const bottomPadding = useBottomTabPadding(hp(2));
 
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('mealsCreated');
@@ -189,7 +192,10 @@ export function CharityAnalyticsScreen() {
 
   return (
     <Screen backgroundColor={palette.creme}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.heroContainer}>
           <Image
             source={require('../../../assets/placeholder/feed-bg.png')}
@@ -204,12 +210,7 @@ export function CharityAnalyticsScreen() {
                   {organization.toUpperCase()}
                 </AppText>
 
-                <View style={styles.locationRow}>
-                  <Ionicons name="location-outline" size={normalize(20)} color={palette.white} />
-                  <AppText variant="body" style={styles.location}>
-                    {address.toUpperCase()}
-                  </AppText>
-                </View>
+                <HeaderAddressRow address={address} uppercase />
               </View>
 
               <View style={styles.logoCircle}>
@@ -356,7 +357,6 @@ const chartConfig = {
 const styles = StyleSheet.create({
   container: {
     gap: hp(2),
-    paddingBottom: hp(4),
   },
   heroContainer: {
     minHeight: hp(20),
@@ -402,9 +402,8 @@ const styles = StyleSheet.create({
     color: palette.white,
     opacity: 0.9,
     flex: 1,
-    flexWrap: 'wrap',
+    minWidth: 0,
     textTransform: 'uppercase',
-    alignSelf: 'center',
   },
   logoCircle: {
     width: normalize(48),

@@ -13,13 +13,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -225,7 +226,7 @@ const cardShadow = Platform.select({
 
 export function RestaurantListingsScreen({ navigation }: any) {
   useTransparentStatusBar('light');
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useBottomTabPadding(hp(2));
   const { authUser, currentProfile } = useAppContext();
   const {
     siteListings: listings,
@@ -625,7 +626,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
     <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(2) }]}
+        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
@@ -649,6 +650,14 @@ export function RestaurantListingsScreen({ navigation }: any) {
                     <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
                       Track surplus food, pickups, and your impact
                     </AppText>
+                    {!!currentProfile.address && (
+                      <HeaderAddressRow
+                        address={currentProfile.address}
+                        iconSize={normalize(14)}
+                        style={styles.heroAddressRow}
+                        textStyle={styles.heroAddressText}
+                      />
+                    )}
                   </View>
 
                   <View style={styles.heroIconCircle}>
@@ -908,6 +917,17 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     fontSize: normalize(15),
     lineHeight: normalize(22),
+  },
+
+  heroAddressRow: {
+    marginTop: hp(0.8),
+  },
+
+  heroAddressText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    opacity: 1,
   },
 
   heroIconCircle: {

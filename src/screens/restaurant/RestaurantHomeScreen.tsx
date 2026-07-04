@@ -12,7 +12,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
@@ -24,6 +23,8 @@ import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -36,7 +37,7 @@ const IMPACT_ICONS = {
 
 export function RestaurantHomeScreen({ navigation }: any) {
   useTransparentStatusBar('light');
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useBottomTabPadding(hp(2));
   const { currentProfile } = useAppContext();
   const {
     showBanner,
@@ -156,7 +157,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(2) }]}
+        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
         {showBanner && (
@@ -172,7 +173,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
         {!!capturedAddress && !showBanner && (
           <View style={styles.locationCapturedPill}>
             <Ionicons name="checkmark-circle" size={normalize(16)} color={palette.middlegreen} />
-            <AppText variant="caption" style={styles.locationCapturedText} numberOfLines={1}>
+            <AppText variant="caption" style={styles.locationCapturedText} numberOfLines={2} ellipsizeMode="tail">
               {capturedAddress}
             </AppText>
           </View>
@@ -213,10 +214,12 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
                 {!!currentProfile.address && (
                   <View style={styles.locationPill}>
-                    <Ionicons name="location" size={normalize(14)} color={palette.white} />
-                    <AppText variant="caption" style={styles.locationPillText} numberOfLines={1}>
-                      {currentProfile.address}
-                    </AppText>
+                    <HeaderAddressRow
+                      address={currentProfile.address}
+                      iconSize={normalize(14)}
+                      style={styles.locationPillRow}
+                      textStyle={styles.locationPillText}
+                    />
                   </View>
                 )}
               </View>
@@ -435,10 +438,7 @@ const styles = StyleSheet.create({
   },
 
   locationPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: wp(1.5),
     backgroundColor: 'rgba(0,0,0,0.2)',
     paddingVertical: hp(0.6),
     paddingHorizontal: wp(3),
@@ -446,10 +446,15 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
 
+  locationPillRow: {
+    marginTop: 0,
+  },
+
   locationPillText: {
     color: palette.white,
-    flexShrink: 1,
-    textTransform: 'none',
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
+    opacity: 1,
   },
 
   logoCircle: {

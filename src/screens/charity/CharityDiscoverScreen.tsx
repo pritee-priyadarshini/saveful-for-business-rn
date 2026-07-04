@@ -25,6 +25,8 @@ import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { mapDiscoverListing } from '../../services/foodListing.service';
 
 import { palette } from '../../theme/colors';
@@ -35,6 +37,7 @@ type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 
 export function CharityDiscoverScreen() {
   useTransparentStatusBar('light');
+  const bottomPadding = useBottomTabPadding(hp(2));
   const { currentProfile, authUser } = useAppContext();
   const {
     showBanner,
@@ -193,12 +196,11 @@ export function CharityDiscoverScreen() {
               {currentProfile.organization || 'Your Organisation'}
             </AppText>
 
-            <View style={styles.locationHeaderRow}>
-              <Ionicons name="location-outline" size={normalize(20)} color="white" />
-              <AppText variant="body" style={styles.headerLocation}>
-                {currentProfile.address || capturedAddress || 'No address available'}
-              </AppText>
-            </View>
+            <HeaderAddressRow
+              address={currentProfile.address || capturedAddress || 'No address available'}
+              style={styles.locationHeaderRow}
+              textStyle={styles.headerLocation}
+            />
           </View>
 
           <View style={styles.logoCircle}>
@@ -234,7 +236,9 @@ export function CharityDiscoverScreen() {
 
       {!!capturedAddress && !showBanner && (
         <View style={styles.locationCapturedPill}>
-          <AppText variant="caption">Location set: {capturedAddress}</AppText>
+          <AppText variant="caption" numberOfLines={2} ellipsizeMode="tail">
+            Location set: {capturedAddress}
+          </AppText>
         </View>
       )}
 
@@ -341,7 +345,7 @@ export function CharityDiscoverScreen() {
         renderItem={renderListing}
         style={styles.list}
         ListHeaderComponent={Header}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <AppText variant="h7">No surplus available</AppText>
@@ -375,7 +379,7 @@ const styles = StyleSheet.create({
   },
 
   listContent: {
-    paddingBottom: hp(3),
+    flexGrow: 1,
   },
 
   topBar: {
@@ -390,16 +394,12 @@ const styles = StyleSheet.create({
   },
 
   locationHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginTop: hp(0.8),
-    gap: wp(1),
   },
 
   headerLocation: {
     color: palette.white,
     opacity: 0.85,
-    flex: 1,
     fontSize: normalize(15),
     lineHeight: normalize(20),
   },

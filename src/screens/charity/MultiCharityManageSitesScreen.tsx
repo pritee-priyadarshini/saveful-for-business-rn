@@ -26,6 +26,8 @@ import { spacing } from '@/theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { hp, normalize, wp } from '@/utils/responsive';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'MultiCharityManageSites'>;
@@ -57,6 +59,7 @@ function findLocationAdmin(users: CharityMember[], locationId: number) {
 }
 export default function MultiCharityManageSitesScreen() {
     useTransparentStatusBar('light');
+    const safeBottomPadding = useSafeBottomPadding(hp(4));
     const navigation = useNavigation<NavigationProp>();
     const { logout, currentProfile, authUser } = useAppContext();
     const {
@@ -202,7 +205,7 @@ export default function MultiCharityManageSitesScreen() {
             <StatusBar style="light" translucent backgroundColor="transparent" />
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: safeBottomPadding }]}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
 
@@ -217,12 +220,11 @@ export default function MultiCharityManageSitesScreen() {
                                 {brandName}
                             </AppText>
 
-                            <View style={styles.locationRow}>
-                                <Ionicons name="location-outline" size={normalize(24)} color="white" />
-                                <AppText variant="body" style={styles.location}>
-                                    {brandAddress}
-                                </AppText>
-                            </View>
+                            <HeaderAddressRow
+                                address={brandAddress}
+                                iconSize={normalize(24)}
+                                textStyle={styles.location}
+                            />
                         </View>
 
                         <View style={styles.logoCircle}>
@@ -639,7 +641,6 @@ export default function MultiCharityManageSitesScreen() {
 
 const styles = StyleSheet.create({
     scrollContent: {
-        paddingBottom: hp(8),
         flexGrow: 1,
     },
     topBar: {
@@ -662,11 +663,8 @@ const styles = StyleSheet.create({
     location: {
         color: 'white',
         opacity: 0.8,
-        flex: 1,
-        flexWrap: 'wrap',
         fontSize: normalize(18),
-        paddingTop: hp(1),
-        justifyContent: 'center',
+        paddingTop: hp(0.5),
     },
     logoCircle: {
         width: normalize(50),

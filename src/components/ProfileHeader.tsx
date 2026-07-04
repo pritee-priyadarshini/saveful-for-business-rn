@@ -18,7 +18,9 @@ export function ProfileHeader({ profile }: { profile: UserProfile }) {
       <View style={styles.copy}>
         <AppText variant="subheading">{profile.name}</AppText>
         <AppText>{profile.organization}</AppText>
-        <AppText color={palette.textMuted}>{profile.address}</AppText>
+        <AppText color={palette.textMuted} numberOfLines={2} ellipsizeMode="tail">
+          {profile.address}
+        </AppText>
       </View>
       <View style={styles.status}>
         <AppText variant="caption" color={palette.primary}>{profile.verificationStatus}</AppText>

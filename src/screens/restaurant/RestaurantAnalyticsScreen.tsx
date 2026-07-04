@@ -13,13 +13,14 @@ import { LineChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { useAppContext } from '../../store/AppContext';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
@@ -108,7 +109,7 @@ const chartConfig = {
 
 export function RestaurantAnalyticsScreen({ navigation }: any) {
   useTransparentStatusBar('light');
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useBottomTabPadding(hp(2));
   const { width } = useWindowDimensions();
   const { currentProfile } = useAppContext();
 
@@ -283,6 +284,9 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
         <AppText
           variant="bodyBold"
           style={[styles.filterChipText, { color: active ? palette.white : palette.stone }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
         >
           {label}
         </AppText>
@@ -301,6 +305,9 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
         <AppText
           variant="bodyBold"
           style={[styles.filterChipText, { color: active ? palette.white : palette.stone }]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
         >
           {label}
         </AppText>
@@ -312,7 +319,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
     return (
       <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
-        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(2) }]}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}>
           <Skeleton width="100%" height={hp(20)} borderRadius={0} />
           <View style={{ padding: wp(5), gap: hp(1.5) }}>
             <Skeleton width="100%" height={normalize(52)} borderRadius={normalize(14)} />
@@ -328,7 +335,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
     <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + hp(2) }]}
+        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
         <HeroHeader
@@ -348,6 +355,14 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
                 <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
                   See the difference your surplus makes
                 </AppText>
+                {!!currentProfile.address && (
+                  <HeaderAddressRow
+                    address={currentProfile.address}
+                    iconSize={normalize(14)}
+                    style={styles.heroAddressRow}
+                    textStyle={styles.heroAddressText}
+                  />
+                )}
               </View>
 
               <View style={styles.heroIconCircle}>
@@ -480,6 +495,17 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     fontSize: normalize(15),
     lineHeight: normalize(22),
+  },
+
+  heroAddressRow: {
+    marginTop: hp(0.8),
+  },
+
+  heroAddressText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    opacity: 1,
   },
 
   heroIconCircle: {
@@ -826,8 +852,9 @@ const styles = StyleSheet.create({
 
   filterChip: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: hp(1),
-    paddingHorizontal: wp(3),
+    paddingHorizontal: wp(2),
     borderRadius: normalize(20),
     borderWidth: 1,
     alignItems: 'center',
@@ -836,12 +863,14 @@ const styles = StyleSheet.create({
   },
 
   metricChip: {
+    minWidth: 0,
     paddingVertical: hp(0.9),
-    paddingHorizontal: wp(4),
+    paddingHorizontal: wp(3),
     borderRadius: normalize(20),
     borderWidth: 1,
     minHeight: normalize(36),
     justifyContent: 'center',
+    alignItems: 'center',
   },
 
   filterChipActive: {

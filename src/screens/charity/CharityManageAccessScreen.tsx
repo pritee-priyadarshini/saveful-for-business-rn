@@ -12,6 +12,7 @@ import {
   Keyboard,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
@@ -27,6 +28,7 @@ import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -57,6 +59,9 @@ function validatePassword(password: string, confirmPassword: string): string | n
 export default function CharityManageAccessScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
+  const safeBottomPadding = useSafeBottomPadding(hp(4));
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { locationId: routeLocationId } = route.params as {
     locationId?: number;
     orgType: 'charity' | 'restaurant' | 'farmer';
@@ -85,6 +90,17 @@ export default function CharityManageAccessScreen() {
       showErrorAlert(e, 'Could not load team', 'Could not load team members'),
     );
   }, [fetchUsers, fetchLocations]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -322,13 +338,18 @@ export default function CharityManageAccessScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={normalize(20)}
+      keyboardVerticalOffset={insets.top + normalize(20)}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <Screen backgroundColor={palette.creme}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingBottom: safeBottomPadding + (keyboardVisible ? hp(3) : 0),
+              },
+            ]}
             showsVerticalScrollIndicator={false}
           >
             <ImageBackground
@@ -358,6 +379,10 @@ export default function CharityManageAccessScreen() {
                 <AppText
                   variant="bodyBold"
                   style={[styles.tabText, activeTab === 'user' && styles.activeTabText]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  ellipsizeMode="tail"
                 >
                   Add User
                 </AppText>
@@ -373,6 +398,10 @@ export default function CharityManageAccessScreen() {
                 <AppText
                   variant="bodyBold"
                   style={[styles.tabText, activeTab === 'driver' && styles.activeTabText]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  ellipsizeMode="tail"
                 >
                   Add Driver
                 </AppText>
@@ -406,9 +435,16 @@ export default function CharityManageAccessScreen() {
                   <AppText variant="label" style={styles.siteBannerLabel}>
                     Site
                   </AppText>
-                  <AppText variant="bodyBold">{selectedLocation.locationName}</AppText>
+                  <AppText variant="bodyBold" numberOfLines={1} ellipsizeMode="tail">
+                    {selectedLocation.locationName}
+                  </AppText>
                   {selectedLocation.address ? (
-                    <AppText variant="bodySmall" style={styles.sectionHint}>
+                    <AppText
+                      variant="bodySmall"
+                      style={styles.sectionHint}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
                       {selectedLocation.address}
                     </AppText>
                   ) : null}
@@ -589,7 +625,7 @@ export default function CharityManageAccessScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: hp(14),
+    flexGrow: 1,
   },
   headerBg: {
     height: hp(22),
@@ -618,12 +654,16 @@ const styles = StyleSheet.create({
     gap: wp(2.5),
     marginHorizontal: wp(4),
     marginBottom: hp(2),
+    paddingBottom: hp(0.5),
   },
   tabPill: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2.5),
     borderRadius: normalize(999),
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: palette.border,
@@ -634,6 +674,8 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: palette.black,
+    textAlign: 'center',
+    width: '100%',
   },
   activeTabText: {
     color: palette.white,
