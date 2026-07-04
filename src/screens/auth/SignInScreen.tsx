@@ -359,6 +359,7 @@ export function SignInScreen() {
       }
 
       if (
+        __DEV__ &&
         email.trim().toLowerCase() === 'farmer@saveful.com' &&
         password === '123456'
       ) {

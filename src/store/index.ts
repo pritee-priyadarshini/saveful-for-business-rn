@@ -23,8 +23,10 @@ import { useDashboardStore } from './dashboardStore';
 import { useSitesStore } from './sitesStore';
 import { useCharityStore } from './charityStore';
 import { useNotificationsStore } from './notificationsStore';
+import { clearListingDetailCache } from '../services/foodListing.service';
 
 export function resetAllDataStores(): void {
+  clearListingDetailCache();
   useListingsStore.getState().reset();
   useDiscoverStore.getState().reset();
   useDashboardStore.getState().reset();

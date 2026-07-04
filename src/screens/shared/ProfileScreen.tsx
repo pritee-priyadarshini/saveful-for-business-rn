@@ -232,12 +232,20 @@ export function ProfileScreen() {
           return;
         }
 
+        const hasNewLogo = logo && (logo.startsWith('file') || logo.startsWith('content'));
+        const hasBrandingChange = formData.branding.trim().length > 0;
+
+        if (!hasBrandingChange && !hasNewLogo) {
+          Alert.alert('Nothing to save', 'Update branding or choose a logo first.');
+          return;
+        }
+
         const form = new FormData();
-        if (formData.branding.trim()) {
+        if (hasBrandingChange) {
           form.append('brandName', formData.branding.trim());
         }
 
-        if (logo && (logo.startsWith('file') || logo.startsWith('content'))) {
+        if (hasNewLogo) {
           form.append('logo', {
             uri: logo,
             name: 'logo.jpg',
@@ -294,14 +302,17 @@ export function ProfileScreen() {
     Linking.openURL(url);
   };
 
+  const showManageAccess =
+    isRestaurant || isCharity || (isFarmerConsumer && !!selectedSiteId);
+
   // DYNAMIC SECTIONS
   const sections = [
     {
       key: 'personal',
       title: 'Personal Details',
       fields: [
-        { label: 'First Name', value: currentProfile.name.split(' ')[0], editable: false },
-        { label: 'Last Name', value: currentProfile.name.split(' ')[1] || '', editable: false },
+        { label: 'First Name', value: formData.firstName, editable: false },
+        { label: 'Last Name', value: formData.lastName, editable: false },
       ],
     },
     {
@@ -331,7 +342,7 @@ export function ProfileScreen() {
           { label: 'Name', value: currentProfile.organization, editable: false },
           { label: 'Address', value: currentProfile.address, editable: true },
           { label: 'Registration No.', value: formData.registration, editable: true },
-          { label: 'Venue Type', value: 'Bakery', editable: true },
+          { label: 'Venue Type', value: formData.venueType || '—', editable: true },
         ],
     },
     {
@@ -638,7 +649,7 @@ export function ProfileScreen() {
             </Pressable>
           )}
 
-          {(isRestaurant || isCollector) && (
+          {showManageAccess && (
             <Pressable
               style={styles.linkRow}
               onPress={() =>
@@ -649,7 +660,7 @@ export function ProfileScreen() {
                       ? 'FarmerManageAccess'
                       : 'ManageAccess',
                   {
-                    locationId: selectedSiteId,
+                    locationId: selectedSiteId ?? 0,
                     orgType: isCharity ? 'charity' : isFarmerConsumer ? 'farmer' : 'restaurant',
                   }
                 )

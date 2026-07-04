@@ -48,11 +48,15 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     setUnauthorizedHandler(async () => {
+      const notificationsStore = useNotificationsStore.getState();
+      notificationsStore.teardownPushHandlers();
+      await notificationsStore.unregisterDeviceToken().catch(() => undefined);
       await authStoreLogout();
+      resetForms();
       resetAllDataStores();
     });
     return () => setUnauthorizedHandler(null);
-  }, [authStoreLogout]);
+  }, [authStoreLogout, resetForms]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -87,9 +91,14 @@ export function AppProvider({ children }: PropsWithChildren) {
         ? authUser.profile.sites[0]
         : null;
 
+    const profileUser = authUser?.profile?.user;
+    const firstName = profileUser?.firstName?.trim() || '';
+    const lastName = profileUser?.lastName?.trim() || '';
+    const displayName = [firstName, lastName].filter(Boolean).join(' ') || profileUser?.email || '';
+
     const currentProfile: UserProfile = authUser?.profile
       ? {
-          name: `${authUser.profile.user.firstName} ${authUser.profile.user.lastName}`,
+          name: displayName,
           organization:
             assignedSite?.locationName ||
             assignedSite?.name ||
@@ -99,10 +108,10 @@ export function AppProvider({ children }: PropsWithChildren) {
             assignedSite?.address ||
             resolveProfileDisplayAddress(authUser.profile),
           verificationStatus: 'Verified',
-          phone: authUser.profile.user.phoneNumber || '',
+          phone: profileUser?.phoneNumber || '',
           logo: authUser.profile.organisation?.logoUrl || '',
-          memberSince: authUser.profile.user.createdAt,
-          email: authUser.profile.user.email || '',
+          memberSince: profileUser?.createdAt,
+          email: profileUser?.email || '',
         }
       : {
           name: '',

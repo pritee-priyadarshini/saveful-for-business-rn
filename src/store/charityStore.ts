@@ -113,7 +113,8 @@ export function isCharityUserActive(raw: any, role?: string): boolean {
     return true;
   }
 
-  return false;
+  // No inactive signals — treat as active (API often omits isActive on valid members).
+  return true;
 }
 
 function resolveCharityUserRecord(raw: any, role: string): CharityMember {

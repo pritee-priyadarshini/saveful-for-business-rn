@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
@@ -36,19 +36,25 @@ const inputProps = { compact: true as const, labelVariant: 'bodyBold' as const }
 
 export default function ManageAccessScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const routeLocationId = (route.params as { locationId?: number } | undefined)?.locationId;
   const insets = useSafeAreaInsets();
   const safeBottomPadding = useSafeBottomPadding(hp(4));
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const {
-    firstSiteId: siteId,
+    firstSiteId: storeSiteId,
     maxUsersPerSite: maxUsers,
     staffBySiteId,
     isFetching: loading,
     fetchFirstSiteTeam,
+    fetchStaff,
     assignManager,
     addStaff,
     removeAccess,
   } = useSitesStore();
+
+  const siteId =
+    routeLocationId != null && routeLocationId > 0 ? routeLocationId : storeSiteId;
 
   const [form, setForm] = useState({
     firstName: '',
@@ -153,6 +159,11 @@ export default function ManageAccessScreen() {
       showErrorAlert(e, 'Could not load team', 'Could not load team members'),
     );
   }, [fetchFirstSiteTeam]);
+
+  useEffect(() => {
+    if (!siteId) return;
+    fetchStaff(siteId, true).catch(() => undefined);
+  }, [siteId, fetchStaff]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';

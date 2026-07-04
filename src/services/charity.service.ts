@@ -1,4 +1,5 @@
 import api from './api';
+import { patchFormData } from './organization.service';
 
 export enum CharityMemberRole {
     HEAD_OFFICE_ADMIN = 'HEAD_OFFICE_ADMIN',
@@ -110,8 +111,6 @@ export const charityService = {
     },
 
     updateOrganisation(orgId: number | string, data: FormData) {
-        return api.patch(`/organization/${orgId}`, data, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        return patchFormData(`/organization/${orgId}`, data);
     },
 };

@@ -110,8 +110,8 @@ export function AppNavigator() {
   const effectiveRoleRef = useRef<UserRole>(effectiveRole);
   useEffect(() => { effectiveRoleRef.current = effectiveRole; }, [effectiveRole]);
 
-  function navigateFromNotification(payload: NotificationPayload) {
-    if (!navigationRef.current?.isReady()) return;
+  function tryNavigateFromNotification(payload: NotificationPayload): boolean {
+    if (!navigationRef.current?.isReady()) return false;
 
     emitNotificationReceived(payload);
 
@@ -124,10 +124,19 @@ export function AppNavigator() {
           params: target.params,
         }),
       );
-      return;
+      return true;
     }
 
     navigationRef.current.navigate(target.name as keyof RootStackParamList, target.params as never);
+    return true;
+  }
+
+  function flushPendingNotification() {
+    if (!pendingNotificationRef.current) return;
+    const payload = pendingNotificationRef.current;
+    if (tryNavigateFromNotification(payload)) {
+      pendingNotificationRef.current = null;
+    }
   }
 
   const initialRouteName: keyof RootStackParamList =
@@ -145,7 +154,7 @@ export function AppNavigator() {
         pendingNotificationRef.current = payload;
         return;
       }
-      navigateFromNotification(payload);
+      tryNavigateFromNotification(payload);
     });
     return () => teardownNotificationOpenedHandler();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,14 +168,16 @@ export function AppNavigator() {
       return;
     }
     if (!pendingNotificationRef.current) return;
-    const payload = pendingNotificationRef.current;
-    pendingNotificationRef.current = null;
-    navigateFromNotification(payload);
+    flushPendingNotification();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
   return (
-    <NavigationContainer ref={navigationRef} theme={navTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navTheme}
+      onReady={flushPendingNotification}
+    >
       {isAuthenticated ? (
         <RootStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
           <RootStack.Screen name="Tabs" component={RoleTabs} />
