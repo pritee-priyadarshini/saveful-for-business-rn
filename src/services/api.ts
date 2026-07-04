@@ -12,10 +12,16 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
 
 const api = axios.create({
   baseURL: 'https://s4b.saveful.app/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 60000,
 });
+
+function isFormData(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (value instanceof FormData) return true;
+  const proto = Object.getPrototypeOf(value);
+  if (proto?.constructor?.name === 'FormData') return true;
+  return typeof (value as any).getParts === 'function';
+}
 
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const token = await SecureStore.getItemAsync('accessToken');
@@ -24,10 +30,13 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // Let React Native set multipart boundary; a bare `multipart/form-data` header drops fields.
-  if (config.data instanceof FormData) {
+  if (isFormData(config.data)) {
+    // Let React Native's XHR set Content-Type with the multipart boundary.
+    // Bypass axios's transformRequest to prevent any serialization of FormData.
     config.headers.delete('Content-Type');
-    config.transformRequest = [(data) => data];
+    config.transformRequest = [(data: any) => data];
+  } else if (!config.headers.get('Content-Type')) {
+    config.headers.set('Content-Type', 'application/json');
   }
 
   const method = (config.method ?? 'get').toUpperCase();
@@ -63,6 +72,9 @@ api.interceptors.response.use(
       `[API] ← ERROR ${error.response?.status ?? 'NETWORK'} ${method} ${base}${path}`,
       error.response?.data ?? error.message,
     );
+    if (!error.response) {
+      console.log('[API] Network failure details:', error.code, error.message);
+    }
 
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync('accessToken');

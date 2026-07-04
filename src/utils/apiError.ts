@@ -103,6 +103,15 @@ export function getUserFriendlyErrorMessage(
   }
 
   if (error instanceof Error && error.message) {
+    // Check if this error has a response payload (from fetch-based calls)
+    const errorWithResponse = error as Error & { response?: { status?: number; data?: unknown } };
+    if (errorWithResponse.response?.data) {
+      const apiMessage = extractApiMessage(errorWithResponse.response.data);
+      if (apiMessage) return apiMessage;
+      const status = errorWithResponse.response.status;
+      if (status && STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
+    }
+
     const friendly = humanizeRawMessage(error.message);
     if (friendly && !isAxiosError(error)) return friendly;
   }
@@ -117,7 +126,10 @@ export function getUserFriendlyErrorMessage(
     }
 
     if (!error.response) {
-      return 'No internet connection. Please check your network and try again.';
+      if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
+        return 'The request timed out. Please check your connection and try again.';
+      }
+      return 'Unable to reach the server. Please check your internet connection and try again.';
     }
   }
 
