@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -20,7 +20,7 @@ import { useAppContext } from '../../store/AppContext';
 
 import { spacing } from '../../theme/spacing';
 import { InputField } from '@/components/InputField';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
@@ -29,6 +29,13 @@ import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
+import { authService } from '@/services/auth.service';
+import { organizationService } from '@/services/organization.service';
+import { sitesService } from '@/services/sites.service';
+import {
+  resolveProfileDisplayAddress,
+  resolveProfilePickupRadiusKm,
+} from '@/utils/authSession';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -38,9 +45,26 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
+function buildProfileForm(authUser: ReturnType<typeof useAuthStore.getState>['authUser']) {
+  const org = authUser?.profile?.organisation;
+
+  return {
+    firstName: authUser?.profile?.user?.firstName || '',
+    lastName: authUser?.profile?.user?.lastName || '',
+    email: authUser?.profile?.user?.email || '',
+    mobile: authUser?.profile?.user?.phoneNumber || '',
+    businessName: org?.name || '',
+    address: resolveProfileDisplayAddress(authUser?.profile),
+    registration: org?.registrationNumber || '',
+    venueType: org?.venueType || '',
+    branding: org?.brandName || '',
+    radius: resolveProfilePickupRadiusKm(authUser?.profile),
+  };
+}
+
 export function ProfileScreen() {
   const { currentProfile, authUser } = useAppContext();
-  const { updateUser, updateLocation, updateOrganisation } = useCharityStore();
+  const { updateLocation } = useCharityStore();
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
   type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -50,10 +74,24 @@ export function ProfileScreen() {
   const [openSection, setOpenSection] = useState<string | null>(null);
   const { submitting, withLock } = useSubmitLock();
   const [logo, setLogo] = useState<string | null>(
-    authUser?.profile?.organisation?.logoUrl ||
-    authUser?.profile?.organisation?.logo ||
-    null
+    currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null,
   );
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfile().catch(() => undefined);
+    }, [refreshProfile]),
+  );
+
+  useEffect(() => {
+    const remoteLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
+
+    setLogo((current) => {
+      if (!remoteLogo) return current;
+      if (current?.startsWith('file') || current?.startsWith('content')) return current;
+      return remoteLogo;
+    });
+  }, [currentProfile.logo, authUser?.profile?.organisation?.logoUrl]);
 
   const rawCreatedAt =
     authUser?.profile?.organisation?.createdAt ||
@@ -84,17 +122,34 @@ export function ProfileScreen() {
     setLogo(null);
   };
 
+  const { selectedRole, logout } = useAppContext();
+
+  const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
+  const isCharity = selectedRole === 'charity_single' || selectedRole === 'charity_multi';
+  const isFarmerConsumer = selectedRole === 'farmer';
+  const isFarmBusiness = selectedRole === 'farm_business';
+  const isCollector = isCharity || isFarmerConsumer;
+  const usesSiteAddress = isRestaurant || isFarmBusiness;
+
+  const [formData, setFormData] = useState(() => buildProfileForm(authUser));
+
+  useEffect(() => {
+    setFormData(buildProfileForm(authUser));
+  }, [authUser]);
+
+  const updateField = (key: string, value: string) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
   const handleUpdateContact = async () => {
     if (submitting) return;
     await withLock(async () => {
       try {
-        if (!authUser?.id) {
-          Alert.alert('Error', 'User not found');
-          return;
-        }
-        await updateUser(authUser.id, { mobile: formData.mobile });
+        await authService.updateProfile({ phoneNumber: formData.mobile.trim() });
         await refreshProfile();
-
         showSuccessAlert('Contact updated');
       } catch (err) {
         showErrorAlert(err, 'Could not update contact', 'Failed to update contact');
@@ -102,26 +157,67 @@ export function ProfileScreen() {
     });
   };
 
-  const handleUpdateLocation = async () => {
+  const handleUpdateBusiness = async () => {
     if (submitting) return;
     await withLock(async () => {
       try {
-        const locationId = authUser?.profile?.sites?.[0]?.id;
-        if (!locationId) {
+        const orgId = authUser?.profile?.organisation?.id;
+        const siteId = authUser?.profile?.sites?.[0]?.id;
+        const trimmedAddress = formData.address.trim();
+
+        if (usesSiteAddress) {
+          if (!siteId) {
+            Alert.alert('Error', 'Site not found');
+            return;
+          }
+          await sitesService.updateSite(siteId, { address: trimmedAddress });
+        } else if (isCharity || isFarmerConsumer) {
+          if (!siteId) {
+            Alert.alert('Error', 'Location not found');
+            return;
+          }
+          await updateLocation(siteId, {
+            address: trimmedAddress,
+          });
+        }
+
+        if (orgId && (formData.registration.trim() || (isRestaurant && formData.venueType.trim()))) {
+          const form = new FormData();
+          if (formData.registration.trim()) {
+            form.append('registrationNumber', formData.registration.trim());
+          }
+          if (isRestaurant && formData.venueType.trim()) {
+            form.append('venueType', formData.venueType.trim());
+          }
+          await organizationService.updateOrganisation(orgId, form);
+        }
+
+        await refreshProfile();
+        showSuccessAlert('Details updated');
+      } catch (err) {
+        showErrorAlert(err, 'Could not update details', 'Failed to update');
+      }
+    });
+  };
+
+  const handleUpdatePickup = async () => {
+    if (submitting || !isCharity) return;
+    await withLock(async () => {
+      try {
+        const siteId = authUser?.profile?.sites?.[0]?.id;
+        if (!siteId) {
           Alert.alert('Error', 'Location not found');
           return;
         }
 
-        await updateLocation(locationId, {
-          address: formData.address,
-          postcode: '',
-          radiusKm: Number(formData.radius),
+        await updateLocation(siteId, {
+          pickupRadiusKm: formData.radius ? Number(formData.radius) : undefined,
         });
-        await refreshProfile();
 
-        showSuccessAlert('Details updated');
+        await refreshProfile();
+        showSuccessAlert('Pickup preferences updated');
       } catch (err) {
-        showErrorAlert(err, 'Could not update details', 'Failed to update');
+        showErrorAlert(err, 'Could not update pickup radius', 'Failed to update');
       }
     });
   };
@@ -137,7 +233,9 @@ export function ProfileScreen() {
         }
 
         const form = new FormData();
-        form.append('brandName', formData.branding);
+        if (formData.branding.trim()) {
+          form.append('brandName', formData.branding.trim());
+        }
 
         if (logo && (logo.startsWith('file') || logo.startsWith('content'))) {
           form.append('logo', {
@@ -147,7 +245,7 @@ export function ProfileScreen() {
           } as any);
         }
 
-        await updateOrganisation(orgId, form);
+        await organizationService.updateOrganisation(orgId, form);
         await refreshProfile();
         showSuccessAlert('Branding updated');
       } catch (err) {
@@ -156,10 +254,21 @@ export function ProfileScreen() {
     });
   };
 
-  const { logout } = useAppContext();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const runLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } catch {
+      Alert.alert('Logout failed', 'Please try again.');
+      setLoggingOut(false);
+    }
+  };
 
   const handleLogout = () => {
-    logout();
+    void runLogout();
   };
 
   const handleDeleteAccount = () => {
@@ -171,32 +280,10 @@ export function ProfileScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: handleLogout,
+          onPress: () => void runLogout(),
         },
-      ]
+      ],
     );
-  };
-
-  const site = authUser?.profile?.sites?.[0];
-
-  const [formData, setFormData] = useState<any>({
-    firstName: authUser?.profile?.user?.firstName || '',
-    lastName: authUser?.profile?.user?.lastName || '',
-    email: authUser?.profile?.user?.email || '',
-    mobile: authUser?.profile?.user?.phoneNumber || '',
-    businessName: authUser?.profile?.organisation?.name || '',
-    address: site?.address || '',
-    registration: authUser?.profile?.organisation?.registrationNumber || '',
-    venueType: authUser?.profile?.organisation?.venueType || '',
-    branding: authUser?.profile?.organisation?.branding || '',
-    radius: site?.radiusKm ? String(site.radiusKm) : '',
-  });
-
-  const updateField = (key: string, value: string) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      [key]: value,
-    }));
   };
 
   const toggle = (key: string) => {
@@ -206,14 +293,6 @@ export function ProfileScreen() {
   const openLink = (url: string) => {
     Linking.openURL(url);
   };
-
-  const { selectedRole } = useAppContext();
-
-  const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
-
-  const isCharity = selectedRole === 'charity_single' || selectedRole === 'charity_multi';
-  const isFarmerConsumer = selectedRole === 'farmer';
-  const isCollector = isCharity || isFarmerConsumer;
 
   // DYNAMIC SECTIONS
   const sections = [
@@ -259,17 +338,17 @@ export function ProfileScreen() {
       key: 'extra',
       title: 'Extra Info (Branding + Logo)',
       fields: [
-        { label: 'Branding', value: 'Saveful Brand', editable: true },
+        { label: 'Branding', value: formData.branding || '—', editable: true },
         { label: 'Logo', value: 'Upload Logo', editable: true, isUpload: true },
       ],
     },
-    ...(isCollector
+    ...(isCharity
       ? [
         {
           key: 'pickup',
           title: 'Pickup Preferences',
           fields: [
-            { label: 'Radius (km)', value: '5', editable: true },
+            { label: 'Radius (km)', value: formData.radius || '—', editable: true },
           ],
         },
       ]
@@ -277,7 +356,7 @@ export function ProfileScreen() {
   ];
 
   return (
-    <Screen backgroundColor={palette.creme}>
+    <Screen backgroundColor={palette.creme} transparentTop={true}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>
@@ -309,9 +388,13 @@ export function ProfileScreen() {
             </View>
 
             <View style={styles.profileCircle}>
-              <AppText variant="bodyBold">
-                {currentProfile.name[0]}
-              </AppText>
+              {logo ? (
+                <Image source={{ uri: logo }} style={styles.profileImage} resizeMode="cover" />
+              ) : (
+                <AppText variant="bodyBold" style={styles.profileInitial}>
+                  {currentProfile.name?.trim()?.[0]?.toUpperCase() || 'S'}
+                </AppText>
+              )}
             </View>
           </View>
         </View>
@@ -508,7 +591,7 @@ export function ProfileScreen() {
                     section.key === 'business' ||
                     section.key === 'extra') &&
                     true) ||
-                    (section.key === 'pickup' && isCollector) ? (
+                    (section.key === 'pickup' && isCharity) ? (
                     <Pressable
                       style={[styles.saveBtn, submitting && { opacity: 0.65 }]}
                       disabled={submitting}
@@ -517,8 +600,12 @@ export function ProfileScreen() {
                           handleUpdateContact();
                         }
 
-                        if (section.key === 'business' || section.key === 'pickup') {
-                          handleUpdateLocation();
+                        if (section.key === 'business') {
+                          handleUpdateBusiness();
+                        }
+
+                        if (section.key === 'pickup') {
+                          handleUpdatePickup();
                         }
 
                         if (section.key === 'extra') {
@@ -595,11 +682,19 @@ export function ProfileScreen() {
           ))}
 
           {/* ACTIONS */}
-          <Pressable style={styles.actionBtn} onPress={handleLogout}>
-            <AppText variant='label'>Log out</AppText>
+          <Pressable
+            style={[styles.actionBtn, loggingOut && styles.actionBtnDisabled]}
+            onPress={handleLogout}
+            disabled={loggingOut}
+          >
+            <AppText variant='label'>{loggingOut ? 'Logging out...' : 'Log out'}</AppText>
           </Pressable>
 
-          <Pressable style={styles.actionBtn} onPress={handleDeleteAccount}>
+          <Pressable
+            style={[styles.actionBtn, loggingOut && styles.actionBtnDisabled]}
+            onPress={handleDeleteAccount}
+            disabled={loggingOut}
+          >
             <AppText variant='label'>Delete my account</AppText>
           </Pressable>
 
@@ -632,7 +727,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
-    marginTop: -(hp(25) - 5),
+    marginTop: -(hp(25) - spacing.xl),
     zIndex: 1,
     gap: spacing.sm,
   },
@@ -670,13 +765,23 @@ const styles = StyleSheet.create({
   },
 
   profileCircle: {
-    width: wp(11),
-    height: hp(5.5),
+    width: normalize(44),
+    height: normalize(44),
     borderRadius: normalize(22),
     backgroundColor: '#A8E6CF',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
+  },
+
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  profileInitial: {
+    color: palette.primary,
   },
 
   supportBtn: {
@@ -800,6 +905,10 @@ const styles = StyleSheet.create({
     borderRadius: normalize(6),
     borderWidth: 1,
     alignItems: 'center',
+  },
+
+  actionBtnDisabled: {
+    opacity: 0.6,
   },
   passwordWrapper: {
     position: 'relative',

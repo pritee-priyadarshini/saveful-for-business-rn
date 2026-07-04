@@ -27,6 +27,12 @@ export type AddStaffPayload = {
   phoneNumber?: string;
 };
 
+export type UpdateSitePayload = {
+  address?: string;
+  siteName?: string;
+  postcode?: string;
+};
+
 export const sitesService = {
   getOrganisation() {
     return api.get('/sites/organisation');
@@ -54,5 +60,9 @@ export const sitesService = {
 
   removeAccess(siteId: number, userId: number) {
     return api.delete(`/sites/${siteId}/access/${userId}`);
+  },
+
+  updateSite(siteId: number | string, data: UpdateSitePayload) {
+    return api.patch(`/sites/${siteId}`, data);
   },
 };

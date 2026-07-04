@@ -5,4 +5,7 @@ export const organizationService = {
     organizationId: number | string,
     data: { latitude: number; longitude: number },
   ) => api.patch(`/organization/ccordinates/${organizationId}`, data),
+
+  updateOrganisation: (organizationId: number | string, data: FormData) =>
+    api.patch(`/organization/${organizationId}`, data),
 };

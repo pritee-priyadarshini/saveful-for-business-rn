@@ -29,6 +29,7 @@ export type UpdateCharityLocationPayload = {
     contactEmail?: string;
     contactMobile?: string;
     radiusKm?: number;
+    pickupRadiusKm?: number;
     latitude?: number;
     longitude?: number;
 };

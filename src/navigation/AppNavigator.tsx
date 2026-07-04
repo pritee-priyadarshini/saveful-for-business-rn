@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { NavigationContainer, DefaultTheme, NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, NavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { useAppContext } from '../store/AppContext';
@@ -24,10 +24,17 @@ import DriverTrackingScreen from '@/screens/shared/DriverTrackingScreen';
 import CharityManageAccessScreen from '@/screens/charity/CharityManageAccessScreen';
 import FarmerManageAccessScreen from '@/screens/farmer/FarmerManageAccessScreen';
 import ForgotPasswordScreen from '@/screens/shared/ForgotPasswordScreen';
-import { setupNotificationOpenedHandler, teardownNotificationOpenedHandler, type NotificationPayload } from '../services/pushNotifications';
+import {
+  setupNotificationOpenedHandler,
+  teardownNotificationOpenedHandler,
+  emitNotificationReceived,
+  resolveNotificationTarget,
+  type NotificationPayload,
+} from '../services/pushNotifications';
+import type { UserRole } from '../types';
 
 export type RootStackParamList = {
-  Tabs: undefined;
+  Tabs: { screen?: string; params?: Record<string, unknown> } | undefined;
   CharityHistory: undefined;
   FarmerHistory: undefined;
   CharityPostCollectSurvey: undefined;
@@ -99,24 +106,36 @@ export function AppNavigator() {
   // Holds a notification tapped before session restore completed (kill-state race condition).
   const pendingNotificationRef = useRef<NotificationPayload | null>(null);
 
+  // Always-current role for notification routing without stale closures.
+  const effectiveRoleRef = useRef<UserRole>(effectiveRole);
+  useEffect(() => { effectiveRoleRef.current = effectiveRole; }, [effectiveRole]);
+
   function navigateFromNotification(payload: NotificationPayload) {
     if (!navigationRef.current?.isReady()) return;
-    const data = payload.data ?? {};
-    if (data.trackingId && data.source) {
-      navigationRef.current.navigate('DriverTracking', {
-        trackingId: String(data.trackingId),
-        source: data.source as 'restaurant' | 'charity' | 'farmer',
-      });
+
+    emitNotificationReceived(payload);
+
+    const target = resolveNotificationTarget(payload, effectiveRoleRef.current);
+
+    if (target.name === 'Tabs' && target.params) {
+      navigationRef.current.dispatch(
+        CommonActions.navigate({
+          name: 'Tabs',
+          params: target.params,
+        }),
+      );
       return;
     }
-    if (effectiveRole === 'restaurant_multi') {
-      navigationRef.current.navigate('ManageSites', undefined);
-    } else if (effectiveRole === 'charity_multi') {
-      navigationRef.current.navigate('MultiCharityManageSites', undefined);
-    } else {
-      navigationRef.current.navigate('Tabs', undefined);
-    }
+
+    navigationRef.current.navigate(target.name as keyof RootStackParamList, target.params as never);
   }
+
+  const initialRouteName: keyof RootStackParamList =
+    effectiveRole === 'restaurant_multi'
+      ? 'ManageSites'
+      : effectiveRole === 'charity_multi'
+        ? 'MultiCharityManageSites'
+        : 'Tabs';
 
   // Register notification-tap handlers once on mount.
   useEffect(() => {
@@ -149,16 +168,19 @@ export function AppNavigator() {
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       {isAuthenticated ? (
-        <RootStack.Navigator screenOptions={{ headerShown: false }}>
-          
+        <RootStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
+          <RootStack.Screen name="Tabs" component={RoleTabs} />
+
           {effectiveRole === 'restaurant_multi' ? (
             <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
-          ) : effectiveRole === 'charity_multi' ? (
+          ) : null}
+
+          {effectiveRole === 'charity_multi' ? (
             <RootStack.Screen
-              name="MultiCharityManageSites" component={MultiCharityManageSitesScreen} />
-          ) : (
-            <RootStack.Screen name="Tabs" component={RoleTabs} />
-          )}
+              name="MultiCharityManageSites"
+              component={MultiCharityManageSitesScreen}
+            />
+          ) : null}
 
           {/* GLOBAL */}
           <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />

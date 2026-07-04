@@ -65,6 +65,9 @@ export const authService = {
       newPassword,
     }),
 
-  profile: () => 
+  profile: () =>
     api.get('/auth/profile'),
+
+  updateProfile: (data: { phoneNumber?: string }) =>
+    api.patch('/auth/profile', data),
 };

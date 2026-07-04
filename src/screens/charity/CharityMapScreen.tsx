@@ -27,6 +27,10 @@ import { useAppContext } from '../../store/AppContext';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import {
+  isFoodListingNotification,
+  subscribeNotificationReceived,
+} from '@/services/pushNotifications';
 import { fetchListingDetail, mapDiscoverListing, type FoodItem, invalidateListingDetail, clearListingDetailCache } from '../../services/foodListing.service';
 import {
   haversineDistanceKm,
@@ -203,6 +207,18 @@ export function CharityMapScreen({ navigation }: any) {
       setRefreshing(false);
     }
   }, [storeFetchListings]);
+
+  const reloadFromNotification = useCallback(() => {
+    void handleRefresh();
+  }, [handleRefresh]);
+
+  useEffect(() => {
+    return subscribeNotificationReceived((payload) => {
+      if (isFoodListingNotification(payload)) {
+        reloadFromNotification();
+      }
+    });
+  }, [reloadFromNotification]);
 
   const getKey = (listingId: string, foodItemId: number) => `${listingId}-${foodItemId}`;
 

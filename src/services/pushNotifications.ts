@@ -7,6 +7,7 @@ import {
   type PushPlatform,
   type RegisterPushTokenPayload,
 } from './notifications.service';
+import type { UserRole } from '../types';
 
 
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
@@ -322,6 +323,14 @@ export function setupForegroundNotificationHandler(): void {
 
   foregroundUnsubscribe = messaging().onMessage(async (remoteMessage) => {
     console.log('[Push] Foreground message received:', remoteMessage.messageId, remoteMessage.notification?.title);
+
+    const payload: NotificationPayload = {
+      messageId: remoteMessage.messageId,
+      data: remoteMessage.data as Record<string, string> | undefined,
+      notification: remoteMessage.notification,
+    };
+    emitNotificationReceived(payload);
+
     // Firebase does not auto-display notifications when the app is in the foreground.
     // Schedule a local notification via expo-notifications so the user sees a banner.
     if (remoteMessage.notification?.title || remoteMessage.notification?.body) {
@@ -419,4 +428,83 @@ export async function setupNotificationOpenedHandler(
 export function teardownNotificationOpenedHandler(): void {
   tapUnsubscribe?.();
   tapUnsubscribe = null;
+}
+
+type NotificationListener = (payload: NotificationPayload) => void;
+
+const notificationListeners = new Set<NotificationListener>();
+
+export function subscribeNotificationReceived(listener: NotificationListener): () => void {
+  notificationListeners.add(listener);
+  return () => notificationListeners.delete(listener);
+}
+
+export function emitNotificationReceived(payload: NotificationPayload): void {
+  notificationListeners.forEach((listener) => {
+    try {
+      listener(payload);
+    } catch (error) {
+      console.log('[Push] Notification listener error', error);
+    }
+  });
+}
+
+function normalizeNotificationValue(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+export function isFoodListingNotification(payload: NotificationPayload): boolean {
+  const data = payload.data ?? {};
+  const type = normalizeNotificationValue(data.type ?? data.notificationType ?? data.event);
+  const deepLink = normalizeNotificationValue(data.deepLink ?? data.deep_link ?? data.link);
+  const screen = normalizeNotificationValue(data.screen ?? data.targetScreen);
+
+  if (type.includes('listing') || type.includes('surplus') || type.includes('food')) {
+    return true;
+  }
+  if (deepLink.includes('available') || deepLink.includes('discover') || deepLink.includes('listing')) {
+    return true;
+  }
+  if (screen === 'available' || screen === 'charitymap' || screen === 'discover') {
+    return true;
+  }
+  return Boolean(data.listingId || data.foodListingId);
+}
+
+export type NotificationNavigationTarget =
+  | { name: 'DriverTracking'; params: { trackingId: string; source: 'restaurant' | 'charity' | 'farmer' } }
+  | { name: 'Tabs'; params?: { screen: string; params?: Record<string, unknown> } }
+  | { name: 'ManageSites'; params?: undefined }
+  | { name: 'MultiCharityManageSites'; params?: undefined };
+
+export function resolveNotificationTarget(
+  payload: NotificationPayload,
+  role: UserRole,
+): NotificationNavigationTarget {
+  const data = payload.data ?? {};
+
+  if (data.trackingId && data.source) {
+    return {
+      name: 'DriverTracking',
+      params: {
+        trackingId: String(data.trackingId),
+        source: data.source as 'restaurant' | 'charity' | 'farmer',
+      },
+    };
+  }
+
+  if (isFoodListingNotification(payload)) {
+    if (role === 'charity_single' || role === 'charity_multi' || role === 'farmer') {
+      return { name: 'Tabs', params: { screen: 'Available' } };
+    }
+  }
+
+  if (role === 'restaurant_multi') {
+    return { name: 'ManageSites' };
+  }
+  if (role === 'charity_multi') {
+    return { name: 'MultiCharityManageSites' };
+  }
+
+  return { name: 'Tabs' };
 }

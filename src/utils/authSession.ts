@@ -75,3 +75,37 @@ export function resolveUserRole(
 
   return fallback;
 }
+
+export function resolveOrganisationAddress(org: {
+  businessAddress?: string;
+  charityAddress?: string;
+  address?: string;
+} | null | undefined): string {
+  return org?.businessAddress ?? org?.charityAddress ?? org?.address ?? '';
+}
+
+export function resolveProfileDisplayAddress(profile: {
+  sites?: Array<{ address?: string; pickupRadiusKm?: number; radiusKm?: number }>;
+  organisation?: {
+    businessAddress?: string;
+    charityAddress?: string;
+    address?: string;
+    pickupRadiusKm?: number;
+  };
+} | null | undefined): string {
+  const site = profile?.sites?.[0];
+  return site?.address || resolveOrganisationAddress(profile?.organisation);
+}
+
+export function resolveProfilePickupRadiusKm(profile: {
+  sites?: Array<{ pickupRadiusKm?: number; radiusKm?: number }>;
+  organisation?: { pickupRadiusKm?: number };
+} | null | undefined): string {
+  const site = profile?.sites?.[0];
+  const value =
+    site?.pickupRadiusKm ??
+    site?.radiusKm ??
+    profile?.organisation?.pickupRadiusKm;
+
+  return value != null ? String(value) : '';
+}

@@ -16,8 +16,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Picker } from '@react-native-picker/picker';
-
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { InputField } from '../../components/InputField';
@@ -39,7 +37,12 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-const inputProps = { compact: true as const, labelVariant: 'label' as const };
+const inputProps = { compact: true as const, labelVariant: 'bodyBold' as const };
+
+const FARMER_ROLE_OPTIONS = [
+  { label: 'Site Admin', value: 'site_admin' },
+  { label: 'Site Team Member', value: 'site_team_member' },
+];
 
 type AccessType = 'user' | 'driver';
 
@@ -59,6 +62,7 @@ export default function FarmerManageAccessScreen() {
   const effectiveLocationId = locationId ?? authUser?.profile?.sites?.[0]?.id;
 
   const [activeTab, setActiveTab] = useState<AccessType>('user');
+  const [roleExpanded, setRoleExpanded] = useState(false);
 
   const {
     users: members,
@@ -390,18 +394,51 @@ export default function FarmerManageAccessScreen() {
 
             {activeTab === 'user' ? (
               <View style={styles.pickerField}>
-                <AppText variant="label" style={styles.pickerLabel}>
+                <AppText variant="bodyBold" style={styles.pickerLabel}>
                   Role
                 </AppText>
-                <View style={styles.dropdown}>
-                  <Picker
-                    selectedValue={form.role}
-                    onValueChange={(v) => setForm({ ...form, role: v })}
+                <View style={[styles.roleSelectorBox, roleExpanded && styles.roleSelectorBoxExpanded]}>
+                  <Pressable
+                    style={styles.roleSelectorHeader}
+                    onPress={() => setRoleExpanded((prev) => !prev)}
                   >
-                    <Picker.Item label="Select role" value="" />
-                    <Picker.Item label="Site Admin" value="site_admin" />
-                    <Picker.Item label="Site Team Member" value="site_team_member" />
-                  </Picker>
+                    <AppText
+                      variant="bodySmall"
+                      style={[styles.roleSelectorValue, !form.role && styles.rolePlaceholderText]}
+                      numberOfLines={1}
+                    >
+                      {FARMER_ROLE_OPTIONS.find((o) => o.value === form.role)?.label || 'Select role'}
+                    </AppText>
+                    <Ionicons
+                      name={roleExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={normalize(18)}
+                      color={palette.kale}
+                    />
+                  </Pressable>
+                  {roleExpanded ? (
+                    <View style={styles.roleOptionsList}>
+                      {FARMER_ROLE_OPTIONS.map((option) => {
+                        const isSelected = form.role === option.value;
+                        return (
+                          <Pressable
+                            key={option.value}
+                            style={[styles.roleOptionRow, isSelected && styles.roleOptionRowSelected]}
+                            onPress={() => {
+                              setForm({ ...form, role: option.value });
+                              setRoleExpanded(false);
+                            }}
+                          >
+                            <View style={[styles.roleRadio, isSelected && styles.roleRadioActive]}>
+                              {isSelected ? <View style={styles.roleRadioInner} /> : null}
+                            </View>
+                            <AppText variant="bodySmall" style={styles.roleOptionText}>
+                              {option.label}
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
                 </View>
               </View>
             ) : (
@@ -570,6 +607,72 @@ const styles = StyleSheet.create({
   pickerLabel: {
     textTransform: 'none',
     color: palette.black,
+  },
+  roleSelectorBox: {
+    borderWidth: 1,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    backgroundColor: palette.white,
+    overflow: 'hidden',
+  },
+  roleSelectorBoxExpanded: {
+    minHeight: normalize(44),
+  },
+  roleSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.2),
+    minHeight: normalize(44),
+  },
+  roleSelectorValue: {
+    flex: 1,
+    color: palette.black,
+    textTransform: 'none',
+    paddingRight: wp(2),
+  },
+  rolePlaceholderText: {
+    color: palette.stone,
+  },
+  roleOptionsList: {
+    borderTopWidth: 1,
+    borderTopColor: '#ECECEC',
+  },
+  roleOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.1),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F2',
+  },
+  roleOptionRowSelected: {
+    backgroundColor: '#F7FAF7',
+  },
+  roleRadio: {
+    width: normalize(18),
+    height: normalize(18),
+    borderRadius: normalize(9),
+    borderWidth: 2,
+    borderColor: '#C8C8C8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleRadioActive: {
+    borderColor: palette.kale,
+  },
+  roleRadioInner: {
+    width: normalize(8),
+    height: normalize(8),
+    borderRadius: normalize(4),
+    backgroundColor: palette.kale,
+  },
+  roleOptionText: {
+    flex: 1,
+    color: palette.black,
+    textTransform: 'none',
   },
   dropdown: {
     borderWidth: 1,

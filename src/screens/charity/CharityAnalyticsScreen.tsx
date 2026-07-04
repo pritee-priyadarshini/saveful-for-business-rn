@@ -105,7 +105,6 @@ export function CharityAnalyticsScreen() {
 
   const organization = currentProfile.organization || 'Your charity';
   const address = currentProfile.address || '';
-  const logoInitial = organization?.[0] || 'S';
 
   const renderMetricCard = (icon: ImageSourcePropType, value: string, label: string) => (
     <View style={styles.metricCard}>
@@ -213,7 +212,12 @@ export function CharityAnalyticsScreen() {
                 <HeaderAddressRow address={address} uppercase />
               </View>
 
-              <View style={styles.logoCircle}>
+              <Pressable
+                style={styles.logoCircle}
+                onPress={() => navigation.navigate('Account')}
+                accessibilityRole="button"
+                accessibilityLabel="Open account profile"
+              >
                 {currentProfile.logo ? (
                   <Image
                     source={{ uri: currentProfile.logo }}
@@ -221,9 +225,11 @@ export function CharityAnalyticsScreen() {
                     resizeMode="cover"
                   />
                 ) : (
-                  <AppText style={styles.logoFallback}>{logoInitial}</AppText>
+                  <AppText style={styles.logoFallback}>
+                    {organization?.[0] || 'S'}
+                  </AppText>
                 )}
-              </View>
+              </Pressable>
             </View>
 
             <View style={styles.headerCenter}>

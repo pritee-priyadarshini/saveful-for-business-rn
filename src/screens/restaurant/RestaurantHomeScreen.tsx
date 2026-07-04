@@ -24,7 +24,6 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
-import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -82,6 +81,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   }, []);
+
+  const displayAddress = (currentProfile.address || capturedAddress || '').trim();
 
   const impactStats = [
     {
@@ -185,7 +186,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
           <>
             <HeroHeader
               source={require('../../../assets/placeholder/kale-header.png')}
-              height={hp(20)}
+              height={hp(22)}
             >
               <View style={styles.heroContent}>
                 <View style={styles.heroTopRow}>
@@ -201,7 +202,12 @@ export function RestaurantHomeScreen({ navigation }: any) {
                     </AppText>
                   </View>
 
-                  <View style={styles.logoCircle}>
+                  <Pressable
+                    style={styles.logoCircle}
+                    onPress={() => navigation.navigate('Account')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open account profile"
+                  >
                     {currentProfile.logo ? (
                       <Image source={{ uri: currentProfile.logo }} style={styles.logoImage} />
                     ) : (
@@ -209,17 +215,20 @@ export function RestaurantHomeScreen({ navigation }: any) {
                         {currentProfile.organization?.[0] || 'S'}
                       </AppText>
                     )}
-                  </View>
+                  </Pressable>
                 </View>
 
-                {!!currentProfile.address && (
+                {!!displayAddress && (
                   <View style={styles.locationPill}>
-                    <HeaderAddressRow
-                      address={currentProfile.address}
-                      iconSize={normalize(14)}
-                      style={styles.locationPillRow}
-                      textStyle={styles.locationPillText}
-                    />
+                    <Ionicons name="location-outline" size={normalize(14)} color={palette.white} />
+                    <AppText
+                      variant="caption"
+                      style={styles.locationPillText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {displayAddress}
+                    </AppText>
                   </View>
                 )}
               </View>
@@ -417,6 +426,8 @@ const styles = StyleSheet.create({
   heroTextBlock: {
     flex: 1,
     gap: hp(0.3),
+    minWidth: 0,
+    paddingBottom: hp(0.2),
   },
 
   heroGreeting: {
@@ -438,7 +449,10 @@ const styles = StyleSheet.create({
   },
 
   locationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
+    gap: wp(1.5),
     backgroundColor: 'rgba(0,0,0,0.2)',
     paddingVertical: hp(0.6),
     paddingHorizontal: wp(3),
@@ -446,15 +460,13 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
 
-  locationPillRow: {
-    marginTop: 0,
-  },
-
   locationPillText: {
     color: palette.white,
+    flex: 1,
+    minWidth: 0,
     fontSize: normalize(12),
     lineHeight: normalize(17),
-    opacity: 1,
+    textTransform: 'none',
   },
 
   logoCircle: {

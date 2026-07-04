@@ -15,6 +15,7 @@ import { useAuthStore } from './authStore';
 import { useRegistrationStore } from './registrationStore';
 import {
   resolveUserRole,
+  resolveProfileDisplayAddress,
 } from '@/utils/authSession';
 import { resetAllDataStores } from './index';
 
@@ -96,8 +97,7 @@ export function AppProvider({ children }: PropsWithChildren) {
             '',
           address:
             assignedSite?.address ||
-            authUser.profile.organisation?.address ||
-            '',
+            resolveProfileDisplayAddress(authUser.profile),
           verificationStatus: 'Verified',
           phone: authUser.profile.user.phoneNumber || '',
           logo: authUser.profile.organisation?.logoUrl || '',

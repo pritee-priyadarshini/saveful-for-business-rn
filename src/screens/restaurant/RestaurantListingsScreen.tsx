@@ -20,7 +20,6 @@ import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
-import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -635,7 +634,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
           <>
             <HeroHeader
               source={require('../../../assets/placeholder/kale-header.png')}
-              height={hp(20)}
+              height={hp(22)}
             >
              
               <View style={styles.heroContent}>
@@ -650,14 +649,6 @@ export function RestaurantListingsScreen({ navigation }: any) {
                     <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
                       Track surplus food, pickups, and your impact
                     </AppText>
-                    {!!currentProfile.address && (
-                      <HeaderAddressRow
-                        address={currentProfile.address}
-                        iconSize={normalize(14)}
-                        style={styles.heroAddressRow}
-                        textStyle={styles.heroAddressText}
-                      />
-                    )}
                   </View>
 
                   <View style={styles.heroIconCircle}>
@@ -668,6 +659,20 @@ export function RestaurantListingsScreen({ navigation }: any) {
                     />
                   </View>
                 </View>
+
+                {!!currentProfile.address && (
+                  <View style={styles.heroLocationRow}>
+                    <Ionicons name="location-outline" size={normalize(14)} color={palette.white} />
+                    <AppText
+                      variant="caption"
+                      style={styles.heroLocationText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {currentProfile.address}
+                    </AppText>
+                  </View>
+                )}
 
                 <View style={styles.heroStatsPill}>
                   <Ionicons name="layers-outline" size={normalize(14)} color={palette.white} />
@@ -919,15 +924,20 @@ const styles = StyleSheet.create({
     lineHeight: normalize(22),
   },
 
-  heroAddressRow: {
-    marginTop: hp(0.8),
+  heroLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
+    maxWidth: '100%',
   },
 
-  heroAddressText: {
+  heroLocationText: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: normalize(13),
-    lineHeight: normalize(18),
-    opacity: 1,
+    flex: 1,
+    minWidth: 0,
+    textTransform: 'none',
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
   },
 
   heroIconCircle: {

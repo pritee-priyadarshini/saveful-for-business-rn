@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import {
   FlatList,
   Image,
@@ -27,6 +27,11 @@ import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
+import {
+  isFoodListingNotification,
+  subscribeNotificationReceived,
+} from '@/services/pushNotifications';
+import { useNavigation } from '@react-navigation/native';
 import { mapDiscoverListing } from '../../services/foodListing.service';
 
 import { palette } from '../../theme/colors';
@@ -37,6 +42,7 @@ type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 
 export function CharityDiscoverScreen() {
   useTransparentStatusBar('light');
+  const navigation = useNavigation<any>();
   const bottomPadding = useBottomTabPadding(hp(2));
   const { currentProfile, authUser } = useAppContext();
   const {
@@ -67,6 +73,18 @@ export function CharityDiscoverScreen() {
       showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
     );
   }, [authUser?.accessToken]);
+
+  const reloadListings = useCallback(() => {
+    storeFetchListings('people', true).catch(() => undefined);
+  }, [storeFetchListings]);
+
+  useEffect(() => {
+    return subscribeNotificationReceived((payload) => {
+      if (isFoodListingNotification(payload)) {
+        reloadListings();
+      }
+    });
+  }, [reloadListings]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -203,7 +221,12 @@ export function CharityDiscoverScreen() {
             />
           </View>
 
-          <View style={styles.logoCircle}>
+          <Pressable
+            style={styles.logoCircle}
+            onPress={() => navigation.navigate('Account')}
+            accessibilityRole="button"
+            accessibilityLabel="Open account profile"
+          >
             {currentProfile.logo ? (
               <Image source={{ uri: currentProfile.logo }} style={styles.logoImage} />
             ) : (
@@ -211,7 +234,7 @@ export function CharityDiscoverScreen() {
                 {currentProfile.organization?.[0] || 'S'}
               </AppText>
             )}
-          </View>
+          </Pressable>
         </View>
       </HeroHeader>
 
