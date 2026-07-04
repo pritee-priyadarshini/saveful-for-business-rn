@@ -1,4 +1,11 @@
 const { existsSync } = require('fs');
+const path = require('path');
+
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+} catch {
+  // dotenv is provided transitively by Expo; ignore if unavailable
+}
 
 const withAndroidFirebaseNotificationManifest = require('./plugins/withAndroidFirebaseNotificationManifest');
 
@@ -99,9 +106,6 @@ export default {
         NSPhotoLibraryUsageDescription:
           'Allow Saveful for Business to access your photo library to upload a logo.',
       },
-      config: {
-        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
-      },
     },
 
     android: {
@@ -119,11 +123,6 @@ export default {
         'POST_NOTIFICATIONS',
         'android.permission.POST_NOTIFICATIONS',
       ],
-      config: {
-        googleMaps: {
-          apiKey: process.env.GOOGLE_MAPS_API_KEY,
-        },
-      },
     },
 
     web: {
@@ -152,7 +151,6 @@ export default {
       eas: {
         projectId: '6863db47-e894-4b7e-944c-c0c66152e71d',
       },
-      googlePlacesApiKey: process.env.GOOGLE_MAPS_API_KEY,
       firebaseEnabled: includeFirebase,
     },
   },

@@ -45,6 +45,12 @@ import {
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { useListingsStore } from '../../store/listingsStore';
 import { showErrorAlert } from '../../utils/apiError';
+import {
+  getListingDateErrors,
+  getListingFoodItemsError,
+  hasListingDateErrors,
+  type ListingDateFieldErrors,
+} from '../../utils/listingDateValidation';
 
 
 const { width, height } = Dimensions.get('window');
@@ -375,11 +381,23 @@ function EditPeopleListingForm({
 
   const handleContinue = () => {
     if (step === 1) {
+      const foodError = getListingFoodItemsError(totalQuantity);
+      if (foodError) {
+        Alert.alert('Food details missing', foodError);
+        return;
+      }
       setStep(2);
       return;
     }
 
-    if (step === 2) setStep(3);
+    if (step === 2) {
+      const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+      if (hasListingDateErrors(dateErrors)) {
+        Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
+        return;
+      }
+      setStep(3);
+    }
   };
 
   const handleBack = () => {
@@ -403,18 +421,16 @@ function EditPeopleListingForm({
       Alert.alert('Confirmation required', 'Please confirm this food is safe for donation.');
       return;
     }
-    if (activeItems.length === 0) {
-      Alert.alert('Food details missing', 'Add at least one food item quantity.');
+    const foodError = getListingFoodItemsError(totalQuantity);
+    if (foodError) {
+      Alert.alert('Food details missing', foodError);
       setStep(1);
       return;
     }
-    if (!bestBeforeDate || !pickupFromDate || !pickupToDate) {
-      Alert.alert('Missing dates', 'Please set best before and pickup window.');
-      setStep(2);
-      return;
-    }
-    if (pickupToDate <= pickupFromDate) {
-      Alert.alert('Invalid window', 'Pickup end time must be after pickup start time.');
+
+    const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+    if (hasListingDateErrors(dateErrors)) {
+      Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
       setStep(2);
       return;
     }
@@ -423,6 +439,10 @@ function EditPeopleListingForm({
       setStep(2);
       return;
     }
+
+    const bestBefore = bestBeforeDate!;
+    const pickupFrom = pickupFromDate!;
+    const pickupTo = pickupToDate!;
 
     await withLock(async () => {
       try {
@@ -433,9 +453,9 @@ function EditPeopleListingForm({
             remainingQtyKg: item.qty,
           })),
           pickupAddress: location.trim(),
-          bestBefore: bestBeforeDate.toISOString(),
-          pickupFromTime: pickupFromDate.toISOString(),
-          pickupByTime: pickupToDate.toISOString(),
+          bestBefore: bestBefore.toISOString(),
+          pickupFromTime: pickupFrom.toISOString(),
+          pickupByTime: pickupTo.toISOString(),
           needsRefrigeration: storage === 'Fridge',
           needsReheating: reheating === 'Yes',
           containsAllergens: hasSelectedAllergens,
@@ -1159,8 +1179,24 @@ function EditFarmListingForm({
   };
 
   const handleContinue = () => {
-    if (step === 1) { setStep(2); return; }
-    if (step === 2) { setStep(3); }
+    if (step === 1) {
+      const foodError = getListingFoodItemsError(totalQuantity);
+      if (foodError) {
+        Alert.alert('Food details missing', foodError);
+        return;
+      }
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+      if (hasListingDateErrors(dateErrors)) {
+        Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
+        return;
+      }
+      setStep(3);
+    }
   };
 
   const handleSaveChanges = async () => {
@@ -1170,18 +1206,16 @@ function EditFarmListingForm({
       Alert.alert('Confirmation required', 'Please confirm this material is for livestock/agricultural use.');
       return;
     }
-    if (activeItems.length === 0) {
-      Alert.alert('Food details missing', 'Add at least one food item quantity.');
+    const foodError = getListingFoodItemsError(totalQuantity);
+    if (foodError) {
+      Alert.alert('Food details missing', foodError);
       setStep(1);
       return;
     }
-    if (!bestBeforeDate || !pickupFromDate || !pickupToDate) {
-      Alert.alert('Missing dates', 'Please set best before and pickup window.');
-      setStep(2);
-      return;
-    }
-    if (pickupToDate <= pickupFromDate) {
-      Alert.alert('Invalid window', 'Pickup end time must be after pickup start time.');
+
+    const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+    if (hasListingDateErrors(dateErrors)) {
+      Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
       setStep(2);
       return;
     }
@@ -1190,6 +1224,10 @@ function EditFarmListingForm({
       setStep(2);
       return;
     }
+
+    const bestBefore = bestBeforeDate!;
+    const pickupFrom = pickupFromDate!;
+    const pickupTo = pickupToDate!;
 
     await withLock(async () => {
       try {
@@ -1200,9 +1238,9 @@ function EditFarmListingForm({
             remainingQtyKg: item.qty,
           })),
           pickupAddress: location.trim(),
-          bestBefore: bestBeforeDate.toISOString(),
-          pickupFromTime: pickupFromDate.toISOString(),
-          pickupByTime: pickupToDate.toISOString(),
+          bestBefore: bestBefore.toISOString(),
+          pickupFromTime: pickupFrom.toISOString(),
+          pickupByTime: pickupTo.toISOString(),
           needsRefrigeration:
             selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
           containsAllergens: selectedContaminants.length > 0,

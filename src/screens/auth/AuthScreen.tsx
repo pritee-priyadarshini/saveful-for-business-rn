@@ -552,18 +552,11 @@ export function AuthScreen() {
         );
 
         if (restaurantForm.logo) {
-          console.log('[SIGNUP] Logo URI:', restaurantForm.logo);
           form.append('logo', {
             uri: restaurantForm.logo,
             name: 'logo.jpg',
             type: 'image/jpeg',
           } as any);
-        }
-
-        // Debug: log all form parts before sending
-        if (__DEV__) {
-          const parts = (form as any)._parts ?? (form as any).getParts?.() ?? [];
-          console.log('[SIGNUP] FormData parts:', JSON.stringify(parts, null, 2));
         }
 
         await authService.registerBusiness(form);
@@ -861,7 +854,7 @@ export function AuthScreen() {
         Location Recommendation
       </AppText>
       <AppText variant="bodySmall" style={styles.locationRecommendationText}>
-        Verify your address with Google lookup so collectors can find you when picking up.
+        Verify your address with map search so collectors can find you when picking up.
       </AppText>
 
       <View style={styles.locationPickerRow}>

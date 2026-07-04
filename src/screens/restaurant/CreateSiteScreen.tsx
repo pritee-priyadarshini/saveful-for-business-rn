@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GOOGLE_PLACES_API_KEY } from '@/config';
 import {
     View,
     ScrollView,
@@ -19,11 +18,11 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { OsmMapView } from '../../components/OsmMapView';
+import { PlacesSearchInput } from '../../components/PlacesSearchInput';
 import { Ionicons } from '@expo/vector-icons';
 import { palette } from '@/theme/colors';
 import { sitesService } from '@/services/sites.service';
@@ -343,32 +342,13 @@ export default function CreateSiteScreen() {
 
                                         {/* SEARCH */}
                                         <View style={styles.modalSearchContainer}>
-                                            <GooglePlacesAutocomplete
+                                            <PlacesSearchInput
                                                 placeholder="Search address or place..."
-                                                fetchDetails
-                                                textInputProps={{ autoFocus: true }}
-                                                onPress={(data, details = null) => {
-                                                    const lat = details?.geometry?.location?.lat;
-                                                    const lng = details?.geometry?.location?.lng;
-                                                    if (lat != null && lng != null) {
-                                                        const addr = details?.formatted_address || data.description;
-                                                        const postcode = details?.address_components?.find((c: any) => c.types.includes('postal_code'))?.long_name || '';
-                                                        applyMapLocation(lat, lng, addr, postcode);
-                                                    }
+                                                autoFocus
+                                                onPlaceSelected={({ latitude, longitude, address, postcode }) => {
+                                                    applyMapLocation(latitude, longitude, address, postcode);
                                                     Keyboard.dismiss();
                                                 }}
-                                                query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
-                                                styles={{
-                                                    container: { flex: 0 },
-                                                    textInputContainer: { borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border },
-                                                    textInput: { height: normalize(46), color: palette.text, fontSize: normalize(14), marginBottom: 0, backgroundColor: palette.white },
-                                                    listView: { backgroundColor: palette.white, borderRadius: normalize(10), borderWidth: 1, borderColor: palette.border, marginTop: normalize(4) },
-                                                    row: { padding: normalize(12), backgroundColor: palette.white },
-                                                    description: { fontSize: normalize(13), color: palette.text },
-                                                }}
-                                                enablePoweredByContainer={false}
-                                                debounce={300}
-                                                keepResultsAfterBlur
                                             />
                                         </View>
 
@@ -848,7 +828,9 @@ const styles = StyleSheet.create({
     modalSearchContainer: {
         paddingHorizontal: wp(4),
         paddingBottom: normalize(8),
-        zIndex: 10,
+        zIndex: 1000,
+        elevation: 1000,
+        position: 'relative',
     },
 
     modalMapContainer: {
@@ -857,6 +839,7 @@ const styles = StyleSheet.create({
         marginBottom: normalize(4),
         borderRadius: normalize(12),
         overflow: 'hidden',
+        zIndex: 1,
     },
 
     confirmBtn: {

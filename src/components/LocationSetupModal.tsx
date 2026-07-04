@@ -11,12 +11,11 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 import { AppText } from './AppText';
 import { OsmMapView } from './OsmMapView';
+import { PlacesSearchInput } from './PlacesSearchInput';
 import { palette } from '../theme/colors';
-import { GOOGLE_PLACES_API_KEY } from '@/config';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
 
 const { width, height } = Dimensions.get('window');
@@ -142,10 +141,7 @@ export function LocationSetupModal({
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={handleClose} />
 
-        <Animated.View
-          style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
-          onStartShouldSetResponder={() => true}
-        >
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.dragArea} {...panResponder.panHandlers}>
             <View style={styles.dragHandle} />
           </View>
@@ -158,46 +154,13 @@ export function LocationSetupModal({
           </View>
 
           <View style={styles.searchWrap}>
-            <GooglePlacesAutocomplete
+            <PlacesSearchInput
               placeholder={searchPlaceholder}
-              fetchDetails
-              textInputProps={{ autoFocus: visible }}
-              onPress={(data, details = null) => {
-                const lat = details?.geometry?.location?.lat;
-                const lng = details?.geometry?.location?.lng;
-                if (lat != null && lng != null) {
-                  applyCoords(lat, lng, details?.formatted_address || data.description);
-                }
+              autoFocus={visible}
+              onPlaceSelected={({ latitude, longitude, address }) => {
+                applyCoords(latitude, longitude, address);
                 Keyboard.dismiss();
               }}
-              query={{ key: GOOGLE_PLACES_API_KEY, language: 'en' }}
-              styles={{
-                container: { flex: 0 },
-                textInputContainer: {
-                  borderRadius: normalize(10),
-                  borderWidth: 1,
-                  borderColor: palette.border,
-                },
-                textInput: {
-                  height: normalize(46),
-                  color: palette.text,
-                  fontSize: normalize(14),
-                  marginBottom: 0,
-                  backgroundColor: palette.white,
-                },
-                listView: {
-                  backgroundColor: palette.white,
-                  borderRadius: normalize(10),
-                  borderWidth: 1,
-                  borderColor: palette.border,
-                  marginTop: normalize(4),
-                },
-                row: { padding: normalize(12), backgroundColor: palette.white },
-                description: { fontSize: normalize(13), color: palette.text },
-              }}
-              enablePoweredByContainer={false}
-              debounce={300}
-              keepResultsAfterBlur
             />
           </View>
 
@@ -206,11 +169,7 @@ export function LocationSetupModal({
             <AppText style={styles.gpsRowText}>Use my current location</AppText>
           </Pressable>
 
-          <View
-            style={styles.mapPreview}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={() => true}
-          >
+          <View style={styles.mapPreview}>
             <OsmMapView
               style={styles.map}
               active={visible}
@@ -269,6 +228,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: normalize(20),
     paddingHorizontal: wp(4),
     paddingBottom: hp(2),
+    overflow: 'visible',
   },
   dragArea: {
     alignItems: 'center',
@@ -295,7 +255,9 @@ const styles = StyleSheet.create({
     padding: normalize(4),
   },
   searchWrap: {
-    zIndex: 20,
+    zIndex: 1000,
+    elevation: 1000,
+    position: 'relative',
   },
   gpsRow: {
     flexDirection: 'row',
@@ -317,6 +279,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: '#F5F5F5',
+    zIndex: 1,
   },
   map: {
     flex: 1,

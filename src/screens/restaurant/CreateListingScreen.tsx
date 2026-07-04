@@ -27,6 +27,12 @@ import { resolveListingSiteId } from '../../utils/listingSite';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getPeopleRelistFormValues } from '../../utils/listingRelist';
+import {
+  getListingDateErrors,
+  getListingFoodItemsError,
+  hasListingDateErrors,
+  type ListingDateFieldErrors,
+} from '../../utils/listingDateValidation';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -134,6 +140,9 @@ export function CreateListingScreen({ navigation }: any) {
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | 'datetime'>('date');
   const [pickerValue, setPickerValue] = useState(new Date());
+  const [stepErrors, setStepErrors] = useState<
+    ListingDateFieldErrors & { foodItems?: string; location?: string; confirmedSafe?: string }
+  >({});
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
@@ -232,9 +241,18 @@ export function CreateListingScreen({ navigation }: any) {
   };
 
   const applySelectedDate = (target: Exclude<PickerTarget, null>, value: Date) => {
-    if (target === 'bestBefore') setBestBeforeDate(value);
-    if (target === 'from') setPickupFromDate(value);
-    if (target === 'to') setPickupToDate(value);
+    if (target === 'bestBefore') {
+      setBestBeforeDate(value);
+      setStepErrors((prev) => ({ ...prev, bestBefore: undefined }));
+    }
+    if (target === 'from') {
+      setPickupFromDate(value);
+      setStepErrors((prev) => ({ ...prev, pickupFrom: undefined }));
+    }
+    if (target === 'to') {
+      setPickupToDate(value);
+      setStepErrors((prev) => ({ ...prev, pickupTo: undefined }));
+    }
   };
 
   const onNativePickerChange = (event: any, selectedDate?: Date) => {
@@ -297,11 +315,25 @@ export function CreateListingScreen({ navigation }: any) {
 
   const handleContinue = () => {
     if (step === 1) {
+      const foodError = getListingFoodItemsError(totalQuantity);
+      if (foodError) {
+        setStepErrors({ foodItems: foodError });
+        return;
+      }
+      setStepErrors({});
       setStep(2);
       return;
     }
 
-    if (step === 2) setStep(3);
+    if (step === 2) {
+      const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+      if (hasListingDateErrors(dateErrors)) {
+        setStepErrors(dateErrors);
+        return;
+      }
+      setStepErrors({});
+      setStep(3);
+    }
   };
 
   const handleBack = () => {
@@ -322,7 +354,7 @@ export function CreateListingScreen({ navigation }: any) {
     if (submitting) return;
 
     if (!confirmedSafe) {
-      Alert.alert('Confirmation required', 'Please confirm this food is safe for donation.');
+      setStepErrors({ confirmedSafe: 'Please confirm this food is safe for donation.' });
       return;
     }
 
@@ -332,33 +364,32 @@ export function CreateListingScreen({ navigation }: any) {
       return;
     }
 
-    if (activeItems.length === 0) {
-      Alert.alert('Food details missing', 'Add at least one food item quantity.');
+    const foodError = getListingFoodItemsError(totalQuantity);
+    if (foodError) {
+      setStepErrors({ foodItems: foodError });
       setStep(1);
       return;
     }
 
-    if (!bestBeforeDate || !pickupFromDate || !pickupToDate) {
-      Alert.alert('Missing dates', 'Please set best before and pickup window.');
-      setStep(2);
-      return;
-    }
-
-    if (pickupToDate <= pickupFromDate) {
-      Alert.alert('Invalid window', 'Pickup end time must be after pickup start time.');
+    const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+    if (hasListingDateErrors(dateErrors)) {
+      setStepErrors(dateErrors);
       setStep(2);
       return;
     }
 
     const coords = getSitePickupCoords(authUser);
     if (!coords) {
-      Alert.alert(
-        'Location missing',
-        'Your site location is not set. Go to Home and use the location banner to set your business address on the map.',
-      );
+      setStepErrors({
+        location: 'Your site location is not set. Set your business address on the map from Home.',
+      });
       setStep(2);
       return;
     }
+
+    const bestBefore = bestBeforeDate!;
+    const pickupFrom = pickupFromDate!;
+    const pickupTo = pickupToDate!;
 
     await withLock(async () => {
       try {
@@ -375,9 +406,9 @@ export function CreateListingScreen({ navigation }: any) {
           pickupPostcode: getSitePostcode(authUser),
           pickupLat: coords.lat,
           pickupLng: coords.lng,
-          bestBefore: bestBeforeDate.toISOString(),
-          pickupFromTime: pickupFromDate.toISOString(),
-          pickupByTime: pickupToDate.toISOString(),
+          bestBefore: bestBefore.toISOString(),
+          pickupFromTime: pickupFrom.toISOString(),
+          pickupByTime: pickupTo.toISOString(),
           needsRefrigeration: storage === 'Fridge',
           needsFreezer: storage === 'Freezer',
           needsAmbient: storage === 'Ambient',
@@ -556,6 +587,11 @@ export function CreateListingScreen({ navigation }: any) {
                 ESTIMATE TOTAL WEIGHT OF SURPLUS FOOD
               </AppText>
             </View>
+            {stepErrors.foodItems ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.foodItems}
+              </AppText>
+            ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               ADD PHOTO (OPTIONAL)
@@ -616,13 +652,21 @@ export function CreateListingScreen({ navigation }: any) {
               <View style={styles.locationBox}>
                 <TextInput
                   value={location}
-                  onChangeText={setLocation}
+                  onChangeText={(value) => {
+                    setLocation(value);
+                    setStepErrors((prev) => ({ ...prev, location: undefined }));
+                  }}
                   placeholder="Enter pickup address"
                   placeholderTextColor={palette.stone}
                   style={styles.locationInput}
                 />
               </View>
             </View>
+            {stepErrors.location ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.location}
+              </AppText>
+            ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               FOOD BEST BEFORE
@@ -633,6 +677,11 @@ export function CreateListingScreen({ navigation }: any) {
                 {formatDate(bestBeforeDate)}
               </AppText>
             </Pressable>
+            {stepErrors.bestBefore ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.bestBefore}
+              </AppText>
+            ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               PICKUP WINDOW
@@ -656,6 +705,16 @@ export function CreateListingScreen({ navigation }: any) {
                 </AppText>
               </Pressable>
             </View>
+            {stepErrors.pickupFrom ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.pickupFrom}
+              </AppText>
+            ) : null}
+            {stepErrors.pickupTo ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.pickupTo}
+              </AppText>
+            ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               STORAGE REQUIREMENTS
@@ -842,7 +901,10 @@ export function CreateListingScreen({ navigation }: any) {
               </View>
             </View>
 
-            <Pressable style={styles.confirmWrap} onPress={() => setConfirmedSafe((prev) => !prev)}>
+            <Pressable style={styles.confirmWrap} onPress={() => {
+              setConfirmedSafe((prev) => !prev);
+              setStepErrors((prev) => ({ ...prev, confirmedSafe: undefined }));
+            }}>
               <View style={[styles.checkbox, confirmedSafe && styles.checkboxActive]}>
                 {confirmedSafe ? <Ionicons name="checkmark" size={normalize(15)} color={palette.white} /> : null}
               </View>
@@ -857,6 +919,11 @@ export function CreateListingScreen({ navigation }: any) {
                 </AppText>
               </AppText>
             </Pressable>
+            {stepErrors.confirmedSafe ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.confirmedSafe}
+              </AppText>
+            ) : null}
 
             <View style={styles.impactCard}>
               <AppText variant="h8" color={palette.success}>
@@ -1161,6 +1228,9 @@ const styles = StyleSheet.create({
   },
   helperText: {
     textAlign: 'left',
+  },
+  inlineError: {
+    marginTop: hp(0.2),
   },
   photoPlaceholder: {
     width: wp(16),

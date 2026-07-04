@@ -1,18 +1,28 @@
 import { create } from 'zustand';
-import { BusinessImpact } from '../services/dashboard.service';
-import { fetchAggregatedSiteImpact } from '../utils/impactData';
+
+import { fetchAggregatedSiteImpact, mapImpactToDisplayStats } from '../utils/impactData';
 import { resolveAccessibleSiteIds } from '../utils/impactSites';
 import { useAuthStore } from './authStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
 
-const STALE_TIME_MS = 10 * 60 * 1000; 
+const STALE_TIME_MS = 10 * 60 * 1000;
 
 function isStale(lastFetched: number | null): boolean {
   return !lastFetched || Date.now() - lastFetched > STALE_TIME_MS;
 }
 
+export type DashboardImpact = {
+  kgSaved: number;
+  mealsCreated: number;
+  charitiesSupported: number;
+  collectionsCompleted: number;
+  co2SavedKg: number;
+  moneySaved: number;
+  currency: string;
+};
+
 interface DashboardState {
-  businessImpact: BusinessImpact | null;
+  businessImpact: DashboardImpact | null;
   isFetching: boolean;
   lastFetched: number | null;
   error: string | null;
@@ -45,24 +55,26 @@ export const useDashboardStore = create<DashboardState & DashboardActions>((set,
     try {
       const siteIds = await resolveAccessibleSiteIds(authUser);
       if (siteIds.length === 0) {
-        set({ lastFetched: Date.now() });
+        set({ businessImpact: null, lastFetched: Date.now() });
         return;
       }
 
-      const impact = await fetchAggregatedSiteImpact(siteIds, 'month');
-      if (impact) {
-        set({
-          businessImpact: {
-            kgSaved: impact.totals.redistributedKg,
-            charitiesSupported: impact.totals.partnersSupported,
-            collectionsCompleted: impact.totals.collectionsCompleted,
-            co2SavedKg: impact.totals.co2AvoidedKg,
-            moneySaved: impact.totals.totalFoodSavedUsd,
-            currency: 'USD',
-          },
-          lastFetched: Date.now(),
-        });
-      }
+      // Same impact API + aggregation as the Insights screen — lifetime = "so far"
+      const impact = await fetchAggregatedSiteImpact(siteIds, 'lifetime');
+      const stats = mapImpactToDisplayStats(impact);
+
+      set({
+        businessImpact: {
+          kgSaved: stats.redistributedKg,
+          mealsCreated: stats.mealsCreated,
+          charitiesSupported: stats.partnersSupported,
+          collectionsCompleted: stats.collectionsCompleted,
+          co2SavedKg: stats.co2AvoidedKg,
+          moneySaved: stats.foodSavedMoney,
+          currency: 'USD',
+        },
+        lastFetched: Date.now(),
+      });
     } catch (error: unknown) {
       const message = getUserFriendlyErrorMessage(error, 'Failed to load impact data');
       set({ error: message });

@@ -28,6 +28,12 @@ import { estimateCo2AvoidedKg, estimateMealsSaved, formatCo2AvoidedKg } from '..
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getFarmRelistFormValues } from '../../utils/listingRelist';
+import {
+  getListingDateErrors,
+  getListingFoodItemsError,
+  hasListingDateErrors,
+  type ListingDateFieldErrors,
+} from '../../utils/listingDateValidation';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -151,6 +157,9 @@ export function CreateFarmListingScreen({ navigation }: any) {
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | 'datetime'>('date');
   const [pickerValue, setPickerValue] = useState(new Date());
+  const [stepErrors, setStepErrors] = useState<
+    ListingDateFieldErrors & { foodItems?: string; location?: string; confirmedSafe?: string }
+  >({});
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
@@ -256,9 +265,18 @@ export function CreateFarmListingScreen({ navigation }: any) {
   };
 
   const applySelectedDate = (target: Exclude<PickerTarget, null>, value: Date) => {
-    if (target === 'bestBefore') setBestBeforeDate(value);
-    if (target === 'from') setPickupFromDate(value);
-    if (target === 'to') setPickupToDate(value);
+    if (target === 'bestBefore') {
+      setBestBeforeDate(value);
+      setStepErrors((prev) => ({ ...prev, bestBefore: undefined }));
+    }
+    if (target === 'from') {
+      setPickupFromDate(value);
+      setStepErrors((prev) => ({ ...prev, pickupFrom: undefined }));
+    }
+    if (target === 'to') {
+      setPickupToDate(value);
+      setStepErrors((prev) => ({ ...prev, pickupTo: undefined }));
+    }
   };
 
   const onNativePickerChange = (event: any, selectedDate?: Date) => {
@@ -311,15 +329,33 @@ export function CreateFarmListingScreen({ navigation }: any) {
   };
 
   const handleContinue = () => {
-    if (step === 1) { setStep(2); return; }
-    if (step === 2) { setStep(3); }
+    if (step === 1) {
+      const foodError = getListingFoodItemsError(totalQuantity);
+      if (foodError) {
+        setStepErrors({ foodItems: foodError });
+        return;
+      }
+      setStepErrors({});
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+      if (hasListingDateErrors(dateErrors)) {
+        setStepErrors(dateErrors);
+        return;
+      }
+      setStepErrors({});
+      setStep(3);
+    }
   };
 
   const handleCreateListing = async () => {
     if (submitting) return;
 
     if (!confirmedSafe) {
-      Alert.alert('Confirmation required', 'Please confirm this material is for livestock/agricultural use.');
+      setStepErrors({ confirmedSafe: 'Please confirm this material is for livestock/agricultural use.' });
       return;
     }
 
@@ -329,31 +365,32 @@ export function CreateFarmListingScreen({ navigation }: any) {
       return;
     }
 
-    if (activeItems.length === 0) {
-      Alert.alert('Food details missing', 'Add at least one food item quantity.');
+    const foodError = getListingFoodItemsError(totalQuantity);
+    if (foodError) {
+      setStepErrors({ foodItems: foodError });
       setStep(1);
       return;
     }
-    if (!bestBeforeDate || !pickupFromDate || !pickupToDate) {
-      Alert.alert('Missing dates', 'Please set best before and pickup window.');
-      setStep(2);
-      return;
-    }
-    if (pickupToDate <= pickupFromDate) {
-      Alert.alert('Invalid window', 'Pickup end time must be after pickup start time.');
+
+    const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+    if (hasListingDateErrors(dateErrors)) {
+      setStepErrors(dateErrors);
       setStep(2);
       return;
     }
 
     const coords = getSitePickupCoords(authUser);
     if (!coords) {
-      Alert.alert(
-        'Location missing',
-        'Your site location is not set. Go to Home and use the location banner to set your farm address on the map.',
-      );
+      setStepErrors({
+        location: 'Your site location is not set. Set your farm address on the map from Home.',
+      });
       setStep(2);
       return;
     }
+
+    const bestBefore = bestBeforeDate!;
+    const pickupFrom = pickupFromDate!;
+    const pickupTo = pickupToDate!;
 
     await withLock(async () => {
       try {
@@ -370,9 +407,9 @@ export function CreateFarmListingScreen({ navigation }: any) {
           pickupPostcode: getSitePostcode(authUser),
           pickupLat: coords.lat,
           pickupLng: coords.lng,
-          bestBefore: bestBeforeDate.toISOString(),
-          pickupFromTime: pickupFromDate.toISOString(),
-          pickupByTime: pickupToDate.toISOString(),
+          bestBefore: bestBefore.toISOString(),
+          pickupFromTime: pickupFrom.toISOString(),
+          pickupByTime: pickupTo.toISOString(),
           needsRefrigeration: selectedStorage.includes('Fridge'),
           needsFreezer: selectedStorage.includes('Freezer'),
           needsAmbient:
@@ -548,6 +585,11 @@ export function CreateFarmListingScreen({ navigation }: any) {
                 ESTIMATE TOTAL WEIGHT OF SURPLUS FOOD
               </AppText>
             </View>
+            {stepErrors.foodItems ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.foodItems}
+              </AppText>
+            ) : null}
 
             {/* Photos */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
@@ -600,13 +642,21 @@ export function CreateFarmListingScreen({ navigation }: any) {
               <View style={styles.locationBox}>
                 <TextInput
                   value={location}
-                  onChangeText={setLocation}
+                  onChangeText={(value) => {
+                    setLocation(value);
+                    setStepErrors((prev) => ({ ...prev, location: undefined }));
+                  }}
                   placeholder="Enter pickup address"
                   placeholderTextColor={palette.stone}
                   style={styles.locationInput}
                 />
               </View>
             </View>
+            {stepErrors.location ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.location}
+              </AppText>
+            ) : null}
 
             {/* Best before */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
@@ -618,6 +668,11 @@ export function CreateFarmListingScreen({ navigation }: any) {
                 {formatDate(bestBeforeDate)}
               </AppText>
             </Pressable>
+            {stepErrors.bestBefore ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.bestBefore}
+              </AppText>
+            ) : null}
 
             {/* Pickup window */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
@@ -637,6 +692,16 @@ export function CreateFarmListingScreen({ navigation }: any) {
                 </AppText>
               </Pressable>
             </View>
+            {stepErrors.pickupFrom ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.pickupFrom}
+              </AppText>
+            ) : null}
+            {stepErrors.pickupTo ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.pickupTo}
+              </AppText>
+            ) : null}
 
             {/* Storage / Handling – multi-select */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
@@ -832,7 +897,10 @@ export function CreateFarmListingScreen({ navigation }: any) {
             </View>
 
             {/* Confirmation checkbox */}
-            <Pressable style={styles.confirmWrap} onPress={() => setConfirmedSafe((prev) => !prev)}>
+            <Pressable style={styles.confirmWrap} onPress={() => {
+              setConfirmedSafe((prev) => !prev);
+              setStepErrors((prev) => ({ ...prev, confirmedSafe: undefined }));
+            }}>
               <View style={[styles.checkbox, confirmedSafe && styles.checkboxActive]}>
                 {confirmedSafe ? (
                   <Ionicons name="checkmark" size={normalize(15)} color={palette.white} />
@@ -850,6 +918,11 @@ export function CreateFarmListingScreen({ navigation }: any) {
                 </AppText>
               </AppText>
             </Pressable>
+            {stepErrors.confirmedSafe ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.confirmedSafe}
+              </AppText>
+            ) : null}
 
             {/* Impact */}
             <View style={styles.impactCard}>
@@ -1184,6 +1257,9 @@ const styles = StyleSheet.create({
   },
   helperText: {
     textAlign: 'left',
+  },
+  inlineError: {
+    marginTop: hp(0.2),
   },
   photoPlaceholder: {
     width: wp(16),

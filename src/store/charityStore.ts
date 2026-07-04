@@ -42,7 +42,7 @@ export function normalizeCharityLocations(data: any): any[] {
       logoUrl: location.logoUrl ?? null,
       isActive: location.isActive ?? true,
     }))
-    .filter((location) => location.isActive !== false && location.id != null);
+    .filter((location: any) => location.isActive !== false && location.id != null);
 }
 
 export function extractCharityLocationId(data: any): number | null {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,6 +8,7 @@ import {
   ImageBackground,
   Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -57,12 +58,16 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const impact = businessImpact ?? {
     kgSaved: 0,
+    mealsCreated: 0,
     charitiesSupported: 0,
     collectionsCompleted: 0,
     co2SavedKg: 0,
     moneySaved: 0,
-    currency: '₹',
+    currency: 'USD',
   };
+
+  const formatImpactValue = (value: number) =>
+    value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 
   const firstName = currentProfile.name?.split(' ')[0] || 'User';
   const isFirstTimeUser =
@@ -81,7 +86,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
     {
       key: 'food',
       icon: IMPACT_ICONS.food,
-      value: `${impact.kgSaved}`,
+      value: formatImpactValue(impact.kgSaved),
       unit: 'kg',
       label: 'Food saved',
       tint: '#E8F8EE',
@@ -89,7 +94,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
     {
       key: 'collections',
       icon: IMPACT_ICONS.collections,
-      value: `${impact.collectionsCompleted}`,
+      value: formatImpactValue(impact.collectionsCompleted),
       unit: '',
       label: 'Collections',
       tint: '#F0EBFF',
@@ -97,18 +102,28 @@ export function RestaurantHomeScreen({ navigation }: any) {
     {
       key: 'co2',
       icon: IMPACT_ICONS.co2,
-      value: `${impact.co2SavedKg}`,
+      value: formatImpactValue(impact.co2SavedKg),
       unit: 'kg',
       label: 'CO₂ avoided',
       tint: '#FFF4E8',
     },
   ];
 
-  useEffect(() => {
+  const loadImpact = useCallback(() => {
     fetchBusinessImpact().catch((e) =>
       showErrorAlert(e, 'Could not load dashboard', 'Could not load dashboard data'),
     );
-  }, []);
+  }, [fetchBusinessImpact]);
+
+  useEffect(() => {
+    loadImpact();
+  }, [loadImpact]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBusinessImpact(true).catch(() => undefined);
+    }, [fetchBusinessImpact]),
+  );
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
