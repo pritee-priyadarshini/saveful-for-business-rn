@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   FlatList,
   Image,
@@ -21,6 +21,10 @@ import { useAppContext } from '../../store/AppContext';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert } from '@/utils/apiError';
+import {
+  isFoodListingNotification,
+  subscribeNotificationReceived,
+} from '@/services/pushNotifications';
 
 import { palette } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -52,25 +56,31 @@ export function FarmerHomeScreen() {
   const listRef = useRef<FlatList>(null);
 
   const {
-    animal: { listings: rawListings, isFetching: loading },
+    animal: { listings, isFetching: loading },
     fetchListings: storeFetchListings,
   } = useDiscoverStore();
 
-  const listings = rawListings;
   const [refreshing, setRefreshing] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'list' | 'map'>('list');
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
-    console.log('[Listings] Farmer session', {
-      orgType: authUser?.orgType,
-      siteRole: authUser?.siteRole,
-      siteIds: authUser?.profile?.sites?.map((site: any) => site.id) ?? [],
-    });
     storeFetchListings('animal').catch((e) =>
       showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
     );
   }, [authUser?.accessToken]);
+
+  const reloadListings = useCallback(() => {
+    storeFetchListings('animal', true).catch(() => undefined);
+  }, [storeFetchListings]);
+
+  useEffect(() => {
+    return subscribeNotificationReceived((payload) => {
+      if (isFoodListingNotification(payload)) {
+        reloadListings();
+      }
+    });
+  }, [reloadListings]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -82,8 +92,6 @@ export function FarmerHomeScreen() {
       setRefreshing(false);
     }
   };
-
-  const availableListings = listings;
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -205,7 +213,7 @@ export function FarmerHomeScreen() {
 
       {showBanner && (
         <LocationRequiredBanner
-          description="Share your charity location for better pickup matching."
+          description="Share your farm location for better pickup matching."
           onUseGps={useGpsLocation}
           onSearchAddress={() => setModalVisible(true)}
           onDismiss={() => setBannerClosed(true)}
@@ -276,7 +284,7 @@ export function FarmerHomeScreen() {
 
         <View style={styles.activeBadge}>
           <AppText variant='h7' style={{ color: palette.white }}>
-            {availableListings.length}
+            {listings.length}
           </AppText>
         </View>
       </View>
@@ -284,7 +292,7 @@ export function FarmerHomeScreen() {
   );
 
   const MapComponent = () => {
-    if (availableListings.length === 0) {
+    if (listings.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <AppText variant="h7">No surplus available</AppText>
@@ -296,7 +304,7 @@ export function FarmerHomeScreen() {
       <View style={[styles.mapContainer, { marginTop: hp(1.8) }]}>
         <OsmMapView
           style={styles.map}
-          markers={availableListings.map((item) => ({
+          markers={listings.map((item) => ({
             latitude: item.lat,
             longitude: item.lng,
           }))}
@@ -305,7 +313,7 @@ export function FarmerHomeScreen() {
         <View style={styles.cardListWrapper}>
           <FlatList
             ref={listRef}
-            data={availableListings}
+            data={listings}
             keyExtractor={(item) => item.id}
             renderItem={renderListing}
             horizontal
@@ -325,12 +333,12 @@ export function FarmerHomeScreen() {
           await saveLocation(latitude, longitude, address);
         }}
         confirming={saving}
-        searchPlaceholder="Search charity address or place..."
+        searchPlaceholder="Search farm address or place..."
       />
 
       {viewMode === 'list' ? (
         <FlatList
-          data={availableListings}
+          data={listings}
           keyExtractor={(item) => item.id}
           renderItem={renderListing}
           ListHeaderComponent={Header}

@@ -55,6 +55,17 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   return config;
 });
 
+function isPublicAuthPath(path: string): boolean {
+  return (
+    path.includes('/auth/login') ||
+    path.includes('/auth/register') ||
+    path.includes('/auth/forgot-password') ||
+    path.includes('/auth/reset-password') ||
+    path.includes('/auth/verify-email') ||
+    path.includes('/auth/resend-verification')
+  );
+}
+
 api.interceptors.response.use(
   response => {
     const method = (response.config.method ?? 'get').toUpperCase();
@@ -77,11 +88,13 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
+      const path = config?.url ?? '';
+      const hadSession = !!(await SecureStore.getItemAsync('accessToken'));
       await SecureStore.deleteItemAsync('accessToken');
-      try {
-        await unauthorizedHandler?.();
-      } catch {
-        // session teardown failed — token is already cleared
+
+      // Don't block sign-in / sign-up error handling with full session teardown.
+      if (hadSession && !isPublicAuthPath(path)) {
+        void Promise.resolve(unauthorizedHandler?.()).catch(() => undefined);
       }
     }
     return Promise.reject(error);

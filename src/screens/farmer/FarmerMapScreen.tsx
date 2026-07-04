@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
+  Alert,
   FlatList,
   StyleSheet,
   TouchableOpacity,
@@ -14,12 +15,28 @@ import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { Skeleton } from '../../components/Skeleton';
+import {
+  ClaimConfirmModal,
+  type ClaimLineItem,
+} from '../../components/ClaimConfirmModal';
+import type { ClaimMode } from '../../services/claims.service';
 import { palette } from '../../theme/colors';
 import { useAppContext } from '../../store/AppContext';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert } from '@/utils/apiError';
+import {
+  isFoodListingNotification,
+  subscribeNotificationReceived,
+} from '@/services/pushNotifications';
+import {
+  fetchListingDetail,
+  mapDiscoverListing,
+  type FoodItem,
+  invalidateListingDetail,
+  clearListingDetailCache,
+} from '../../services/foodListing.service';
 
-const { width, height } = Dimensions.get("window");
+const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
 const hp = (p: number) => (height * p) / 100;
 const normalize = (size: number) => {
@@ -27,55 +44,111 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
+type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 type ClaimState = Record<string, number>;
 
-function mapToMapListing(item: any) {
-  return {
-    id: String(item.id),
-    businessName:
-      item?.site?.locationName ||
-      item?.organisation?.name ||
-      'Food Provider',
-    suburb: item?.pickupAddress || 'Unknown',
-    type: 'Surplus',
-    distance: item.distance || '—',
-    quantityKg:
-      item.foodItems?.reduce(
-        (sum: number, f: any) => sum + (f.remainingQtyKg || 0),
-        0,
-      ) || 0,
-    pickupDate: item.bestBefore,
-    pickupTime:
-      item.pickupFromTime && item.pickupByTime
-        ? `${item.pickupFromTime} - ${item.pickupByTime}`
-        : 'Flexible',
-    storage: item.needsRefrigeration ? 'Keep Refrigerated' : 'Room Temp',
-    items:
-      item.foodItems?.map((f: any) => ({
-        name: f.category,
-        quantityKg: f.remainingQtyKg,
-      })) || [],
-  };
+type ClaimFoodItem = {
+  foodItemId: number;
+  name: string;
+  quantityKg: number;
+};
+
+type PendingClaim = {
+  listing: DiscoverListing;
+  claimMode: ClaimMode;
+  items: ClaimLineItem[];
+};
+
+const QTY_STEP = 0.5;
+
+function roundKg(value: number) {
+  return Math.round(value * 2) / 2;
+}
+
+function formatKg(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function toClaimFoodItems(
+  listing: DiscoverListing,
+  detail?: { foodItems?: FoodItem[] },
+): ClaimFoodItem[] {
+  const source: FoodItem[] = detail?.foodItems?.length
+    ? detail.foodItems
+    : (listing.foodItems as FoodItem[])?.length
+      ? (listing.foodItems as FoodItem[])
+      : [];
+
+  if (!source.length) return [];
+
+  return source
+    .map((foodItem, index) => {
+      const foodItemId = Number(foodItem.id);
+      return {
+        foodItemId,
+        name: foodItem.name || foodItem.category || `Item ${index + 1}`,
+        quantityKg: foodItem.remainingQtyKg ?? foodItem.totalQtyKg ?? 0,
+      };
+    })
+    .filter(
+      (foodItem) =>
+        foodItem.quantityKg > 0 && Number.isFinite(foodItem.foodItemId) && foodItem.foodItemId > 0,
+    );
+}
+
+async function loadListingFoodItems(
+  listing: DiscoverListing,
+  options?: { refresh?: boolean },
+): Promise<ClaimFoodItem[]> {
+  const detail = await fetchListingDetail(listing.listingId, options);
+  return toClaimFoodItems(listing, detail);
 }
 
 export function FarmerMapScreen({ navigation }: any) {
   const { authUser } = useAppContext();
   const {
-    animal: { rawListings, isFetching: loading },
+    animal: { listings, isFetching: loading },
     fetchListings: storeFetchListings,
   } = useDiscoverStore();
 
   const [claimState, setClaimState] = useState<ClaimState>({});
+  const [foodItemsByListing, setFoodItemsByListing] = useState<Record<string, ClaimFoodItem[]>>({});
+  const [loadingFoodItems, setLoadingFoodItems] = useState<Record<string, boolean>>({});
   const [activeFilter, setActiveFilter] = useState<'distance' | 'surplus' | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingClaim, setPendingClaim] = useState<PendingClaim | null>(null);
+  const pendingClaimRef = useRef<PendingClaim | null>(null);
+  const fetchedListingIds = useRef(new Set<string>());
+  const listingSnapshotRef = useRef<Record<string, string>>({});
 
-  // Map raw store data to this screen's field shape
-  const listings = useMemo(
-    () => rawListings.map(mapToMapListing),
-    [rawListings],
+  useEffect(() => {
+    pendingClaimRef.current = pendingClaim;
+  }, [pendingClaim]);
+
+  const applyFoodItems = useCallback((listingId: string, items: ClaimFoodItem[]) => {
+    setFoodItemsByListing((prev) => ({ ...prev, [listingId]: items }));
+  }, []);
+
+  const refreshListingFoodItems = useCallback(
+    async (listing: DiscoverListing, options?: { refresh?: boolean }) => {
+      setLoadingFoodItems((prev) => ({ ...prev, [listing.id]: true }));
+
+      try {
+        const items = await loadListingFoodItems(listing, options);
+        applyFoodItems(listing.id, items);
+      } catch {
+        applyFoodItems(listing.id, toClaimFoodItems(listing));
+      } finally {
+        setLoadingFoodItems((prev) => {
+          const next = { ...prev };
+          delete next[listing.id];
+          return next;
+        });
+      }
+    },
+    [applyFoodItems],
   );
 
-  // Initial load — no-ops when FarmerHomeScreen already fetched fresh data
   useEffect(() => {
     if (!authUser?.accessToken) return;
     storeFetchListings('animal').catch((e) =>
@@ -83,9 +156,38 @@ export function FarmerMapScreen({ navigation }: any) {
     );
   }, [authUser?.accessToken]);
 
+  useEffect(() => {
+    listings.forEach((listing) => {
+      const snapshot = `${listing.remainingQtyKg ?? listing.quantityKg}:${listing.statusRaw}`;
+      const snapshotChanged = listingSnapshotRef.current[listing.id] !== snapshot;
+      listingSnapshotRef.current[listing.id] = snapshot;
+
+      const seeded = toClaimFoodItems(listing);
+      if (seeded.length) {
+        applyFoodItems(listing.id, seeded);
+      }
+
+      const needsFetch = !fetchedListingIds.current.has(listing.id) || snapshotChanged;
+      if (!needsFetch) return;
+
+      fetchedListingIds.current.add(listing.id);
+
+      if (snapshotChanged) {
+        invalidateListingDetail(listing.listingId);
+      }
+
+      refreshListingFoodItems(listing, { refresh: snapshotChanged });
+    });
+  }, [listings, applyFoodItems, refreshListingFoodItems]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
+      fetchedListingIds.current.clear();
+      listingSnapshotRef.current = {};
+      clearListingDetailCache();
+      setFoodItemsByListing({});
+      setClaimState({});
       await storeFetchListings('animal', true);
     } catch (e) {
       showErrorAlert(e, 'Could not load listings', 'Could not load listings');
@@ -94,54 +196,165 @@ export function FarmerMapScreen({ navigation }: any) {
     }
   }, [storeFetchListings]);
 
-  const getKey = (listingId: string, itemName: string) =>
-    `${listingId}-${itemName}`;
+  const reloadFromNotification = useCallback(() => {
+    void handleRefresh();
+  }, [handleRefresh]);
+
+  useEffect(() => {
+    return subscribeNotificationReceived((payload) => {
+      if (isFoodListingNotification(payload)) {
+        reloadFromNotification();
+      }
+    });
+  }, [reloadFromNotification]);
+
+  const getKey = (listingId: string, foodItemId: number) => `${listingId}-${foodItemId}`;
 
   const updateQty = (
     listingId: string,
-    itemName: string,
+    foodItemId: number,
     maxQty: number,
     delta: number,
   ) => {
-    const key = getKey(listingId, itemName);
+    const key = getKey(listingId, foodItemId);
 
     setClaimState((prev) => {
       const current = prev[key] || 0;
-      let next = current + delta;
-
+      let next = roundKg(current + delta);
       if (next < 0) next = 0;
-      if (next > maxQty) next = maxQty;
-
-      return {
-        ...prev,
-        [key]: next,
-      };
+      if (next > maxQty) next = roundKg(maxQty);
+      return { ...prev, [key]: next };
     });
   };
 
-  const getTotalSelected = (listingId: string) => {
-    return Object.entries(claimState)
-      .filter(([key]) => key.startsWith(listingId))
-      .reduce((sum, [, qty]) => sum + qty, 0);
-  };
+  const getTotalSelected = (listingId: string) =>
+    roundKg(
+      Object.entries(claimState)
+        .filter(([key]) => key.startsWith(`${listingId}-`))
+        .reduce((sum, [, qty]) => sum + qty, 0),
+    );
 
-  const buildPayload = (listing: any) => {
-    return listing.items
-      .map((i: any) => {
-        const key = getKey(listing.id, i.name);
-        const qty = claimState[key] || 0;
+  const buildPartialClaimItems = useCallback(
+    (listing: DiscoverListing, claimItems: ClaimFoodItem[]): ClaimLineItem[] =>
+      claimItems
+        .map((item) => {
+          const qty = claimState[getKey(listing.id, item.foodItemId)] || 0;
+          if (qty <= 0) return null;
+          return {
+            foodItemId: item.foodItemId,
+            name: item.name,
+            qtyKg: roundKg(qty),
+          };
+        })
+        .filter((item): item is ClaimLineItem => item !== null),
+    [claimState],
+  );
 
-        if (qty > 0) {
-          return { name: i.name, claimedQty: qty };
+  const openPartialClaim = useCallback(
+    (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
+      const items = buildPartialClaimItems(listing, claimItems);
+      if (!items.length) {
+        Alert.alert(
+          'Select quantities',
+          'Use the + / − buttons to choose how much of each food item you want to claim.',
+        );
+        return;
+      }
+
+      setPendingClaim({
+        listing,
+        claimMode: 'PARTIAL',
+        items,
+      });
+    },
+    [buildPartialClaimItems],
+  );
+
+  const openFullClaim = useCallback(
+    (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
+      if (!claimItems.length) {
+        Alert.alert(
+          'Items not ready',
+          'Food items are still loading. Please wait a moment and try again.',
+        );
+        return;
+      }
+
+      setPendingClaim({
+        listing,
+        claimMode: 'FULL',
+        items: claimItems.map((item) => ({
+          foodItemId: item.foodItemId,
+          name: item.name,
+          qtyKg: item.quantityKg,
+        })),
+      });
+    },
+    [],
+  );
+
+  const handleClaimSuccess = useCallback(
+    async (listingId: string) => {
+      const claimedListing = pendingClaimRef.current?.listing;
+
+      setClaimState((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (key.startsWith(`${listingId}-`)) delete next[key];
+        });
+        return next;
+      });
+
+      fetchedListingIds.current.delete(listingId);
+      delete listingSnapshotRef.current[listingId];
+      setFoodItemsByListing((prev) => {
+        const next = { ...prev };
+        delete next[listingId];
+        return next;
+      });
+
+      if (claimedListing) {
+        invalidateListingDetail(claimedListing.listingId);
+      }
+
+      try {
+        await storeFetchListings('animal', true);
+
+        if (claimedListing) {
+          await refreshListingFoodItems(claimedListing, { refresh: true });
+          fetchedListingIds.current.add(listingId);
         }
-        return null;
-      })
-      .filter(Boolean);
-  };
+      } catch (e) {
+        showErrorAlert(e, 'Claim submitted', 'Could not refresh listings');
+      }
+
+      Alert.alert(
+        'Claim submitted',
+        'The restaurant will review and confirm your claim soon.',
+      );
+    },
+    [storeFetchListings, refreshListingFoodItems],
+  );
+
+  const sortedListings = useMemo(() => {
+    let data = [...listings];
+
+    if (activeFilter === 'distance') {
+      data.sort(
+        (a, b) =>
+          parseFloat(String(a.distance || '0')) - parseFloat(String(b.distance || '0')),
+      );
+    }
+
+    if (activeFilter === 'surplus') {
+      data.sort((a, b) => (b.quantityKg || 0) - (a.quantityKg || 0));
+    }
+
+    return data;
+  }, [listings, activeFilter]);
 
   const ListHeader = () => (
     <View style={styles.headerWrapper}>
-      {/* TITLE */}
       <ImageBackground
         source={require('../../../assets/placeholder/feed-bg.png')}
         style={styles.headerBg}
@@ -155,25 +368,21 @@ export function FarmerMapScreen({ navigation }: any) {
         style={styles.pickupBtn}
         onPress={() => navigation.navigate('FarmerPickup')}
       >
-        <AppText variant="bodyBold" style={styles.pickupBtnText} >
+        <AppText variant="bodyBold" style={styles.pickupBtnText}>
           View Your Pickups
         </AppText>
       </Pressable>
 
-      {/* ACTIVE LISTINGS */}
       <View style={styles.activeRow}>
-        <AppText variant='h7'>
-          Active Listings
-        </AppText>
+        <AppText variant="h7">Active Listings</AppText>
 
         <View style={styles.activeBadge}>
-          <AppText variant='h7' color='white'>
+          <AppText variant="h7" color="white">
             {listings.length}
           </AppText>
         </View>
       </View>
 
-      {/* FILTER PILLS */}
       <View style={styles.filterRow}>
         <TouchableOpacity
           style={[
@@ -184,7 +393,8 @@ export function FarmerMapScreen({ navigation }: any) {
             setActiveFilter(activeFilter === 'distance' ? null : 'distance')
           }
         >
-          <AppText variant='caption'
+          <AppText
+            variant="caption"
             style={
               activeFilter === 'distance'
                 ? styles.filterTextActive
@@ -204,168 +414,155 @@ export function FarmerMapScreen({ navigation }: any) {
             setActiveFilter(activeFilter === 'surplus' ? null : 'surplus')
           }
         >
-          <AppText variant='caption'
+          <AppText
+            variant="caption"
             style={
               activeFilter === 'surplus'
                 ? styles.filterTextActive
                 : styles.filterText
             }
           >
-          by Surplus Available
+            by Surplus Available
           </AppText>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  const renderItemRow = (listing: any, item: any) => {
-    const key = getKey(listing.id, item.name);
+  const renderItemRow = (
+    listing: DiscoverListing,
+    item: ClaimFoodItem,
+  ) => {
+    const key = getKey(listing.id, item.foodItemId);
     const qty = claimState[key] || 0;
 
     return (
-      <View key={item.name} style={styles.itemCard}>
-        {/* LEFT */}
+      <View key={item.foodItemId} style={styles.itemCard}>
         <View style={{ flex: 1 }}>
-          <AppText variant='label'>{item.name}</AppText>
-          <AppText variant='bodySmall'>
-            Available: {item.quantityKg} kg
+          <AppText variant="label">{item.name}</AppText>
+          <AppText variant="bodySmall">
+            Available: {formatKg(item.quantityKg)} kg
           </AppText>
         </View>
 
-        {/* RIGHT - STEPPER */}
         <View style={styles.stepper}>
           <TouchableOpacity
             onPress={() =>
-              updateQty(listing.id, item.name, item.quantityKg, -1)
+              updateQty(listing.id, item.foodItemId, item.quantityKg, -QTY_STEP)
             }
             style={styles.stepBtn}
           >
-            <AppText variant='label'>−</AppText>
+            <AppText variant="label">−</AppText>
           </TouchableOpacity>
 
           <View style={styles.qtyPill}>
-            <AppText variant='label'>{qty}</AppText>
+            <AppText variant="label">{formatKg(qty)}</AppText>
           </View>
 
           <TouchableOpacity
             onPress={() =>
-              updateQty(listing.id, item.name, item.quantityKg, 1)
+              updateQty(listing.id, item.foodItemId, item.quantityKg, QTY_STEP)
             }
             style={styles.stepBtn}
           >
-            <AppText variant='label'>＋</AppText>
+            <AppText variant="label">＋</AppText>
           </TouchableOpacity>
         </View>
       </View>
     );
   };
 
-  const renderListing = ({ item }: any) => {
+  const renderListing = ({ item }: { item: DiscoverListing }) => {
+    const claimItems = foodItemsByListing[item.id] ?? [];
+    const isLoadingItems = loadingFoodItems[item.id];
     const totalSelected = getTotalSelected(item.id);
     const hasSelection = totalSelected > 0;
 
     return (
       <View style={styles.card}>
-        {/* HEADER */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <AppText variant='bodyBold'>{item.businessName}</AppText>
-            <AppText variant='bodySmall'>
-              {item.suburb} · {item.type}
+            <AppText variant="bodyBold">{item.title || item.businessName}</AppText>
+            <AppText variant="bodySmall">
+              {item.businessName} · {item.pickupAddress}
             </AppText>
           </View>
 
           <View style={styles.distanceChip}>
-            <AppText variant='bodySmall'>📍 {item.distance}</AppText>
+            <AppText variant="bodySmall">📍 {item.distance}</AppText>
           </View>
         </View>
 
-        {/* INFO STRIP */}
         <View style={styles.infoRow}>
           <View style={styles.infoCard}>
-            <AppText variant='label'>Quantity</AppText>
-            <AppText variant='bodySmall'>{item.quantityKg} kg</AppText>
+            <AppText variant="label">Quantity</AppText>
+            <AppText variant="bodySmall">{formatKg(item.quantityKg)} kg</AppText>
           </View>
 
           <View style={styles.infoCard}>
-            <AppText variant='label'>Pickup Date</AppText>
-            <AppText variant='bodySmall'>{item.pickupDate}</AppText>
+            <AppText variant="label">Pickup Date</AppText>
+            <AppText variant="bodySmall">{item.bestBeforeLabel}</AppText>
           </View>
 
           <View style={styles.infoCard}>
-            <AppText variant='label'>Pickup Time</AppText>
-            <AppText variant='bodySmall'>{item.pickupTime}</AppText>
+            <AppText variant="label">Pickup Time</AppText>
+            <AppText variant="bodySmall">{item.pickupWindow}</AppText>
           </View>
         </View>
 
         <View style={styles.storageRow}>
-          <AppText variant='label'>Storage:</AppText>
-          <AppText variant='bodySmall'> {item.storage}</AppText>
+          <AppText variant="label">Storage:</AppText>
+          <AppText variant="bodySmall"> {item.storage}</AppText>
         </View>
 
-        {/* ITEMS */}
         <View style={styles.section}>
-          <AppText variant='label' style={styles.sectionTitle}>Select quantity</AppText>
-          {item.items.map((i: any) => renderItemRow(item, i))}
+          <AppText variant="label" style={styles.sectionTitle}>
+            Select quantity
+          </AppText>
+          {isLoadingItems ? (
+            <AppText variant="bodySmall" style={styles.loadingItemsText}>
+              Loading food items…
+            </AppText>
+          ) : claimItems.length === 0 ? (
+            <AppText variant="bodySmall" style={styles.loadingItemsText}>
+              No items available to claim
+            </AppText>
+          ) : (
+            claimItems.map((foodItem) => renderItemRow(item, foodItem))
+          )}
         </View>
 
-        {/* CTA */}
         <View style={styles.ctaRow}>
           <Button
-            label={`Claim ${totalSelected} kg`}
-            disabled={!hasSelection}
+            label={`Claim ${formatKg(totalSelected)} kg`}
+            disabled={!hasSelection || isLoadingItems}
             style={styles.flexBtn}
-            onPress={() => {
-              const payload = buildPayload(item);
-
-              navigation.navigate('FarmerClaimConfirm', {
-                listing: item,
-                payload,
-              });
-            }}
+            onPress={() => openPartialClaim(item, claimItems)}
           />
 
           <Button
             label="Claim All"
             variant="primary"
+            disabled={isLoadingItems || claimItems.length === 0}
             style={styles.flexBtn}
-            onPress={() =>
-              navigation.navigate('FarmerClaimConfirm', {
-                listing: item,
-              })
-            }
+            onPress={() => openFullClaim(item, claimItems)}
           />
         </View>
       </View>
     );
   };
 
-  const sortedListings = useMemo(() => {
-    let data = [...listings];
-
-    if (activeFilter === 'distance') {
-      data.sort(
-        (a, b) =>
-          parseFloat(a.distance || '0') -
-          parseFloat(b.distance || '0')
-      );
-    }
-
-    if (activeFilter === 'surplus') {
-      data.sort(
-        (a, b) => (b.quantityKg || 0) - (a.quantityKg || 0)
-      );
-    }
-
-    return data;
-  }, [listings, activeFilter]);
-
-  if (loading && !refreshing) {
+  if (loading && !refreshing && listings.length === 0) {
     return (
       <Screen backgroundColor={palette.creme} scrollable={false}>
         <View style={styles.skeletonWrap}>
           <Skeleton width="100%" height={hp(20)} borderRadius={0} />
-          <Skeleton width={wp(70)} height={normalize(44)} borderRadius={normalize(14)} style={styles.skeletonCenter} />
+          <Skeleton
+            width={wp(70)}
+            height={normalize(44)}
+            borderRadius={normalize(14)}
+            style={styles.skeletonCenter}
+          />
           <View style={styles.skeletonActiveRow}>
             <Skeleton width={wp(35)} height={normalize(18)} />
             <Skeleton width={wp(16)} height={hp(4.2)} borderRadius={normalize(12)} />
@@ -375,15 +572,45 @@ export function FarmerMapScreen({ navigation }: any) {
             <Skeleton width={wp(42)} height={normalize(36)} borderRadius={normalize(20)} />
           </View>
           {[1, 2].map((i) => (
-            <Skeleton key={i} width={wp(92)} height={normalize(280)} borderRadius={normalize(20)} style={styles.skeletonCard} />
+            <Skeleton
+              key={i}
+              width={wp(92)}
+              height={normalize(280)}
+              borderRadius={normalize(20)}
+              style={styles.skeletonCard}
+            />
           ))}
         </View>
+
+        <ClaimConfirmModal
+          visible={!!pendingClaim}
+          listing={pendingClaim?.listing ?? null}
+          claimMode={pendingClaim?.claimMode ?? 'PARTIAL'}
+          items={pendingClaim?.items ?? []}
+          onClose={() => setPendingClaim(null)}
+          onSuccess={() => {
+            const claim = pendingClaimRef.current;
+            if (claim) handleClaimSuccess(claim.listing.id);
+          }}
+        />
       </Screen>
     );
   }
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false}>
+      <ClaimConfirmModal
+        visible={!!pendingClaim}
+        listing={pendingClaim?.listing ?? null}
+        claimMode={pendingClaim?.claimMode ?? 'PARTIAL'}
+        items={pendingClaim?.items ?? []}
+        onClose={() => setPendingClaim(null)}
+        onSuccess={() => {
+          const claim = pendingClaimRef.current;
+          if (claim) handleClaimSuccess(claim.listing.id);
+        }}
+      />
+
       <FlatList
         data={sortedListings}
         keyExtractor={(item) => item.id}
@@ -391,9 +618,8 @@ export function FarmerMapScreen({ navigation }: any) {
         ListHeaderComponent={ListHeader}
         contentContainerStyle={[
           styles.container,
-          listings.length === 0 && { flex: 1 },
+          sortedListings.length === 0 && { flex: 1 },
         ]}
-
         ListEmptyComponent={
           <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
             <AppText variant="h7">No surplus available</AppText>
@@ -402,14 +628,9 @@ export function FarmerMapScreen({ navigation }: any) {
             </AppText>
           </View>
         }
-
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
-
         showsVerticalScrollIndicator={false}
       />
     </Screen>
@@ -544,6 +765,11 @@ const styles = StyleSheet.create({
     marginBottom: hp(1),
   },
 
+  loadingItemsText: {
+    color: '#888',
+    marginBottom: hp(0.5),
+  },
+
   itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,5 +831,4 @@ const styles = StyleSheet.create({
   skeletonCard: {
     alignSelf: 'center',
   },
-
 });

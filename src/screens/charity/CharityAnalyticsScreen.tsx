@@ -190,7 +190,7 @@ export function CharityAnalyticsScreen() {
   }
 
   return (
-    <Screen backgroundColor={palette.creme}>
+    <Screen backgroundColor={palette.creme} transparentTop={true}>
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
@@ -381,6 +381,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
     paddingHorizontal: wp(4),
     gap: hp(1),
+    paddingTop: hp(4),
   },
   topBar: {
     flexDirection: 'row',

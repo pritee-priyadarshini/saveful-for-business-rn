@@ -319,6 +319,7 @@ export function SignInScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const inputs = useRef<(TextInput | null)[]>([]);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
@@ -345,62 +346,68 @@ export function SignInScreen() {
   };
 
   const handleLogin = async () => {
-    try {
-      if (loading) return;
-      setError('');
-      if (!trimmedEmail || !password) {
-        setError('Please enter email and password.');
-        return;
-      }
+    if (loginLoading) return;
 
-      if (!isValidEmail(trimmedEmail)) {
-        setError('Please enter a valid email address.');
-        return;
-      }
+    setError('');
 
-      if (
-        __DEV__ &&
-        email.trim().toLowerCase() === 'farmer@saveful.com' &&
-        password === '123456'
-      ) {
-        setAuthUser({
-          id: 'demo-farmer',
-          firstName: 'Demo',
-          lastName: 'Farmer',
-          email: 'farmer@saveful.com',
-          accessToken: 'demo-token',
-          orgType: 'FARMER',
-          orgRole: 'OWNER',
-          siteRole: null,
-          profile: {
-            user: {
-              firstName: 'Demo',
-              lastName: 'Farmer',
-              email: 'farmer@saveful.com',
-              phoneNumber: '9999999999',
-              createdAt: new Date().toISOString(),
-            },
-            organisation: {
-              name: 'Green Valley Farm',
-              address: 'Demo Farm Address',
-              logoUrl: '',
-              type: 'FARMER',
-            },
-            role: {
-              orgRole: 'OWNER',
-              siteRole: null,
-            },
-            sites: [],
+    if (!trimmedEmail || !password) {
+      setError('Please enter email and password.');
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (
+      __DEV__ &&
+      email.trim().toLowerCase() === 'farmer@saveful.com' &&
+      password === '123456'
+    ) {
+      setAuthUser({
+        id: 'demo-farmer',
+        firstName: 'Demo',
+        lastName: 'Farmer',
+        email: 'farmer@saveful.com',
+        accessToken: 'demo-token',
+        orgType: 'FARMER',
+        orgRole: 'OWNER',
+        siteRole: null,
+        profile: {
+          user: {
+            firstName: 'Demo',
+            lastName: 'Farmer',
+            email: 'farmer@saveful.com',
+            phoneNumber: '9999999999',
+            createdAt: new Date().toISOString(),
           },
-        } as any);
+          organisation: {
+            name: 'Green Valley Farm',
+            address: 'Demo Farm Address',
+            logoUrl: '',
+            type: 'FARMER',
+          },
+          role: {
+            orgRole: 'OWNER',
+            siteRole: null,
+          },
+          sites: [],
+        },
+      } as any);
 
-        return;
-      }
+      return;
+    }
 
-      setLoading(true);
-
+    setLoginLoading(true);
+    try {
       const res = await authService.login(trimmedEmail, password);
       const data = res.data;
+
+      if (!data?.accessToken) {
+        setError('Sign in failed. Please try again.');
+        return;
+      }
 
       await SecureStore.setItemAsync('accessToken', data.accessToken);
 
@@ -418,10 +425,12 @@ export function SignInScreen() {
         throw profileError;
       }
     } catch (loginError: unknown) {
-      const status = isAxiosError(loginError) ? loginError.response?.status : undefined;
+      const axiosStatus = isAxiosError(loginError) ? loginError.response?.status : undefined;
+      const fetchStatus = (loginError as { response?: { status?: number } })?.response?.status;
+      const status = axiosStatus ?? fetchStatus;
       const apiMessage = isAxiosError(loginError)
         ? extractApiMessage(loginError.response?.data)
-        : null;
+        : extractApiMessage((loginError as { response?: { data?: unknown } })?.response?.data);
       const isUnverified =
         status === 403 &&
         typeof apiMessage === 'string' &&
@@ -435,14 +444,13 @@ export function SignInScreen() {
         return;
       }
 
-      setError(
-        getUserFriendlyErrorMessage(
-          loginError,
-          'Email or password is incorrect. Please try again.',
-        ),
+      const message = getUserFriendlyErrorMessage(
+        loginError,
+        'Email or password is incorrect. Please try again.',
       );
+      setError(message || 'Email or password is incorrect. Please try again.');
     } finally {
-      setLoading(false);
+      setLoginLoading(false);
     }
   };
 
@@ -707,9 +715,9 @@ export function SignInScreen() {
 
                 {mode === 'login' ? (
                   <PrimaryButton
-                    label={loading ? 'Signing in...' : 'Sign in'}
+                    label={loginLoading ? 'Signing in...' : 'Sign in'}
                     onPress={handleLogin}
-                    disabled={loading}
+                    disabled={loginLoading}
                     showArrow
                   />
                 ) : null}

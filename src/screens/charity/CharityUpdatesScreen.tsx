@@ -422,7 +422,7 @@ export function CharityUpdatesScreen() {
   }
 
   return (
-    <Screen backgroundColor={palette.creme} scrollable={false}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop={true}>
       <FlatList
         data={sections}
         keyExtractor={(item) => item.title}
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
 
   headerBg: {
     width: '100%',
-    height: hp(14),
+    height: hp(18),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -507,6 +507,7 @@ const styles = StyleSheet.create({
     color: palette.white,
     fontSize: normalize(24),
     letterSpacing: 0.5,
+    paddingTop: hp(4),
   },
 
   filterWrap: {
