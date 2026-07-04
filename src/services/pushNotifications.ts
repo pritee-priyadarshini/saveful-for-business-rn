@@ -8,17 +8,7 @@ import {
   type RegisterPushTokenPayload,
 } from './notifications.service';
 
-/**
- * True when running inside Expo Go.
- *
- * expo-notifications remote push APIs (getExpoPushTokenAsync, addPushTokenListener, etc.)
- * were removed from Expo Go in SDK 53. Importing the module at the top level or calling
- * any of those APIs inside Expo Go throws "runtime not ready" and crashes the app.
- *
- * All push-notification code is guarded by this flag and loaded via require() at
- * call-time so the problematic modules are never resolved in Expo Go.
- * Use a development build to test push notifications end-to-end.
- */
+
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
 const FIREBASE_ENABLED = Constants.expoConfig?.extra?.firebaseEnabled === true;
 
@@ -226,6 +216,7 @@ function buildTokenPayload(
     appVersion: Application.nativeApplicationVersion ?? undefined,
     appBuild: Application.nativeBuildVersion ?? undefined,
     appBundle: getAppBundle(),
+    targetApp: 'business',
   };
 }
 
@@ -301,8 +292,8 @@ export async function unregisterDeviceToken(): Promise<void> {
   }
 
   try {
-    await notificationsService.unregisterAllTokens();
-    console.log('[Push] All tokens unregistered');
+    await notificationsService.unregisterAllTokens('business');
+    console.log('[Push] Business app tokens unregistered');
   } catch (error) {
     console.log('[Push] Token unregister failed', error);
   }
