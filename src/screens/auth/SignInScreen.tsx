@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   ScrollView,
   TextInput,
   Pressable,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -50,18 +51,22 @@ import { hp, normalize, wp } from '@/utils/responsive';
 
 type Mode = 'login' | 'forgot';
 
+const { height: WINDOW_HEIGHT } = Dimensions.get('window');
+const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
+const HAS_SIGNED_IN_BEFORE_KEY = 'hasSignedInBefore';
+
 const valueProps = [
   {
     image: require('../../../assets/intro/welcome_reduce_waste.png'),
-    label: 'Reduce waste',
+    label: 'SAVE FOOD',
   },
   {
     image: require('../../../assets/intro/welcome_feed_communities.png'),
-    label: 'Feed communities',
+    label: 'FEED COMMUNITIES',
   },
   {
     image: require('../../../assets/intro/welcome_connect_locally.png'),
-    label: 'Connect locally',
+    label: 'CONNECT LOCALLY',
   },
 ];
 
@@ -326,9 +331,103 @@ export function SignInScreen() {
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetStep, setResetStep] = useState<1 | 2>(1);
+  const [hasSignedInBefore, setHasSignedInBefore] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const activeFieldRef = useRef<View | null>(null);
+  const keyboardHeightRef = useRef(0);
 
   const trimmedEmail = email.trim().toLowerCase();
-  const copy = MODE_COPY[mode];
+  const copy =
+    mode === 'login'
+      ? {
+          title: hasSignedInBefore ? 'Welcome back' : 'Welcome',
+          subtitle: MODE_COPY.login.subtitle,
+        }
+      : MODE_COPY.forgot;
+
+  useEffect(() => {
+    let mounted = true;
+    SecureStore.getItemAsync(HAS_SIGNED_IN_BEFORE_KEY)
+      .then((value) => {
+        if (mounted) setHasSignedInBefore(value === 'true');
+      })
+      .catch(() => {
+        if (mounted) setHasSignedInBefore(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const markSignedInBefore = useCallback(async () => {
+    setHasSignedInBefore(true);
+    try {
+      await SecureStore.setItemAsync(HAS_SIGNED_IN_BEFORE_KEY, 'true');
+    } catch {
+      // Ignore persistence failures; greeting still updates for this session.
+    }
+  }, []);
+
+  const scrollActiveFieldIntoView = useCallback(() => {
+    const field = activeFieldRef.current;
+    if (!field) return;
+
+    requestAnimationFrame(() => {
+      field.measureInWindow((_x, fieldY, _w, fieldH) => {
+        const gap = hp(2);
+        const activeKeyboardHeight =
+          keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
+        const visibleBottom = WINDOW_HEIGHT - activeKeyboardHeight - gap;
+        const fieldBottom = fieldY + fieldH;
+
+        if (fieldBottom > visibleBottom) {
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, scrollYRef.current + (fieldBottom - visibleBottom)),
+            animated: true,
+          });
+        }
+      });
+    });
+  }, []);
+
+  const handleFieldFocus = useCallback(
+    (field: View) => {
+      activeFieldRef.current = field;
+      const shortDelay = Platform.OS === 'ios' ? 80 : 150;
+      const longDelay = Platform.OS === 'ios' ? 320 : 420;
+      setTimeout(scrollActiveFieldIntoView, shortDelay);
+      setTimeout(scrollActiveFieldIntoView, longDelay);
+    },
+    [scrollActiveFieldIntoView],
+  );
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      keyboardHeightRef.current = event.endCoordinates.height;
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+      setTimeout(scrollActiveFieldIntoView, Platform.OS === 'ios' ? 80 : 150);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      keyboardHeightRef.current = 0;
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      activeFieldRef.current = null;
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [scrollActiveFieldIntoView]);
 
   const closeResetModal = () => {
     setResetModalVisible(false);
@@ -365,6 +464,7 @@ export function SignInScreen() {
       email.trim().toLowerCase() === 'farmer@saveful.com' &&
       password === '123456'
     ) {
+      await markSignedInBefore();
       setAuthUser({
         id: 'demo-farmer',
         firstName: 'Demo',
@@ -418,6 +518,7 @@ export function SignInScreen() {
           data.accessToken,
           data.siteAccess,
         );
+        await markSignedInBefore();
         setRole(resolveUserRole(authUser));
         setAuthUser(authUser);
       } catch (profileError) {
@@ -605,18 +706,27 @@ export function SignInScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
+        enabled={keyboardVisible}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.scrollContent,
-            (mode === 'login' || mode === 'forgot') && styles.scrollContentCentered,
+            (mode === 'login' || mode === 'forgot') && !keyboardVisible && styles.scrollContentCentered,
             {
               paddingTop: insets.top + hp(3.5),
-              paddingBottom: insets.bottom + hp(2.5),
+              paddingBottom: keyboardVisible
+                ? keyboardHeight + hp(3)
+                : insets.bottom + hp(2.5),
             },
           ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+          onScroll={(event) => {
+            scrollYRef.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={keyboardVisible}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
         >
           <Pressable
             style={styles.backRow}
@@ -672,11 +782,11 @@ export function SignInScreen() {
                 <InputField
                   label="Email address"
                   placeholder="your@email.com"
-                  compact
                   labelVariant="label"
                   value={email}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  onFieldFocus={handleFieldFocus}
                   onChangeText={(text) => {
                     setEmail(text);
                     setError('');
@@ -688,11 +798,11 @@ export function SignInScreen() {
                     <InputField
                       label="Password"
                       placeholder="Enter your password"
-                      compact
                       labelVariant="label"
                       value={password}
                       secureTextEntry
                       isPassword
+                      onFieldFocus={handleFieldFocus}
                       onChangeText={(t) => {
                         setPassword(t);
                         setError('');
@@ -866,8 +976,8 @@ const styles = StyleSheet.create({
 
   iconLabel: {
     textAlign: 'center',
-    fontSize: normalize(10),
-    lineHeight: normalize(13),
+    fontSize: normalize(12),
+    lineHeight: normalize(14),
     letterSpacing: 0.3,
   },
 
@@ -925,7 +1035,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(5),
     paddingTop: hp(2),
     paddingBottom: hp(2.2),
-    gap: hp(1.3),
+    gap: hp(1.5),
   },
 
   forgotLinkWrap: {

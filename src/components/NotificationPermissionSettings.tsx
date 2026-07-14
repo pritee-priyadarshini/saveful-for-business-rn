@@ -41,7 +41,7 @@ function getStatusPresentation(state: NotificationPermissionState) {
 
   return {
     label: 'Not allowed',
-    description: 'Turn on notifications to get pickup updates, claims, and nearby listing alerts.',
+    description: 'Allow Saveful for Business to send notifications in order to provide you with prompts and information about food surplus and collections',
     tone: 'warning' as const,
     icon: 'notifications-off-outline' as const,
   };

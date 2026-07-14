@@ -27,7 +27,7 @@ const roleCards = [
 		title: 'I HAVE SURPLUS FOOD',
 		subTitle: 'For Businesses, venues & farms',
 		description:
-			'List surplus food for collection by charities to redistribute to communities in need. Or food no longer fit for human consumption, for collection by farmers for farm livestock feed.',
+			'List surplus edible food for charities to help communities in need. Or list non-edible for farmers to feed livestock.',
 		borderColor: palette.kale,
 		titleColor: palette.kale,
 		accentColor: palette.kale,
@@ -42,9 +42,9 @@ const roleCards = [
 		title: 'I COLLECT & REDISTRIBUTE FOOD',
 		subTitle: 'For Charities and farmers',
 		description:
-			'Collect surplus food to redistribute to communities in need. Or collect surplus food no longer fit for human consumption to be used for farm livestock feed.',
+			'Collect surplus edible food to help communities in need. Or collect non-edible to be used for farm livestock feed.',
 		borderColor: palette.eggplant,
-		titleColor: palette.eggplant,
+		titleColor: palette.kale,
 		accentColor: palette.validation,
 		buttonColor: palette.eggplant,
 		iconBgColor: palette.eggplant,
@@ -74,7 +74,7 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 				contentStyle={styles.headerContent}
 			>
 				<AppText variant="h5" color={palette.white} style={styles.headerText}>
-					HOW WILL YOU USE SAVEFUL FOR BUSINESS?
+					{`HOW WILL YOU USE\nSAVEFUL FOR BUSINESS?`}
 				</AppText>
 			</HeroHeader>
 
@@ -101,12 +101,12 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 							/>
 						</View>
 
-						<AppText variant="h8" color={card.titleColor} style={styles.cardTitle}>
-							{card.title}
-						</AppText>
-
 						<AppText variant="bodyBold1" color={palette.primary} style={styles.cardSubTitle}>
 							{card.subTitle}
+						</AppText>
+
+						<AppText variant="h8" color={card.titleColor} style={styles.cardTitle}>
+							{card.title}
 						</AppText>
 
 						<AppText variant="body1" color={palette.primary} style={styles.cardDescription}>
@@ -190,12 +190,12 @@ const styles = StyleSheet.create({
 		height: hp(10),
 		marginLeft: 'auto',
 	},
-	cardTitle: {
-		marginTop: hp(0.9),
-	},
 	cardSubTitle: {
-		marginTop: hp(1),
+		marginTop: hp(0.9),
 		lineHeight: normalize(20),
+	},
+	cardTitle: {
+		marginTop: hp(0.4),
 	},
 	cardDescription: {
 		marginTop: hp(0.5),

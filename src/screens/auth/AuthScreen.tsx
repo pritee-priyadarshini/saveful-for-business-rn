@@ -36,7 +36,7 @@ import { COUNTRY_CODES, findCountryByIso, appendSignupMobileFields } from '@/dat
 import type { CountryCode } from '@/data/countryCodes';
 import { fetchCurrentLocation } from '@/utils/currentLocation';
 import { getUserFriendlyErrorMessage } from '@/utils/apiError';
-import { REGION_OPTIONS, getRegionLabel, appendSignupRegionAndCoordinates, isValidRegion } from '@/data/regions';
+import { REGION_OPTIONS, getRegionLabel, appendSignupRegionAndCoordinates, isSelectableRegion } from '@/data/regions';
 import type { Region } from '@/types';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -810,7 +810,7 @@ export function AuthScreen() {
   const validateStep3 = (): string | null => {
     if (!isChecked) return 'Please accept the Terms & Conditions to continue.';
 
-    if (!isValidRegion(getCurrentRegion())) {
+    if (!isSelectableRegion(getCurrentRegion())) {
       return 'Please select your operating region.';
     }
 

@@ -17,15 +17,15 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 const valueProps = [
   {
     image: require('../../../assets/intro/welcome_reduce_waste.png'),
-    label: 'Reduce food waste',
+    label: 'SAVE FOOD',
   },
   {
     image: require('../../../assets/intro/welcome_feed_communities.png'),
-    label: 'Feed communities',
+    label: 'FEED COMMUNITIES',
   },
   {
     image: require('../../../assets/intro/welcome_connect_locally.png'),
-    label: 'Connect locally',
+    label: 'CONNECT LOCALLY',
   },
 ];
 
@@ -57,12 +57,12 @@ export function WelcomeScreen({ navigation }: Props) {
           />
 
           <AppText variant="h5" color={palette.primary} style={styles.heading}>
-            Ready to save and share good food?
+            HELP GOOD FOOD GO FURTHER
           </AppText>
 
           <AppText variant="body1" color={palette.textMuted} style={styles.subtitle}>
-            List surplus or find food ready for collection. Saveful connects businesses and
-            charities to help good food go further.
+            List surplus or find food ready for collection.{'\n'}
+            Saveful connects businesses, charities and farmers to help good food go further.
           </AppText>
         </View>
 
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
 
   valuePropLabel: {
     textAlign: 'center',
-    fontSize: normalize(10),
+    fontSize: normalize(12),
     lineHeight: normalize(13),
     letterSpacing: 0.3,
   },

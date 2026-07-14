@@ -40,13 +40,16 @@ async function setupAndroidNotificationChannel(): Promise<void> {
   });
 }
 
+const NOTIFICATION_PERMISSION_MESSAGE =
+  'Allow Saveful for Business to send notifications in order to provide you with prompts and information about food surplus and collections';
+
 function showNotificationSettingsAlert(): void {
   if (permissionSettingsAlertShown) return;
   permissionSettingsAlertShown = true;
 
   Alert.alert(
     'Enable notifications',
-    'Allow notifications to receive pickup updates, claims, and nearby listing alerts.',
+    NOTIFICATION_PERMISSION_MESSAGE,
     [
       {
         text: 'Not now',
@@ -66,6 +69,27 @@ function showNotificationSettingsAlert(): void {
   );
 }
 
+function askNotificationPermissionApproval(): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Notification approval',
+      NOTIFICATION_PERMISSION_MESSAGE,
+      [
+        {
+          text: "Don't allow",
+          style: 'cancel',
+          onPress: () => resolve(false),
+        },
+        {
+          text: 'Allow',
+          onPress: () => resolve(true),
+        },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
+}
+
 /**
  * Requests the OS notification permission when not yet granted.
  * Shows the system dialog on first ask; directs to Settings if permanently denied.
@@ -81,6 +105,11 @@ export async function ensureNotificationPermission(
   let permissions = await Notifications.getPermissionsAsync();
 
   if (!isPermissionGranted(permissions) && prompt) {
+    const approved = await askNotificationPermissionApproval();
+    if (!approved) {
+      return false;
+    }
+
     console.log('[Push] Requesting notification permission');
     permissions = await Notifications.requestPermissionsAsync({
       ios: {

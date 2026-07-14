@@ -45,9 +45,9 @@ export function RoleReadyScreen({ navigation }: Props) {
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop contentStyle={styles.screenContent}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false}>
-      <View style={[styles.topAccent, { backgroundColor: palette.middlegreen }]} />
       <HeroHeader
-        source={require('../../../assets/intro/confetti-bg.png')}
+        source={require('../../../assets/placeholder/kale-headera.png')}
+        height={hp(16)}
         padContentRight={false}
         contentStyle={styles.heroContent}
       />
@@ -55,17 +55,11 @@ export function RoleReadyScreen({ navigation }: Props) {
       <View style={styles.mainCard}>
         <View style={styles.titleBlock}>
           <AppText variant="h4" color={palette.black} style={styles.title}>
-            You're all set!
-          </AppText>
-          <AppText variant="bodyBold" color={palette.black} style={styles.subtitle}>
-            Let's start making a difference together
+            What happens next?
           </AppText>
         </View>
 
         <View style={styles.stepsSection}>
-          <AppText variant="h8" color={palette.black} style={styles.cardTitle}>
-            What happens next?
-          </AppText>
 
           {nextSteps.map((step) => (
             <View key={step.title} style={styles.stepRow}>
@@ -108,23 +102,19 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: hp(3),
   },
-  topAccent: {
-    width: '100%',
-    height: hp(0.35),
-  },
   heroContent: {
-    justifyContent: 'flex-end',
-    paddingBottom: hp(3),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mainCard: {
-    marginTop: hp(1),
+    marginTop: hp(5),
     marginHorizontal: wp(4),
     backgroundColor: palette.creme,
     borderRadius: normalize(16),
     borderWidth: normalize(1),
     borderColor: palette.middlegreen,
     paddingHorizontal: wp(4.5),
-    paddingTop: hp(3.5),
+    paddingTop: hp(5),
     paddingBottom: hp(2.5),
     gap: hp(2),
   },

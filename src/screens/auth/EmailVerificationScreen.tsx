@@ -216,12 +216,15 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
             ))}
           </View>
 
-          {/* RESEND */}
-          <Pressable style={styles.resendButton} onPress={handleResend} disabled={resending}>
-            <AppText variant='label' style={styles.resendText}>
-              {resending ? 'Resending...' : 'Resend Email'}
-            </AppText>
-          </Pressable>
+          {/* CTA */}
+          <View style={styles.continueWrap}>
+            <Button
+              label={loading ? 'Verifying...' : 'Continue'}
+              onPress={handleVerify}
+              loading={loading}
+              disabled={loading}
+            />
+          </View>
 
           {/* INFO */}
           <AppText variant='bodyLarge' style={styles.infoText}>
@@ -230,14 +233,13 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
 
         </View>
 
-        {/* CTA */}
+        {/* RESEND */}
         <View style={styles.bottom}>
-          <Button
-            label={loading ? 'Verifying...' : 'Continue'}
-            onPress={handleVerify}
-            loading={loading}
-            disabled={loading}
-          />
+          <Pressable style={styles.resendButton} onPress={handleResend} disabled={resending}>
+            <AppText variant='label' style={styles.resendText}>
+              {resending ? 'Resending...' : 'Resend Email'}
+            </AppText>
+          </Pressable>
         </View>
 
       </Screen>
@@ -378,7 +380,6 @@ const styles = StyleSheet.create({
   },
 
   resendButton: {
-    marginTop: hp(2),
     alignSelf: 'center',
   },
 
@@ -397,8 +398,14 @@ const styles = StyleSheet.create({
     fontSize: normalize(14),
   },
 
+  continueWrap: {
+    marginTop: hp(2),
+    marginHorizontal: wp(4),
+  },
+
   bottom: {
     margin: hp(4),
+    alignItems: 'center',
   },
 
   /* MODAL */

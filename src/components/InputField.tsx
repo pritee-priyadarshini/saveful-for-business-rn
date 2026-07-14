@@ -49,6 +49,7 @@ export function InputField({
   const containerRef = useRef<View>(null);
 
   const [hidden, setHidden] = useState(secureTextEntry);
+  const useFormLabel = compact || labelVariant === 'label';
 
   const handleFocus = (_e: FocusEvent) => {
     setIsFocused(true);
@@ -61,8 +62,11 @@ export function InputField({
     <View ref={containerRef} style={styles.container}>
       <AppText
         variant={labelVariant}
-        color={compact ? palette.black : palette.textMuted}
-        style={[compact && styles.labelCompact]}
+        color={useFormLabel ? palette.black : palette.textMuted}
+        style={[
+          useFormLabel && styles.labelCompact,
+          useFormLabel && !compact && styles.labelForm,
+        ]}
       >
         {label}
         {optional ? ' (optional)' : ''}
@@ -78,6 +82,7 @@ export function InputField({
           style={[
             styles.input,
             compact && styles.inputCompact,
+            useFormLabel && !compact && styles.inputForm,
             multiline && styles.multiline,
             isFocused && styles.inputFocused, 
           ]}
@@ -118,6 +123,11 @@ const styles = StyleSheet.create({
     color: palette.black,
   },
 
+  labelForm: {
+    fontSize: scaleFont(14),
+    lineHeight: scaleFont(18),
+  },
+
   inputWrapper: {
     position: 'relative',
     justifyContent: 'center',
@@ -142,6 +152,17 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     paddingHorizontal: 14,
     fontSize: scaleFont(14),
+  },
+
+  inputForm: {
+    minHeight: 48,
+    borderRadius: 10,
+    borderColor: '#D9D9D9',
+    backgroundColor: palette.white,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: scaleFont(15),
+    lineHeight: scaleFont(20),
   },
 
   eye: {
