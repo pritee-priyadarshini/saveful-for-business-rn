@@ -273,7 +273,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
                 <View style={styles.surplusBody}>
                   <AppText variant="bodySmall" color={palette.textMuted} style={styles.surplusDescription}>
-                    List what you have spare - nearby charities get notified and arrange pickup.
+                    List what you have - local charities get notified to arrange pickup.
                   </AppText>
 
                   <View style={styles.surplusSteps}>

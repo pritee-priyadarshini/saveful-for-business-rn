@@ -636,7 +636,7 @@ export function AuthScreen() {
         form.append('brandName', charityForm.branding);
         form.append('charityType', mapRole(selectedRole));
         form.append('pickupPostCode', charityForm.postcodes.trim());
-        form.append('pickupRadiusKm', String(Number(charityForm.pickupRadius) || 5));
+        form.append('pickupRadiusKm', String(Number(charityForm.pickupRadius) || 50));
         appendSignupRegionAndCoordinates(
           form,
           charityForm.region,

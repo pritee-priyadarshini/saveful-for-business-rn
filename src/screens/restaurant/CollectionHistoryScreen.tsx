@@ -680,7 +680,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   }
 
   return (
-    <Screen backgroundColor={palette.creme} scrollable={false}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <FlatList
         data={filteredData}
         keyExtractor={(item) => String(item.id)}
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     gap: hp(1),
   },
   header: {
-    height: hp(13.5),
+    height: hp(16),
     justifyContent: 'flex-end',
     paddingBottom: hp(1.9),
     paddingHorizontal: wp(4),
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: wp(4),
-    top: hp(2.2),
+    top: hp(4.2),
     width: wp(10),
     height: wp(10),
     alignItems: 'center',

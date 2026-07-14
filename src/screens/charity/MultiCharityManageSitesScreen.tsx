@@ -19,6 +19,10 @@ import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
+import {
+    LocationSetupModal,
+    type SelectedLocation,
+} from '../../components/LocationSetupModal';
 import { useAppContext } from '@/store/AppContext';
 import { useCharityStore, type CharityMember } from '@/store/charityStore';
 import { palette } from '@/theme/colors';
@@ -29,6 +33,8 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { hp, normalize, wp } from '@/utils/responsive';
+import { organizationService } from '@/services/organization.service';
+import { useAuthStore } from '@/store/authStore';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'MultiCharityManageSites'>;
 
@@ -80,6 +86,8 @@ export default function MultiCharityManageSitesScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
+    const [locationModalVisible, setLocationModalVisible] = useState(false);
+    const refreshProfile = useAuthStore((s) => s.refreshProfile);
     const businessLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
     const brandName =
         authUser?.profile?.organisation?.branding ||
@@ -203,6 +211,30 @@ export default function MultiCharityManageSitesScreen() {
     return (
         <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
             <StatusBar style="light" translucent backgroundColor="transparent" />
+            <LocationSetupModal
+                visible={locationModalVisible}
+                onClose={() => setLocationModalVisible(false)}
+                searchPlaceholder="Search charity address..."
+                initialLocation={
+                    Number.isFinite(Number(editForm.latitude)) &&
+                    Number.isFinite(Number(editForm.longitude))
+                        ? {
+                              latitude: Number(editForm.latitude),
+                              longitude: Number(editForm.longitude),
+                              address: String(editForm.address || ''),
+                          }
+                        : null
+                }
+                onConfirm={async ({ latitude, longitude, address }: SelectedLocation) => {
+                    setEditForm((prev: any) => ({
+                        ...prev,
+                        address,
+                        latitude,
+                        longitude,
+                    }));
+                    setLocationModalVisible(false);
+                }}
+            />
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: safeBottomPadding }]}
@@ -368,10 +400,6 @@ export default function MultiCharityManageSitesScreen() {
                                                 label: 'Location Name',
                                             },
                                             {
-                                                key: 'address',
-                                                label: 'Address',
-                                            },
-                                            {
                                                 key: 'postCode',
                                                 label: 'Post Code',
                                             },
@@ -404,6 +432,26 @@ export default function MultiCharityManageSitesScreen() {
                                             </View>
                                         ))}
 
+                                        <View style={{ marginBottom: hp(1.2) }}>
+                                            <AppText variant="bodyBold">Address / Location</AppText>
+                                            <AppText variant="bodySmall" style={{ color: palette.textMuted, marginTop: hp(0.3) }}>
+                                                Use map search so latitude and longitude update with the address.
+                                            </AppText>
+                                            {!!editForm.address && (
+                                                <AppText variant="bodySmall" style={{ marginTop: hp(0.6) }}>
+                                                    {String(editForm.address)}
+                                                </AppText>
+                                            )}
+                                            <Pressable
+                                                style={[styles.editBtn, { marginTop: hp(1), alignSelf: 'flex-start' }]}
+                                                onPress={() => setLocationModalVisible(true)}
+                                            >
+                                                <AppText variant="bodyBold" style={{ color: 'white' }}>
+                                                    Update on Map
+                                                </AppText>
+                                            </Pressable>
+                                        </View>
+
                                         {/* SAVE */}
                                         <Pressable
                                             style={[styles.saveBtn, actionLoading && { opacity: 0.65 }]}
@@ -412,12 +460,30 @@ export default function MultiCharityManageSitesScreen() {
                                                 if (actionLoading || !editingSiteId) return;
                                                 setActionLoading(true);
                                                 try {
+                                                    const latitude = Number(editForm.latitude);
+                                                    const longitude = Number(editForm.longitude);
+                                                    const hasCoordinates =
+                                                        Number.isFinite(latitude) && Number.isFinite(longitude);
+
                                                     await updateLocation(editingSiteId, {
                                                         locationName: editForm.tradingName,
                                                         address: editForm.address,
                                                         postcode: editForm.postCode,
                                                         radiusKm: Number(editForm.radiusKm),
+                                                        ...(hasCoordinates
+                                                            ? { latitude, longitude }
+                                                            : {}),
                                                     });
+
+                                                    const orgId = authUser?.profile?.organisation?.id;
+                                                    if (orgId && hasCoordinates) {
+                                                        await organizationService.updateCoordinates(orgId, {
+                                                            latitude,
+                                                            longitude,
+                                                        });
+                                                        await refreshProfile();
+                                                    }
+
                                                     await loadData(true);
 
                                                     setEditingSiteId(null);

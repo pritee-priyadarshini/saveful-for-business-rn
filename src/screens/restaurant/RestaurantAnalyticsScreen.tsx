@@ -8,6 +8,7 @@ import {
   ImageSourcePropType,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,7 @@ import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { useAppContext } from '../../store/AppContext';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
+import { toLineChartDatasets } from '@/utils/impactData';
 
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -112,11 +114,12 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
   const { width } = useWindowDimensions();
   const { currentProfile } = useAppContext();
 
-  const [range, setRange] = React.useState<TimeRange>('week');
-  const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('mealsCreated');
+  const [range, setRange] = React.useState<TimeRange>('month');
+  const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('foodRedistributed');
 
   const {
     loading,
+    chartLoading,
     monthStats,
     lifetimeStats,
     getChartSeries,
@@ -427,13 +430,20 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
                 key={`${range}-${selectedMetric}`}
                 data={{
                   labels: chartSeries.labels,
-                  datasets: [{ data: chartSeries.values }],
+                  datasets: toLineChartDatasets(chartSeries.values),
                 }}
                 width={chartWidth}
                 height={hp(24)}
                 yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
                 yLabelsOffset={4}
-                chartConfig={chartConfig}
+                chartConfig={{
+                  ...chartConfig,
+                  decimalPlaces:
+                    selectedMetric === 'mealsCreated' ||
+                    selectedMetric === 'collectionsCompleted'
+                      ? 1
+                      : 0,
+                }}
                 bezier
                 fromZero
                 segments={4}
@@ -441,8 +451,13 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
                 withOuterLines={false}
                 withVerticalLines
                 withHorizontalLines
-                style={styles.chart}
+                style={[styles.chart, chartLoading && styles.chartDimmed]}
               />
+              {chartLoading ? (
+                <View style={styles.chartLoadingOverlay}>
+                  <ActivityIndicator size="small" color={palette.kale} />
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -903,6 +918,19 @@ const styles = StyleSheet.create({
     width: '100%',
     overflow: 'hidden',
     alignItems: 'center',
+    minHeight: hp(24),
+    justifyContent: 'center',
+  },
+
+  chartLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+
+  chartDimmed: {
+    opacity: 0.55,
   },
 
   chart: {

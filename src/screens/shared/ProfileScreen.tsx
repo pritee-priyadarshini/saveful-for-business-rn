@@ -8,6 +8,7 @@ import {
   Linking,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { pickSquareImage } from '@/utils/pickSquareImage';
@@ -16,6 +17,10 @@ import { Picker } from '@react-native-picker/picker';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
+import {
+  LocationSetupModal,
+  type SelectedLocation,
+} from '../../components/LocationSetupModal';
 import { useAppContext } from '../../store/AppContext';
 
 import { spacing } from '../../theme/spacing';
@@ -36,6 +41,11 @@ import {
   resolveProfileDisplayAddress,
   resolveProfilePickupRadiusKm,
 } from '@/utils/authSession';
+import {
+  normalizeAuthProfile,
+  resolveProfileCoordinates,
+} from '@/utils/coordinates';
+import { fetchCurrentLocation } from '@/utils/currentLocation';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -47,6 +57,7 @@ const normalize = (size: number) => {
 
 function buildProfileForm(authUser: ReturnType<typeof useAuthStore.getState>['authUser']) {
   const org = authUser?.profile?.organisation;
+  const coords = resolveProfileCoordinates(normalizeAuthProfile(authUser));
 
   return {
     firstName: authUser?.profile?.user?.firstName || '',
@@ -59,6 +70,8 @@ function buildProfileForm(authUser: ReturnType<typeof useAuthStore.getState>['au
     venueType: org?.venueType || '',
     branding: org?.brandName || '',
     radius: resolveProfilePickupRadiusKm(authUser?.profile),
+    latitude: coords?.lat ?? null,
+    longitude: coords?.lng ?? null,
   };
 }
 
@@ -76,6 +89,8 @@ export function ProfileScreen() {
   const [logo, setLogo] = useState<string | null>(
     currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null,
   );
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,6 +159,27 @@ export function ProfileScreen() {
     }));
   };
 
+  const applySelectedLocation = ({ latitude, longitude, address }: SelectedLocation) => {
+    setFormData((prev: any) => ({
+      ...prev,
+      address,
+      latitude,
+      longitude,
+    }));
+  };
+
+  const handleUseGpsLocation = async () => {
+    if (gpsLoading) return;
+    setGpsLoading(true);
+    try {
+      const location = await fetchCurrentLocation();
+      if (!location) return;
+      applySelectedLocation(location);
+    } finally {
+      setGpsLoading(false);
+    }
+  };
+
   const handleUpdateContact = async () => {
     if (submitting) return;
     await withLock(async () => {
@@ -164,13 +200,31 @@ export function ProfileScreen() {
         const orgId = authUser?.profile?.organisation?.id;
         const siteId = authUser?.profile?.sites?.[0]?.id;
         const trimmedAddress = formData.address.trim();
+        const latitude = formData.latitude != null ? Number(formData.latitude) : null;
+        const longitude = formData.longitude != null ? Number(formData.longitude) : null;
+        const hasCoordinates =
+          latitude != null &&
+          longitude != null &&
+          Number.isFinite(latitude) &&
+          Number.isFinite(longitude);
+
+        if (trimmedAddress && !hasCoordinates) {
+          Alert.alert(
+            'Update location',
+            'Please use Search Address or Use My Location so latitude and longitude update with the address.',
+          );
+          return;
+        }
 
         if (usesSiteAddress) {
           if (!siteId) {
             Alert.alert('Error', 'Site not found');
             return;
           }
-          await sitesService.updateSite(siteId, { address: trimmedAddress });
+          await sitesService.updateSite(siteId, {
+            address: trimmedAddress,
+            ...(hasCoordinates ? { latitude: latitude!, longitude: longitude! } : {}),
+          });
         } else if (isCharity || isFarmerConsumer) {
           if (!siteId) {
             Alert.alert('Error', 'Location not found');
@@ -178,6 +232,15 @@ export function ProfileScreen() {
           }
           await updateLocation(siteId, {
             address: trimmedAddress,
+            ...(hasCoordinates ? { latitude: latitude!, longitude: longitude! } : {}),
+          });
+        }
+
+        // Keep organisation coordinates in sync — discovery / map flows use these.
+        if (orgId && hasCoordinates) {
+          await organizationService.updateCoordinates(orgId, {
+            latitude: latitude!,
+            longitude: longitude!,
           });
         }
 
@@ -313,12 +376,6 @@ export function ProfileScreen() {
       fields: [
         { label: 'First Name', value: formData.firstName, editable: false },
         { label: 'Last Name', value: formData.lastName, editable: false },
-      ],
-    },
-    {
-      key: 'contact',
-      title: 'Contact Details',
-      fields: [
         { label: 'Email', value: currentProfile.email || '', editable: false },
         { label: 'Mobile', value: currentProfile.phone, editable: true },
         { label: 'Password', value: '********', editable: true },
@@ -368,6 +425,31 @@ export function ProfileScreen() {
 
   return (
     <Screen backgroundColor={palette.creme} transparentTop={true}>
+      <LocationSetupModal
+        visible={locationModalVisible}
+        onClose={() => setLocationModalVisible(false)}
+        initialLocation={
+          formData.latitude != null && formData.longitude != null
+            ? {
+                latitude: Number(formData.latitude),
+                longitude: Number(formData.longitude),
+                address: formData.address,
+              }
+            : null
+        }
+        onConfirm={async (location) => {
+          applySelectedLocation(location);
+          setLocationModalVisible(false);
+        }}
+        searchPlaceholder={
+          isCharity
+            ? 'Search charity address...'
+            : isFarmerConsumer || isFarmBusiness
+              ? 'Search farm address...'
+              : 'Search business address...'
+        }
+      />
+
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>
@@ -450,37 +532,26 @@ export function ProfileScreen() {
                     <>
                       <InputField label="First Name" value={formData.firstName} editable={false} />
                       <InputField label="Last Name" value={formData.lastName} editable={false} />
-                    </>
-                  )}
-
-                  {section.key === 'contact' && (
-                    <>
                       <InputField
                         label="Email"
                         value={formData.email}
                         editable={false}
                       />
-
                       <InputField
                         label="Mobile"
                         value={formData.mobile}
                         editable={true}
                         onChangeText={(v) => updateField('mobile', v)}
                       />
-
                       <View style={{ marginTop: spacing.sm }}>
                         <AppText variant="bodyBold">Password</AppText>
-
                         <Pressable
                           style={styles.passwordLink}
-                          onPress={() =>
-                            navigation.navigate('ForgotPassword')
-                          }
+                          onPress={() => navigation.navigate('ForgotPassword')}
                         >
                           <AppText variant="body" style={styles.linkText}>
                             Change Password
                           </AppText>
-
                           <Ionicons name="chevron-forward" size={16} color={palette.primary} />
                         </Pressable>
                       </View>
@@ -497,12 +568,54 @@ export function ProfileScreen() {
                         editable={false}
                       />
 
-                      <InputField
-                        label="Address"
-                        value={formData.address}
-                        editable={true}
-                        onChangeText={(v) => updateField('address', v)}
-                      />
+                      <View style={styles.locationSection}>
+                        <AppText variant="bodyBold">Address / Location</AppText>
+                        <AppText variant="bodySmall" style={styles.locationHint}>
+                          Update address with map search so latitude and longitude stay accurate for pickups.
+                        </AppText>
+
+                        <View style={styles.locationPickerRow}>
+                          <Pressable
+                            style={[styles.locationPickerBtn, gpsLoading && styles.locationPickerBtnDisabled]}
+                            onPress={handleUseGpsLocation}
+                            disabled={gpsLoading}
+                          >
+                            {gpsLoading ? (
+                              <ActivityIndicator size="small" color={palette.kale} />
+                            ) : (
+                              <Ionicons name="locate" size={normalize(14)} color={palette.kale} />
+                            )}
+                            <AppText style={styles.locationPickerBtnText}>
+                              {gpsLoading ? 'Getting location...' : 'Use My Location'}
+                            </AppText>
+                          </Pressable>
+
+                          <Pressable
+                            style={[styles.locationPickerBtn, styles.locationPickerBtnSearch]}
+                            onPress={() => setLocationModalVisible(true)}
+                          >
+                            <Ionicons name="search" size={normalize(14)} color={palette.white} />
+                            <AppText style={[styles.locationPickerBtnText, styles.locationPickerBtnTextWhite]}>
+                              Search Address
+                            </AppText>
+                          </Pressable>
+                        </View>
+
+                        {!!formData.address && (
+                          <View style={styles.selectedAddressBox}>
+                            <Ionicons name="checkmark-circle" size={normalize(16)} color={palette.middlegreen} />
+                            <AppText style={styles.selectedAddressText} numberOfLines={3}>
+                              {formData.address}
+                            </AppText>
+                          </View>
+                        )}
+
+                        {formData.latitude != null && formData.longitude != null ? (
+                          <AppText variant="caption" style={styles.coordsHint}>
+                            Lat {Number(formData.latitude).toFixed(5)}, Lng {Number(formData.longitude).toFixed(5)}
+                          </AppText>
+                        ) : null}
+                      </View>
 
                       <InputField
                         label="Registration No."
@@ -598,7 +711,7 @@ export function ProfileScreen() {
                   )}
 
                   {/* SAVE BUTTON */}
-                  {((section.key === 'contact' ||
+                  {((section.key === 'personal' ||
                     section.key === 'business' ||
                     section.key === 'extra') &&
                     true) ||
@@ -607,7 +720,7 @@ export function ProfileScreen() {
                       style={[styles.saveBtn, submitting && { opacity: 0.65 }]}
                       disabled={submitting}
                       onPress={() => {
-                        if (section.key === 'contact') {
+                        if (section.key === 'personal') {
                           handleUpdateContact();
                         }
 
@@ -763,6 +876,78 @@ const styles = StyleSheet.create({
     borderRadius: normalize(8),
     backgroundColor: palette.creme,
     elevation: 4,
+  },
+
+  locationSection: {
+    gap: hp(0.8),
+    marginBottom: hp(0.5),
+  },
+
+  locationHint: {
+    color: palette.textMuted,
+    textTransform: 'none',
+  },
+
+  locationPickerRow: {
+    flexDirection: 'row',
+    gap: wp(2),
+  },
+
+  locationPickerBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1.2),
+    borderWidth: 1,
+    borderColor: palette.kale,
+    backgroundColor: palette.white,
+    borderRadius: normalize(10),
+    paddingVertical: hp(1.1),
+    paddingHorizontal: wp(2),
+  },
+
+  locationPickerBtnSearch: {
+    backgroundColor: palette.kale,
+    borderColor: palette.kale,
+  },
+
+  locationPickerBtnDisabled: {
+    opacity: 0.7,
+  },
+
+  locationPickerBtnText: {
+    color: palette.kale,
+    fontSize: normalize(12),
+    fontWeight: '700',
+    textTransform: 'none',
+  },
+
+  locationPickerBtnTextWhite: {
+    color: palette.white,
+  },
+
+  selectedAddressBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2),
+    backgroundColor: '#EEF7F1',
+    borderRadius: normalize(10),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+  },
+
+  selectedAddressText: {
+    flex: 1,
+    color: palette.black,
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    textTransform: 'none',
+  },
+
+  coordsHint: {
+    color: palette.midgray,
+    textTransform: 'none',
   },
 
   centerDivider: {

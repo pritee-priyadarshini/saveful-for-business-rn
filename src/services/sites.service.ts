@@ -31,6 +31,8 @@ export type UpdateSitePayload = {
   address?: string;
   siteName?: string;
   postcode?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export const sitesService = {

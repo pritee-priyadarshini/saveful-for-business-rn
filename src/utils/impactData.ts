@@ -100,11 +100,15 @@ function mergeCharts(responses: SiteImpactResponse[]): ImpactChartPoint[] {
   const labelOrder: string[] = [];
 
   for (const response of responses) {
-    for (const point of response.chart) {
-      if (!bucketMap.has(point.label)) {
-        labelOrder.push(point.label);
+    for (const point of response.chart ?? []) {
+      const label = String(point?.label ?? '');
+      if (!label) continue;
+      const kg = Number(point?.kg);
+      const safeKg = Number.isFinite(kg) ? Math.max(0, kg) : 0;
+      if (!bucketMap.has(label)) {
+        labelOrder.push(label);
       }
-      bucketMap.set(point.label, round2((bucketMap.get(point.label) ?? 0) + point.kg));
+      bucketMap.set(label, round2((bucketMap.get(label) ?? 0) + safeKg));
     }
   }
 
@@ -181,38 +185,83 @@ export function buildChartSeries(
     return { labels: ['—'], values: [0] };
   }
 
-  const labels = impact.chart.map((point) => point.label);
-  const kgValues = impact.chart.map((point) => point.kg);
-  const totalKg = impact.totals.redistributedKg || 0;
-  const totalCollections = impact.totals.collectionsCompleted || 0;
+  const labels = impact.chart.map((point) => String(point.label ?? ''));
+  const kgValues = impact.chart.map((point) => {
+    const raw = Number((point as ImpactChartPoint).kg);
+    return Number.isFinite(raw) ? Math.max(0, raw) : 0;
+  });
+  const totalKg = Number(impact.totals?.redistributedKg) || 0;
+  const totalCollections = Number(impact.totals?.collectionsCompleted) || 0;
 
   let values: number[];
   switch (metric) {
     case 'food':
-      values = kgValues;
+      values = kgValues.map((kg) => round1(kg));
       break;
     case 'meals':
-      values = kgValues.map((kg) => Math.round(kg / MEAL_WEIGHT_KG));
+      // Keep fractional meals so small daily kg values are still visible on the chart.
+      // (Math.round(kg / 0.42) often collapses sparse days to 0 → flat line.)
+      values = kgValues.map((kg) => (kg > 0 ? round1(kg / MEAL_WEIGHT_KG) : 0));
       break;
     case 'co2':
       values = kgValues.map((kg) => round1(kg * CO2_PER_KG));
       break;
-    case 'collections':
-      values =
-        totalKg > 0
-          ? kgValues.map((kg) => Math.round((kg / totalKg) * totalCollections))
-          : kgValues.map(() => 0);
+    case 'collections': {
+      if (totalKg <= 0 || totalCollections <= 0) {
+        values = kgValues.map(() => 0);
+        break;
+      }
+      // Keep proportional floats so low-volume days don’t all round to 0.
+      values = kgValues.map((kg) => round1((kg / totalKg) * totalCollections));
       break;
+    }
     default:
       values = kgValues;
   }
 
+  // Normalize any NaN/negative leftovers from bad payloads.
+  values = values.map((value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  });
+
+  // react-native-chart-kit needs >= 2 points; duplicate instead of padding with 0
+  // (padding with 0 was forcing a flat drop to the baseline).
   if (values.length === 1) {
-    return { labels: [...labels, ''], values: [...values, 0] };
+    return {
+      labels: [labels[0], labels[0]],
+      values: [values[0], values[0]],
+    };
   }
 
-  return {
-    labels,
-    values: values.map((value) => Math.max(0, value)),
-  };
+  return { labels, values };
+}
+
+/** LineChart crashes the Y scale when all points are equal — add a silent 0 baseline. */
+export function toLineChartDatasets(values: number[]): Array<{
+  data: number[];
+  withDots?: boolean;
+  strokeWidth?: number;
+  color?: (opacity?: number) => string;
+}> {
+  const data = values.length > 0 ? values : [0];
+  const datasets: Array<{
+    data: number[];
+    withDots?: boolean;
+    strokeWidth?: number;
+    color?: (opacity?: number) => string;
+  }> = [{ data }];
+
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  if (max > 0 && max === min) {
+    datasets.push({
+      data: data.map(() => 0),
+      withDots: false,
+      strokeWidth: 0,
+      color: () => 'transparent',
+    });
+  }
+
+  return datasets;
 }

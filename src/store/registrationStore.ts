@@ -37,7 +37,7 @@ const DEFAULT_CHARITY_FORM: CharityForm = {
   branding: '',
   logo: '',
   postcodes: '',
-  pickupRadius: '',
+  pickupRadius: '50',
   region: '',
   latitude: '',
   longitude: '',

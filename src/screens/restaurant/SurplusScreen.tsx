@@ -28,7 +28,7 @@ const surplusCards = [
 		titleColor: palette.kale,
 		summary: 'Suitable for charity donation &\ncommunity redistribution',
 		description:
-			'Food that is safe for human consumption and within a suitable use-by date',
+			'Edible food that is safe for human consumption and within a suitable use-by date',
 		borderColor: palette.kale,
 		backgroundColor: '#EEF0E6',
 		buttonColor: palette.kale,
@@ -59,7 +59,7 @@ export function SurplusScreen({ navigation }: any) {
 	};
 
 	return (
-		<Screen scrollable backgroundColor={palette.creme} contentStyle={styles.screenContent}>
+		<Screen scrollable backgroundColor={palette.creme} contentStyle={styles.screenContent} transparentTop>
 			<ImageBackground
 				source={require('../../../assets/placeholder/kale-headera.png')}
 				resizeMode="cover"
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
 		paddingBottom: hp(2.4),
 	},
 	header: {
-		height: hp(13.5),
+		height: hp(16),
 		justifyContent: 'flex-end',
 		paddingBottom: hp(1.9),
 		paddingHorizontal: wp(4),
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
 	backButton: {
 		position: 'absolute',
 		left: wp(4),
-		top: hp(2.2),
+		top: hp(4.2),
 		width: wp(10),
 		height: wp(10),
 		alignItems: 'center',

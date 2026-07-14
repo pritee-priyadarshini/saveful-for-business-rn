@@ -1,98 +1,90 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { ImpactPeriod, SiteImpactResponse } from '../services/impact.service';
 import { useAuthStore } from '../store/authStore';
+import { ChartPeriod, useImpactStore } from '../store/impactStore';
 import {
   ChartMetricKey,
   EMPTY_IMPACT_STATS,
   buildChartSeries,
-  fetchAggregatedSiteImpact,
   mapImpactToDisplayStats,
 } from '../utils/impactData';
-import { AccessibleSite, resolveAccessibleSites } from '../utils/impactSites';
-import { getUserFriendlyErrorMessage } from '../utils/apiError';
 
 type UseImpactAnalyticsOptions = {
   siteId?: number | null;
-  chartPeriod?: Exclude<ImpactPeriod, 'lifetime'>;
+  chartPeriod?: ChartPeriod;
 };
 
 export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
   const { siteId = null, chartPeriod = 'week' } = options;
   const authUser = useAuthStore((state) => state.authUser);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [sites, setSites] = useState<AccessibleSite[]>([]);
-  const [monthImpact, setMonthImpact] = useState<SiteImpactResponse | null>(null);
-  const [lifetimeImpact, setLifetimeImpact] = useState<SiteImpactResponse | null>(null);
-  const [periodImpact, setPeriodImpact] = useState<SiteImpactResponse | null>(null);
-
-  const load = useCallback(async () => {
-    if (!authUser?.accessToken) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const accessibleSites =
-        siteId != null ? [{ id: siteId, name: '' }] : await resolveAccessibleSites(authUser);
-      setSites(accessibleSites);
-
-      const siteIds = accessibleSites.map((site) => site.id);
-      if (siteIds.length === 0) {
-        setMonthImpact(null);
-        setLifetimeImpact(null);
-        setPeriodImpact(null);
-        return;
-      }
-
-      const [month, lifetime, period] = await Promise.all([
-        fetchAggregatedSiteImpact(siteIds, 'month'),
-        fetchAggregatedSiteImpact(siteIds, 'lifetime'),
-        fetchAggregatedSiteImpact(siteIds, chartPeriod),
-      ]);
-
-      setMonthImpact(month);
-      setLifetimeImpact(lifetime);
-      setPeriodImpact(period);
-    } catch (err: unknown) {
-      setError(getUserFriendlyErrorMessage(err, 'Failed to load impact data'));
-    } finally {
-      setLoading(false);
-    }
-  }, [authUser, siteId, chartPeriod]);
+  const expectedScope = siteId != null ? `site:${siteId}` : 'org';
+  const scopeKey = useImpactStore((state) => state.scopeKey);
+  const cache = useImpactStore((state) =>
+    state.scopeKey === expectedScope ? state.cache : null,
+  );
+  const isInitialLoading = useImpactStore((state) => state.isInitialLoading);
+  const isChartLoading = useImpactStore((state) => state.isChartLoading);
+  const error = useImpactStore((state) => state.error);
+  const ensureBase = useImpactStore((state) => state.ensureBase);
+  const ensureChart = useImpactStore((state) => state.ensureChart);
+  const reloadStore = useImpactStore((state) => state.reload);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!authUser?.accessToken) return;
+    void ensureBase(siteId);
+  }, [authUser?.accessToken, siteId, ensureBase]);
+
+  useEffect(() => {
+    if (!authUser?.accessToken) return;
+    void ensureChart(chartPeriod, siteId);
+  }, [authUser?.accessToken, siteId, chartPeriod, ensureChart]);
 
   const monthStats = useMemo(
-    () => mapImpactToDisplayStats(monthImpact),
-    [monthImpact],
+    () => mapImpactToDisplayStats(cache?.monthImpact ?? null),
+    [cache?.monthImpact],
   );
   const lifetimeStats = useMemo(
-    () => mapImpactToDisplayStats(lifetimeImpact),
-    [lifetimeImpact],
+    () => mapImpactToDisplayStats(cache?.lifetimeImpact ?? null),
+    [cache?.lifetimeImpact],
   );
 
+  const periodImpact = cache?.chartByPeriod[chartPeriod] ?? null;
+  const lastPeriodImpactRef = useRef<SiteImpactResponse | null>(null);
+  if (periodImpact) {
+    lastPeriodImpactRef.current = periodImpact;
+  }
+
+  // Keep the last chart visible while a new period is fetching for the first time.
+  const displayPeriodImpact =
+    periodImpact ?? (isChartLoading ? lastPeriodImpactRef.current : null);
+
   const getChartSeries = useCallback(
-    (metric: ChartMetricKey) => buildChartSeries(periodImpact, metric),
-    [periodImpact],
+    (metric: ChartMetricKey) => buildChartSeries(displayPeriodImpact, metric),
+    [displayPeriodImpact],
   );
+
+  const reload = useCallback(
+    (period?: Exclude<ImpactPeriod, 'lifetime'>) => reloadStore(siteId, period ?? chartPeriod),
+    [reloadStore, siteId, chartPeriod],
+  );
+
+  // Full-page loader only before we have any base stats for this scope.
+  const loading =
+    (!!authUser?.accessToken && isInitialLoading && !cache?.baseFetchedAt) ||
+    (!!authUser?.accessToken && scopeKey !== expectedScope && !cache?.baseFetchedAt);
 
   return {
     loading,
+    chartLoading: isChartLoading,
     error,
-    reload: load,
-    sites,
-    isMultiSite: sites.length > 1,
+    reload,
+    sites: cache?.sites ?? [],
+    isMultiSite: (cache?.sites?.length ?? 0) > 1,
     monthStats,
     lifetimeStats,
-    periodImpact,
+    periodImpact: displayPeriodImpact,
     getChartSeries,
     hasData:
       monthStats.redistributedKg > 0 ||

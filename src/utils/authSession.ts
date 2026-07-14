@@ -97,6 +97,9 @@ export function resolveProfileDisplayAddress(profile: {
   return site?.address || resolveOrganisationAddress(profile?.organisation);
 }
 
+/** Confirmed default pickup radius for charity / collector orgs. */
+export const DEFAULT_PICKUP_RADIUS_KM = 50;
+
 export function resolveProfilePickupRadiusKm(profile: {
   sites?: Array<{ pickupRadiusKm?: number; radiusKm?: number }>;
   organisation?: { pickupRadiusKm?: number };
@@ -107,5 +110,12 @@ export function resolveProfilePickupRadiusKm(profile: {
     site?.radiusKm ??
     profile?.organisation?.pickupRadiusKm;
 
-  return value != null ? String(value) : '';
+  const numeric = value == null || value === '' ? NaN : Number(value);
+
+  // Fall back to 50 when missing/invalid, or when the old signup default (5) was stored.
+  if (!Number.isFinite(numeric) || numeric <= 0 || numeric === 5) {
+    return String(DEFAULT_PICKUP_RADIUS_KM);
+  }
+
+  return String(numeric);
 }

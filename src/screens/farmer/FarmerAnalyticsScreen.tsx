@@ -21,6 +21,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
+import { toLineChartDatasets } from '@/utils/impactData';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { palette } from '../../theme/colors';
@@ -307,7 +308,7 @@ export function FarmerAnalyticsScreen() {
               key={`${range}-${selectedMetric}`}
               data={{
                 labels: chartSeries.labels,
-                datasets: [{ data: chartSeries.values }],
+                datasets: toLineChartDatasets(chartSeries.values),
               }}
               width={chartWidth + wp(5)}
               height={hp(26)}

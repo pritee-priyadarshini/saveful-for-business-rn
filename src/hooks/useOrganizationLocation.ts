@@ -4,6 +4,9 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { useAppContext } from '../store/AppContext';
 import { useAuthStore } from '../store/authStore';
+import { useCharityStore } from '../store/charityStore';
+import { organizationService } from '../services/organization.service';
+import { sitesService } from '../services/sites.service';
 import {
   getLocationDebugInfo,
   normalizeAuthProfile,
@@ -12,10 +15,28 @@ import {
 import { fetchCurrentLocation } from '../utils/currentLocation';
 import { showErrorAlert } from '../utils/apiError';
 
+function resolvePrimarySiteId(profile: any): number | null {
+  const sites = Array.isArray(profile?.sites)
+    ? profile.sites
+    : profile?.site
+      ? [profile.site]
+      : [];
+  const id = sites[0]?.id ?? sites[0]?.siteId ?? sites[0]?.locationId;
+  const parsed = Number(id);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function isCharityLike(authUser: any): boolean {
+  const orgType = String(
+    authUser?.orgType ?? normalizeAuthProfile(authUser)?.organisation?.organizationType ?? '',
+  ).toUpperCase();
+  return orgType.startsWith('CHARITY') || orgType === 'FARMER' || orgType === 'FARMER_CONSUMER';
+}
+
 export function useOrganizationLocation() {
   const { authUser } = useAppContext();
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
-  const updateCoordinates = useAuthStore((s) => s.updateCoordinates);
+  const updateLocation = useCharityStore((s) => s.updateLocation);
   const [bannerClosed, setBannerClosed] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -78,7 +99,29 @@ export function useOrganizationLocation() {
 
     try {
       setSaving(true);
-      await updateCoordinates(organizationId, latitude, longitude);
+
+      const siteId = resolvePrimarySiteId(profile);
+      if (siteId) {
+        if (isCharityLike(authUser)) {
+          await updateLocation(siteId, {
+            address: address?.trim() || undefined,
+            latitude,
+            longitude,
+          });
+        } else {
+          await sitesService.updateSite(siteId, {
+            address: address?.trim() || undefined,
+            latitude,
+            longitude,
+          });
+        }
+      }
+
+      await organizationService.updateCoordinates(organizationId, {
+        latitude,
+        longitude,
+      });
+      await refreshProfile();
 
       if (address) setCapturedAddress(address);
       setBannerClosed(true);

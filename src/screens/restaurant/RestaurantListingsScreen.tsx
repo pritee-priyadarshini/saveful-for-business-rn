@@ -551,11 +551,15 @@ export function RestaurantListingsScreen({ navigation }: any) {
           {active && (
             <View style={styles.actionRow}>
               <Pressable
-                style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+                style={[
+                  styles.actionBtn,
+                  styles.actionBtnOutlined,
+                  { borderColor: theme.accent },
+                ]}
                 onPress={() => navigation.navigate('EditListing', { listingId: Number(item.id) })}
               >
-                <Ionicons name="create-outline" size={normalize(15)} color={palette.white} />
-                <AppText variant="bodyBold" style={styles.actionBtnText}>
+                <Ionicons name="create-outline" size={normalize(15)} color={theme.accent} />
+                <AppText variant="bodyBold" style={[styles.actionBtnText, { color: theme.accent }]}>
                   Edit
                 </AppText>
               </Pressable>
@@ -563,14 +567,15 @@ export function RestaurantListingsScreen({ navigation }: any) {
               <Pressable
                 style={[
                   styles.actionBtn,
-                  styles.cancelBtn,
+                  styles.actionBtnOutlined,
+                  styles.cancelBtnOutlined,
                   cancellingId !== null && { opacity: 0.6 },
                 ]}
                 disabled={cancellingId !== null}
                 onPress={() => handleCancelListing(item.id)}
               >
-                <Ionicons name="close-circle-outline" size={normalize(15)} color={palette.white} />
-                <AppText variant="bodyBold" style={styles.actionBtnText}>
+                <Ionicons name="close-circle-outline" size={normalize(15)} color={palette.danger} />
+                <AppText variant="bodyBold" style={[styles.actionBtnText, styles.cancelBtnText]}>
                   {cancellingId === item.id ? 'Cancelling…' : 'Cancel'}
                 </AppText>
               </Pressable>
@@ -1345,14 +1350,22 @@ const styles = StyleSheet.create({
     borderRadius: normalize(12),
   },
 
-  cancelBtn: {
-    backgroundColor: palette.danger,
+  actionBtnOutlined: {
+    backgroundColor: palette.white,
+    borderWidth: normalize(1.5),
+  },
+
+  cancelBtnOutlined: {
+    borderColor: palette.danger,
   },
 
   actionBtnText: {
-    color: palette.white,
     textTransform: 'none',
     fontSize: normalize(15),
+  },
+
+  cancelBtnText: {
+    color: palette.danger,
   },
 
   emptyWrap: {
