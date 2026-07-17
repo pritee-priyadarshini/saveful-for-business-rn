@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,7 @@ import {
   Image,
   ImageBackground,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -127,6 +128,18 @@ export function RestaurantHomeScreen({ navigation }: any) {
     }, [fetchBusinessImpact]),
   );
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchBusinessImpact(true);
+    } catch (e) {
+      showErrorAlert(e, 'Could not load dashboard', 'Could not load dashboard data');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchBusinessImpact]);
+
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
       <Skeleton width="100%" height={hp(18)} borderRadius={0} />
@@ -160,6 +173,14 @@ export function RestaurantHomeScreen({ navigation }: any) {
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
       >
         {showBanner && (
           <LocationRequiredBanner
@@ -180,7 +201,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
           </View>
         )}
 
-        {loadingImpact ? (
+        {loadingImpact && !refreshing ? (
           renderSkeleton()
         ) : (
           <>

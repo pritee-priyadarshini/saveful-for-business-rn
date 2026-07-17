@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 import { Screen } from '../../components/Screen';
@@ -32,6 +33,7 @@ export default function CharitySiteAnalyticsScreen() {
   const { locations, fetchLocations } = useCharityStore();
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     void fetchLocations();
@@ -53,10 +55,19 @@ export default function CharitySiteAnalyticsScreen() {
   }, [siteOptions, selectedSiteId]);
 
   const selectedSite = siteOptions.find((site) => site.id === selectedSiteId) ?? siteOptions[0];
-  const { loading, lifetimeStats } = useImpactAnalytics({
+  const { loading, lifetimeStats, reload } = useImpactAnalytics({
     siteId: selectedSite?.id ?? null,
     chartPeriod: 'month',
   });
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchLocations(true), reload()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchLocations, reload]);
 
   const foodReceivedKg = lifetimeStats.redistributedKg;
   const mealsCreated = lifetimeStats.mealsCreated;
@@ -70,6 +81,14 @@ export default function CharitySiteAnalyticsScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
       >
 
         {/* HEADER */}
@@ -124,7 +143,7 @@ export default function CharitySiteAnalyticsScreen() {
           </View>
         )}
 
-        {loading ? (
+        {loading && !refreshing ? (
           <View style={styles.loadingWrap}>
             <Skeleton width="100%" height={90} borderRadius={14} />
             <Skeleton width="100%" height={90} borderRadius={14} />

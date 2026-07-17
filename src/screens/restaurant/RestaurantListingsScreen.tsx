@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   Modal,
   Alert,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -234,22 +235,35 @@ export function RestaurantListingsScreen({ navigation }: any) {
     cancelListing: storeCancelListing,
   } = useListingsStore();
 
-  const [modalVisible, setModalVisible] = React.useState(false);
-  const [modalLoading, setModalLoading] = React.useState(false);
-  const [selectedItems, setSelectedItems] = React.useState<any[]>([]);
-  const [selectedListingStatus, setSelectedListingStatus] = React.useState<ListingStatus>('ACTIVE');
-  const [cancellingId, setCancellingId] = React.useState<number | null>(null);
-  const [listingFilter, setListingFilter] = React.useState<ListingFilter>('all');
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('active');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [selectedListingStatus, setSelectedListingStatus] = useState<ListingStatus>('ACTIVE');
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [listingFilter, setListingFilter] = useState<ListingFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (!authUser?.accessToken) return;
       fetchSiteListings(true).catch((e) =>
         showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
       );
     }, [authUser?.accessToken, fetchSiteListings]),
   );
+
+  const onRefresh = useCallback(async () => {
+    if (!authUser?.accessToken) return;
+    setRefreshing(true);
+    try {
+      await fetchSiteListings(true);
+    } catch (e) {
+      showErrorAlert(e, 'Could not load listings', 'Could not load listings');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [authUser?.accessToken, fetchSiteListings]);
 
   const peopleCount = useMemo(
     () => listings.filter((l) => isPeopleListing(l)).length,
@@ -632,8 +646,16 @@ export function RestaurantListingsScreen({ navigation }: any) {
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
       >
-        {loading ? (
+        {loading && !refreshing ? (
           renderSkeleton()
         ) : (
           <>

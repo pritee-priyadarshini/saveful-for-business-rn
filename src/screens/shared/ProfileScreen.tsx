@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { pickSquareImage } from '@/utils/pickSquareImage';
@@ -91,12 +92,24 @@ export function ProfileScreen() {
   );
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       refreshProfile().catch(() => undefined);
     }, [refreshProfile]),
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshProfile();
+    } catch {
+      // Silent — profile may still show cached data.
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshProfile]);
 
   useEffect(() => {
     const remoteLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
@@ -450,7 +463,18 @@ export function ProfileScreen() {
         }
       />
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
+      >
 
         <View style={styles.header}>
           <Image

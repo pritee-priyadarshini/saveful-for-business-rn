@@ -11,6 +11,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -90,11 +91,23 @@ export default function CharityManageAccessScreen() {
   } = useCharityStore();
   const { submitting, withLock } = useSubmitLock();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     Promise.all([fetchUsers(true), fetchLocations(true)]).catch((e) =>
       showErrorAlert(e, 'Could not load team', 'Could not load team members'),
     );
+  }, [fetchUsers, fetchLocations]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchUsers(true), fetchLocations(true)]);
+    } catch (e) {
+      showErrorAlert(e, 'Could not load team', 'Could not load team members');
+    } finally {
+      setRefreshing(false);
+    }
   }, [fetchUsers, fetchLocations]);
 
   useEffect(() => {
@@ -357,6 +370,14 @@ export default function CharityManageAccessScreen() {
               },
             ]}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[palette.primary]}
+                tintColor={palette.primary}
+              />
+            }
           >
             <ImageBackground
               source={require('../../../assets/placeholder/kale-header.png')}

@@ -819,7 +819,7 @@ export function CharityMapScreen({ navigation }: any) {
             <AppText variant="bodySmall">Check again later for new listings near you</AppText>
           </View>
         }
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[palette.primary]} tintColor={palette.primary} />}
         showsVerticalScrollIndicator={false}
       />
     </Screen>

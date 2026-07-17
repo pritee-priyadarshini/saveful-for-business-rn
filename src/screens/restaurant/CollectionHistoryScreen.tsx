@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,6 +11,7 @@ import {
   ViewStyle,
   TextStyle,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -164,6 +165,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [yearDropdownAnchor, setYearDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const [monthDropdownAnchor, setMonthDropdownAnchor] = useState<DropdownAnchor | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const yearDropdownRef = useRef<View>(null);
   const monthDropdownRef = useRef<View>(null);
 
@@ -172,6 +174,17 @@ export default function CollectionHistoryScreen({ navigation }: any) {
       showErrorAlert(e, 'Could not load history', 'Could not load collection history'),
     );
   }, [authUser?.profile?.organisation?.id]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchOrgListings(true);
+    } catch (e) {
+      showErrorAlert(e, 'Could not load history', 'Could not load collection history');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchOrgListings]);
 
   const months = getMonthsForYear(selectedYear);
 
@@ -661,7 +674,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     </View>
   );
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <Screen backgroundColor={palette.creme} scrollable={false}>
         <FlatList
@@ -674,6 +687,14 @@ export default function CollectionHistoryScreen({ navigation }: any) {
             </>
           }
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[palette.primary]}
+              tintColor={palette.primary}
+            />
+          }
         />
       </Screen>
     );
@@ -687,6 +708,14 @@ export default function CollectionHistoryScreen({ navigation }: any) {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         onScrollBeginDrag={closeDropdowns}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
         ListHeaderComponent={
           <>
             {renderScreenHeader()}

@@ -9,6 +9,7 @@ import {
   Platform,
   useWindowDimensions,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
@@ -116,6 +117,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
 
   const [range, setRange] = React.useState<TimeRange>('month');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('foodRedistributed');
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const {
     loading,
@@ -124,7 +126,17 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
     lifetimeStats,
     getChartSeries,
     isMultiSite,
+    reload,
   } = useImpactAnalytics({ chartPeriod: range });
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reload]);
 
   const chartSeries = getChartSeries(METRIC_TO_CHART[selectedMetric]);
   const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
@@ -317,11 +329,21 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
     );
   };
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
-        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}>
+        <ScrollView
+          contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[palette.primary]}
+              tintColor={palette.primary}
+            />
+          }
+        >
           <Skeleton width="100%" height={hp(20)} borderRadius={0} />
           <View style={{ padding: wp(5), gap: hp(1.5) }}>
             <Skeleton width="100%" height={normalize(52)} borderRadius={normalize(14)} />
@@ -339,6 +361,14 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
       >
         <HeroHeader
           source={require('../../../assets/placeholder/kale-header.png')}

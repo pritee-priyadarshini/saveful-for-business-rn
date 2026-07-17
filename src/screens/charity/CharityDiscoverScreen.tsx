@@ -375,7 +375,7 @@ export function CharityDiscoverScreen() {
               <AppText variant="bodySmall">There are currently no food listings near you</AppText>
             </View>
           )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[palette.primary]} tintColor={palette.primary} />}
         />
       ) : (
         <FlatList
@@ -388,7 +388,7 @@ export function CharityDiscoverScreen() {
             </>
           )}
           keyExtractor={(item) => item.key}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[palette.primary]} tintColor={palette.primary} />}
         />
       )}
     </Screen>

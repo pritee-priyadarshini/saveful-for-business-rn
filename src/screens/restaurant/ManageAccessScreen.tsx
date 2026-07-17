@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -11,6 +11,7 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +42,7 @@ export default function ManageAccessScreen() {
   const insets = useSafeAreaInsets();
   const safeBottomPadding = useSafeBottomPadding(hp(4));
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const {
     firstSiteId: storeSiteId,
     maxUsersPerSite: maxUsers,
@@ -165,6 +167,20 @@ export default function ManageAccessScreen() {
     fetchStaff(siteId, true).catch(() => undefined);
   }, [siteId, fetchStaff]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchFirstSiteTeam(true);
+      if (siteId) {
+        await fetchStaff(siteId, true);
+      }
+    } catch (e) {
+      showErrorAlert(e, 'Could not load team', 'Could not load team members');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchFirstSiteTeam, fetchStaff, siteId]);
+
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -191,6 +207,14 @@ export default function ManageAccessScreen() {
               { paddingBottom: safeBottomPadding + (keyboardVisible ? hp(3) : 0) },
             ]}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[palette.primary]}
+                tintColor={palette.primary}
+              />
+            }
           >
 
         {/* HEADER */}
