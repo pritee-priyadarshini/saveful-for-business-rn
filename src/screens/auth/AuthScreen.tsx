@@ -40,6 +40,7 @@ import { REGION_OPTIONS, getRegionLabel, appendSignupRegionAndCoordinates, isSel
 import type { Region } from '@/types';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize, wp } from '@/utils/responsive';
+import { DEFAULT_PICKUP_RADIUS_KM } from '@/utils/authSession';
 
 const { height } = Dimensions.get('window');
 
@@ -621,6 +622,8 @@ export function AuthScreen() {
           } as any);
         }
 
+        form.append('pickupRadiusKm', String(DEFAULT_PICKUP_RADIUS_KM));
+
         await authService.registerFarmerConsumer(form);
 
       } else {
@@ -636,7 +639,7 @@ export function AuthScreen() {
         form.append('brandName', charityForm.branding);
         form.append('charityType', mapRole(selectedRole));
         form.append('pickupPostCode', charityForm.postcodes.trim());
-        form.append('pickupRadiusKm', String(Number(charityForm.pickupRadius) || 50));
+        form.append('pickupRadiusKm', String(DEFAULT_PICKUP_RADIUS_KM));
         appendSignupRegionAndCoordinates(
           form,
           charityForm.region,
@@ -816,13 +819,6 @@ export function AuthScreen() {
 
     if (isRestaurant && !restaurantForm.venueType.trim()) {
       return 'Please select a venue type.';
-    }
-
-    if (!isRestaurant && !isFarmer) {
-      const radius = charityForm.pickupRadius.trim();
-      if (radius && (Number.isNaN(Number(radius)) || Number(radius) <= 0)) {
-        return 'Please enter a valid pickup radius in km.';
-      }
     }
 
     return null;
@@ -1369,27 +1365,36 @@ export function AuthScreen() {
 
           {currentStep === 3 && (
             <View style={styles.formCard}>
-              {(isRestaurant || isFarmer) ? (
+              {(isRestaurant || isFarmerProducer) ? (
                 <VenueTypeSelector
-                  label={isFarmer ? 'Please select Venue Type (optional)' : 'Please select Venue Type'}
-                  value={isFarmer ? farmerForm.venueType : restaurantForm.venueType}
-                  options={isFarmer ? farmerVenueOptions : venueOptions}
-                  optional={isFarmer}
+                  label={isFarmerProducer ? 'Please select Venue Type (optional)' : 'Please select Venue Type'}
+                  value={isFarmerProducer ? farmerForm.venueType : restaurantForm.venueType}
+                  options={isFarmerProducer ? farmerVenueOptions : venueOptions}
+                  optional={isFarmerProducer}
                   onChange={(v) =>
-                    isFarmer
+                    isFarmerProducer
                       ? updateFarmerField('venueType', v)
                       : updateRestaurantField('venueType', v)
                   }
                 />
               ) : (
                 <InputField
-                  label="Pickup Radius in Km (can change it later)"
-                  placeholder="50"
+                  label="Pickup Radius (km)"
                   {...inputProps}
-                  value={charityForm.pickupRadius}
-                  onChangeText={(v) => updateCharityField('pickupRadius', v)}
+                  value={String(DEFAULT_PICKUP_RADIUS_KM)}
+                  editable={false}
                 />
               )}
+
+              {isFarmerConsumer ? (
+                <VenueTypeSelector
+                  label="Please select Venue Type (optional)"
+                  value={farmerForm.venueType}
+                  options={farmerVenueOptions}
+                  optional
+                  onChange={(v) => updateFarmerField('venueType', v)}
+                />
+              ) : null}
 
               <RegionSelector
                 value={getCurrentRegion()}

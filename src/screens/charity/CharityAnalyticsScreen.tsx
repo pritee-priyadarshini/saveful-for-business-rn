@@ -189,7 +189,7 @@ export function CharityAnalyticsScreen() {
 
   if (loading && !refreshing) {
     return (
-      <Screen backgroundColor={palette.creme}>
+      <Screen backgroundColor={palette.creme} scrollable={false}>
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
@@ -214,10 +214,12 @@ export function CharityAnalyticsScreen() {
   }
 
   return (
-    <Screen backgroundColor={palette.creme} transparentTop={true}>
+    <Screen backgroundColor={palette.creme} transparentTop={true} scrollable={false}>
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
+        bounces
+        alwaysBounceVertical
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -394,6 +396,7 @@ const chartConfig = {
 
 const styles = StyleSheet.create({
   container: {
+    flexGrow: 1,
     gap: hp(2),
   },
   heroContainer: {

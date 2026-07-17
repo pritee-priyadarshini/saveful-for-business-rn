@@ -40,7 +40,7 @@ import { organizationService } from '@/services/organization.service';
 import { sitesService } from '@/services/sites.service';
 import {
   resolveProfileDisplayAddress,
-  resolveProfilePickupRadiusKm,
+  DEFAULT_PICKUP_RADIUS_KM,
 } from '@/utils/authSession';
 import {
   normalizeAuthProfile,
@@ -70,7 +70,7 @@ function buildProfileForm(authUser: ReturnType<typeof useAuthStore.getState>['au
     registration: org?.registrationNumber || '',
     venueType: org?.venueType || '',
     branding: org?.brandName || '',
-    radius: resolveProfilePickupRadiusKm(authUser?.profile),
+    radius: String(DEFAULT_PICKUP_RADIUS_KM),
     latitude: coords?.lat ?? null,
     longitude: coords?.lng ?? null,
   };
@@ -276,28 +276,6 @@ export function ProfileScreen() {
     });
   };
 
-  const handleUpdatePickup = async () => {
-    if (submitting || !isCharity) return;
-    await withLock(async () => {
-      try {
-        const siteId = authUser?.profile?.sites?.[0]?.id;
-        if (!siteId) {
-          Alert.alert('Error', 'Location not found');
-          return;
-        }
-
-        await updateLocation(siteId, {
-          pickupRadiusKm: formData.radius ? Number(formData.radius) : undefined,
-        });
-
-        await refreshProfile();
-        showSuccessAlert('Pickup preferences updated');
-      } catch (err) {
-        showErrorAlert(err, 'Could not update pickup radius', 'Failed to update');
-      }
-    });
-  };
-
   const handleUpdateExtra = async () => {
     if (submitting) return;
     await withLock(async () => {
@@ -423,13 +401,17 @@ export function ProfileScreen() {
         { label: 'Logo', value: 'Upload Logo', editable: true, isUpload: true },
       ],
     },
-    ...(isCharity
+    ...(isCollector
       ? [
         {
           key: 'pickup',
           title: 'Pickup Preferences',
           fields: [
-            { label: 'Radius (km)', value: formData.radius || '—', editable: true },
+            {
+              label: 'Radius (km)',
+              value: String(DEFAULT_PICKUP_RADIUS_KM),
+              editable: false,
+            },
           ],
         },
       ]
@@ -729,17 +711,15 @@ export function ProfileScreen() {
                   {section.key === 'pickup' && (
                     <InputField
                       label="Radius (km)"
-                      value={formData.radius}
-                      onChangeText={(v) => updateField('radius', v)}
+                      value={String(DEFAULT_PICKUP_RADIUS_KM)}
+                      editable={false}
                     />
                   )}
 
                   {/* SAVE BUTTON */}
-                  {((section.key === 'personal' ||
-                    section.key === 'business' ||
-                    section.key === 'extra') &&
-                    true) ||
-                    (section.key === 'pickup' && isCharity) ? (
+                  {section.key === 'personal' ||
+                  section.key === 'business' ||
+                  section.key === 'extra' ? (
                     <Pressable
                       style={[styles.saveBtn, submitting && { opacity: 0.65 }]}
                       disabled={submitting}
@@ -750,10 +730,6 @@ export function ProfileScreen() {
 
                         if (section.key === 'business') {
                           handleUpdateBusiness();
-                        }
-
-                        if (section.key === 'pickup') {
-                          handleUpdatePickup();
                         }
 
                         if (section.key === 'extra') {
