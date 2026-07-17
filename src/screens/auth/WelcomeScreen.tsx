@@ -17,15 +17,15 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 const valueProps = [
   {
     image: require('../../../assets/intro/welcome_reduce_waste.png'),
-    label: 'SAVE FOOD',
+    label: 'SAVE \n FOOD',
   },
   {
     image: require('../../../assets/intro/welcome_feed_communities.png'),
-    label: 'FEED COMMUNITIES',
+    label: 'FEED \n COMMUNITIES',
   },
   {
     image: require('../../../assets/intro/welcome_connect_locally.png'),
-    label: 'CONNECT LOCALLY',
+    label: 'CONNECT \n LOCALLY',
   },
 ];
 

@@ -10,6 +10,7 @@ import { palette } from './src/theme/colors';
 import { useFonts } from 'expo-font';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { SplashScreen } from './src/screens/SplashScreen';
+import { CircularImageCropHost } from './src/components/CircularImageCropModal';
 
 export default function App() {
   const [splashTimerDone, setSplashTimerDone] = useState(false);
@@ -48,6 +49,7 @@ export default function App() {
         <AppProvider>
           <StatusBar style="dark" backgroundColor={palette.background} />
           <AppNavigator />
+          <CircularImageCropHost />
         </AppProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
