@@ -23,7 +23,10 @@ import { Skeleton } from '../../components/Skeleton';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
+import { ImpactDateFilter } from '@/components/ImpactDateFilter';
+import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import { useAppContext } from '../../store/AppContext';
+import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
 
@@ -115,24 +118,27 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
   const { width } = useWindowDimensions();
   const { currentProfile } = useAppContext();
 
+  const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
   const [range, setRange] = React.useState<TimeRange>('month');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('foodRedistributed');
   const [refreshing, setRefreshing] = React.useState(false);
+  const [foodsRefreshNonce, setFoodsRefreshNonce] = React.useState(0);
 
   const {
     loading,
     chartLoading,
-    monthStats,
-    lifetimeStats,
+    stats,
     getChartSeries,
     isMultiSite,
     reload,
-  } = useImpactAnalytics({ chartPeriod: range });
+    filterLabel,
+  } = useImpactAnalytics({ filter, chartPeriod: range });
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
       await reload();
+      setFoodsRefreshNonce((n) => n + 1);
     } finally {
       setRefreshing(false);
     }
@@ -412,7 +418,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
               <Ionicons name="leaf-outline" size={normalize(14)} color={palette.white} />
               <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
                 {isMultiSite ? 'All sites · ' : ''}
-                {formatNumber(monthStats.mealsCreated)} meals · {formatNumber(monthStats.redistributedKg)} kg this month
+                {formatNumber(stats.mealsCreated)} meals · {formatNumber(stats.redistributedKg)} kg · {filterLabel}
               </AppText>
             </View>
           </View>
@@ -436,7 +442,12 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             </View>
           </Pressable>
 
-          {renderImpactMetricsSection('This month', monthStats)}
+          <ImpactDateFilter filter={filter} onChange={setFilter} />
+
+          {renderImpactMetricsSection(
+            filter.mode === 'all_time' ? 'All-time impact' : `Impact · ${filterLabel}`,
+            stats,
+          )}
 
           <View style={styles.chartCard}>
             <AppText variant="bodyBold" style={styles.sectionTitle}>
@@ -491,7 +502,12 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
             </View>
           </View>
 
-          {renderImpactMetricsSection('Lifetime impact', lifetimeStats)}
+          <SpecificFoodSavings
+            filter={filter}
+            peoplePercent={stats.peoplePercent}
+            animalPercent={stats.animalPercent}
+            refreshNonce={foodsRefreshNonce}
+          />
         </View>
       </ScrollView>
     </Screen>
@@ -950,6 +966,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: hp(24),
     justifyContent: 'center',
+  },
+
+  chartEmpty: {
+    width: '100%',
+    minHeight: hp(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(4),
+  },
+
+  chartEmptyText: {
+    color: palette.midgray,
+    textAlign: 'center',
+    textTransform: 'none',
   },
 
   chartLoadingOverlay: {

@@ -755,7 +755,7 @@ export function ProfileScreen() {
           {isRestaurant && (
             <Pressable
               style={styles.linkRow}
-              onPress={() => navigation.navigate('RestaurantPlan')}
+              onPress={() => navigation.navigate('SingleSitePlans')}
             >
               <AppText variant='body'>Plans</AppText>
               <Ionicons name="chevron-forward" size={18} />

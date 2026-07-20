@@ -1,22 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { ImpactPeriod, SiteImpactResponse } from '../services/impact.service';
+import { SiteImpactResponse } from '../services/impact.service';
 import { useAuthStore } from '../store/authStore';
-import { ChartPeriod, useImpactStore } from '../store/impactStore';
+import {
+  ChartPeriod,
+  ImpactFilter,
+  filterCacheKey,
+  useImpactStore,
+} from '../store/impactStore';
 import {
   ChartMetricKey,
   EMPTY_IMPACT_STATS,
   buildChartSeries,
   mapImpactToDisplayStats,
 } from '../utils/impactData';
+import { formatDisplayDate } from '../components/ImpactDateFilter';
 
 type UseImpactAnalyticsOptions = {
   siteId?: number | null;
+  /** Controls the stats cards (All time / custom From–To). */
+  filter?: ImpactFilter;
+  /** Controls the line chart Week / Month / Year / All time chips. */
   chartPeriod?: ChartPeriod;
 };
 
 export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
-  const { siteId = null, chartPeriod = 'week' } = options;
+  const {
+    siteId = null,
+    filter = { mode: 'all_time' as const },
+    chartPeriod = 'week',
+  } = options;
   const authUser = useAuthStore((state) => state.authUser);
 
   const expectedScope = siteId != null ? `site:${siteId}` : 'org';
@@ -24,30 +37,47 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
   const cache = useImpactStore((state) =>
     state.scopeKey === expectedScope ? state.cache : null,
   );
-  const isInitialLoading = useImpactStore((state) => state.isInitialLoading);
+  const isStatsLoading = useImpactStore((state) => state.isStatsLoading);
   const isChartLoading = useImpactStore((state) => state.isChartLoading);
   const error = useImpactStore((state) => state.error);
-  const ensureBase = useImpactStore((state) => state.ensureBase);
+  const ensureStats = useImpactStore((state) => state.ensureStats);
   const ensureChart = useImpactStore((state) => state.ensureChart);
   const reloadStore = useImpactStore((state) => state.reload);
 
+  const filterKey = filterCacheKey(filter);
+  const canFetchStats =
+    filter.mode === 'all_time' ||
+    (Boolean(filter.startDate) && Boolean(filter.endDate));
+
   useEffect(() => {
-    if (!authUser?.accessToken) return;
-    void ensureBase(siteId);
-  }, [authUser?.accessToken, siteId, ensureBase]);
+    if (!authUser?.accessToken || !canFetchStats) return;
+    void ensureStats(filter, siteId);
+  }, [
+    authUser?.accessToken,
+    siteId,
+    filter.mode,
+    filter.startDate,
+    filter.endDate,
+    canFetchStats,
+    ensureStats,
+  ]);
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
     void ensureChart(chartPeriod, siteId);
   }, [authUser?.accessToken, siteId, chartPeriod, ensureChart]);
 
-  const monthStats = useMemo(
-    () => mapImpactToDisplayStats(cache?.monthImpact ?? null),
-    [cache?.monthImpact],
-  );
-  const lifetimeStats = useMemo(
-    () => mapImpactToDisplayStats(cache?.lifetimeImpact ?? null),
-    [cache?.lifetimeImpact],
+  const statsImpact = cache?.statsByFilter[filterKey] ?? null;
+  const lastStatsRef = useRef<SiteImpactResponse | null>(null);
+  if (statsImpact) {
+    lastStatsRef.current = statsImpact;
+  }
+  const displayStatsImpact =
+    statsImpact ?? (isStatsLoading ? lastStatsRef.current : null);
+
+  const stats = useMemo(
+    () => mapImpactToDisplayStats(displayStatsImpact),
+    [displayStatsImpact],
   );
 
   const periodImpact = cache?.chartByPeriod[chartPeriod] ?? null;
@@ -55,8 +85,6 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
   if (periodImpact) {
     lastPeriodImpactRef.current = periodImpact;
   }
-
-  // Keep the last chart visible while a new period is fetching for the first time.
   const displayPeriodImpact =
     periodImpact ?? (isChartLoading ? lastPeriodImpactRef.current : null);
 
@@ -66,14 +94,15 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
   );
 
   const reload = useCallback(
-    (period?: Exclude<ImpactPeriod, 'lifetime'>) => reloadStore(siteId, period ?? chartPeriod),
-    [reloadStore, siteId, chartPeriod],
+    () => reloadStore(filter, chartPeriod, siteId),
+    [reloadStore, filter, chartPeriod, siteId],
   );
 
-  // Full-page loader only before we have any base stats for this scope.
   const loading =
-    (!!authUser?.accessToken && isInitialLoading && !cache?.baseFetchedAt) ||
-    (!!authUser?.accessToken && scopeKey !== expectedScope && !cache?.baseFetchedAt);
+    !!authUser?.accessToken &&
+    isStatsLoading &&
+    !displayStatsImpact &&
+    (scopeKey !== expectedScope || !cache?.statsByFilter[filterKey]);
 
   return {
     loading,
@@ -82,14 +111,18 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
     reload,
     sites: cache?.sites ?? [],
     isMultiSite: (cache?.sites?.length ?? 0) > 1,
-    monthStats,
-    lifetimeStats,
+    stats,
+    /** @deprecated use stats */
+    monthStats: stats,
+    /** @deprecated use stats */
+    lifetimeStats: stats,
     periodImpact: displayPeriodImpact,
     getChartSeries,
-    hasData:
-      monthStats.redistributedKg > 0 ||
-      monthStats.collectionsCompleted > 0 ||
-      lifetimeStats.redistributedKg > 0,
+    hasData: stats.redistributedKg > 0 || stats.collectionsCompleted > 0,
     emptyStats: EMPTY_IMPACT_STATS,
+    filterLabel:
+      filter.mode === 'all_time'
+        ? 'All time'
+        : `${formatDisplayDate(filter.startDate)} → ${formatDisplayDate(filter.endDate)}`,
   };
 }

@@ -10,7 +10,8 @@ import { CharityHistoryScreen } from '../screens/charity/CharityHistoryScreen';
 import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
 
 import { palette } from '../theme/colors';
-import { RestaurantPlansScreen } from '@/screens/restaurant/RestaurantPlansScreen';
+import { SingleSitePlansScreen } from '@/screens/subscription/SingleSitePlansScreen';
+import { SingleSiteCompareScreen } from '@/screens/subscription/SingleSiteCompareScreen';
 import ManageAccessScreen from '@/screens/restaurant/ManageAccessScreen';
 import ManageSitesScreen from '@/screens/restaurant/ManageSitesScreen';
 import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
@@ -39,6 +40,8 @@ export type RootStackParamList = {
   FarmerHistory: undefined;
   CharityPostCollectSurvey: undefined;
   RestaurantPlan: undefined;
+  SingleSitePlans: undefined;
+  SingleSiteCompare: { selectedPlanId?: 'single' | 'single_plus' } | undefined;
   //ManageAccess: undefined;
   ManageSites: undefined;
   //CreateSite: undefined;
@@ -196,7 +199,9 @@ export function AppNavigator() {
           {/* GLOBAL */}
           <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />
           <RootStack.Screen name="FarmerHistory" component={FarmerHistoryScreen} />
-          <RootStack.Screen name="RestaurantPlan" component={RestaurantPlansScreen} />
+          <RootStack.Screen name="SingleSitePlans" component={SingleSitePlansScreen} />
+          <RootStack.Screen name="SingleSiteCompare" component={SingleSiteCompareScreen} />
+          <RootStack.Screen name="RestaurantPlan" component={SingleSitePlansScreen} />
           <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
           <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
           <RootStack.Screen name="SiteAnalytics" component={SiteAnalyticsScreen} />

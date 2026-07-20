@@ -57,7 +57,7 @@ export default function CharitySiteAnalyticsScreen() {
   const selectedSite = siteOptions.find((site) => site.id === selectedSiteId) ?? siteOptions[0];
   const { loading, lifetimeStats, reload } = useImpactAnalytics({
     siteId: selectedSite?.id ?? null,
-    chartPeriod: 'month',
+    filter: { mode: 'all_time' },
   });
 
   const onRefresh = useCallback(async () => {

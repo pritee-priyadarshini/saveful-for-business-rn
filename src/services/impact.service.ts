@@ -1,6 +1,6 @@
 import api from './api';
 
-export type ImpactPeriod = 'week' | 'month' | 'year' | 'lifetime';
+export type ImpactPeriod = 'week' | 'month' | 'year' | 'lifetime' | 'range';
 
 export type ImpactTotals = {
   redistributedKg: number;
@@ -33,10 +33,64 @@ export type SiteImpactResponse = {
   chart: ImpactChartPoint[];
 };
 
+export type ImpactDateRange = {
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+};
+
+export type TopFoodItem = {
+  rank: number;
+  foodName: string;
+  unit: string;
+  category: string | null;
+  totalKg: number;
+  co2AvoidedKg: number;
+  mealsCreated: number;
+  totalFoodSavedUsd: number;
+};
+
+export type TopFoodsResponse = {
+  siteId: number | null;
+  organisationId: number | null;
+  rangeStart: string | null;
+  rangeEnd: string;
+  topFoods: TopFoodItem[];
+};
+
 export const impactService = {
-  getSiteImpact(siteId: number, period: ImpactPeriod = 'week') {
+  getSiteImpact(siteId: number, period: Exclude<ImpactPeriod, 'range'> = 'week') {
     return api.get<SiteImpactResponse>(`/impact/sites/${siteId}`, {
       params: { period },
+    });
+  },
+
+  /** Custom range — backend: GET /impact/sites/:siteId/range */
+  getSiteImpactByRange(siteId: number, range: ImpactDateRange) {
+    return api.get<SiteImpactResponse>(`/impact/sites/${siteId}/range`, {
+      params: {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      },
+    });
+  },
+
+  /** Top foods for an organisation — GET /impact/organisations/:orgId/top-foods */
+  getOrgTopFoods(orgId: number, range?: Partial<ImpactDateRange>) {
+    return api.get<TopFoodsResponse>(`/impact/organisations/${orgId}/top-foods`, {
+      params: {
+        startDate: range?.startDate,
+        endDate: range?.endDate,
+      },
+    });
+  },
+
+  /** Top foods for a site — GET /impact/sites/:siteId/top-foods */
+  getSiteTopFoods(siteId: number, range?: Partial<ImpactDateRange>) {
+    return api.get<TopFoodsResponse>(`/impact/sites/${siteId}/top-foods`, {
+      params: {
+        startDate: range?.startDate,
+        endDate: range?.endDate,
+      },
     });
   },
 };

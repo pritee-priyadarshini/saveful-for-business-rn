@@ -28,6 +28,7 @@ coverage/
 /svforb/.temp
 /svforb/.tmp
 /svforb/.DS_Store
+.idea/
 
 ./svforb/.env
 .svforb/.env

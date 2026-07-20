@@ -1,12 +1,24 @@
 import { create } from 'zustand';
 
 import { ImpactPeriod, SiteImpactResponse } from '../services/impact.service';
-import { fetchAggregatedSiteImpact } from '../utils/impactData';
+import {
+  fetchAggregatedSiteImpact,
+  fetchAggregatedSiteImpactByRange,
+} from '../utils/impactData';
 import { AccessibleSite, resolveAccessibleSites } from '../utils/impactSites';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
 import { useAuthStore } from './authStore';
 
-export type ChartPeriod = Exclude<ImpactPeriod, 'lifetime'>;
+/** Chart time chips — week / month / year only. */
+export type ChartPeriod = Exclude<ImpactPeriod, 'lifetime' | 'range'>;
+
+export type ImpactFilterMode = 'all_time' | 'custom';
+
+export type ImpactFilter = {
+  mode: ImpactFilterMode;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+};
 
 const STALE_TIME_MS = 10 * 60 * 1000;
 
@@ -18,43 +30,58 @@ function scopeKeyFor(siteId: number | null): string {
   return siteId != null ? `site:${siteId}` : 'org';
 }
 
+export function filterCacheKey(filter: ImpactFilter): string {
+  if (filter.mode === 'all_time') return 'all_time';
+  return `custom:${filter.startDate ?? ''}:${filter.endDate ?? ''}`;
+}
+
 type ScopeCache = {
   sites: AccessibleSite[];
-  monthImpact: SiteImpactResponse | null;
-  lifetimeImpact: SiteImpactResponse | null;
+  statsByFilter: Record<string, SiteImpactResponse | null>;
+  statsFetchedAt: Record<string, number>;
   chartByPeriod: Partial<Record<ChartPeriod, SiteImpactResponse | null>>;
-  baseFetchedAt: number | null;
   chartFetchedAt: Partial<Record<ChartPeriod, number>>;
 };
 
 interface ImpactAnalyticsState {
   scopeKey: string | null;
   cache: ScopeCache | null;
-  isInitialLoading: boolean;
+  isStatsLoading: boolean;
   isChartLoading: boolean;
   error: string | null;
-  ensureBase: (siteId?: number | null, force?: boolean) => Promise<void>;
-  ensureChart: (period: ChartPeriod, siteId?: number | null, force?: boolean) => Promise<void>;
-  reload: (siteId?: number | null, period?: ChartPeriod) => Promise<void>;
+  ensureStats: (
+    filter: ImpactFilter,
+    siteId?: number | null,
+    force?: boolean,
+  ) => Promise<void>;
+  ensureChart: (
+    period: ChartPeriod,
+    siteId?: number | null,
+    force?: boolean,
+  ) => Promise<void>;
+  reload: (
+    filter: ImpactFilter,
+    period: ChartPeriod,
+    siteId?: number | null,
+  ) => Promise<void>;
   reset: () => void;
 }
 
 const EMPTY_CACHE = (): ScopeCache => ({
   sites: [],
-  monthImpact: null,
-  lifetimeImpact: null,
+  statsByFilter: {},
+  statsFetchedAt: {},
   chartByPeriod: {},
-  baseFetchedAt: null,
   chartFetchedAt: {},
 });
 
 const INITIAL: Pick<
   ImpactAnalyticsState,
-  'scopeKey' | 'cache' | 'isInitialLoading' | 'isChartLoading' | 'error'
+  'scopeKey' | 'cache' | 'isStatsLoading' | 'isChartLoading' | 'error'
 > = {
   scopeKey: null,
   cache: null,
-  isInitialLoading: false,
+  isStatsLoading: false,
   isChartLoading: false,
   error: null,
 };
@@ -71,70 +98,139 @@ async function resolveSiteIds(
   return { sites, siteIds: sites.map((site) => site.id) };
 }
 
+async function ensureSites(
+  get: () => ImpactAnalyticsState,
+  set: (
+    partial:
+      | Partial<ImpactAnalyticsState>
+      | ((state: ImpactAnalyticsState) => Partial<ImpactAnalyticsState>),
+  ) => void,
+  siteId: number | null,
+  forceResolve: boolean,
+): Promise<{ sites: AccessibleSite[]; siteIds: number[] } | null> {
+  const { authUser } = useAuthStore.getState();
+  if (!authUser?.accessToken) {
+    set({ cache: null, scopeKey: null, isStatsLoading: false, isChartLoading: false });
+    return null;
+  }
+
+  const nextScope = scopeKeyFor(siteId);
+  const { scopeKey, cache } = get();
+  const scoped = scopeKey === nextScope ? cache : null;
+
+  if (!forceResolve && scoped && scoped.sites.length > 0) {
+    if (scopeKey !== nextScope) {
+      set({ scopeKey: nextScope, cache: scoped });
+    }
+    return {
+      sites: scoped.sites,
+      siteIds: scoped.sites.map((site) => site.id),
+    };
+  }
+
+  const resolved = await resolveSiteIds(siteId, authUser);
+  const prev = get().scopeKey === nextScope ? get().cache : null;
+  set({
+    scopeKey: nextScope,
+    cache: {
+      ...(prev ?? EMPTY_CACHE()),
+      sites: resolved.sites,
+    },
+  });
+  return resolved;
+}
+
 export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
   ...INITIAL,
 
-  ensureBase: async (siteId = null, force = false) => {
+  ensureStats: async (filter, siteId = null, force = false) => {
     const { authUser } = useAuthStore.getState();
     if (!authUser?.accessToken) {
-      set({ isInitialLoading: false, cache: null, scopeKey: null });
+      set({ isStatsLoading: false, cache: null, scopeKey: null });
+      return;
+    }
+
+    if (filter.mode === 'custom' && (!filter.startDate || !filter.endDate)) {
       return;
     }
 
     const nextScope = scopeKeyFor(siteId);
+    const key = filterCacheKey(filter);
     const { scopeKey, cache } = get();
     const scoped = scopeKey === nextScope ? cache : null;
-    const hasBase = !!scoped?.baseFetchedAt;
 
-    if (!force && scoped && !isStale(scoped.baseFetchedAt)) {
+    if (
+      !force &&
+      scoped &&
+      scoped.statsByFilter[key] !== undefined &&
+      !isStale(scoped.statsFetchedAt[key])
+    ) {
       if (scopeKey !== nextScope) {
         set({ scopeKey: nextScope, cache: scoped });
       }
       return;
     }
 
-    // Only block the whole page on the first load for this scope.
+    const hadStats = !!scoped && Object.keys(scoped.statsByFilter).length > 0;
     set({
       scopeKey: nextScope,
-      isInitialLoading: !hasBase,
+      isStatsLoading: !hadStats,
       error: null,
     });
 
     try {
-      const { sites, siteIds } = await resolveSiteIds(siteId, authUser);
+      const resolved = await ensureSites(get, set, siteId, scopeKey !== nextScope);
+      if (!resolved) return;
+
+      const { sites, siteIds } = resolved;
       if (siteIds.length === 0) {
+        const prev = get().scopeKey === nextScope ? get().cache : null;
         set({
           cache: {
-            ...EMPTY_CACHE(),
+            ...(prev ?? EMPTY_CACHE()),
             sites,
-            baseFetchedAt: Date.now(),
+            statsByFilter: {
+              ...(prev?.statsByFilter ?? {}),
+              [key]: null,
+            },
+            statsFetchedAt: {
+              ...(prev?.statsFetchedAt ?? {}),
+              [key]: Date.now(),
+            },
           },
-          isInitialLoading: false,
+          isStatsLoading: false,
         });
         return;
       }
 
-      const [monthImpact, lifetimeImpact] = await Promise.all([
-        fetchAggregatedSiteImpact(siteIds, 'month'),
-        fetchAggregatedSiteImpact(siteIds, 'lifetime'),
-      ]);
+      const impact =
+        filter.mode === 'all_time'
+          ? await fetchAggregatedSiteImpact(siteIds, 'lifetime')
+          : await fetchAggregatedSiteImpactByRange(siteIds, {
+              startDate: filter.startDate!,
+              endDate: filter.endDate!,
+            });
 
       const prev = get().scopeKey === nextScope ? get().cache : null;
       set({
         cache: {
+          ...(prev ?? EMPTY_CACHE()),
           sites,
-          monthImpact,
-          lifetimeImpact,
-          chartByPeriod: prev?.chartByPeriod ?? {},
-          baseFetchedAt: Date.now(),
-          chartFetchedAt: prev?.chartFetchedAt ?? {},
+          statsByFilter: {
+            ...(prev?.statsByFilter ?? {}),
+            [key]: impact,
+          },
+          statsFetchedAt: {
+            ...(prev?.statsFetchedAt ?? {}),
+            [key]: Date.now(),
+          },
         },
-        isInitialLoading: false,
+        isStatsLoading: false,
       });
     } catch (error: unknown) {
       set({
         error: getUserFriendlyErrorMessage(error, 'Failed to load impact data'),
-        isInitialLoading: false,
+        isStatsLoading: false,
       });
     }
   },
@@ -146,9 +242,8 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
     const nextScope = scopeKeyFor(siteId);
     let { scopeKey, cache } = get();
 
-    // Base data must exist first (or share sites from a parallel ensureBase).
-    if (scopeKey !== nextScope || !cache?.baseFetchedAt) {
-      await get().ensureBase(siteId, force);
+    if (scopeKey !== nextScope || !cache || cache.sites.length === 0) {
+      await ensureSites(get, set, siteId, true);
       scopeKey = get().scopeKey;
       cache = get().cache;
     }
@@ -173,7 +268,6 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
       return;
     }
 
-    // Keep showing the previous chart while the next period loads.
     set({ isChartLoading: cachedPeriod === undefined, error: null });
 
     try {
@@ -197,9 +291,11 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
     }
   },
 
-  reload: async (siteId = null, period = 'month') => {
-    await get().ensureBase(siteId, true);
-    await get().ensureChart(period, siteId, true);
+  reload: async (filter, period, siteId = null) => {
+    await Promise.all([
+      get().ensureStats(filter, siteId, true),
+      get().ensureChart(period, siteId, true),
+    ]);
   },
 
   reset: () => set({ ...INITIAL }),

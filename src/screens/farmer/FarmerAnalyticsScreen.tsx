@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
@@ -20,6 +19,9 @@ import type { RootStackParamList } from '../../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
+import { ImpactDateFilter } from '@/components/ImpactDateFilter';
+import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
+import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
@@ -88,21 +90,21 @@ export function FarmerAnalyticsScreen() {
   const { currentProfile } = useAppContext();
   const bottomPadding = useBottomTabPadding(hp(2));
 
+  const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('feedCollected');
 
   const {
     loading,
-    monthStats,
-    lifetimeStats,
+    chartLoading,
+    stats,
     getChartSeries,
-    isMultiSite,
-  } = useImpactAnalytics({ chartPeriod: range });
+    filterLabel,
+  } = useImpactAnalytics({ filter, chartPeriod: range });
 
   const chartSeries = getChartSeries(METRIC_TO_CHART[selectedMetric]);
   const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
-  const monthDisplay = toFarmerStats(monthStats);
-  const lifetimeDisplay = toFarmerStats(lifetimeStats);
+  const displayStats = toFarmerStats(stats);
 
   const organization = currentProfile.organization || 'Your farm';
   const address = currentProfile.address || '';
@@ -254,7 +256,11 @@ export function FarmerAnalyticsScreen() {
         </Pressable>
 
         <View style={styles.topSection}>
-          {renderImpactMetricsSection('This month', monthDisplay)}
+          <ImpactDateFilter filter={filter} onChange={setFilter} />
+          {renderImpactMetricsSection(
+            filter.mode === 'all_time' ? 'All-time impact' : `Impact · ${filterLabel}`,
+            displayStats,
+          )}
         </View>
 
         <View style={styles.impactOverTimeSection}>
@@ -322,13 +328,24 @@ export function FarmerAnalyticsScreen() {
               withOuterLines={false}
               withVerticalLines
               withHorizontalLines
-              style={styles.chart}
+              style={[styles.chart, chartLoading && styles.chartDimmed]}
             />
+            {chartLoading ? (
+              <View style={styles.chartLoadingOverlay}>
+                <AppText variant="caption" style={styles.chartEmptyText}>
+                  Updating…
+                </AppText>
+              </View>
+            ) : null}
           </View>
         </View>
 
         <View style={styles.lifetimeSection}>
-          {renderImpactMetricsSection('Lifetime impact', lifetimeDisplay)}
+          <SpecificFoodSavings
+            filter={filter}
+            peoplePercent={stats.peoplePercent}
+            animalPercent={stats.animalPercent}
+          />
         </View>
       </ScrollView>
     </Screen>
@@ -598,6 +615,29 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: hp(0.5),
     paddingHorizontal: wp(2),
+    minHeight: hp(22),
+    justifyContent: 'center',
+  },
+  chartEmpty: {
+    width: '100%',
+    minHeight: hp(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(4),
+  },
+  chartEmptyText: {
+    color: palette.midgray,
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  chartLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  chartDimmed: {
+    opacity: 0.55,
   },
   chart: {
     borderRadius: normalize(12),

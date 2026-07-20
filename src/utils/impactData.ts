@@ -140,13 +140,29 @@ export function aggregateSiteImpacts(
 
 export async function fetchAggregatedSiteImpact(
   siteIds: number[],
-  period: ImpactPeriod,
+  period: Exclude<ImpactPeriod, 'range'>,
 ): Promise<SiteImpactResponse | null> {
   if (siteIds.length === 0) return null;
 
   const responses = await Promise.all(
     siteIds.map(async (siteId) => {
       const res = await impactService.getSiteImpact(siteId, period);
+      return res.data;
+    }),
+  );
+
+  return aggregateSiteImpacts(responses);
+}
+
+export async function fetchAggregatedSiteImpactByRange(
+  siteIds: number[],
+  range: { startDate: string; endDate: string },
+): Promise<SiteImpactResponse | null> {
+  if (siteIds.length === 0) return null;
+
+  const responses = await Promise.all(
+    siteIds.map(async (siteId) => {
+      const res = await impactService.getSiteImpactByRange(siteId, range);
       return res.data;
     }),
   );
