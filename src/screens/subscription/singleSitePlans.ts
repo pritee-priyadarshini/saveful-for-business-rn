@@ -107,6 +107,26 @@ export const SINGLE_SITE_COMPARE_UPGRADE_POINTS = [
   'Generate management & ESG reports in seconds',
 ];
 
+export type BillingCycle = 'monthly' | 'annual';
+
+export const CONFIRM_TRUST_POINTS = [
+  { key: 'trial', label: '30 Day Free Trial', icon: 'alarm-outline' as const },
+  { key: 'contract', label: 'No lock-in contracts', icon: 'document-text-outline' as const },
+  { key: 'cancel', label: 'Cancel Anytime', icon: 'time-outline' as const },
+];
+
+export function getPlanById(planId: SingleSitePlanId) {
+  return SINGLE_SITE_PLANS.find((plan) => plan.id === planId) ?? SINGLE_SITE_PLANS[1];
+}
+
 export function getContinueLabel(planId: SingleSitePlanId) {
   return planId === 'single_plus' ? 'Continue with Single Site +' : 'Continue with Single Site';
+}
+
+export function getBillingAmount(planId: SingleSitePlanId, cycle: BillingCycle) {
+  const plan = getPlanById(planId);
+  if (cycle === 'annual') {
+    return { amount: plan.annualPrice, suffix: '/year' };
+  }
+  return { amount: plan.monthlyPrice, suffix: '/month' };
 }

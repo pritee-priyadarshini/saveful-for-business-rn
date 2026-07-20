@@ -20,6 +20,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
+import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
@@ -91,16 +92,19 @@ export function FarmerAnalyticsScreen() {
   const bottomPadding = useBottomTabPadding(hp(2));
 
   const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
+  const [selectedSiteId, setSelectedSiteId] = React.useState<number | null>(null);
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('feedCollected');
 
   const {
     loading,
     chartLoading,
+    sitesLoading,
     stats,
     getChartSeries,
+    sites,
     filterLabel,
-  } = useImpactAnalytics({ filter, chartPeriod: range });
+  } = useImpactAnalytics({ filter, chartPeriod: range, siteId: selectedSiteId });
 
   const chartSeries = getChartSeries(METRIC_TO_CHART[selectedMetric]);
   const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
@@ -256,6 +260,14 @@ export function FarmerAnalyticsScreen() {
         </Pressable>
 
         <View style={styles.topSection}>
+          <View style={styles.siteSelectorSlot}>
+            <ImpactSiteSelector
+              sites={sites}
+              selectedSiteId={selectedSiteId}
+              onChange={setSelectedSiteId}
+              loading={sitesLoading}
+            />
+          </View>
           <ImpactDateFilter filter={filter} onChange={setFilter} />
           {renderImpactMetricsSection(
             filter.mode === 'all_time' ? 'All-time impact' : `Impact · ${filterLabel}`,
@@ -343,6 +355,7 @@ export function FarmerAnalyticsScreen() {
         <View style={styles.lifetimeSection}>
           <SpecificFoodSavings
             filter={filter}
+            siteId={selectedSiteId}
             peoplePercent={stats.peoplePercent}
             animalPercent={stats.animalPercent}
           />
@@ -462,6 +475,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     gap: hp(1.5),
     marginTop: -hp(1.5),
+  },
+  siteSelectorSlot: {
+    marginBottom: hp(0.5),
   },
   sectionTitle: {
     color: palette.black,

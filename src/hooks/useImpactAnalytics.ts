@@ -17,10 +17,9 @@ import {
 import { formatDisplayDate } from '../components/ImpactDateFilter';
 
 type UseImpactAnalyticsOptions = {
+  /** null = all accessible sites (aggregated). */
   siteId?: number | null;
-  /** Controls the stats cards (All time / custom From–To). */
   filter?: ImpactFilter;
-  /** Controls the line chart Week / Month / Year / All time chips. */
   chartPeriod?: ChartPeriod;
 };
 
@@ -37,9 +36,12 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
   const cache = useImpactStore((state) =>
     state.scopeKey === expectedScope ? state.cache : null,
   );
+  const availableSites = useImpactStore((state) => state.availableSites);
+  const sitesLoading = useImpactStore((state) => state.sitesLoading);
   const isStatsLoading = useImpactStore((state) => state.isStatsLoading);
   const isChartLoading = useImpactStore((state) => state.isChartLoading);
   const error = useImpactStore((state) => state.error);
+  const ensureAvailableSites = useImpactStore((state) => state.ensureAvailableSites);
   const ensureStats = useImpactStore((state) => state.ensureStats);
   const ensureChart = useImpactStore((state) => state.ensureChart);
   const reloadStore = useImpactStore((state) => state.reload);
@@ -48,6 +50,11 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
   const canFetchStats =
     filter.mode === 'all_time' ||
     (Boolean(filter.startDate) && Boolean(filter.endDate));
+
+  useEffect(() => {
+    if (!authUser?.accessToken) return;
+    void ensureAvailableSites();
+  }, [authUser?.accessToken, ensureAvailableSites]);
 
   useEffect(() => {
     if (!authUser?.accessToken || !canFetchStats) return;
@@ -89,14 +96,15 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
     periodImpact ?? (isChartLoading ? lastPeriodImpactRef.current : null);
 
   const getChartSeries = useCallback(
-    (metric: ChartMetricKey) => buildChartSeries(displayPeriodImpact, metric),
-    [displayPeriodImpact],
+    (metric: ChartMetricKey) =>
+      buildChartSeries(displayPeriodImpact, metric, chartPeriod),
+    [displayPeriodImpact, chartPeriod],
   );
 
-  const reload = useCallback(
-    () => reloadStore(filter, chartPeriod, siteId),
-    [reloadStore, filter, chartPeriod, siteId],
-  );
+  const reload = useCallback(async () => {
+    await ensureAvailableSites(true);
+    await reloadStore(filter, chartPeriod, siteId);
+  }, [ensureAvailableSites, reloadStore, filter, chartPeriod, siteId]);
 
   const loading =
     !!authUser?.accessToken &&
@@ -104,13 +112,22 @@ export function useImpactAnalytics(options: UseImpactAnalyticsOptions = {}) {
     !displayStatsImpact &&
     (scopeKey !== expectedScope || !cache?.statsByFilter[filterKey]);
 
+  const selectedSiteLabel =
+    siteId == null
+      ? availableSites.length > 1
+        ? 'All sites'
+        : availableSites[0]?.name ?? null
+      : availableSites.find((site) => site.id === siteId)?.name ?? `Site ${siteId}`;
+
   return {
     loading,
     chartLoading: isChartLoading,
+    sitesLoading,
     error,
     reload,
-    sites: cache?.sites ?? [],
-    isMultiSite: (cache?.sites?.length ?? 0) > 1,
+    sites: availableSites,
+    isMultiSite: availableSites.length > 1,
+    selectedSiteLabel,
     stats,
     /** @deprecated use stats */
     monthStats: stats,

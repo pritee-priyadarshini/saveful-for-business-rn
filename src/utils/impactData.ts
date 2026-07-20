@@ -44,8 +44,33 @@ export const EMPTY_IMPACT_STATS: ImpactDisplayStats = {
 
 export type ChartMetricKey = 'food' | 'meals' | 'co2' | 'collections';
 
+export type ChartPeriodKey = 'week' | 'month' | 'year';
+
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+const EMPTY_CHART_BY_PERIOD: Record<ChartPeriodKey, { labels: string[]; values: number[] }> = {
+  week: {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    values: [0, 0, 0, 0, 0, 0, 0],
+  },
+  month: {
+    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'],
+    values: [0, 0, 0, 0, 0],
+  },
+  year: {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    values: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+};
+
+export function emptyChartSeries(period: ChartPeriodKey = 'month') {
+  const empty = EMPTY_CHART_BY_PERIOD[period] ?? EMPTY_CHART_BY_PERIOD.month;
+  return {
+    labels: [...empty.labels],
+    values: [...empty.values],
+  };
 }
 
 function round2(value: number): number {
@@ -196,9 +221,10 @@ export function mapImpactToDisplayStats(
 export function buildChartSeries(
   impact: SiteImpactResponse | null,
   metric: ChartMetricKey,
+  period: ChartPeriodKey = 'month',
 ): { labels: string[]; values: number[] } {
   if (!impact?.chart?.length) {
-    return { labels: ['—'], values: [0] };
+    return emptyChartSeries(period);
   }
 
   const labels = impact.chart.map((point) => String(point.label ?? ''));
@@ -241,6 +267,15 @@ export function buildChartSeries(
     return Number.isFinite(n) && n > 0 ? n : 0;
   });
 
+  // All-zero series → keep labels but force a clear flat zero line (never blank).
+  if (values.every((v) => v === 0)) {
+    const empty = emptyChartSeries(period);
+    return {
+      labels: labels.length >= 2 ? labels : empty.labels,
+      values: labels.length >= 2 ? values : empty.values,
+    };
+  }
+
   // react-native-chart-kit needs >= 2 points; duplicate instead of padding with 0
   // (padding with 0 was forcing a flat drop to the baseline).
   if (values.length === 1) {
@@ -253,14 +288,18 @@ export function buildChartSeries(
   return { labels, values };
 }
 
-/** LineChart crashes the Y scale when all points are equal — add a silent 0 baseline. */
+/**
+ * LineChart Y-scale breaks when every point is equal.
+ * - Flat positive values → silent 0 baseline
+ * - Flat zeros → silent max=1 so the zero line sits on the axis (like Insights empty state)
+ */
 export function toLineChartDatasets(values: number[]): Array<{
   data: number[];
   withDots?: boolean;
   strokeWidth?: number;
   color?: (opacity?: number) => string;
 }> {
-  const data = values.length > 0 ? values : [0];
+  const data = values.length > 0 ? values : [0, 0];
   const datasets: Array<{
     data: number[];
     withDots?: boolean;
@@ -270,6 +309,17 @@ export function toLineChartDatasets(values: number[]): Array<{
 
   const max = Math.max(...data);
   const min = Math.min(...data);
+
+  if (max === 0 && min === 0) {
+    datasets.push({
+      data: data.map(() => 1),
+      withDots: false,
+      strokeWidth: 0,
+      color: () => 'transparent',
+    });
+    return datasets;
+  }
+
   if (max > 0 && max === min) {
     datasets.push({
       data: data.map(() => 0),

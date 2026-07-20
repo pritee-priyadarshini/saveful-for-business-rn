@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
@@ -21,11 +20,13 @@ import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { useBottomTabPadding, useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
+import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import { useAppContext } from '../../store/AppContext';
+import { useNavigation } from '@react-navigation/native';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
@@ -112,13 +113,25 @@ const chartConfig = {
   },
 };
 
-export function RestaurantAnalyticsScreen({ navigation }: any) {
+export function RestaurantAnalyticsScreen({
+  navigation,
+  variant = 'tab',
+}: {
+  navigation?: any;
+  /** `stack` = opened from Manage Sites (back overlay; same layout as Insights). */
+  variant?: 'tab' | 'stack';
+}) {
   useTransparentStatusBar('light');
-  const bottomPadding = useBottomTabPadding(hp(2));
+  const tabBottomPadding = useBottomTabPadding(hp(2));
+  const stackBottomPadding = useSafeBottomPadding(hp(4));
+  const bottomPadding = variant === 'stack' ? stackBottomPadding : tabBottomPadding;
   const { width } = useWindowDimensions();
   const { currentProfile } = useAppContext();
+  const stackNavigation = useNavigation();
 
   const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
+  /** null = All sites (client aggregates per-site impact). */
+  const [selectedSiteId, setSelectedSiteId] = React.useState<number | null>(null);
   const [range, setRange] = React.useState<TimeRange>('month');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('foodRedistributed');
   const [refreshing, setRefreshing] = React.useState(false);
@@ -127,12 +140,18 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
   const {
     loading,
     chartLoading,
+    sitesLoading,
     stats,
     getChartSeries,
-    isMultiSite,
+    sites,
+    selectedSiteLabel,
     reload,
     filterLabel,
-  } = useImpactAnalytics({ filter, chartPeriod: range });
+  } = useImpactAnalytics({
+    filter,
+    chartPeriod: range,
+    siteId: selectedSiteId,
+  });
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -378,10 +397,26 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
       >
         <HeroHeader
           source={require('../../../assets/placeholder/kale-header.png')}
-          height={hp(22)}
+          height={variant === 'stack' ? hp(24) : hp(22)}
         >
-       
-          <View style={styles.heroContent}>
+          <View
+            style={[
+              styles.heroContent,
+              variant === 'stack' && styles.heroContentWithBack,
+            ]}
+          >
+            {variant === 'stack' ? (
+              <Pressable
+                onPress={() => stackNavigation.goBack()}
+                style={({ pressed }) => [styles.heroBackBtnAbsolute, pressed && styles.pressed]}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+              >
+                <Ionicons name="arrow-back" size={normalize(22)} color={palette.white} />
+              </Pressable>
+            ) : null}
+
             <View style={styles.heroTopRow}>
               <View style={styles.heroTextBlock}>
                 <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
@@ -400,47 +435,49 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
               </View>
             </View>
 
-            {!!currentProfile.address && (
-              <View style={styles.heroLocationRow}>
-                <Ionicons name="location-outline" size={normalize(14)} color={palette.white} />
-                <AppText
-                  variant="caption"
-                  style={styles.heroLocationText}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {currentProfile.address}
-                </AppText>
-              </View>
-            )}
-
             <View style={styles.heroStatsPill}>
               <Ionicons name="leaf-outline" size={normalize(14)} color={palette.white} />
               <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
-                {isMultiSite ? 'All sites · ' : ''}
-                {formatNumber(stats.mealsCreated)} meals · {formatNumber(stats.redistributedKg)} kg · {filterLabel}
+                {selectedSiteLabel ? `${selectedSiteLabel} · ` : ''}
+                {formatNumber(stats.mealsCreated)} meals · {formatNumber(stats.redistributedKg)} kg ·{' '}
+                {filterLabel}
               </AppText>
             </View>
           </View>
         </HeroHeader>
 
         <View style={styles.mainContent}>
-          <Pressable
-            style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
-            onPress={() => navigation.navigate('Listings', { screen: 'CreateListing' })}
-          >
-            <View style={styles.createBtnLeft}>
-              <View style={styles.createBtnIconWrap}>
-                <Ionicons name="add" size={normalize(20)} color={palette.white} />
+          {variant !== 'stack' ? (
+            <Pressable
+              style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
+              onPress={() => {
+                navigation?.navigate('Listings', { screen: 'CreateListing' });
+              }}
+            >
+              <View style={styles.createBtnLeft}>
+                <View style={styles.createBtnIconWrap}>
+                  <Ionicons name="add" size={normalize(20)} color={palette.white} />
+                </View>
+                <AppText variant="bodyBold" style={styles.createBtnText}>
+                  Create new listing
+                </AppText>
               </View>
-              <AppText variant="bodyBold" style={styles.createBtnText}>
-                Create new listing
-              </AppText>
-            </View>
-            <View style={styles.createBtnArrow}>
-              <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
-            </View>
-          </Pressable>
+              <View style={styles.createBtnArrow}>
+                <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+              </View>
+            </Pressable>
+          ) : null}
+
+          <View style={styles.siteSelectorSlot}>
+            <ImpactSiteSelector
+              sites={sites}
+              selectedSiteId={selectedSiteId}
+              onChange={setSelectedSiteId}
+              loading={sitesLoading}
+              includeAllSites
+              label="Site"
+            />
+          </View>
 
           <ImpactDateFilter filter={filter} onChange={setFilter} />
 
@@ -468,7 +505,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
 
             <View style={styles.chartContainer}>
               <LineChart
-                key={`${range}-${selectedMetric}`}
+                key={`${range}-${selectedMetric}-${selectedSiteId ?? 'all'}`}
                 data={{
                   labels: chartSeries.labels,
                   datasets: toLineChartDatasets(chartSeries.values),
@@ -492,7 +529,10 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
                 withOuterLines={false}
                 withVerticalLines
                 withHorizontalLines
-                style={[styles.chart, chartLoading && styles.chartDimmed]}
+                style={StyleSheet.flatten([
+                  styles.chart,
+                  chartLoading && styles.chartDimmed,
+                ])}
               />
               {chartLoading ? (
                 <View style={styles.chartLoadingOverlay}>
@@ -504,6 +544,7 @@ export function RestaurantAnalyticsScreen({ navigation }: any) {
 
           <SpecificFoodSavings
             filter={filter}
+            siteId={selectedSiteId}
             peoplePercent={stats.peoplePercent}
             animalPercent={stats.animalPercent}
             refreshNonce={foodsRefreshNonce}
@@ -526,6 +567,23 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingBottom: hp(3),
     gap: hp(1.2),
+  },
+
+  heroContentWithBack: {
+    paddingTop: normalize(56),
+  },
+
+  heroBackBtnAbsolute: {
+    position: 'absolute',
+    top: hp(2.5),
+    left: wp(5),
+    zIndex: 5,
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)',
   },
 
   heroTopRow: {
@@ -561,22 +619,6 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     fontSize: normalize(15),
     lineHeight: normalize(22),
-  },
-
-  heroLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.5),
-    maxWidth: '100%',
-  },
-
-  heroLocationText: {
-    color: 'rgba(255,255,255,0.9)',
-    flex: 1,
-    minWidth: 0,
-    textTransform: 'none',
-    fontSize: normalize(12),
-    lineHeight: normalize(17),
   },
 
   heroIconCircle: {
@@ -621,6 +663,10 @@ const styles = StyleSheet.create({
     paddingTop: hp(2),
     gap: hp(2),
     paddingBottom: hp(1),
+  },
+
+  siteSelectorSlot: {
+    marginBottom: hp(0.5),
   },
 
   createBtn: {

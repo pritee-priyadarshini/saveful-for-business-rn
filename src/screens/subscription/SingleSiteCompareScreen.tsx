@@ -10,7 +10,6 @@ import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
-import { useAppContext } from '@/store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import {
@@ -24,7 +23,8 @@ import {
 } from './singleSitePlans';
 
 const ACCENT = palette.kale;
-const ACCENT_SOFT = `${palette.mint}66`;
+const ACCENT_SOFT = '#D8F0E0';
+const ACCENT_SOFT_ALT = '#E8F6EC';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'SingleSiteCompare'>;
 type Route = RouteProp<RootStackParamList, 'SingleSiteCompare'>;
@@ -34,7 +34,6 @@ export function SingleSiteCompareScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const insets = useSafeAreaInsets();
-  const { selectPlan } = useAppContext();
 
   const [selectedPlanId, setSelectedPlanId] = useState<SingleSitePlanId>(
     route.params?.selectedPlanId ?? 'single_plus',
@@ -43,8 +42,7 @@ export function SingleSiteCompareScreen() {
   const continueLabel = getContinueLabel(selectedPlanId);
 
   const onContinue = () => {
-    selectPlan(selectedPlanId);
-    navigation.pop(2);
+    navigation.navigate('SingleSiteConfirm', { selectedPlanId });
   };
 
   return (
@@ -80,7 +78,10 @@ export function SingleSiteCompareScreen() {
 
         <View style={styles.toggleWrap}>
           <Pressable
-            style={[styles.toggleBtn, selectedPlanId === 'single' && styles.toggleBtnActive]}
+            style={[
+              styles.toggleBtn,
+              selectedPlanId === 'single' ? styles.toggleBtnActive : styles.toggleBtnIdle,
+            ]}
             onPress={() => setSelectedPlanId('single')}
           >
             <AppText
@@ -91,7 +92,10 @@ export function SingleSiteCompareScreen() {
             </AppText>
           </Pressable>
           <Pressable
-            style={[styles.toggleBtn, selectedPlanId === 'single_plus' && styles.toggleBtnActive]}
+            style={[
+              styles.toggleBtn,
+              selectedPlanId === 'single_plus' ? styles.toggleBtnActive : styles.toggleBtnIdle,
+            ]}
             onPress={() => setSelectedPlanId('single_plus')}
           >
             <AppText
@@ -103,13 +107,14 @@ export function SingleSiteCompareScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.priceCard}>
-          <Ionicons name="storefront-outline" size={normalize(28)} color={ACCENT} />
-          <View style={styles.priceColumns}>
-            {SINGLE_SITE_PLANS.map((plan, index) => (
-              <React.Fragment key={plan.id}>
-                {index > 0 ? <View style={styles.priceDivider} /> : null}
-                <View style={styles.priceCol}>
+        <View style={styles.compareCard}>
+          <View style={styles.priceHeader}>
+            <View style={styles.storeIconWrap}>
+              <Ionicons name="storefront-outline" size={normalize(28)} color={ACCENT} />
+            </View>
+            <View style={styles.priceColumns}>
+              {SINGLE_SITE_PLANS.map((plan) => (
+                <View key={plan.id} style={styles.priceCol}>
                   <AppText color={ACCENT} style={styles.pricePlanName}>
                     {plan.name}
                   </AppText>
@@ -120,45 +125,43 @@ export function SingleSiteCompareScreen() {
                     </AppText>
                   </AppText>
                 </View>
-              </React.Fragment>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
 
-        {SINGLE_SITE_COMPARE_SECTIONS.map((section) => (
-          <View key={section.title} style={styles.section}>
-            <AppText color={palette.midgray} style={styles.sectionTitle}>
-              {section.title}
-            </AppText>
+          {SINGLE_SITE_COMPARE_SECTIONS.map((section) => (
+            <View key={section.title} style={styles.section}>
+              <AppText color={palette.midgray} style={styles.sectionTitle}>
+                {section.title}
+              </AppText>
 
-            {section.title === 'USERS' ? (
-              <View style={styles.usersHeaderRow}>
-                <View style={styles.usersSpacer} />
-                <View style={styles.usersBadgeCol}>
-                  <View style={styles.mostPopularBadge}>
-                    <AppText color={palette.white} style={styles.mostPopularText}>
-                      Most Popular
-                    </AppText>
+              {section.rows.map((row) => (
+                <View key={row.label} style={styles.featureRow}>
+                  <AppText color={palette.black} style={styles.featureLabel}>
+                    {row.label}
+                  </AppText>
+                  <View style={styles.featureValue}>
+                    <CompareValue value={row.single} />
+                  </View>
+                  <View style={styles.featureValue}>
+                    {row.label === 'Users included' ? (
+                      <View style={styles.plusUsersWrap}>
+                        <View style={styles.mostPopularBadge}>
+                          <AppText color={palette.white} style={styles.mostPopularText}>
+                            Most Popular
+                          </AppText>
+                        </View>
+                        <CompareValue value={row.plus} />
+                      </View>
+                    ) : (
+                      <CompareValue value={row.plus} />
+                    )}
                   </View>
                 </View>
-              </View>
-            ) : null}
-
-            {section.rows.map((row) => (
-              <View key={row.label} style={styles.featureRow}>
-                <AppText color={palette.black} style={styles.featureLabel}>
-                  {row.label}
-                </AppText>
-                <View style={styles.featureValue}>
-                  <CompareValue value={row.single} />
-                </View>
-                <View style={styles.featureValue}>
-                  <CompareValue value={row.plus} />
-                </View>
-              </View>
-            ))}
-          </View>
-        ))}
+              ))}
+            </View>
+          ))}
+        </View>
 
         <View style={styles.upgradeBox}>
           <AppText color={ACCENT} style={styles.upgradeTitle}>
@@ -177,7 +180,7 @@ export function SingleSiteCompareScreen() {
         </View>
 
         <Pressable
-          style={styles.continueBtn}
+          style={({ pressed }) => [styles.continueBtn, pressed && styles.pressed]}
           onPress={onContinue}
           accessibilityRole="button"
           accessibilityLabel={continueLabel}
@@ -214,7 +217,7 @@ function CompareValue({ value }: { value: CompareCell }) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: wp(5),
-    gap: hp(1.4),
+    gap: hp(1.35),
   },
   backBtn: {
     width: normalize(40),
@@ -236,22 +239,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'none',
     marginTop: -hp(0.3),
-    marginBottom: hp(0.4),
+    marginBottom: hp(0.2),
   },
   toggleWrap: {
     flexDirection: 'row',
     backgroundColor: ACCENT_SOFT,
-    borderRadius: normalize(12),
+    borderRadius: normalize(14),
     padding: normalize(4),
     gap: wp(1),
   },
   toggleBtn: {
     flex: 1,
-    minHeight: normalize(40),
-    borderRadius: normalize(10),
+    minHeight: normalize(42),
+    borderRadius: normalize(11),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: wp(2),
+  },
+  toggleBtnIdle: {
+    backgroundColor: 'transparent',
   },
   toggleBtnActive: {
     backgroundColor: ACCENT,
@@ -261,42 +267,49 @@ const styles = StyleSheet.create({
     fontSize: normalize(13),
     textTransform: 'none',
   },
-  priceCard: {
+  compareCard: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(16),
+    borderWidth: 1,
+    borderColor: `${palette.kale}33`,
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.4),
+    gap: hp(1.1),
+  },
+  priceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(3),
-    backgroundColor: palette.white,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: `${palette.kale}33`,
-    borderRadius: normalize(14),
-    paddingVertical: hp(1.4),
-    paddingHorizontal: wp(3.5),
+    gap: wp(2.5),
+    paddingBottom: hp(0.8),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: `${palette.kale}33`,
+  },
+  storeIconWrap: {
+    width: normalize(36),
+    alignItems: 'center',
   },
   priceColumns: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  priceDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: `${palette.kale}44`,
-    marginHorizontal: wp(2),
   },
   priceCol: {
     flex: 1,
-    gap: hp(0.25),
+    gap: hp(0.2),
+    alignItems: 'center',
   },
   pricePlanName: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(11),
     lineHeight: normalize(14),
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   priceAmount: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(15),
     lineHeight: normalize(18),
     textTransform: 'none',
+    textAlign: 'center',
   },
   priceUnit: {
     fontFamily: 'Saveful-Bold',
@@ -304,8 +317,7 @@ const styles = StyleSheet.create({
     textTransform: 'none',
   },
   section: {
-    gap: hp(0.7),
-    marginTop: hp(0.4),
+    gap: hp(0.55),
   },
   sectionTitle: {
     fontFamily: 'Saveful-Bold',
@@ -313,47 +325,41 @@ const styles = StyleSheet.create({
     lineHeight: normalize(15),
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-  },
-  usersHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: -hp(0.2),
-  },
-  usersSpacer: {
-    flex: 1.5,
-  },
-  usersBadgeCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  mostPopularBadge: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.35),
-    borderRadius: normalize(8),
-  },
-  mostPopularText: {
-    fontFamily: 'Saveful-Bold',
-    fontSize: normalize(10),
-    textTransform: 'none',
+    marginTop: hp(0.2),
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: hp(0.55),
+    paddingVertical: hp(0.5),
   },
   featureLabel: {
-    flex: 1.5,
+    flex: 1.45,
     fontFamily: 'Saveful-Regular',
     fontSize: normalize(13),
     lineHeight: normalize(17),
     textTransform: 'none',
-    paddingRight: wp(2),
+    paddingRight: wp(1.5),
   },
   featureValue: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: normalize(28),
+  },
+  plusUsersWrap: {
+    alignItems: 'center',
+    gap: hp(0.35),
+  },
+  mostPopularBadge: {
+    backgroundColor: ACCENT,
+    paddingHorizontal: wp(2.2),
+    paddingVertical: hp(0.28),
+    borderRadius: normalize(7),
+  },
+  mostPopularText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(9),
+    textTransform: 'none',
   },
   valueText: {
     fontFamily: 'Saveful-Bold',
@@ -367,12 +373,11 @@ const styles = StyleSheet.create({
     lineHeight: normalize(18),
   },
   upgradeBox: {
-    backgroundColor: ACCENT_SOFT,
+    backgroundColor: ACCENT_SOFT_ALT,
     borderRadius: normalize(16),
     paddingVertical: hp(1.6),
     paddingHorizontal: wp(4),
     gap: hp(0.9),
-    marginTop: hp(0.4),
   },
   upgradeTitle: {
     fontFamily: 'Saveful-Bold',
@@ -409,7 +414,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: hp(0.4),
+    marginTop: hp(0.2),
   },
   continueText: {
     fontFamily: 'Saveful-Bold',
@@ -417,5 +422,8 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     flex: 1,
     paddingRight: wp(2),
+  },
+  pressed: {
+    opacity: 0.88,
   },
 });

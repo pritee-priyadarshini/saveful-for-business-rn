@@ -1,12 +1,10 @@
 import api from './api';
 
+/** Matches CreateSiteDto in svforb — contact fields are set server-side. */
 export type CreateSitePayload = {
   siteName: string;
   address: string;
   postcode: string;
-  contactName: string;
-  contactEmail: string;
-  phoneNumber?: string;
   latitude: number;
   longitude: number;
 };
@@ -31,6 +29,9 @@ export type UpdateSitePayload = {
   address?: string;
   siteName?: string;
   postcode?: string;
+  contactName?: string;
+  contactEmail?: string;
+  phoneNumber?: string;
   latitude?: number;
   longitude?: number;
 };
@@ -66,5 +67,9 @@ export const sitesService = {
 
   updateSite(siteId: number | string, data: UpdateSitePayload) {
     return api.patch(`/sites/${siteId}`, data);
+  },
+
+  deleteSite(siteId: number | string) {
+    return api.delete(`/sites/${siteId}`);
   },
 };

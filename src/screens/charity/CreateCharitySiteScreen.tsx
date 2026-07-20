@@ -5,7 +5,6 @@ import {
     Pressable,
     StyleSheet,
     Alert,
-    ImageBackground,
     KeyboardAvoidingView,
     Platform,
     TouchableWithoutFeedback,
@@ -24,6 +23,7 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { OsmMapView } from '../../components/OsmMapView';
 import { PlacesSearchInput } from '../../components/PlacesSearchInput';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
 
 import { Ionicons } from '@expo/vector-icons';
 
@@ -36,6 +36,7 @@ import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLoca
 import { InputField } from '@/components/InputField';
 import { Skeleton } from '@/components/Skeleton';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -60,6 +61,7 @@ function validateManagerPassword(password: string, confirmPassword: string): str
 }
 
 export default function CreateCharitySiteScreen() {
+    useTransparentStatusBar('light');
     const navigation = useNavigation();
     const route = useRoute<any>();
     const isAssignMode = route.params?.mode === 'assign-manager';
@@ -489,7 +491,7 @@ export default function CreateCharitySiteScreen() {
             keyboardVerticalOffset={normalize(20)}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <Screen backgroundColor={palette.creme}>
+                <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
                     <Modal
                         visible={showPlacesSearch}
                         transparent
@@ -557,23 +559,15 @@ export default function CreateCharitySiteScreen() {
                         keyboardShouldPersistTaps="always"
                         contentContainerStyle={styles.scrollContent}
                     >
-                        <ImageBackground
-                            source={require('../../../assets/placeholder/kale-header.png')}
-                            style={styles.headerBg}
-                        >
-                            <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-                                <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
-                            </Pressable>
-
-                            <AppText variant="h5" style={styles.headerTitle}>
-                                {isAssignMode ? 'Assign Site Manager' : 'Add Charity Site'}
-                            </AppText>
-                            <AppText variant="bodySmall" style={styles.headerSubtitle}>
-                                {isAssignMode
+                        <StackHeroHeader
+                            title={isAssignMode ? 'Assign Site Manager' : 'Add Charity Site'}
+                            subtitle={
+                                isAssignMode
                                     ? 'Add a manager to an existing site'
-                                    : 'Set up the site, location, and manager in one step'}
-                            </AppText>
-                        </ImageBackground>
+                                    : 'Set up the site, location, and manager in one step'
+                            }
+                            height={hp(16)}
+                        />
 
                         {isAssignMode ? (
                             isFetchingLocations && !assignSite ? (
@@ -702,28 +696,6 @@ export default function CreateCharitySiteScreen() {
 const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: hp(14),
-    },
-    headerBg: {
-        height: hp(22),
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: wp(8),
-        marginBottom: hp(2),
-    },
-    backBtn: {
-        position: 'absolute',
-        left: wp(4),
-        top: hp(2.2),
-    },
-    headerTitle: {
-        color: palette.white,
-        textAlign: 'center',
-    },
-    headerSubtitle: {
-        color: palette.white,
-        opacity: 0.9,
-        textAlign: 'center',
-        marginTop: hp(0.8),
     },
     formCard: {
         marginHorizontal: wp(4),

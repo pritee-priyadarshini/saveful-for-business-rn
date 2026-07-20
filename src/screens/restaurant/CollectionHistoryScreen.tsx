@@ -5,7 +5,6 @@ import {
   FlatList,
   Pressable,
   Image,
-  ImageBackground,
   Modal,
   Dimensions,
   ViewStyle,
@@ -18,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
 import { estimateMealsSaved, getListingAudience, isAnimalListing, isListingCancelled, isListingCollected, isListingExpired, isPeopleListing } from '../../utils/foodListing';
 import { useAppContext } from '../../store/AppContext';
@@ -145,6 +146,7 @@ function getOrgName(listing: any) {
 }
 
 export default function CollectionHistoryScreen({ navigation }: any) {
+  useTransparentStatusBar('light');
   const { authUser } = useAppContext();
 
   const {
@@ -330,19 +332,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   );
 
   const renderScreenHeader = () => (
-    <ImageBackground
-      source={require('../../../assets/placeholder/kale-headera.png')}
-      resizeMode="cover"
-      style={styles.header}
-    >
-      <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={normalize(22)} color={palette.white} />
-      </Pressable>
-
-      <AppText variant="h4" style={styles.headerTitle}>
-        COLLECTION HISTORY
-      </AppText>
-    </ImageBackground>
+    <StackHeroHeader title="Collection History" height={hp(14)} />
   );
 
   const renderMetaBox = (
@@ -813,30 +803,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: hp(3),
     gap: hp(1),
-  },
-  header: {
-    height: hp(16),
-    justifyContent: 'flex-end',
-    paddingBottom: hp(1.9),
-    paddingHorizontal: wp(4),
-  },
-
-  backButton: {
-    position: 'absolute',
-    left: wp(4),
-    top: hp(4.2),
-    width: wp(10),
-    height: wp(10),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  headerTitle: {
-    textAlign: 'center',
-    color: palette.white,
-    fontSize: normalize(22),
-    letterSpacing: 0.5,
-    textTransform: 'none',
   },
   sectionHeading: {
     paddingHorizontal: wp(4),

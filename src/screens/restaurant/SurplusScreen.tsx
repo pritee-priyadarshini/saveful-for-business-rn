@@ -2,15 +2,15 @@ import React from 'react';
 import {
 	Dimensions,
 	Image,
-	ImageBackground,
 	Pressable,
 	StyleSheet,
 	View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -49,6 +49,7 @@ const surplusCards = [
 ] as const;
 
 export function SurplusScreen({ navigation }: any) {
+	useTransparentStatusBar('light');
 	const handleListSurplus = (type: (typeof surplusCards)[number]['id']) => {
 		if (type === 'livestock') {
 			navigation.navigate('CreateFarmListing');
@@ -60,19 +61,7 @@ export function SurplusScreen({ navigation }: any) {
 
 	return (
 		<Screen scrollable backgroundColor={palette.creme} contentStyle={styles.screenContent} transparentTop>
-			<ImageBackground
-				source={require('../../../assets/placeholder/kale-headera.png')}
-				resizeMode="cover"
-				style={styles.header}
-			>
-				<Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-					<Ionicons name="arrow-back" size={normalize(22)} color={palette.white} />
-				</Pressable>
-
-				<AppText variant="h4" color={palette.white} style={styles.headerTitle}>
-					TODAY'S SURPLUS
-				</AppText>
-			</ImageBackground>
+			<StackHeroHeader title="Today's Surplus" height={hp(14)} />
 
 			<View style={styles.contentWrap}>
 				<AppText variant="label" color={palette.primary} style={styles.subtitle}>
@@ -143,24 +132,6 @@ const styles = StyleSheet.create({
 	screenContent: {
 		flexGrow: 1,
 		paddingBottom: hp(2.4),
-	},
-	header: {
-		height: hp(16),
-		justifyContent: 'flex-end',
-		paddingBottom: hp(1.9),
-		paddingHorizontal: wp(4),
-	},
-	backButton: {
-		position: 'absolute',
-		left: wp(4),
-		top: hp(4.2),
-		width: wp(10),
-		height: wp(10),
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	headerTitle: {
-		textAlign: 'center',
 	},
 	contentWrap: {
 		width: '100%',

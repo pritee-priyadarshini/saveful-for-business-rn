@@ -18,6 +18,7 @@ import { Picker } from '@react-native-picker/picker';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
+import { HeroHeader } from '../../components/HeroHeader';
 import {
   LocationSetupModal,
   type SelectedLocation,
@@ -38,6 +39,8 @@ import { NotificationPermissionSettings } from '@/components/NotificationPermiss
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
 import { sitesService } from '@/services/sites.service';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { StatusBar } from 'expo-status-bar';
 import {
   resolveProfileDisplayAddress,
   DEFAULT_PICKUP_RADIUS_KM,
@@ -77,6 +80,7 @@ function buildProfileForm(authUser: ReturnType<typeof useAuthStore.getState>['au
 }
 
 export function ProfileScreen() {
+  useTransparentStatusBar('light');
   const { currentProfile, authUser } = useAppContext();
   const { updateLocation } = useCharityStore();
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
@@ -419,7 +423,8 @@ export function ProfileScreen() {
   ];
 
   return (
-    <Screen backgroundColor={palette.creme} transparentTop={true}>
+    <Screen backgroundColor={palette.creme} transparentTop scrollable={false}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <LocationSetupModal
         visible={locationModalVisible}
         onClose={() => setLocationModalVisible(false)}
@@ -457,14 +462,11 @@ export function ProfileScreen() {
           />
         }
       >
-
-        <View style={styles.header}>
-          <Image
-            source={require('../../../assets/placeholder/modal-head-backgrounda.png')}
-            style={styles.headerBg}
-            resizeMode="cover"
-          />
-
+        <HeroHeader
+          source={require('../../../assets/placeholder/kale-header.png')}
+          height={hp(16)}
+          style={{ marginBottom: hp(2) }}
+        >
           <View style={styles.headerContent}>
             {canGoBack ? (
               <Pressable
@@ -472,9 +474,11 @@ export function ProfileScreen() {
                 style={styles.backBtn}
                 hitSlop={8}
               >
-                <Ionicons name="arrow-back" size={22} color="white" />
+                <Ionicons name="arrow-back" size={normalize(22)} color="white" />
               </Pressable>
-            ) : null}
+            ) : (
+              <View style={styles.backBtnSpacer} />
+            )}
 
             <View style={styles.headerTextBlock}>
               <AppText variant="heading" style={styles.white} numberOfLines={2}>
@@ -496,7 +500,7 @@ export function ProfileScreen() {
               )}
             </View>
           </View>
-        </View>
+        </HeroHeader>
 
         <View style={styles.scroll}>
 
@@ -830,34 +834,30 @@ export function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: spacing.xl,
-  },
-
-  header: {
-    height: hp(25),
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-
-  headerBg: {
-    width: '100%',
-    height: '100%',
+    paddingBottom: spacing.xl,
   },
 
   headerContent: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    marginTop: -(hp(25) - spacing.xl),
-    zIndex: 1,
+    paddingHorizontal: wp(4),
+    paddingBottom: hp(1.5),
     gap: spacing.sm,
   },
 
   backBtn: {
-    marginRight: spacing.xs,
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+
+  backBtnSpacer: {
+    width: normalize(40),
+    height: normalize(40),
   },
 
   headerTextBlock: {
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
   },
 
   scroll: {
-    paddingTop: hp(10),
+    paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
   },
 

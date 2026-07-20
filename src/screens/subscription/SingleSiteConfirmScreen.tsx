@@ -1,0 +1,476 @@
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { AppText } from '@/components/AppText';
+import { Screen } from '@/components/Screen';
+import { palette } from '@/theme/colors';
+import { hp, normalize, wp } from '@/utils/responsive';
+import { useAppContext } from '@/store/AppContext';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
+import {
+  CONFIRM_TRUST_POINTS,
+  getBillingAmount,
+  getPlanById,
+  type BillingCycle,
+  type SingleSitePlanId,
+} from './singleSitePlans';
+
+const ACCENT = palette.kale;
+
+type Nav = NativeStackNavigationProp<RootStackParamList, 'SingleSiteConfirm'>;
+type Route = RouteProp<RootStackParamList, 'SingleSiteConfirm'>;
+
+export function SingleSiteConfirmScreen() {
+  useTransparentStatusBar('dark');
+  const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
+  const insets = useSafeAreaInsets();
+  const { selectPlan } = useAppContext();
+
+  const planId: SingleSitePlanId = route.params?.selectedPlanId ?? 'single_plus';
+  const plan = useMemo(() => getPlanById(planId), [planId]);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+
+  const afterTrial = getBillingAmount(planId, billingCycle);
+  const afterTrialLabel =
+    billingCycle === 'monthly'
+      ? `AU ${afterTrial.amount} /month`
+      : `AU ${afterTrial.amount} /year`;
+
+  const onStartTrial = () => {
+    selectPlan(planId);
+    const state = navigation.getState();
+    const firstSubIdx = state.routes.findIndex(
+      (route) =>
+        route.name === 'SingleSitePlans' ||
+        route.name === 'RestaurantPlan' ||
+        route.name === 'SingleSiteCompare' ||
+        route.name === 'SingleSiteConfirm',
+    );
+    const pops = firstSubIdx >= 0 ? state.index - firstSubIdx + 1 : 1;
+    navigation.pop(Math.max(1, pops));
+  };
+
+  return (
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
+
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, hp(1.2)),
+            paddingBottom: Math.max(insets.bottom, hp(2)) + hp(2),
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="arrow-back" size={normalize(22)} color={palette.black} />
+        </Pressable>
+
+        <AppText color={palette.black} style={styles.title}>
+          Confirm your plan
+        </AppText>
+        <AppText color={palette.black} style={styles.subtitle}>
+          Please confirm your plan and billing cycle
+        </AppText>
+
+        <AppText color={palette.midgray} style={styles.sectionLabel}>
+          Your plan
+        </AppText>
+
+        <View style={styles.planCard}>
+          <AppText color={palette.black} style={styles.planName}>
+            {plan.name}
+          </AppText>
+
+          <View style={styles.priceRow}>
+            <AppText color={palette.black} style={styles.price}>
+              {plan.monthlyPrice}
+            </AppText>
+            <AppText color={palette.black} style={styles.priceUnit}>
+              {' '}/month
+            </AppText>
+          </View>
+
+          <AppText color={ACCENT} style={styles.annualLine}>
+            or {plan.annualPrice} annually ({plan.annualNote})
+          </AppText>
+
+          <AppText color={palette.midgray} style={styles.description}>
+            {plan.description}
+          </AppText>
+
+          {plan.includesLabel ? (
+            <AppText color={ACCENT} style={styles.includesLabel}>
+              {plan.includesLabel}
+            </AppText>
+          ) : (
+            <AppText color={ACCENT} style={styles.includesLabel}>
+              Includes
+            </AppText>
+          )}
+
+          <View style={styles.featureList}>
+            {plan.features.map((feature) => (
+              <View key={feature} style={styles.featureRow}>
+                <View style={styles.checkIcon}>
+                  <Ionicons name="checkmark" size={normalize(11)} color={palette.white} />
+                </View>
+                <AppText color={palette.black} style={styles.featureText}>
+                  {feature}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <AppText color={palette.midgray} style={styles.sectionLabel}>
+          Billing cycle
+        </AppText>
+
+        <View style={styles.billingRow}>
+          <Pressable
+            style={[
+              styles.billingBtn,
+              billingCycle === 'monthly' ? styles.billingBtnActive : styles.billingBtnIdle,
+            ]}
+            onPress={() => setBillingCycle('monthly')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: billingCycle === 'monthly' }}
+          >
+            <AppText
+              color={billingCycle === 'monthly' ? palette.white : ACCENT}
+              style={styles.billingText}
+            >
+              Monthly
+            </AppText>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.billingBtn,
+              billingCycle === 'annual' ? styles.billingBtnActive : styles.billingBtnIdle,
+            ]}
+            onPress={() => setBillingCycle('annual')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: billingCycle === 'annual' }}
+          >
+            <AppText
+              color={billingCycle === 'annual' ? palette.white : ACCENT}
+              style={styles.billingText}
+            >
+              Annual
+            </AppText>
+            <AppText
+              color={billingCycle === 'annual' ? palette.white : ACCENT}
+              style={styles.billingSubText}
+            >
+              2 months free
+            </AppText>
+          </Pressable>
+        </View>
+
+        <View style={styles.trialCard}>
+          <View style={styles.trialRow}>
+            <AppText color={palette.black} style={styles.trialLabel}>
+              Today
+            </AppText>
+            <AppText color={ACCENT} style={styles.trialValue}>
+              AU $0.00
+            </AppText>
+          </View>
+          <View style={styles.trialDivider} />
+          <View style={styles.trialRow}>
+            <AppText color={palette.black} style={styles.trialLabel}>
+              After 30 day free Trial
+            </AppText>
+            <AppText color={ACCENT} style={styles.trialValue}>
+              {afterTrialLabel}
+            </AppText>
+          </View>
+          <AppText color={palette.midgray} style={styles.taxNote}>
+            Applicable local taxes will be added at checkout.
+          </AppText>
+        </View>
+
+        <AppText color={palette.midgray} style={styles.remindText}>
+          We'll remind you before your trial ends
+        </AppText>
+
+        <View style={styles.trustRow}>
+          {CONFIRM_TRUST_POINTS.map((point) => (
+            <View key={point.key} style={styles.trustItem}>
+              <View style={styles.trustIconWrap}>
+                <Ionicons name={point.icon} size={normalize(22)} color={ACCENT} />
+              </View>
+              <AppText color={ACCENT} style={styles.trustLabel}>
+                {point.label}
+              </AppText>
+            </View>
+          ))}
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [styles.ctaBtn, pressed && styles.pressed]}
+          onPress={onStartTrial}
+          accessibilityRole="button"
+          accessibilityLabel="Start my Free Trial"
+        >
+          <AppText color={palette.white} style={styles.ctaText}>
+            Start my Free Trial
+          </AppText>
+          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+        </Pressable>
+      </ScrollView>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: wp(5),
+    gap: hp(1.15),
+  },
+  backBtn: {
+    width: normalize(40),
+    height: normalize(36),
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  title: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(30),
+    lineHeight: normalize(34),
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  subtitle: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(14),
+    lineHeight: normalize(18),
+    textAlign: 'center',
+    textTransform: 'none',
+    marginTop: -hp(0.25),
+    marginBottom: hp(0.4),
+  },
+  sectionLabel: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: normalize(12),
+    textTransform: 'none',
+    marginTop: hp(0.3),
+  },
+  planCard: {
+    backgroundColor: palette.white,
+    borderWidth: 1.5,
+    borderColor: ACCENT,
+    borderRadius: normalize(16),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.7),
+    gap: hp(0.45),
+  },
+  planName: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(17),
+    lineHeight: normalize(21),
+    textTransform: 'uppercase',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginTop: hp(0.15),
+  },
+  price: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(28),
+    lineHeight: normalize(32),
+    textTransform: 'none',
+  },
+  priceUnit: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(15),
+    lineHeight: normalize(22),
+    marginBottom: hp(0.25),
+    textTransform: 'none',
+  },
+  annualLine: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(13),
+    lineHeight: normalize(17),
+    textTransform: 'none',
+  },
+  description: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
+    textTransform: 'none',
+    marginTop: hp(0.35),
+  },
+  includesLabel: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
+    textTransform: 'none',
+    marginTop: hp(0.55),
+  },
+  featureList: {
+    gap: hp(0.75),
+    marginTop: hp(0.35),
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2.2),
+  },
+  checkIcon: {
+    width: normalize(16),
+    height: normalize(16),
+    borderRadius: normalize(8),
+    backgroundColor: ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp(0.15),
+  },
+  featureText: {
+    flex: 1,
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
+    textTransform: 'none',
+  },
+  billingRow: {
+    flexDirection: 'row',
+    gap: wp(2.5),
+  },
+  billingBtn: {
+    flex: 1,
+    minHeight: normalize(54),
+    borderRadius: normalize(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(0.9),
+    paddingHorizontal: wp(2),
+    gap: hp(0.15),
+  },
+  billingBtnActive: {
+    backgroundColor: ACCENT,
+  },
+  billingBtnIdle: {
+    backgroundColor: palette.white,
+    borderWidth: 1.5,
+    borderColor: ACCENT,
+  },
+  billingText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(14),
+    textTransform: 'none',
+  },
+  billingSubText: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: normalize(11),
+    textTransform: 'none',
+  },
+  trialCard: {
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    borderRadius: normalize(14),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.4),
+    gap: hp(0.9),
+  },
+  trialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(3),
+  },
+  trialDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: palette.strokecream,
+  },
+  trialLabel: {
+    flex: 1,
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: normalize(13),
+    textTransform: 'none',
+  },
+  trialValue: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(15),
+    textTransform: 'none',
+  },
+  taxNote: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(11),
+    lineHeight: normalize(15),
+    textTransform: 'none',
+  },
+  remindText: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: normalize(12),
+    textAlign: 'center',
+    textTransform: 'none',
+    marginTop: hp(0.3),
+  },
+  trustRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: wp(2),
+    marginBottom: hp(0.4),
+  },
+  trustItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: hp(0.55),
+  },
+  trustIconWrap: {
+    width: normalize(44),
+    height: normalize(44),
+    borderRadius: normalize(12),
+    borderWidth: 1.5,
+    borderColor: ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.white,
+  },
+  trustLabel: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: normalize(10),
+    lineHeight: normalize(13),
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  ctaBtn: {
+    backgroundColor: ACCENT,
+    borderRadius: normalize(14),
+    minHeight: normalize(52),
+    paddingHorizontal: wp(4),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ctaText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(15),
+    textTransform: 'none',
+    flex: 1,
+    paddingRight: wp(2),
+  },
+  pressed: {
+    opacity: 0.88,
+  },
+});

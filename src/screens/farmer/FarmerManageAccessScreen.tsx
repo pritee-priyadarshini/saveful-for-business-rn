@@ -5,7 +5,6 @@ import {
   Pressable,
   Alert,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -20,6 +19,7 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { InputField } from '../../components/InputField';
 import { Skeleton } from '../../components/Skeleton';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { CharityMemberRole } from '@/services/charity.service';
@@ -28,6 +28,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -49,6 +50,7 @@ type AccessType = 'user' | 'driver';
 const PROTECTED_ROLES = new Set(['LOCATION_ADMIN', 'HEAD_OFFICE_ADMIN']);
 
 export default function FarmerManageAccessScreen() {
+  useTransparentStatusBar('light');
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -265,7 +267,12 @@ export default function FarmerManageAccessScreen() {
 
   if (loadingMembers && members.length === 0) {
     return (
-      <Screen backgroundColor={palette.creme}>
+      <Screen backgroundColor={palette.creme} transparentTop>
+        <StackHeroHeader
+          title="Manage Access"
+          subtitle="Add and manage users & drivers"
+          height={hp(14)}
+        />
         {renderSkeleton()}
       </Screen>
     );
@@ -278,7 +285,7 @@ export default function FarmerManageAccessScreen() {
       keyboardVerticalOffset={insets.top + normalize(20)}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <Screen backgroundColor={palette.creme}>
+        <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={[
@@ -288,24 +295,11 @@ export default function FarmerManageAccessScreen() {
               },
             ]}
           >
-        <ImageBackground
-          source={require('../../../assets/placeholder/kale-header.png')}
-          style={styles.headerBg}
-        >
-          <Pressable style={styles.backIcon} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
-          </Pressable>
-
-          <View style={styles.headerContent}>
-            <AppText variant="h3" style={styles.white}>
-              Manage Access
-            </AppText>
-            <View style={{ height: hp(0.7) }} />
-            <AppText variant="bodyBold" style={styles.white}>
-              Add and manage users & drivers
-            </AppText>
-          </View>
-        </ImageBackground>
+        <StackHeroHeader
+          title="Manage Access"
+          subtitle="Add and manage users & drivers"
+          height={hp(14)}
+        />
 
         <View style={styles.tabRow}>
           <Pressable
@@ -536,24 +530,6 @@ const styles = StyleSheet.create({
   container: {
     gap: hp(2),
     flexGrow: 1,
-  },
-  headerBg: {
-    height: hp(20),
-    justifyContent: 'center',
-    paddingHorizontal: wp(4),
-  },
-  backIcon: {
-    position: 'absolute',
-    top: hp(2.2),
-    left: wp(4),
-    zIndex: 5,
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  white: {
-    color: palette.white,
-    textAlign: 'center',
   },
   tabRow: {
     flexDirection: 'row',

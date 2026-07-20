@@ -46,9 +46,13 @@ type ScopeCache = {
 interface ImpactAnalyticsState {
   scopeKey: string | null;
   cache: ScopeCache | null;
+  /** Org-wide site list for the selector (not tied to selected scope). */
+  availableSites: AccessibleSite[];
+  sitesLoading: boolean;
   isStatsLoading: boolean;
   isChartLoading: boolean;
   error: string | null;
+  ensureAvailableSites: (force?: boolean) => Promise<AccessibleSite[]>;
   ensureStats: (
     filter: ImpactFilter,
     siteId?: number | null,
@@ -77,10 +81,18 @@ const EMPTY_CACHE = (): ScopeCache => ({
 
 const INITIAL: Pick<
   ImpactAnalyticsState,
-  'scopeKey' | 'cache' | 'isStatsLoading' | 'isChartLoading' | 'error'
+  | 'scopeKey'
+  | 'cache'
+  | 'availableSites'
+  | 'sitesLoading'
+  | 'isStatsLoading'
+  | 'isChartLoading'
+  | 'error'
 > = {
   scopeKey: null,
   cache: null,
+  availableSites: [],
+  sitesLoading: false,
   isStatsLoading: false,
   isChartLoading: false,
   error: null,
@@ -89,12 +101,18 @@ const INITIAL: Pick<
 async function resolveSiteIds(
   siteId: number | null,
   authUser: NonNullable<ReturnType<typeof useAuthStore.getState>['authUser']>,
+  availableSites: AccessibleSite[],
 ): Promise<{ sites: AccessibleSite[]; siteIds: number[] }> {
   if (siteId != null) {
-    const sites = [{ id: siteId, name: '' }];
+    const known = availableSites.find((site) => site.id === siteId);
+    const sites = [{ id: siteId, name: known?.name ?? '' }];
     return { sites, siteIds: [siteId] };
   }
-  const sites = await resolveAccessibleSites(authUser);
+
+  const sites =
+    availableSites.length > 0
+      ? availableSites
+      : await resolveAccessibleSites(authUser);
   return { sites, siteIds: sites.map((site) => site.id) };
 }
 
@@ -110,8 +128,18 @@ async function ensureSites(
 ): Promise<{ sites: AccessibleSite[]; siteIds: number[] } | null> {
   const { authUser } = useAuthStore.getState();
   if (!authUser?.accessToken) {
-    set({ cache: null, scopeKey: null, isStatsLoading: false, isChartLoading: false });
+    set({
+      cache: null,
+      scopeKey: null,
+      isStatsLoading: false,
+      isChartLoading: false,
+    });
     return null;
+  }
+
+  let availableSites = get().availableSites;
+  if (availableSites.length === 0) {
+    availableSites = await get().ensureAvailableSites();
   }
 
   const nextScope = scopeKeyFor(siteId);
@@ -122,13 +150,20 @@ async function ensureSites(
     if (scopeKey !== nextScope) {
       set({ scopeKey: nextScope, cache: scoped });
     }
+    // For "all sites", prefer the org-wide list with proper names.
+    if (siteId == null && availableSites.length > 0) {
+      return {
+        sites: availableSites,
+        siteIds: availableSites.map((site) => site.id),
+      };
+    }
     return {
       sites: scoped.sites,
       siteIds: scoped.sites.map((site) => site.id),
     };
   }
 
-  const resolved = await resolveSiteIds(siteId, authUser);
+  const resolved = await resolveSiteIds(siteId, authUser, availableSites);
   const prev = get().scopeKey === nextScope ? get().cache : null;
   set({
     scopeKey: nextScope,
@@ -142,6 +177,27 @@ async function ensureSites(
 
 export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
   ...INITIAL,
+
+  ensureAvailableSites: async (force = false) => {
+    const { authUser } = useAuthStore.getState();
+    if (!authUser?.accessToken) {
+      set({ availableSites: [], sitesLoading: false });
+      return [];
+    }
+
+    const existing = get().availableSites;
+    if (!force && existing.length > 0) return existing;
+
+    set({ sitesLoading: true });
+    try {
+      const sites = await resolveAccessibleSites(authUser);
+      set({ availableSites: sites, sitesLoading: false });
+      return sites;
+    } catch {
+      set({ sitesLoading: false });
+      return get().availableSites;
+    }
+  },
 
   ensureStats: async (filter, siteId = null, force = false) => {
     const { authUser } = useAuthStore.getState();

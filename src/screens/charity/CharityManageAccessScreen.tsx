@@ -5,7 +5,6 @@ import {
   Pressable,
   Alert,
   StyleSheet,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
@@ -22,12 +21,14 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { InputField } from '../../components/InputField';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { CharityMemberRole } from '@/services/charity.service';
 import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 
@@ -63,6 +64,7 @@ function validatePassword(password: string, confirmPassword: string): string | n
 }
 
 export default function CharityManageAccessScreen() {
+  useTransparentStatusBar('light');
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -347,7 +349,12 @@ export default function CharityManageAccessScreen() {
 
   if ((loadingMembers || loadingLocations) && members.length === 0) {
     return (
-      <Screen backgroundColor={palette.creme}>
+      <Screen backgroundColor={palette.creme} transparentTop>
+        <StackHeroHeader
+          title="Manage Access"
+          subtitle="Add and manage users & drivers"
+          height={hp(14)}
+        />
         {renderSkeleton()}
       </Screen>
     );
@@ -360,7 +367,7 @@ export default function CharityManageAccessScreen() {
       keyboardVerticalOffset={insets.top + normalize(20)}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <Screen backgroundColor={palette.creme}>
+        <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={[
@@ -379,21 +386,11 @@ export default function CharityManageAccessScreen() {
               />
             }
           >
-            <ImageBackground
-              source={require('../../../assets/placeholder/kale-header.png')}
-              style={styles.headerBg}
-            >
-              <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-                <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
-              </Pressable>
-
-              <AppText variant="h5" style={styles.headerTitle}>
-                Manage Access
-              </AppText>
-              <AppText variant="bodySmall" style={styles.headerSubtitle}>
-                Add and manage users & drivers
-              </AppText>
-            </ImageBackground>
+            <StackHeroHeader
+              title="Manage Access"
+              subtitle="Add and manage users & drivers"
+              height={hp(14)}
+            />
 
             <View style={styles.tabRow}>
               <Pressable

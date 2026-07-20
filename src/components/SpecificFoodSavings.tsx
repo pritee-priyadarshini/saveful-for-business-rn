@@ -126,10 +126,7 @@ export function SpecificFoodSavings({
   const selected = foods.find((f) => foodKey(f) === selectedKey) ?? foods[0] ?? null;
 
   const split = useMemo(() => {
-    if (!selected) {
-      return { peopleKg: 0, animalKg: 0, peoplePercent: 0, animalPercent: 0 };
-    }
-    const total = selected.totalKg;
+    const total = selected?.totalKg ?? 0;
     const peoplePct = Math.max(0, Math.min(100, peoplePercent));
     const animalPct = Math.max(0, Math.min(100, animalPercent));
     const peopleKg = round2((total * peoplePct) / 100);
@@ -141,6 +138,9 @@ export function SpecificFoodSavings({
       animalPercent: round1(animalPct),
     };
   }, [selected, peoplePercent, animalPercent]);
+
+  const displayTotalKg = selected?.totalKg ?? 0;
+  const displayCo2Kg = selected?.co2AvoidedKg ?? 0;
 
   const cardShadow = Platform.select({
     ios: {
@@ -179,14 +179,11 @@ export function SpecificFoodSavings({
           <View style={styles.loadingBox}>
             <ActivityIndicator color={palette.kale} />
           </View>
-        ) : error && !selected ? (
-          <AppText style={styles.emptyText}>{error}</AppText>
-        ) : !selected ? (
-          <AppText style={styles.emptyText}>
-            No redistributed foods in this period yet.
-          </AppText>
         ) : (
           <View style={styles.grid}>
+            {error && !selected ? (
+              <AppText style={styles.errorHint}>{error}</AppText>
+            ) : null}
             <View style={styles.row}>
               <View style={[styles.statCard, cardShadow]}>
                 <View style={styles.statIconWrap}>
@@ -194,7 +191,7 @@ export function SpecificFoodSavings({
                 </View>
                 <View style={styles.statText}>
                   <AppText style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-                    {formatNumber(selected.totalKg)} kg
+                    {formatNumber(displayTotalKg)} kg
                   </AppText>
                   <AppText style={styles.statLabel}>Redistributed</AppText>
                 </View>
@@ -206,7 +203,7 @@ export function SpecificFoodSavings({
                 </View>
                 <View style={styles.statText}>
                   <AppText style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-                    {formatNumber(selected.co2AvoidedKg)} kg
+                    {formatNumber(displayCo2Kg)} kg
                   </AppText>
                   <AppText style={styles.statLabel}>CO₂ avoided</AppText>
                 </View>
@@ -377,13 +374,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyText: {
+  errorHint: {
     fontFamily: 'Saveful-SemiBold',
-    fontSize: normalize(13),
+    fontSize: normalize(12),
     color: palette.midgray,
     textAlign: 'center',
     textTransform: 'none',
-    paddingVertical: hp(3),
   },
   grid: {
     gap: hp(1.2),

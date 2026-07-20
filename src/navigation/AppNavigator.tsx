@@ -12,6 +12,7 @@ import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
 import { palette } from '../theme/colors';
 import { SingleSitePlansScreen } from '@/screens/subscription/SingleSitePlansScreen';
 import { SingleSiteCompareScreen } from '@/screens/subscription/SingleSiteCompareScreen';
+import { SingleSiteConfirmScreen } from '@/screens/subscription/SingleSiteConfirmScreen';
 import ManageAccessScreen from '@/screens/restaurant/ManageAccessScreen';
 import ManageSitesScreen from '@/screens/restaurant/ManageSitesScreen';
 import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
@@ -42,6 +43,7 @@ export type RootStackParamList = {
   RestaurantPlan: undefined;
   SingleSitePlans: undefined;
   SingleSiteCompare: { selectedPlanId?: 'single' | 'single_plus' } | undefined;
+  SingleSiteConfirm: { selectedPlanId?: 'single' | 'single_plus' } | undefined;
   //ManageAccess: undefined;
   ManageSites: undefined;
   //CreateSite: undefined;
@@ -201,6 +203,7 @@ export function AppNavigator() {
           <RootStack.Screen name="FarmerHistory" component={FarmerHistoryScreen} />
           <RootStack.Screen name="SingleSitePlans" component={SingleSitePlansScreen} />
           <RootStack.Screen name="SingleSiteCompare" component={SingleSiteCompareScreen} />
+          <RootStack.Screen name="SingleSiteConfirm" component={SingleSiteConfirmScreen} />
           <RootStack.Screen name="RestaurantPlan" component={SingleSitePlansScreen} />
           <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
           <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />

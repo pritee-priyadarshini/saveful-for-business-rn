@@ -5,7 +5,6 @@ import {
   Pressable,
   Alert,
   StyleSheet,
-  ImageBackground,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -15,16 +14,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { InputField } from '../../components/InputField';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { useSitesStore } from '@/store/sitesStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize } from '@/utils/responsive';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 
@@ -36,7 +37,7 @@ const RESTAURANT_ROLE_OPTIONS = [
 const inputProps = { compact: true as const, labelVariant: 'bodyBold' as const };
 
 export default function ManageAccessScreen() {
-  const navigation = useNavigation();
+  useTransparentStatusBar('light');
   const route = useRoute();
   const routeLocationId = (route.params as { locationId?: number } | undefined)?.locationId;
   const insets = useSafeAreaInsets();
@@ -199,7 +200,7 @@ export default function ManageAccessScreen() {
       keyboardVerticalOffset={insets.top + normalize(20)}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <Screen backgroundColor={palette.creme}>
+        <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={[
@@ -217,27 +218,11 @@ export default function ManageAccessScreen() {
             }
           >
 
-        {/* HEADER */}
-        <ImageBackground
-          source={require('../../../assets/placeholder/kale-header.png')}
-          style={styles.headerBg}
-        >
-          <Pressable style={styles.backIcon} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </Pressable>
-
-          <View style={styles.headerContent}>
-            <AppText variant="h4" style={styles.white}>
-              Manage Access
-            </AppText>
-
-            <View style={{ height: 6 }} />
-
-            <AppText variant="bodyBold" style={styles.white}>
-              Manage your team and permissions
-            </AppText>
-          </View>
-        </ImageBackground>
+        <StackHeroHeader
+          title="Manage Access"
+          subtitle="Manage your team and permissions"
+          height={hp(14)}
+        />
 
         {/* SUBTEXT */}
         <View style={styles.subTextBox}>
@@ -425,27 +410,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: spacing.lg,
     flexGrow: 1,
-  },
-
-  headerBg: {
-    height: 160,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-
-  backIcon: {
-    position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-  },
-
-  headerContent: {
-    alignItems: 'center',
-  },
-
-  white: {
-    color: palette.white,
-    textAlign: 'center',
   },
 
   subTextBox: {

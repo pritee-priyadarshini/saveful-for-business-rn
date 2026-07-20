@@ -46,6 +46,12 @@ export default function ManageSitesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [removingManagerSiteId, setRemovingManagerSiteId] = useState<number | null>(null);
 
+  const brandName =
+    organisation?.name || currentProfile.organization || 'Business';
+  const brandAddress =
+    organisation?.address || currentProfile.address || 'No address available';
+  const businessLogo = organisation?.logoUrl || currentProfile.logo || null;
+
   const actions = [
     { label: 'Add Site & Manager', route: 'CreateSite' },
     { label: 'View Analytics', route: 'SiteAnalytics' },
@@ -73,29 +79,25 @@ export default function ManageSitesScreen() {
   };
 
   const handleRemoveManager = async (siteId: number, userId: number) => {
-    Alert.alert(
-      'Remove Manager',
-      'Are you sure you want to remove this manager?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            if (removingManagerSiteId !== null) return;
-            setRemovingManagerSiteId(siteId);
-            try {
-              await removeAccess(siteId, userId);
-              await fetchSitesWithManagers(true);
-            } catch (err) {
-              showErrorAlert(err, 'Could not remove manager', 'Failed to remove manager');
-            } finally {
-              setRemovingManagerSiteId(null);
-            }
-          },
+    Alert.alert('Remove Manager', 'Are you sure you want to remove this manager?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          if (removingManagerSiteId !== null) return;
+          setRemovingManagerSiteId(siteId);
+          try {
+            await removeAccess(siteId, userId);
+            await fetchSitesWithManagers(true);
+          } catch (err) {
+            showErrorAlert(err, 'Could not remove manager', 'Failed to remove manager');
+          } finally {
+            setRemovingManagerSiteId(null);
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const handleAssignManager = (siteId: number) => {
@@ -105,309 +107,314 @@ export default function ManageSitesScreen() {
     });
   };
 
-  const handleDeleteSite = (siteId: number) => {
+  const handleDeleteSite = (_siteId: number) => {
     Alert.alert('Delete Site', 'API to be integrated', [{ text: 'OK' }]);
   };
 
   const renderSkeleton = () => (
-    <View style={{ paddingHorizontal: wp(5) }}>
-      <View style={{ height: hp(18), width: '100%', marginBottom: hp(2), overflow: 'hidden' }}>
+    <View style={styles.skeletonWrap}>
+      <View style={styles.skeletonHero}>
         <Skeleton width="100%" height="100%" borderRadius={0} />
       </View>
-      
-      <View style={{ alignItems: 'center', marginBottom: hp(2) }}>
+
+      <View style={styles.skeletonTitle}>
         <Skeleton width={wp(50)} height={normalize(24)} />
       </View>
 
       <View style={styles.actionGrid}>
         {[1, 2, 3, 4].map((i) => (
-          <View key={i} style={[styles.actionCard, { elevation: 0, shadowOpacity: 0 }]}>
+          <View key={i} style={[styles.actionCard, styles.skeletonActionCard]}>
             <Skeleton width="60%" height={normalize(14)} />
           </View>
         ))}
       </View>
 
-      <View style={{ alignItems: 'center', marginBottom: hp(2) }}>
+      <View style={styles.skeletonTitle}>
         <Skeleton width={wp(40)} height={normalize(24)} />
       </View>
 
       {[1, 2].map((i) => (
-        <View key={i} style={[styles.siteCard, { elevation: 0, shadowOpacity: 0 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <Skeleton width={normalize(60)} height={normalize(60)} borderRadius={normalize(10)} style={{ marginRight: wp(3) }} />
-            <View style={{ flex: 1, gap: 5 }}>
-              <Skeleton width="70%" height={normalize(18)} />
-              <Skeleton width="90%" height={normalize(14)} />
-              <Skeleton width="40%" height={normalize(14)} />
+        <View key={i} style={[styles.siteCard, styles.skeletonSiteCard]}>
+          <View style={styles.siteHeader}>
+            <View style={styles.siteLeft}>
+              <Skeleton
+                width={normalize(48)}
+                height={normalize(48)}
+                borderRadius={normalize(24)}
+              />
+              <View style={{ flex: 1, gap: normalize(6) }}>
+                <Skeleton width="70%" height={normalize(18)} />
+                <Skeleton width="90%" height={normalize(14)} />
+                <Skeleton width="40%" height={normalize(14)} />
+              </View>
             </View>
+            <Skeleton width={normalize(56)} height={normalize(32)} borderRadius={normalize(8)} />
           </View>
-          <Skeleton width={normalize(60)} height={normalize(35)} borderRadius={normalize(8)} />
         </View>
       ))}
     </View>
   );
+
+  if (loading && sites.length === 0) {
+    return (
+      <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
+        {renderSkeleton()}
+      </Screen>
+    );
+  }
 
   return (
     <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: safeBottomPadding }}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: safeBottomPadding }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[palette.primary]} // Android
-            tintColor={palette.primary} // iOS
+            colors={[palette.primary]}
+            tintColor={palette.primary}
           />
         }
       >
-        {loading ? (
-          renderSkeleton()
-        ) : (
-          <>
-            {/* HERO */}
-            <HeroHeader
-              source={require('../../../assets/placeholder/feed-bg.png')}
-              contentStyle={styles.heroContentWrap}
-            >
-              <View style={styles.heroContent}>
-                <View style={styles.heroTextBlock}>
-                  <AppText variant="h5" style={styles.businessName}>
-                    {organisation?.name || 'Business'}
-                  </AppText>
+        <HeroHeader
+          source={require('../../../assets/placeholder/kale-header.png')}
+          style={{ marginBottom: hp(2.5) }}
+        >
+          <View style={[styles.topBar, { paddingTop: hp(2) }]}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <AppText variant="h6" style={styles.whiteText} numberOfLines={2}>
+                {brandName}
+              </AppText>
 
-                  <HeaderAddressRow
-                    address={organisation?.address || currentProfile.address || ''}
-                    iconSize={normalize(18)}
-                    style={styles.heroAddressRow}
-                    textStyle={styles.heroAddressText}
+              <HeaderAddressRow
+                address={brandAddress}
+                iconSize={normalize(22)}
+                textStyle={styles.location}
+              />
+            </View>
+
+            <View style={styles.logoCircle}>
+              {businessLogo ? (
+                <Image source={{ uri: businessLogo }} style={styles.logoImage} />
+              ) : (
+                <AppText style={styles.logoFallback}>{brandName[0] || 'B'}</AppText>
+              )}
+            </View>
+          </View>
+        </HeroHeader>
+
+        <AppText variant="subheading" style={styles.sectionTitle}>
+          What to do today !
+        </AppText>
+
+        <View style={styles.actionGrid}>
+          {actions.map((item) => (
+            <Pressable
+              key={item.label}
+              style={styles.actionCard}
+              onPress={() => {
+                if (item.route) navigation.navigate(item.route as any);
+                else item.action?.();
+              }}
+            >
+              <AppText variant="bodyBold" style={styles.actionText}>
+                {item.label}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+
+        <AppText variant="subheading" style={styles.sectionTitle}>
+          Your Sites
+        </AppText>
+
+        {sites.length === 0 && (
+          <View style={{ paddingHorizontal: wp(5), marginTop: hp(1.2) }}>
+            <AppText variant="bodyLarge">No sites created yet</AppText>
+          </View>
+        )}
+
+        {sites.map((site, index) => (
+          <View key={site.id} style={styles.siteCard}>
+            <AppText variant="bodyBold" style={styles.siteIndex}>
+              Site {index + 1}
+            </AppText>
+
+            <View style={styles.siteHeader}>
+              <View style={styles.siteLeft}>
+                <View style={styles.siteLogoWrap}>
+                  <Image
+                    source={
+                      businessLogo
+                        ? { uri: businessLogo }
+                        : require('../../../assets/placeholder/kale-header.png')
+                    }
+                    style={styles.siteLogo}
                   />
                 </View>
 
-                {organisation?.logoUrl && (
-                  <Image
-                    source={{ uri: organisation.logoUrl }}
-                    style={styles.logoTopRight}
-                  />
-                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <AppText variant="bodyBold" style={styles.siteName} numberOfLines={2}>
+                    {site.tradingName}
+                  </AppText>
+
+                  <AppText
+                    variant="bodySmall"
+                    style={styles.siteAddress}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                  >
+                    {site.address}
+                  </AppText>
+
+                  <AppText variant="bodySmall" style={styles.siteAddress}>
+                    {site.postCode}
+                  </AppText>
+                </View>
               </View>
-            </HeroHeader>
 
-            {/* ACTIONS */}
-            <AppText variant="subheading" style={styles.sectionTitle}>
-              What to do today !
-            </AppText>
-
-            <View style={styles.actionGrid}>
-              {actions.map((item) => (
+              <View style={styles.siteActionsCol}>
                 <Pressable
-                  key={item.label}
-                  style={styles.actionCard}
-                  onPress={() => {
-                    if (item.route) navigation.navigate(item.route as any);
-                    else item.action?.();
-                  }}
+                  style={styles.viewBtn}
+                  onPress={() => setExpandedSite(expandedSite === site.id ? null : site.id)}
                 >
-                  <AppText variant="bodyBold" style={styles.actionText}>
-                    {item.label}
+                  <AppText variant="bodyBold" style={styles.viewText}>
+                    View
                   </AppText>
                 </Pressable>
-              ))}
+              </View>
             </View>
 
-            {/* SITES */}
-            <AppText variant="subheading" style={styles.sectionTitle}>
-              Your Sites
-            </AppText>
+            {expandedSite === site.id && (
+              <View style={styles.details}>
+                <AppText variant="bodyBold">Manager: {site.contactName}</AppText>
+                <AppText variant="bodyBold">Email: {site.email}</AppText>
+                <AppText variant="bodyBold">Mobile: {site.mobile}</AppText>
 
-            {sites.length === 0 && (
-              <AppText style={{ textAlign: 'center', marginTop: 20 }}>
-                No sites created yet
-              </AppText>
-            )}
-
-            {sites.map((site, index) => (
-              <View key={site.id} style={styles.siteCard}>
-
-                <AppText variant="bodyBold" style={styles.siteIndex}>
-                  Site {index + 1}
-                </AppText>
-
-                <View style={styles.siteHeader}>
-                  <View style={styles.siteLeft}>
-                    <Image
-                      source={require('../../../assets/placeholder/kale-header.png')}
-                      style={styles.siteLogo}
-                    />
-
-                    <View style={{ flex: 1 }}>
-                      <AppText variant="bodyBold" style={styles.siteName}>
-                        {site.tradingName}
-                      </AppText>
-
-                      <AppText variant="bodySmall" numberOfLines={2} ellipsizeMode="tail">
-                        {site.address}
-                      </AppText>
-
-                      <AppText variant="bodySmall">
-                        {site.postCode}
-                      </AppText>
-                    </View>
-                  </View>
-
+                <View style={styles.detailActions}>
                   <Pressable
-                    style={styles.viewBtn}
-                    onPress={() =>
-                      setExpandedSite(
-                        expandedSite === site.id ? null : site.id
-                      )
-                    }
+                    style={[styles.saveBtn, { flex: 1, marginTop: 0 }]}
+                    onPress={() => handleAssignManager(site.id)}
                   >
-                    <AppText variant="bodyBold" style={{ color: palette.white }}>View</AppText>
+                    <AppText variant="bodyBold" style={styles.viewText}>
+                      {site.managerId ? 'Replace Manager' : 'Add Manager'}
+                    </AppText>
                   </Pressable>
+
+                  {site.managerId ? (
+                    <Pressable
+                      style={[
+                        styles.saveBtn,
+                        {
+                          flex: 1,
+                          marginTop: 0,
+                          backgroundColor: '#D9534F',
+                        },
+                        removingManagerSiteId === site.id && { opacity: 0.65 },
+                      ]}
+                      disabled={removingManagerSiteId !== null}
+                      onPress={() => {
+                        if (site.managerId) {
+                          handleRemoveManager(site.id, site.managerId);
+                        }
+                      }}
+                    >
+                      <AppText variant="bodyBold" style={styles.viewText}>
+                        {removingManagerSiteId === site.id ? 'Removing...' : 'Remove Manager'}
+                      </AppText>
+                    </Pressable>
+                  ) : null}
                 </View>
 
-                {expandedSite === site.id && (
-                  <View style={styles.details}>
-
-                    <AppText variant="bodyBold">
-                      Manager: {site.contactName}
-                    </AppText>
-
-                    <AppText variant="bodyBold">
-                      Email: {site.email}
-                    </AppText>
-
-                    <AppText variant="bodyBold">
-                      Mobile: {site.mobile}
-                    </AppText>
-
-                    {/* ACTIONS */}
-                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-
-                      {/* ADD / REPLACE MANAGER */}
-                      <Pressable
-                        style={styles.viewBtn}
-                        onPress={() => handleAssignManager(site.id)}
-                      >
-                        <AppText variant="bodyBold" style={{ color: palette.white }}>
-                          {site.managerId ? 'Replace Manager' : 'Add Manager'}
-                        </AppText>
-                      </Pressable>
-
-                      {/* REMOVE MANAGER */}
-                      {site.managerId && (
-                        <Pressable
-                          style={[styles.viewBtn, removingManagerSiteId === site.id && { opacity: 0.65 }]}
-                          disabled={removingManagerSiteId !== null}
-                          onPress={() => {
-                            if (site.managerId) {
-                              handleRemoveManager(site.id, site.managerId);
-                            }
-                          }}
-                        >
-                          <AppText variant="bodyBold" style={{ color: palette.white }}>
-                            {removingManagerSiteId === site.id ? 'Removing...' : 'Remove Manager'}
-                          </AppText>
-                        </Pressable>
-                      )}
-
-                    </View>
-
-                    {/* DELETE SITE */}
-                    <Pressable
-                      style={[styles.logoutBtn, { marginTop: 10 }]}
-                      onPress={() => handleDeleteSite(site.id)}
-                    >
-                      <AppText variant="bodyBold">Delete Site</AppText>
-                    </Pressable>
-
-                  </View>
-                )}
+                <Pressable
+                  style={[styles.saveBtn, { backgroundColor: '#D9534F' }]}
+                  onPress={() => handleDeleteSite(site.id)}
+                >
+                  <AppText variant="bodyBold" style={styles.viewText}>
+                    Delete Site
+                  </AppText>
+                </Pressable>
               </View>
-            ))}
+            )}
+          </View>
+        ))}
 
-            {/* FOOTER */}
-            <View style={styles.bottomActions}>
-              <Pressable style={styles.logoutBtn} onPress={logout}>
-                <AppText variant="bodyBold">Logout</AppText>
-              </Pressable>
+        <View style={styles.bottomActions}>
+          <Pressable style={styles.logoutBtn} onPress={logout}>
+            <AppText variant="bodyBold" style={{ color: palette.black }}>
+              Logout
+            </AppText>
+          </Pressable>
 
-              <Pressable
-                style={styles.logoutBtn}
-                onPress={() =>
-                  Alert.alert('Delete Account', 'API to be added soon')
-                }
-              >
-                <AppText variant="bodyBold">Delete My Account</AppText>
-              </Pressable>
-            </View>
-          </>
-        )}
+          <Pressable
+            style={styles.logoutBtn}
+            onPress={() =>
+              Alert.alert('Delete Account', 'Are you sure you want to delete your account?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Yes, Delete', style: 'destructive', onPress: logout },
+              ])
+            }
+          >
+            <AppText variant="bodyBold" style={{ color: palette.black }}>
+              Delete My Account
+            </AppText>
+          </Pressable>
+        </View>
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-
-  heroContentWrap: {
-    justifyContent: 'center',
-    marginBottom: hp(2),
+  scrollContent: {
+    flexGrow: 1,
   },
-
-  logoTopRight: {
-    width: wp(22),
-    height: wp(22),
-    borderRadius: wp(11),
-    resizeMode: 'cover',
-    position: 'absolute',
-    right: wp(5),
-  },
-
-  heroContent: {
+  topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: wp(4),
+    justifyContent: 'space-between',
     gap: wp(3),
+    paddingLeft: wp(4),
+    paddingRight: wp(4),
   },
-
-  heroTextBlock: {
-    flex: 1,
-    minWidth: 0,
-  },
-
-  businessName: {
+  whiteText: {
     color: 'white',
-    fontSize: normalize(24),
-  },
-
-  heroAddressRow: {
-    marginTop: hp(0.8),
-  },
-
-  heroAddressText: {
-    color: 'white',
-    fontSize: normalize(14),
-    lineHeight: normalize(19),
-    opacity: 0.9,
-  },
-
-  logo: {
-    width: wp(24),
-    height: hp(6),
-    resizeMode: 'contain',
-  },
-
-  sectionTitle: {
-    marginHorizontal: wp(5),
-    marginBottom: hp(2),
-    textAlign: 'center',
     fontSize: normalize(20),
   },
-
+  location: {
+    color: 'white',
+    opacity: 0.8,
+    fontSize: normalize(16),
+    paddingTop: hp(0.5),
+  },
+  logoCircle: {
+    width: normalize(50),
+    height: normalize(50),
+    borderRadius: normalize(25),
+    flexShrink: 0,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: normalize(25),
+  },
+  logoFallback: {
+    color: palette.eggplant,
+    fontWeight: 'bold',
+    fontSize: normalize(18),
+  },
+  sectionTitle: {
+    marginHorizontal: wp(6),
+    marginBottom: hp(2),
+    textAlign: 'center',
+  },
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -415,141 +422,136 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     marginBottom: hp(2.5),
   },
-
   actionCard: {
     backgroundColor: 'white',
     width: '48%',
-    paddingVertical: hp(2.5),
+    paddingVertical: hp(2.3),
+    paddingHorizontal: wp(2),
     borderRadius: normalize(14),
-    marginBottom: hp(1.5),
+    marginBottom: hp(1.4),
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: normalize(64),
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
-
   actionText: {
     textAlign: 'center',
-    fontSize: normalize(14),
+    fontSize: normalize(13),
   },
-
   bottomActions: {
     marginTop: hp(2),
-    paddingHorizontal: wp(5),
+    paddingHorizontal: wp(4),
     gap: hp(1),
-    paddingBottom: hp(4),
   },
-
   logoutBtn: {
     backgroundColor: palette.creme,
-    paddingVertical: hp(1.8),
+    paddingVertical: hp(1.5),
+    marginHorizontal: wp(4),
     borderRadius: normalize(12),
     alignItems: 'center',
     borderWidth: 1,
     borderColor: palette.border,
   },
-
   siteCard: {
     backgroundColor: 'white',
     marginHorizontal: wp(4),
-    marginBottom: hp(1.5),
+    marginBottom: hp(1.4),
     padding: wp(4),
     borderRadius: normalize(12),
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
-
   siteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: wp(2),
   },
-
   siteLeft: {
     flexDirection: 'row',
     flex: 1,
     alignItems: 'center',
+    minWidth: 0,
   },
-
+  siteLogoWrap: {
+    width: normalize(48),
+    height: normalize(48),
+    borderRadius: normalize(24),
+    overflow: 'hidden',
+    marginRight: wp(2.5),
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
   siteLogo: {
-    width: normalize(40),
-    height: normalize(40),
-    marginRight: wp(3),
-    resizeMode: 'contain',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
-
   siteIndex: {
     color: palette.primary,
-    marginBottom: hp(0.5),
-    fontSize: normalize(14),
+    marginBottom: hp(0.7),
   },
-
   siteName: {
     flexShrink: 1,
-    fontSize: normalize(16),
   },
-
   siteAddress: {
     color: '#777',
-    fontSize: normalize(14),
   },
-
+  siteActionsCol: {
+    alignItems: 'flex-end',
+    gap: hp(0.7),
+    flexShrink: 0,
+  },
   viewBtn: {
     backgroundColor: palette.middlegreen,
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.7),
     borderRadius: normalize(8),
   },
-
-  editBtn: {
-    backgroundColor: palette.blueberry,
-    paddingHorizontal: wp(3.5),
-    paddingVertical: hp(0.8),
-    borderRadius: normalize(8),
-  },
-
   viewText: {
     color: 'white',
-    fontSize: normalize(14),
+    fontSize: normalize(13),
   },
-
-  input: {
-    backgroundColor: '#FAFAFA',
-    padding: hp(1.2),
-    borderRadius: normalize(8),
-    borderWidth: 1,
-    borderColor: '#eee',
-    fontSize: normalize(14),
+  detailActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2.5),
+    marginTop: hp(1.8),
   },
-
-  inputWrapper: {
-    position: 'relative',
-  },
-
-  eyeIcon: {
-    position: 'absolute',
-    right: wp(2.5),
-    top: hp(1.5),
-  },
-
   saveBtn: {
     marginTop: hp(1.2),
     backgroundColor: palette.middlegreen,
-    padding: hp(1.5),
+    padding: normalize(12),
     borderRadius: normalize(8),
     alignItems: 'center',
   },
-
   details: {
     marginTop: hp(1.2),
     borderTopWidth: 1,
     borderTopColor: '#eee',
     paddingTop: hp(1.2),
-    gap: hp(0.8),
+    gap: hp(0.6),
+  },
+  skeletonWrap: {
+    paddingBottom: hp(4),
+  },
+  skeletonHero: {
+    height: hp(18),
+    width: '100%',
+    marginBottom: hp(2.5),
+    overflow: 'hidden',
+  },
+  skeletonTitle: {
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  skeletonActionCard: {
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  skeletonSiteCard: {
+    elevation: 0,
+    shadowOpacity: 0,
   },
 });

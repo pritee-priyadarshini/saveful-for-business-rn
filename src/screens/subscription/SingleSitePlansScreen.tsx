@@ -32,14 +32,12 @@ export function SingleSitePlansScreen() {
   useTransparentStatusBar('dark');
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { selectPlan } = useAppContext();
   const [selectedPlanId, setSelectedPlanId] = useState<SingleSitePlanId>('single_plus');
 
   const continueLabel = getContinueLabel(selectedPlanId);
 
   const onContinue = () => {
-    selectPlan(selectedPlanId);
-    navigation.goBack();
+    navigation.navigate('SingleSiteConfirm', { selectedPlanId });
   };
 
   return (

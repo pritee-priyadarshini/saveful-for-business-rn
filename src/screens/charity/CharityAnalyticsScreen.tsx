@@ -21,23 +21,20 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
+import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
-import { HeaderAddressRow } from '@/components/HeaderAddressRow';
-import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { useBottomTabPadding, useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
+import { StatusBar } from 'expo-status-bar';
+import { HeroHeader } from '@/components/HeroHeader';
+import { Ionicons } from '@expo/vector-icons';
+import { hp, normalize, wp } from '@/utils/responsive';
 
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
-const chartWidth = width - wp(8) - wp(7);
+const { width } = Dimensions.get('window');
 
 const ANALYTICS_ICONS = {
   foodRecovered: require('../../../assets/placeholder/storage_box_green.png'),
@@ -86,12 +83,21 @@ const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = 
   { key: 'collectionsCompleted', label: 'Collections Completed' },
 ];
 
-export function CharityAnalyticsScreen() {
+export function CharityAnalyticsScreen({
+  variant = 'tab',
+}: {
+  variant?: 'tab' | 'stack';
+} = {}) {
+  useTransparentStatusBar('light');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentProfile } = useAppContext();
-  const bottomPadding = useBottomTabPadding(hp(2));
+  const tabBottomPadding = useBottomTabPadding(hp(2));
+  const stackBottomPadding = useSafeBottomPadding(hp(4));
+  const bottomPadding = variant === 'stack' ? stackBottomPadding : tabBottomPadding;
 
   const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
+  /** null = All sites (aggregated). */
+  const [selectedSiteId, setSelectedSiteId] = React.useState<number | null>(null);
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('mealsCreated');
   const [refreshing, setRefreshing] = React.useState(false);
@@ -100,12 +106,14 @@ export function CharityAnalyticsScreen() {
   const {
     loading,
     chartLoading,
+    sitesLoading,
     stats,
     getChartSeries,
+    sites,
     isMultiSite,
     reload,
     filterLabel,
-  } = useImpactAnalytics({ filter, chartPeriod: range });
+  } = useImpactAnalytics({ filter, chartPeriod: range, siteId: selectedSiteId });
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -122,7 +130,6 @@ export function CharityAnalyticsScreen() {
   const displayStats = toCharityStats(stats);
 
   const organization = currentProfile.organization || 'Your charity';
-  const address = currentProfile.address || '';
 
   const renderMetricCard = (icon: ImageSourcePropType, value: string, label: string) => (
     <View style={styles.metricCard}>
@@ -194,7 +201,8 @@ export function CharityAnalyticsScreen() {
 
   if (loading && !refreshing) {
     return (
-      <Screen backgroundColor={palette.creme} scrollable={false}>
+      <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
         <ScrollView
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
@@ -219,7 +227,8 @@ export function CharityAnalyticsScreen() {
   }
 
   return (
-    <Screen backgroundColor={palette.creme} transparentTop={true} scrollable={false}>
+    <Screen backgroundColor={palette.creme} transparentTop scrollable={false}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
@@ -234,25 +243,43 @@ export function CharityAnalyticsScreen() {
           />
         }
       >
-        <View style={styles.heroContainer}>
-          <Image
-            source={require('../../../assets/placeholder/feed-bg.png')}
-            style={styles.heroBg}
-            resizeMode="cover"
-          />
+        <HeroHeader
+          source={require('../../../assets/placeholder/kale-header.png')}
+          height={variant === 'stack' ? hp(24) : hp(22)}
+        >
+          <View
+            style={[
+              styles.heroContent,
+              variant === 'stack' && styles.heroContentWithBack,
+            ]}
+          >
+            {variant === 'stack' ? (
+              <Pressable
+                onPress={() => navigation.goBack()}
+                style={styles.heroBackBtnAbsolute}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+              >
+                <Ionicons name="arrow-back" size={normalize(22)} color={palette.white} />
+              </Pressable>
+            ) : null}
 
-          <View style={styles.heroContent}>
-            <View style={styles.topBar}>
-              <View style={styles.topBarLeft}>
-                <AppText variant="h6" style={styles.brandText}>
-                  {organization.toUpperCase()}
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroTextBlock}>
+                <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                  {organization}
                 </AppText>
-
-                <HeaderAddressRow address={address} uppercase />
+                <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                  Your insights
+                </AppText>
+                <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
+                  See the difference your surplus makes
+                </AppText>
               </View>
 
               <Pressable
-                style={styles.logoCircle}
+                style={styles.heroIconCircle}
                 onPress={() => navigation.navigate('Account')}
                 accessibilityRole="button"
                 accessibilityLabel="Open account profile"
@@ -264,123 +291,141 @@ export function CharityAnalyticsScreen() {
                     resizeMode="cover"
                   />
                 ) : (
-                  <AppText style={styles.logoFallback}>
-                    {organization?.[0] || 'S'}
-                  </AppText>
+                  <Ionicons name="bar-chart" size={normalize(26)} color={palette.eggplant} />
                 )}
               </Pressable>
             </View>
 
-            <View style={styles.headerCenter}>
-              <AppText variant="h4" style={styles.heroTitle}>
-                YOUR DASHBOARD
+            <View style={styles.heroStatsPill}>
+              <Ionicons name="leaf-outline" size={normalize(14)} color={palette.white} />
+              <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
+                {selectedSiteId == null && isMultiSite ? 'All sites · ' : ''}
+                {formatNumber(displayStats.mealsCreated)} meals ·{' '}
+                {formatNumber(displayStats.foodRecoveredKg)} kg · {filterLabel}
               </AppText>
-              {isMultiSite ? (
-                <AppText variant="caption" style={styles.multiSiteHint}>
-                  Combined impact across all sites
-                </AppText>
-              ) : null}
             </View>
           </View>
-        </View>
+        </HeroHeader>
 
-        <Pressable
-          style={styles.ctaButton}
-          onPress={() => navigation.navigate('CharityHistory')}
-        >
-          <AppText variant="bodyLarge" style={styles.ctaText}>
-            View Collections History
-          </AppText>
-        </Pressable>
+        <View style={styles.mainContent}>
+          <Pressable
+            style={styles.ctaButton}
+            onPress={() => navigation.navigate('CharityHistory')}
+          >
+            <AppText variant="bodyLarge" style={styles.ctaText}>
+              View Collections History
+            </AppText>
+          </Pressable>
 
-        <View style={styles.topSection}>
+          <View style={styles.siteSelectorSlot}>
+            <ImpactSiteSelector
+              sites={sites}
+              selectedSiteId={selectedSiteId}
+              onChange={setSelectedSiteId}
+              loading={sitesLoading}
+              includeAllSites
+              label="Site"
+            />
+          </View>
           <ImpactDateFilter filter={filter} onChange={setFilter} />
           {renderImpactMetricsSection(
             filter.mode === 'all_time' ? 'All-time impact' : `Impact · ${filterLabel}`,
             displayStats,
           )}
-        </View>
 
-        <View style={styles.impactOverTimeSection}>
-          <AppText variant="h8" style={styles.impactOverTimeTitle}>
-            Impact over time
-          </AppText>
+          <View style={styles.chartCard}>
+            <AppText variant="bodyBold" style={styles.chartSectionTitle}>
+              Impact over time
+            </AppText>
 
-          <View style={styles.timeFilterRow}>
-            {TIME_RANGES.map(({ key, label }) => {
-              const isActive = range === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => setRange(key)}
-                  activeOpacity={0.8}
-                  style={[styles.timeFilterPill, isActive && styles.filterPillActive]}
-                >
-                  <AppText style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                    {label}
-                  </AppText>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.metricFilterRow}>
-            {IMPACT_METRICS.map(({ key, label }) => {
-              const isActive = selectedMetric === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => setSelectedMetric(key)}
-                  activeOpacity={0.8}
-                  style={[styles.metricFilterPill, isActive && styles.filterPillActive]}
-                >
-                  <AppText
-                    style={[styles.metricFilterPillText, isActive && styles.filterPillTextActive]}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
+            <View style={styles.timeFilterRow}>
+              {TIME_RANGES.map(({ key, label }) => {
+                const isActive = range === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    onPress={() => setRange(key)}
+                    activeOpacity={0.8}
+                    style={[styles.timeFilterPill, isActive && styles.filterPillActive]}
                   >
-                    {label}
+                    <AppText
+                      style={[styles.filterPillText, isActive && styles.filterPillTextActive]}
+                    >
+                      {label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.metricFilterScroll}
+            >
+              {IMPACT_METRICS.map(({ key, label }) => {
+                const isActive = selectedMetric === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    onPress={() => setSelectedMetric(key)}
+                    activeOpacity={0.8}
+                    style={[styles.metricFilterPill, isActive && styles.filterPillActive]}
+                  >
+                    <AppText
+                      style={[styles.metricFilterPillText, isActive && styles.filterPillTextActive]}
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
+                      {label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.chartContainer}>
+              <LineChart
+                key={`${range}-${selectedMetric}-${selectedSiteId ?? 'all'}`}
+                data={{
+                  labels: chartSeries.labels,
+                  datasets: toLineChartDatasets(chartSeries.values),
+                }}
+                width={width - wp(10) - wp(8)}
+                height={hp(24)}
+                yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
+                yLabelsOffset={4}
+                chartConfig={{
+                  ...chartConfig,
+                  decimalPlaces:
+                    selectedMetric === 'mealsCreated' ||
+                    selectedMetric === 'collectionsCompleted'
+                      ? 1
+                      : 0,
+                }}
+                bezier
+                fromZero
+                segments={4}
+                withInnerLines
+                withOuterLines={false}
+                withVerticalLines
+                withHorizontalLines
+                style={[styles.chart, chartLoading && styles.chartDimmed]}
+              />
+              {chartLoading ? (
+                <View style={styles.chartLoadingOverlay}>
+                  <AppText variant="caption" style={styles.chartEmptyText}>
+                    Updating…
                   </AppText>
-                </TouchableOpacity>
-              );
-            })}
+                </View>
+              ) : null}
+            </View>
           </View>
 
-          <View style={styles.chartContainer}>
-            <LineChart
-              key={`${range}-${selectedMetric}`}
-              data={{
-                labels: chartSeries.labels,
-                datasets: toLineChartDatasets(chartSeries.values),
-              }}
-              width={chartWidth + wp(5)}
-              height={hp(26)}
-              yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
-              yLabelsOffset={4}
-              chartConfig={chartConfig}
-              bezier
-              fromZero
-              segments={4}
-              withInnerLines
-              withOuterLines={false}
-              withVerticalLines
-              withHorizontalLines
-              style={[styles.chart, chartLoading && styles.chartDimmed]}
-            />
-            {chartLoading ? (
-              <View style={styles.chartLoadingOverlay}>
-                <AppText variant="caption" style={styles.chartEmptyText}>
-                  Updating…
-                </AppText>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.lifetimeSection}>
           <SpecificFoodSavings
             filter={filter}
+            siteId={selectedSiteId}
             peoplePercent={stats.peoplePercent}
             animalPercent={stats.animalPercent}
             refreshNonce={foodsRefreshNonce}
@@ -403,7 +448,7 @@ const chartConfig = {
   fillShadowGradientToOpacity: 0.01,
   strokeWidth: 2,
   propsForDots: {
-    r: '6',
+    r: '5',
     strokeWidth: '0',
     stroke: palette.kale,
     fill: palette.kale,
@@ -418,106 +463,108 @@ const chartConfig = {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    gap: hp(2),
-  },
-  heroContainer: {
-    minHeight: hp(20),
-    width: '100%',
-    paddingTop: hp(2),
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: palette.primary,
-  },
-  heroBg: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+    marginTop: -hp(2),
   },
   heroContent: {
-    zIndex: 1,
-    paddingHorizontal: wp(4),
-    gap: hp(1),
-    paddingTop: hp(4),
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: wp(2),
-  },
-  topBarLeft: {
     flex: 1,
-    minWidth: 0,
+    paddingHorizontal: wp(5),
+    justifyContent: 'flex-end',
+    paddingBottom: hp(3),
+    gap: hp(1.2),
   },
-  brandText: {
-    color: palette.white,
-    fontSize: normalize(18),
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+  heroContentWithBack: {
+    paddingTop: normalize(56),
   },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: hp(0.6),
-    gap: wp(1.5),
-  },
-  location: {
-    color: palette.white,
-    opacity: 0.9,
-    flex: 1,
-    minWidth: 0,
-    textTransform: 'uppercase',
-  },
-  logoCircle: {
-    width: normalize(48),
-    height: normalize(48),
-    borderRadius: normalize(24),
-    marginLeft: wp(2),
-    backgroundColor: palette.white,
-    justifyContent: 'center',
+  heroBackBtnAbsolute: {
+    position: 'absolute',
+    top: hp(1.6),
+    left: wp(5),
+    zIndex: 5,
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: wp(3),
+  },
+  heroTextBlock: {
+    flex: 1,
+    gap: hp(0.3),
+    minWidth: 0,
+  },
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'none',
+    letterSpacing: 0.3,
+    fontSize: normalize(13),
+  },
+  heroTitle: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(30),
+    lineHeight: normalize(38),
+  },
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'none',
+    fontSize: normalize(15),
+    lineHeight: normalize(22),
+  },
+  heroIconCircle: {
+    width: normalize(52),
+    height: normalize(52),
+    borderRadius: normalize(26),
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
   logoImage: {
     width: '100%',
     height: '100%',
   },
-  logoFallback: {
-    color: palette.primary,
-    fontWeight: 'bold',
-    fontSize: normalize(18),
-  },
-  headerCenter: {
+  heroStatsPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: hp(0.5),
-    marginTop: hp(0.5),
+    alignSelf: 'flex-start',
+    gap: wp(1.5),
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(20),
+    maxWidth: '100%',
   },
-  heroTitle: {
+  heroStatsText: {
     color: palette.white,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingTop: hp(0.5),
+    flexShrink: 1,
+    textTransform: 'none',
+    fontSize: normalize(13),
   },
-  multiSiteHint: {
-    color: 'rgba(255,255,255,0.85)',
-    textAlign: 'center',
-    marginTop: hp(0.5),
+  mainContent: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    gap: hp(2),
+    paddingBottom: hp(1),
   },
-  topSection: {
-
-    paddingHorizontal: wp(4),
-    gap: hp(1.5),
-    marginTop: -hp(1.5),
+  siteSelectorSlot: {
+    marginBottom: hp(0.5),
   },
   sectionTitle: {
     color: palette.black,
     textTransform: 'none',
     marginTop: hp(0.5),
   },
-  lifetimeSection: {
-    paddingHorizontal: wp(4),
-    gap: hp(1.5),
+  chartSectionTitle: {
+    fontSize: normalize(18),
+    textTransform: 'none',
+    color: palette.black,
+    letterSpacing: 0.2,
   },
   metricsGrid: {
     gap: hp(1.2),
@@ -532,7 +579,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     borderRadius: normalize(16),
     borderWidth: 1,
-    borderColor: palette.middlegreen,
+    borderColor: palette.strokecream,
     paddingVertical: hp(1.4),
     paddingHorizontal: wp(2.5),
     flexDirection: 'row',
@@ -573,9 +620,9 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: '48.5%',
     backgroundColor: palette.white,
-    borderRadius: normalize(12),
-    borderWidth: normalize(1),
-    borderColor: '#E0E0E0',
+    borderRadius: normalize(16),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
     paddingVertical: hp(1.4),
     paddingHorizontal: wp(2.5),
     flexDirection: 'row',
@@ -586,72 +633,69 @@ const styles = StyleSheet.create({
     width: normalize(24),
     height: normalize(24),
   },
-  impactOverTimeSection: {
-    marginHorizontal: wp(4),
-    backgroundColor: palette.creme,
-    borderRadius: normalize(16),
-    paddingHorizontal: wp(3.5),
-    paddingTop: hp(2),
-    paddingBottom: hp(1.2),
+  chartCard: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(20),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.8),
     gap: hp(1.2),
-  },
-  impactOverTimeTitle: {
-    color: palette.black,
-    textTransform: 'none',
-    letterSpacing: 0,
   },
   timeFilterRow: {
     flexDirection: 'row',
     width: '100%',
     gap: wp(2),
   },
-  metricFilterRow: {
+  metricFilterScroll: {
     flexDirection: 'row',
-    width: '100%',
-    gap: wp(1),
+    gap: wp(2),
+    paddingVertical: hp(0.2),
   },
   timeFilterPill: {
     flex: 1,
-    paddingVertical: hp(0.85),
-    borderRadius: normalize(8),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(20),
     backgroundColor: palette.white,
     borderWidth: 1,
-    borderColor: palette.kale,
+    borderColor: palette.strokecream,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: normalize(38),
   },
   metricFilterPill: {
-    flex: 1,
     minWidth: 0,
-    paddingHorizontal: wp(1),
-    paddingVertical: hp(0.85),
-    borderRadius: normalize(8),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.9),
+    borderRadius: normalize(20),
     backgroundColor: palette.white,
     borderWidth: 1,
-    borderColor: palette.kale,
+    borderColor: palette.strokecream,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: normalize(36),
   },
   filterPillActive: {
     backgroundColor: palette.eggplant,
     borderColor: palette.eggplant,
   },
   filterPillText: {
-    color: palette.kale,
-    textTransform: 'none',
-    letterSpacing: 0,
-    fontSize: normalize(14),
-    lineHeight: normalize(16),
-    fontFamily: 'Saveful-SemiBold',
-    textAlign: 'center',
-  },
-  metricFilterPillText: {
-    color: palette.kale,
+    color: palette.stone,
     textTransform: 'none',
     letterSpacing: 0,
     fontSize: normalize(13),
-    lineHeight: normalize(16),
-    fontFamily: 'Saveful-SemiBold',
+    lineHeight: normalize(18),
+    fontFamily: 'Saveful-Bold',
+    textAlign: 'center',
+  },
+  metricFilterPillText: {
+    color: palette.stone,
+    textTransform: 'none',
+    letterSpacing: 0,
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    fontFamily: 'Saveful-Bold',
     textAlign: 'center',
   },
   filterPillTextActive: {
@@ -660,16 +704,9 @@ const styles = StyleSheet.create({
   chartContainer: {
     width: '100%',
     overflow: 'hidden',
-    marginTop: hp(0.5),
-    minHeight: hp(22),
-    justifyContent: 'center',
-  },
-  chartEmpty: {
-    width: '100%',
-    minHeight: hp(18),
     alignItems: 'center',
+    minHeight: hp(24),
     justifyContent: 'center',
-    paddingHorizontal: wp(4),
   },
   chartEmptyText: {
     color: palette.midgray,
@@ -687,18 +724,17 @@ const styles = StyleSheet.create({
   },
   chart: {
     borderRadius: normalize(12),
-    marginLeft: -wp(5),
+    marginLeft: -wp(2),
   },
   ctaButton: {
-    marginHorizontal: wp(8),
-    backgroundColor: palette.kale,
-    padding: hp(1.5),
-    borderRadius: normalize(14),
+    backgroundColor: palette.eggplant,
+    borderRadius: normalize(16),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(5),
     alignItems: 'center',
-    marginVertical: hp(1),
   },
   ctaText: {
     color: palette.white,
-    fontSize: normalize(18),
+    textTransform: 'none',
   },
 });
