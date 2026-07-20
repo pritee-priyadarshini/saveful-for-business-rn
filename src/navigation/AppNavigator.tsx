@@ -13,6 +13,11 @@ import { palette } from '../theme/colors';
 import { SingleSitePlansScreen } from '@/screens/subscription/SingleSitePlansScreen';
 import { SingleSiteCompareScreen } from '@/screens/subscription/SingleSiteCompareScreen';
 import { SingleSiteConfirmScreen } from '@/screens/subscription/SingleSiteConfirmScreen';
+import { MultiSitePlansScreen } from '@/screens/subscription/MultiSitePlansScreen';
+import { MultiSiteConfirmScreen } from '@/screens/subscription/MultiSiteConfirmScreen';
+import { EnterpriseConsultScreen } from '@/screens/subscription/EnterpriseConsultScreen';
+import { EnterpriseThanksScreen } from '@/screens/subscription/EnterpriseThanksScreen';
+import { RestaurantPlanRouter } from '@/screens/subscription/RestaurantPlanRouter';
 import ManageAccessScreen from '@/screens/restaurant/ManageAccessScreen';
 import ManageSitesScreen from '@/screens/restaurant/ManageSitesScreen';
 import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
@@ -44,6 +49,10 @@ export type RootStackParamList = {
   SingleSitePlans: undefined;
   SingleSiteCompare: { selectedPlanId?: 'single' | 'single_plus' } | undefined;
   SingleSiteConfirm: { selectedPlanId?: 'single' | 'single_plus' } | undefined;
+  MultiSitePlans: undefined;
+  MultiSiteConfirm: undefined;
+  EnterpriseConsult: undefined;
+  EnterpriseThanks: undefined;
   //ManageAccess: undefined;
   ManageSites: undefined;
   //CreateSite: undefined;
@@ -204,7 +213,11 @@ export function AppNavigator() {
           <RootStack.Screen name="SingleSitePlans" component={SingleSitePlansScreen} />
           <RootStack.Screen name="SingleSiteCompare" component={SingleSiteCompareScreen} />
           <RootStack.Screen name="SingleSiteConfirm" component={SingleSiteConfirmScreen} />
-          <RootStack.Screen name="RestaurantPlan" component={SingleSitePlansScreen} />
+          <RootStack.Screen name="MultiSitePlans" component={MultiSitePlansScreen} />
+          <RootStack.Screen name="MultiSiteConfirm" component={MultiSiteConfirmScreen} />
+          <RootStack.Screen name="EnterpriseConsult" component={EnterpriseConsultScreen} />
+          <RootStack.Screen name="EnterpriseThanks" component={EnterpriseThanksScreen} />
+          <RootStack.Screen name="RestaurantPlan" component={RestaurantPlanRouter} />
           <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
           <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
           <RootStack.Screen name="SiteAnalytics" component={SiteAnalyticsScreen} />
