@@ -6,20 +6,29 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { palette } from '@/theme/colors';
 import { useAppContext } from '@/store/AppContext';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { getSubscriptionRoute } from '@/utils/subscriptionAccess';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'RestaurantPlan'>;
 
-/** Routes restaurant plan entry to single-site or multi-site flow by role. */
+/**
+ * Routes plan entry by role:
+ * - restaurant multi → multi-site
+ * - restaurant single / farmer producer → single-site
+ * - charity / farmer consumer → no subscription (go back)
+ */
 export function RestaurantPlanRouter() {
   const navigation = useNavigation<Nav>();
   const { selectedRole } = useAppContext();
 
   useEffect(() => {
-    if (selectedRole === 'restaurant_multi') {
-      navigation.replace('MultiSitePlans');
+    const route = getSubscriptionRoute(selectedRole);
+    if (route) {
+      navigation.replace(route);
       return;
     }
-    navigation.replace('SingleSitePlans');
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
   }, [navigation, selectedRole]);
 
   return (

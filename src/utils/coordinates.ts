@@ -48,7 +48,10 @@ export function normalizeAuthProfile(authUser: any): any {
   return nested ?? null;
 }
 
-function collectCoordinateCandidates(profile: any): Array<{ latitude: unknown; longitude: unknown }> {
+function collectCoordinateCandidates(
+  profile: any,
+  options?: { preferOrganisation?: boolean },
+): Array<{ latitude: unknown; longitude: unknown }> {
   if (!profile) return [];
 
   const candidates: Array<{ latitude: unknown; longitude: unknown }> = [];
@@ -58,17 +61,21 @@ function collectCoordinateCandidates(profile: any): Array<{ latitude: unknown; l
       ? [profile.site]
       : [];
 
-  for (const site of sites) {
-    candidates.push(readLatLng(site));
+  const org = profile.organisation ?? profile.organization;
+  const orgCandidates: Array<{ latitude: unknown; longitude: unknown }> = [];
+  if (org) {
+    orgCandidates.push(readLatLng(org));
+    if (org.location && typeof org.location === 'object') {
+      orgCandidates.push(readLatLng(org.location));
+    }
   }
 
-  const org = profile.organisation ?? profile.organization;
-  if (org) {
-    candidates.push(readLatLng(org));
+  const siteCandidates = sites.map((site: any) => readLatLng(site));
 
-    if (org.location && typeof org.location === 'object') {
-      candidates.push(readLatLng(org.location));
-    }
+  if (options?.preferOrganisation) {
+    candidates.push(...orgCandidates, ...siteCandidates);
+  } else {
+    candidates.push(...siteCandidates, ...orgCandidates);
   }
 
   return candidates;
@@ -76,8 +83,11 @@ function collectCoordinateCandidates(profile: any): Array<{ latitude: unknown; l
 
 export function resolveProfileCoordinates(
   profile: any,
+  options?: { preferOrganisation?: boolean },
 ): { lat: number; lng: number } | null {
-  for (const candidate of collectCoordinateCandidates(profile)) {
+  for (const candidate of collectCoordinateCandidates(profile, {
+    preferOrganisation: options?.preferOrganisation === true,
+  })) {
     const lat = parseCoordinate(candidate.latitude);
     const lng = parseCoordinate(candidate.longitude);
 

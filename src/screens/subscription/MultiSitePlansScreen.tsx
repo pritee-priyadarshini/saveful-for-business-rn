@@ -19,6 +19,7 @@ import {
   MULTI_SITE_TRUST_POINTS,
   type MultiSitePlan,
 } from './multiSitePlans';
+import { useSubscriptionGate } from './useSubscriptionGate';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = '#E8F6EC';
@@ -27,6 +28,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'MultiSitePlans'>;
 
 export function MultiSitePlansScreen() {
   useTransparentStatusBar('dark');
+  useSubscriptionGate('multi');
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
 

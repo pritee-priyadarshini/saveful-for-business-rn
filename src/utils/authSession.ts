@@ -84,17 +84,28 @@ export function resolveOrganisationAddress(org: {
   return org?.businessAddress ?? org?.charityAddress ?? org?.address ?? '';
 }
 
-export function resolveProfileDisplayAddress(profile: {
-  sites?: Array<{ address?: string; pickupRadiusKm?: number; radiusKm?: number }>;
-  organisation?: {
-    businessAddress?: string;
-    charityAddress?: string;
-    address?: string;
-    pickupRadiusKm?: number;
-  };
-} | null | undefined): string {
+/** Prefer organisation address when `preferOrganisation` is set (multi head-office). */
+export function resolveProfileDisplayAddress(
+  profile: {
+    sites?: Array<{ address?: string; pickupRadiusKm?: number; radiusKm?: number }>;
+    organisation?: {
+      type?: string;
+      businessAddress?: string;
+      charityAddress?: string;
+      address?: string;
+      pickupRadiusKm?: number;
+    };
+  } | null | undefined,
+  options?: { preferOrganisation?: boolean },
+): string {
+  const org = profile?.organisation;
   const site = profile?.sites?.[0];
-  return site?.address || resolveOrganisationAddress(profile?.organisation);
+
+  if (options?.preferOrganisation) {
+    return resolveOrganisationAddress(org) || site?.address || '';
+  }
+
+  return site?.address || resolveOrganisationAddress(org);
 }
 
 /** Confirmed default pickup radius for charity / collector orgs. */

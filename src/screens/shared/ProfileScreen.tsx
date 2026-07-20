@@ -18,7 +18,6 @@ import { Picker } from '@react-native-picker/picker';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Card } from '../../components/Card';
-import { HeroHeader } from '../../components/HeroHeader';
 import {
   LocationSetupModal,
   type SelectedLocation,
@@ -38,6 +37,10 @@ import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
+import {
+  canAccessSubscription,
+  getSubscriptionRoute,
+} from '@/utils/subscriptionAccess';
 import { sitesService } from '@/services/sites.service';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { StatusBar } from 'expo-status-bar';
@@ -59,9 +62,15 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-function buildProfileForm(authUser: ReturnType<typeof useAuthStore.getState>['authUser']) {
+function buildProfileForm(
+  authUser: ReturnType<typeof useAuthStore.getState>['authUser'],
+  options?: { preferOrganisation?: boolean },
+) {
   const org = authUser?.profile?.organisation;
-  const coords = resolveProfileCoordinates(normalizeAuthProfile(authUser));
+  const preferOrganisation = options?.preferOrganisation === true;
+  const coords = resolveProfileCoordinates(normalizeAuthProfile(authUser), {
+    preferOrganisation,
+  });
 
   return {
     firstName: authUser?.profile?.user?.firstName || '',
@@ -69,7 +78,7 @@ function buildProfileForm(authUser: ReturnType<typeof useAuthStore.getState>['au
     email: authUser?.profile?.user?.email || '',
     mobile: authUser?.profile?.user?.phoneNumber || '',
     businessName: org?.name || '',
-    address: resolveProfileDisplayAddress(authUser?.profile),
+    address: resolveProfileDisplayAddress(authUser?.profile, { preferOrganisation }),
     registration: org?.registrationNumber || '',
     venueType: org?.venueType || '',
     branding: org?.brandName || '',
@@ -157,17 +166,27 @@ export function ProfileScreen() {
   const { selectedRole, logout } = useAppContext();
 
   const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
+  const isRestaurantMulti = selectedRole === 'restaurant_multi';
   const isCharity = selectedRole === 'charity_single' || selectedRole === 'charity_multi';
   const isFarmerConsumer = selectedRole === 'farmer';
   const isFarmBusiness = selectedRole === 'farm_business';
   const isCollector = isCharity || isFarmerConsumer;
-  const usesSiteAddress = isRestaurant || isFarmBusiness;
+  // Multi head-office profile is organisation-scoped (same fields as single), not a site.
+  const usesSiteAddress = selectedRole === 'restaurant_single' || isFarmBusiness;
 
-  const [formData, setFormData] = useState(() => buildProfileForm(authUser));
+  const [formData, setFormData] = useState(() =>
+    buildProfileForm(authUser, {
+      preferOrganisation: selectedRole === 'restaurant_multi' || selectedRole === 'charity_multi',
+    }),
+  );
 
   useEffect(() => {
-    setFormData(buildProfileForm(authUser));
-  }, [authUser]);
+    setFormData(
+      buildProfileForm(authUser, {
+        preferOrganisation: selectedRole === 'restaurant_multi' || selectedRole === 'charity_multi',
+      }),
+    );
+  }, [authUser, selectedRole]);
 
   const updateField = (key: string, value: string) => {
     setFormData((prev: any) => ({
@@ -261,13 +280,21 @@ export function ProfileScreen() {
           });
         }
 
-        if (orgId && (formData.registration.trim() || (isRestaurant && formData.venueType.trim()))) {
+        if (
+          orgId &&
+          (formData.registration.trim() ||
+            (isRestaurant && formData.venueType.trim()) ||
+            (isRestaurantMulti && trimmedAddress))
+        ) {
           const form = new FormData();
           if (formData.registration.trim()) {
             form.append('registrationNumber', formData.registration.trim());
           }
           if (isRestaurant && formData.venueType.trim()) {
             form.append('venueType', formData.venueType.trim());
+          }
+          if (isRestaurantMulti && trimmedAddress) {
+            form.append('businessAddress', trimmedAddress);
           }
           await organizationService.updateOrganisation(orgId, form);
         }
@@ -423,7 +450,7 @@ export function ProfileScreen() {
   ];
 
   return (
-    <Screen backgroundColor={palette.creme} transparentTop scrollable={false}>
+    <Screen backgroundColor={palette.creme} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <LocationSetupModal
         visible={locationModalVisible}
@@ -462,11 +489,13 @@ export function ProfileScreen() {
           />
         }
       >
-        <HeroHeader
-          source={require('../../../assets/placeholder/kale-header.png')}
-          height={hp(16)}
-          style={{ marginBottom: hp(2) }}
-        >
+        <View style={styles.header}>
+          <Image
+            source={require('../../../assets/placeholder/modal-head-backgrounda.png')}
+            style={styles.headerBg}
+            resizeMode="cover"
+          />
+
           <View style={styles.headerContent}>
             {canGoBack ? (
               <Pressable
@@ -474,11 +503,9 @@ export function ProfileScreen() {
                 style={styles.backBtn}
                 hitSlop={8}
               >
-                <Ionicons name="arrow-back" size={normalize(22)} color="white" />
+                <Ionicons name="arrow-back" size={22} color="white" />
               </Pressable>
-            ) : (
-              <View style={styles.backBtnSpacer} />
-            )}
+            ) : null}
 
             <View style={styles.headerTextBlock}>
               <AppText variant="heading" style={styles.white} numberOfLines={2}>
@@ -490,17 +517,22 @@ export function ProfileScreen() {
               </AppText>
             </View>
 
-            <View style={styles.profileCircle}>
-              {logo ? (
-                <Image source={{ uri: logo }} style={styles.profileImage} resizeMode="cover" />
-              ) : (
-                <AppText variant="bodyBold" style={styles.profileInitial}>
-                  {currentProfile.name?.trim()?.[0]?.toUpperCase() || 'S'}
-                </AppText>
-              )}
-            </View>
+            <Pressable style={styles.profileCircleWrap} onPress={pickImage}>
+              <View style={styles.profileCircle}>
+                {logo ? (
+                  <Image source={{ uri: logo }} style={styles.profileImage} resizeMode="cover" />
+                ) : (
+                  <AppText variant="bodyBold" style={styles.profileInitial}>
+                    {currentProfile.name?.trim()?.[0]?.toUpperCase() || 'S'}
+                  </AppText>
+                )}
+              </View>
+              <View style={styles.profilePlus}>
+                <Ionicons name="add" size={12} color="white" />
+              </View>
+            </Pressable>
           </View>
-        </HeroHeader>
+        </View>
 
         <View style={styles.scroll}>
 
@@ -755,15 +787,14 @@ export function ProfileScreen() {
             </View>
           ))}
 
-          {/* LINKS */}
-          {isRestaurant && (
+          {/* LINKS — Plans: restaurant (+ multi) and farmer producer only */}
+          {canAccessSubscription(selectedRole) && (
             <Pressable
               style={styles.linkRow}
-              onPress={() =>
-                navigation.navigate(
-                  selectedRole === 'restaurant_multi' ? 'MultiSitePlans' : 'SingleSitePlans',
-                )
-              }
+              onPress={() => {
+                const route = getSubscriptionRoute(selectedRole);
+                if (route) navigation.navigate(route);
+              }}
             >
               <AppText variant='body'>Plans</AppText>
               <Ionicons name="chevron-forward" size={18} />
@@ -838,30 +869,34 @@ export function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: spacing.xl,
+    padding: spacing.xl,
+  },
+
+  header: {
+    height: hp(25),
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+
+  headerBg: {
+    width: '100%',
+    height: '100%',
   },
 
   headerContent: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: wp(4),
-    paddingBottom: hp(1.5),
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    marginTop: -(hp(25) - spacing.xl),
+    zIndex: 1,
     gap: spacing.sm,
   },
 
   backBtn: {
-    width: normalize(40),
-    height: normalize(40),
-    borderRadius: normalize(20),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-
-  backBtnSpacer: {
-    width: normalize(40),
-    height: normalize(40),
+    marginRight: spacing.xs,
   },
 
   headerTextBlock: {
@@ -870,7 +905,7 @@ const styles = StyleSheet.create({
   },
 
   scroll: {
-    paddingHorizontal: spacing.xl,
+    paddingTop: hp(10),
     paddingBottom: spacing.xl,
   },
 
@@ -964,6 +999,12 @@ const styles = StyleSheet.create({
     color: 'white',
   },
 
+  profileCircleWrap: {
+    width: normalize(44),
+    height: normalize(44),
+    flexShrink: 0,
+  },
+
   profileCircle: {
     width: normalize(44),
     height: normalize(44),
@@ -971,7 +1012,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#A8E6CF',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
     overflow: 'hidden',
   },
 
@@ -982,6 +1022,20 @@ const styles = StyleSheet.create({
 
   profileInitial: {
     color: palette.primary,
+  },
+
+  profilePlus: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: normalize(18),
+    height: normalize(18),
+    borderRadius: normalize(9),
+    backgroundColor: palette.eggplant,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: palette.white,
   },
 
   supportBtn: {

@@ -16,6 +16,7 @@ import { useRegistrationStore } from './registrationStore';
 import {
   resolveUserRole,
   resolveProfileDisplayAddress,
+  resolveOrganisationAddress,
 } from '@/utils/authSession';
 import { resetAllDataStores } from './index';
 
@@ -104,9 +105,15 @@ export function AppProvider({ children }: PropsWithChildren) {
             assignedSite?.name ||
             authUser.profile.organisation?.name ||
             '',
-          address:
-            assignedSite?.address ||
-            resolveProfileDisplayAddress(authUser.profile),
+          address: isLocationUser
+            ? assignedSite?.address ||
+              resolveProfileDisplayAddress(authUser.profile)
+            : resolvedRole === 'restaurant_multi' || resolvedRole === 'charity_multi'
+              ? resolveOrganisationAddress(authUser.profile.organisation) ||
+                resolveProfileDisplayAddress(authUser.profile, {
+                  preferOrganisation: true,
+                })
+              : resolveProfileDisplayAddress(authUser.profile),
           verificationStatus: 'Verified',
           phone: profileUser?.phoneNumber || '',
           logo: authUser.profile.organisation?.logoUrl || '',

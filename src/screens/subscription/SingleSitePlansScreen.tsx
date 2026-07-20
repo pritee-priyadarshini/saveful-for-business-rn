@@ -22,6 +22,7 @@ import {
   type SingleSitePlan,
   type SingleSitePlanId,
 } from './singleSitePlans';
+import { useSubscriptionGate } from './useSubscriptionGate';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = `${palette.mint}66`;
@@ -30,6 +31,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'SingleSitePlans'>;
 
 export function SingleSitePlansScreen() {
   useTransparentStatusBar('dark');
+  useSubscriptionGate('single');
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const [selectedPlanId, setSelectedPlanId] = useState<SingleSitePlanId>('single_plus');
