@@ -38,20 +38,16 @@ export function SingleSiteConfirmScreen() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
 
   const afterTrial = getBillingAmount(planId, billingCycle);
-  const afterTrialLabel =
-    billingCycle === 'monthly'
-      ? `AU ${afterTrial.amount} /month`
-      : `AU ${afterTrial.amount} /year`;
 
   const onStartTrial = () => {
     selectPlan(planId);
     const state = navigation.getState();
     const firstSubIdx = state.routes.findIndex(
-      (route) =>
-        route.name === 'SingleSitePlans' ||
-        route.name === 'RestaurantPlan' ||
-        route.name === 'SingleSiteCompare' ||
-        route.name === 'SingleSiteConfirm',
+      (navRoute) =>
+        navRoute.name === 'SingleSitePlans' ||
+        navRoute.name === 'RestaurantPlan' ||
+        navRoute.name === 'SingleSiteCompare' ||
+        navRoute.name === 'SingleSiteConfirm',
     );
     const pops = firstSubIdx >= 0 ? state.index - firstSubIdx + 1 : 1;
     navigation.pop(Math.max(1, pops));
@@ -84,7 +80,7 @@ export function SingleSiteConfirmScreen() {
         <AppText color={palette.black} style={styles.title}>
           Confirm your plan
         </AppText>
-        <AppText color={palette.black} style={styles.subtitle}>
+        <AppText color={palette.stone} style={styles.subtitle}>
           Please confirm your plan and billing cycle
         </AppText>
 
@@ -102,12 +98,18 @@ export function SingleSiteConfirmScreen() {
               {plan.monthlyPrice}
             </AppText>
             <AppText color={palette.black} style={styles.priceUnit}>
-              {' '}/month
+              {' '}
+              /month
             </AppText>
           </View>
 
-          <AppText color={ACCENT} style={styles.annualLine}>
-            or {plan.annualPrice} annually ({plan.annualNote})
+          <AppText color={palette.midgray} style={styles.annualLine}>
+            or{' '}
+            <AppText color={ACCENT} style={styles.annualPriceBold}>
+              {plan.annualPrice}
+            </AppText>
+            {' '}
+            annually ({plan.annualNote})
           </AppText>
 
           <AppText color={palette.midgray} style={styles.description}>
@@ -186,22 +188,34 @@ export function SingleSiteConfirmScreen() {
 
         <View style={styles.trialCard}>
           <View style={styles.trialRow}>
-            <AppText color={palette.black} style={styles.trialLabel}>
-              Today
-            </AppText>
+            <View style={styles.trialLabelWrap}>
+              <AppText color={palette.black} style={styles.trialLabel}>
+                Today
+              </AppText>
+            </View>
             <AppText color={ACCENT} style={styles.trialValue}>
               AU $0.00
             </AppText>
           </View>
+
           <View style={styles.trialDivider} />
+
           <View style={styles.trialRow}>
-            <AppText color={palette.black} style={styles.trialLabel}>
-              After 30 day free Trial
-            </AppText>
-            <AppText color={ACCENT} style={styles.trialValue}>
-              {afterTrialLabel}
-            </AppText>
+            <View style={styles.trialLabelWrap}>
+              <AppText color={palette.black} style={styles.trialLabel}>
+                After 30 day free Trial
+              </AppText>
+            </View>
+            <View style={styles.trialValueWrap}>
+              <AppText color={ACCENT} style={styles.trialValue}>
+                AU {afterTrial.amount}
+              </AppText>
+              <AppText color={ACCENT} style={styles.trialSuffix}>
+                {afterTrial.suffix}
+              </AppText>
+            </View>
           </View>
+
           <AppText color={palette.midgray} style={styles.taxNote}>
             Applicable local taxes will be added at checkout.
           </AppText>
@@ -243,7 +257,7 @@ export function SingleSiteConfirmScreen() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: wp(5),
-    gap: hp(1.15),
+    gap: hp(1.25),
   },
   backBtn: {
     width: normalize(40),
@@ -253,25 +267,26 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(30),
+    fontSize: normalize(28),
     lineHeight: normalize(34),
     textAlign: 'center',
     textTransform: 'none',
   },
   subtitle: {
-    fontFamily: 'Saveful-Bold',
+    fontFamily: 'Saveful-Regular',
     fontSize: normalize(14),
-    lineHeight: normalize(18),
+    lineHeight: normalize(20),
     textAlign: 'center',
     textTransform: 'none',
-    marginTop: -hp(0.25),
-    marginBottom: hp(0.4),
+    marginTop: -hp(0.45),
+    marginBottom: hp(0.35),
   },
   sectionLabel: {
     fontFamily: 'Saveful-SemiBold',
-    fontSize: normalize(12),
+    fontSize: normalize(13),
+    lineHeight: normalize(17),
     textTransform: 'none',
-    marginTop: hp(0.3),
+    marginTop: hp(0.2),
   },
   planCard: {
     backgroundColor: palette.white,
@@ -279,37 +294,43 @@ const styles = StyleSheet.create({
     borderColor: ACCENT,
     borderRadius: normalize(16),
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.7),
-    gap: hp(0.45),
+    paddingVertical: hp(1.8),
+    gap: hp(0.4),
   },
   planName: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(17),
-    lineHeight: normalize(21),
+    lineHeight: normalize(22),
     textTransform: 'uppercase',
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginTop: hp(0.15),
+    marginTop: hp(0.2),
   },
   price: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(28),
-    lineHeight: normalize(32),
+    fontSize: normalize(30),
+    lineHeight: normalize(36),
     textTransform: 'none',
   },
   priceUnit: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(15),
-    lineHeight: normalize(22),
-    marginBottom: hp(0.25),
+    lineHeight: normalize(24),
+    marginBottom: hp(0.35),
     textTransform: 'none',
   },
   annualLine: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    textTransform: 'none',
+  },
+  annualPriceBold: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(13),
-    lineHeight: normalize(17),
+    lineHeight: normalize(18),
     textTransform: 'none',
   },
   description: {
@@ -317,7 +338,7 @@ const styles = StyleSheet.create({
     fontSize: normalize(12),
     lineHeight: normalize(17),
     textTransform: 'none',
-    marginTop: hp(0.35),
+    marginTop: hp(0.4),
   },
   includesLabel: {
     fontFamily: 'Saveful-Bold',
@@ -327,8 +348,8 @@ const styles = StyleSheet.create({
     marginTop: hp(0.55),
   },
   featureList: {
-    gap: hp(0.75),
-    marginTop: hp(0.35),
+    gap: hp(0.8),
+    marginTop: hp(0.4),
   },
   featureRow: {
     flexDirection: 'row',
@@ -336,19 +357,19 @@ const styles = StyleSheet.create({
     gap: wp(2.2),
   },
   checkIcon: {
-    width: normalize(16),
-    height: normalize(16),
-    borderRadius: normalize(8),
+    width: normalize(18),
+    height: normalize(18),
+    borderRadius: normalize(9),
     backgroundColor: ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(0.15),
+    marginTop: hp(0.1),
   },
   featureText: {
     flex: 1,
     fontFamily: 'Saveful-Regular',
-    fontSize: normalize(12),
-    lineHeight: normalize(17),
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
     textTransform: 'none',
   },
   billingRow: {
@@ -357,11 +378,11 @@ const styles = StyleSheet.create({
   },
   billingBtn: {
     flex: 1,
-    minHeight: normalize(54),
+    minHeight: normalize(56),
     borderRadius: normalize(12),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: hp(0.9),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(2),
     gap: hp(0.15),
   },
@@ -375,12 +396,14 @@ const styles = StyleSheet.create({
   },
   billingText: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(14),
+    fontSize: normalize(15),
+    lineHeight: normalize(19),
     textTransform: 'none',
   },
   billingSubText: {
     fontFamily: 'Saveful-SemiBold',
     fontSize: normalize(11),
+    lineHeight: normalize(14),
     textTransform: 'none',
   },
   trialCard: {
@@ -389,28 +412,47 @@ const styles = StyleSheet.create({
     borderColor: palette.strokecream,
     borderRadius: normalize(14),
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.4),
-    gap: hp(0.9),
+    paddingVertical: hp(1.5),
+    gap: hp(1),
   },
   trialRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: wp(3),
+    gap: wp(2),
   },
   trialDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: palette.strokecream,
   },
-  trialLabel: {
+  trialLabelWrap: {
     flex: 1,
+    minWidth: 0,
+    paddingRight: wp(2),
+  },
+  trialLabel: {
     fontFamily: 'Saveful-SemiBold',
     fontSize: normalize(13),
+    lineHeight: normalize(18),
     textTransform: 'none',
+  },
+  trialValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexShrink: 0,
+    flexGrow: 0,
+    gap: wp(1),
   },
   trialValue: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(15),
+    lineHeight: normalize(20),
+    textTransform: 'none',
+  },
+  trialSuffix: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
     textTransform: 'none',
   },
   taxNote: {
@@ -422,15 +464,16 @@ const styles = StyleSheet.create({
   remindText: {
     fontFamily: 'Saveful-SemiBold',
     fontSize: normalize(12),
+    lineHeight: normalize(16),
     textAlign: 'center',
     textTransform: 'none',
-    marginTop: hp(0.3),
+    marginTop: hp(0.35),
   },
   trustRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: wp(2),
-    marginBottom: hp(0.4),
+    marginBottom: hp(0.35),
   },
   trustItem: {
     flex: 1,
@@ -438,8 +481,8 @@ const styles = StyleSheet.create({
     gap: hp(0.55),
   },
   trustIconWrap: {
-    width: normalize(44),
-    height: normalize(44),
+    width: normalize(46),
+    height: normalize(46),
     borderRadius: normalize(12),
     borderWidth: 1.5,
     borderColor: ACCENT,
@@ -457,8 +500,8 @@ const styles = StyleSheet.create({
   ctaBtn: {
     backgroundColor: ACCENT,
     borderRadius: normalize(14),
-    minHeight: normalize(52),
-    paddingHorizontal: wp(4),
+    minHeight: normalize(54),
+    paddingHorizontal: wp(4.5),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -466,6 +509,7 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(15),
+    lineHeight: normalize(20),
     textTransform: 'none',
     flex: 1,
     paddingRight: wp(2),

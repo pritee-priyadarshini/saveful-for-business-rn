@@ -83,7 +83,7 @@ export const SINGLE_SITE_COMPARE_SECTIONS: CompareFeatureSection[] = [
   {
     title: 'USERS',
     rows: [
-      { label: 'Users included', single: 'Upto 2', plus: 'Up to 6' },
+      { label: 'Users included', single: 'Up to 2', plus: 'Up to 6' },
     ],
   },
   {

@@ -25,6 +25,7 @@ import {
 const ACCENT = palette.kale;
 const ACCENT_SOFT = '#D8F0E0';
 const ACCENT_SOFT_ALT = '#E8F6EC';
+const BORDER = '#C7E4D1';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'SingleSiteCompare'>;
 type Route = RouteProp<RootStackParamList, 'SingleSiteCompare'>;
@@ -72,7 +73,7 @@ export function SingleSiteCompareScreen() {
         <AppText color={palette.black} style={styles.title}>
           Compare plans
         </AppText>
-        <AppText color={palette.black} style={styles.subtitle}>
+        <AppText color={palette.stone} style={styles.subtitle}>
           See what's included in each plan
         </AppText>
 
@@ -110,22 +111,39 @@ export function SingleSiteCompareScreen() {
         <View style={styles.compareCard}>
           <View style={styles.priceHeader}>
             <View style={styles.storeIconWrap}>
-              <Ionicons name="storefront-outline" size={normalize(28)} color={ACCENT} />
+              <Ionicons name="storefront-outline" size={normalize(30)} color={ACCENT} />
             </View>
+
             <View style={styles.priceColumns}>
-              {SINGLE_SITE_PLANS.map((plan) => (
-                <View key={plan.id} style={styles.priceCol}>
-                  <AppText color={ACCENT} style={styles.pricePlanName}>
-                    {plan.name}
-                  </AppText>
-                  <AppText color={ACCENT} style={styles.priceAmount}>
-                    {plan.monthlyPrice}{' '}
-                    <AppText color={ACCENT} style={styles.priceUnit}>
-                      /month
+              {SINGLE_SITE_PLANS.map((plan) => {
+                const isSelected = selectedPlanId === plan.id;
+                return (
+                  <View
+                    key={plan.id}
+                    style={[styles.priceCol, isSelected && styles.priceColSelected]}
+                  >
+                    {plan.badge ? (
+                      <View style={styles.mostPopularBadge}>
+                        <AppText color={palette.white} style={styles.mostPopularText}>
+                          {plan.badge}
+                        </AppText>
+                      </View>
+                    ) : (
+                      <View style={styles.badgeSpacer} />
+                    )}
+                    <AppText color={ACCENT} style={styles.pricePlanName}>
+                      {plan.name}
                     </AppText>
-                  </AppText>
-                </View>
-              ))}
+                    <AppText color={ACCENT} style={styles.priceAmount}>
+                      {plan.monthlyPrice}
+                      <AppText color={ACCENT} style={styles.priceUnit}>
+                        {' '}
+                        /month
+                      </AppText>
+                    </AppText>
+                  </View>
+                );
+              })}
             </View>
           </View>
 
@@ -140,22 +158,21 @@ export function SingleSiteCompareScreen() {
                   <AppText color={palette.black} style={styles.featureLabel}>
                     {row.label}
                   </AppText>
-                  <View style={styles.featureValue}>
+                  <View
+                    style={[
+                      styles.featureValue,
+                      selectedPlanId === 'single' && styles.featureValueSelected,
+                    ]}
+                  >
                     <CompareValue value={row.single} />
                   </View>
-                  <View style={styles.featureValue}>
-                    {row.label === 'Users included' ? (
-                      <View style={styles.plusUsersWrap}>
-                        <View style={styles.mostPopularBadge}>
-                          <AppText color={palette.white} style={styles.mostPopularText}>
-                            Most Popular
-                          </AppText>
-                        </View>
-                        <CompareValue value={row.plus} />
-                      </View>
-                    ) : (
-                      <CompareValue value={row.plus} />
-                    )}
+                  <View
+                    style={[
+                      styles.featureValue,
+                      selectedPlanId === 'single_plus' && styles.featureValueSelected,
+                    ]}
+                  >
+                    <CompareValue value={row.plus} />
                   </View>
                 </View>
               ))}
@@ -170,7 +187,7 @@ export function SingleSiteCompareScreen() {
           {SINGLE_SITE_COMPARE_UPGRADE_POINTS.map((point) => (
             <View key={point} style={styles.upgradeRow}>
               <View style={styles.checkIcon}>
-                <Ionicons name="checkmark" size={normalize(11)} color={palette.white} />
+                <Ionicons name="checkmark" size={normalize(12)} color={palette.white} />
               </View>
               <AppText color={palette.black} style={styles.upgradePoint}>
                 {point}
@@ -198,10 +215,10 @@ export function SingleSiteCompareScreen() {
 function CompareValue({ value }: { value: CompareCell }) {
   if (typeof value === 'boolean') {
     if (value) {
-      return <Ionicons name="checkmark" size={normalize(18)} color={ACCENT} />;
+      return <Ionicons name="checkmark" size={normalize(20)} color={ACCENT} />;
     }
     return (
-      <AppText color={ACCENT} style={styles.dash}>
+      <AppText color={palette.midgray} style={styles.dash}>
         —
       </AppText>
     );
@@ -217,7 +234,7 @@ function CompareValue({ value }: { value: CompareCell }) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: wp(5),
-    gap: hp(1.35),
+    gap: hp(1.5),
   },
   backBtn: {
     width: normalize(40),
@@ -227,31 +244,31 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(30),
+    fontSize: normalize(28),
     lineHeight: normalize(34),
     textAlign: 'center',
     textTransform: 'none',
   },
   subtitle: {
-    fontFamily: 'Saveful-Bold',
+    fontFamily: 'Saveful-Regular',
     fontSize: normalize(14),
-    lineHeight: normalize(18),
+    lineHeight: normalize(20),
     textAlign: 'center',
     textTransform: 'none',
-    marginTop: -hp(0.3),
+    marginTop: -hp(0.55),
     marginBottom: hp(0.2),
   },
   toggleWrap: {
     flexDirection: 'row',
     backgroundColor: ACCENT_SOFT,
-    borderRadius: normalize(14),
-    padding: normalize(4),
-    gap: wp(1),
+    borderRadius: normalize(16),
+    padding: normalize(5),
+    gap: wp(1.2),
   },
   toggleBtn: {
     flex: 1,
-    minHeight: normalize(42),
-    borderRadius: normalize(11),
+    minHeight: normalize(44),
+    borderRadius: normalize(12),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: wp(2),
@@ -264,38 +281,65 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(13),
+    fontSize: normalize(14),
+    lineHeight: normalize(18),
     textTransform: 'none',
   },
   compareCard: {
     backgroundColor: palette.white,
-    borderRadius: normalize(16),
-    borderWidth: 1,
-    borderColor: `${palette.kale}33`,
-    paddingHorizontal: wp(3.5),
-    paddingVertical: hp(1.4),
-    gap: hp(1.1),
+    borderRadius: normalize(18),
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    paddingHorizontal: wp(3),
+    paddingTop: hp(1.6),
+    paddingBottom: hp(1.5),
+    gap: hp(1.2),
   },
   priceHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2.5),
-    paddingBottom: hp(0.8),
+    alignItems: 'flex-end',
+    gap: wp(1.5),
+    paddingBottom: hp(1.1),
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: `${palette.kale}33`,
+    borderBottomColor: BORDER,
   },
   storeIconWrap: {
-    width: normalize(36),
+    width: normalize(34),
     alignItems: 'center',
+    paddingBottom: hp(0.35),
   },
   priceColumns: {
     flex: 1,
     flexDirection: 'row',
+    gap: wp(1),
   },
   priceCol: {
     flex: 1,
-    gap: hp(0.2),
     alignItems: 'center',
+    gap: hp(0.25),
+    paddingVertical: hp(0.45),
+    paddingHorizontal: wp(1),
+    borderRadius: normalize(10),
+  },
+  priceColSelected: {
+    backgroundColor: ACCENT_SOFT_ALT,
+  },
+  badgeSpacer: {
+    height: normalize(18),
+  },
+  mostPopularBadge: {
+    backgroundColor: ACCENT,
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.22),
+    borderRadius: normalize(6),
+    minHeight: normalize(18),
+    justifyContent: 'center',
+  },
+  mostPopularText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(9),
+    lineHeight: normalize(12),
+    textTransform: 'none',
   },
   pricePlanName: {
     fontFamily: 'Saveful-Bold',
@@ -306,34 +350,36 @@ const styles = StyleSheet.create({
   },
   priceAmount: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(15),
-    lineHeight: normalize(18),
+    fontSize: normalize(16),
+    lineHeight: normalize(20),
     textTransform: 'none',
     textAlign: 'center',
   },
   priceUnit: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(12),
+    lineHeight: normalize(16),
     textTransform: 'none',
   },
   section: {
-    gap: hp(0.55),
+    gap: hp(0.35),
   },
   sectionTitle: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(12),
+    fontSize: normalize(11),
     lineHeight: normalize(15),
-    letterSpacing: 0.4,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
-    marginTop: hp(0.2),
+    marginBottom: hp(0.15),
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: hp(0.5),
+    minHeight: normalize(32),
+    paddingVertical: hp(0.35),
   },
   featureLabel: {
-    flex: 1.45,
+    flex: 1.55,
     fontFamily: 'Saveful-Regular',
     fontSize: normalize(13),
     lineHeight: normalize(17),
@@ -344,45 +390,36 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: normalize(28),
+    minHeight: normalize(30),
+    borderRadius: normalize(8),
+    paddingVertical: hp(0.2),
   },
-  plusUsersWrap: {
-    alignItems: 'center',
-    gap: hp(0.35),
-  },
-  mostPopularBadge: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: wp(2.2),
-    paddingVertical: hp(0.28),
-    borderRadius: normalize(7),
-  },
-  mostPopularText: {
-    fontFamily: 'Saveful-Bold',
-    fontSize: normalize(9),
-    textTransform: 'none',
+  featureValueSelected: {
+    backgroundColor: ACCENT_SOFT_ALT,
   },
   valueText: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(13),
+    lineHeight: normalize(17),
     textTransform: 'none',
     textAlign: 'center',
   },
   dash: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(16),
-    lineHeight: normalize(18),
+    fontSize: normalize(18),
+    lineHeight: normalize(20),
   },
   upgradeBox: {
     backgroundColor: ACCENT_SOFT_ALT,
     borderRadius: normalize(16),
-    paddingVertical: hp(1.6),
+    paddingVertical: hp(1.7),
     paddingHorizontal: wp(4),
-    gap: hp(0.9),
+    gap: hp(1),
   },
   upgradeTitle: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(14),
-    lineHeight: normalize(18),
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
     textTransform: 'none',
   },
   upgradeRow: {
@@ -391,26 +428,26 @@ const styles = StyleSheet.create({
     gap: wp(2.5),
   },
   checkIcon: {
-    width: normalize(18),
-    height: normalize(18),
-    borderRadius: normalize(9),
+    width: normalize(20),
+    height: normalize(20),
+    borderRadius: normalize(10),
     backgroundColor: ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(0.1),
+    marginTop: hp(0.05),
   },
   upgradePoint: {
     flex: 1,
     fontFamily: 'Saveful-Regular',
     fontSize: normalize(13),
-    lineHeight: normalize(18),
+    lineHeight: normalize(19),
     textTransform: 'none',
   },
   continueBtn: {
     backgroundColor: ACCENT,
     borderRadius: normalize(14),
-    minHeight: normalize(52),
-    paddingHorizontal: wp(4),
+    minHeight: normalize(54),
+    paddingHorizontal: wp(4.5),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -419,6 +456,7 @@ const styles = StyleSheet.create({
   continueText: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(15),
+    lineHeight: normalize(20),
     textTransform: 'none',
     flex: 1,
     paddingRight: wp(2),
