@@ -1,7 +1,7 @@
-import { Alert } from 'react-native';
 import * as ExpoImagePicker from 'expo-image-picker';
 
 import { openCircularImageCrop } from '@/utils/circularImageCrop';
+import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 
 /**
  * Opens the gallery, then the in-app circular crop UI:
@@ -11,9 +11,9 @@ export async function pickSquareImage(): Promise<string | null> {
   try {
     const permission = await ExpoImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Photo access needed',
+      showInfoAlert(
         'Allow photo library access so you can upload a logo.',
+        'Photo access needed',
       );
       return null;
     }
@@ -31,7 +31,7 @@ export async function pickSquareImage(): Promise<string | null> {
     return openCircularImageCrop(result.assets[0].uri);
   } catch (error) {
     console.warn('[Logo] Image pick/crop failed:', error);
-    Alert.alert('Could not open gallery', 'Please try again.');
+    showErrorAlert('Please try again.', 'Could not open gallery');
     return null;
   }
 }

@@ -5,7 +5,6 @@ import {
     Pressable,
     ImageBackground,
     Modal,
-    Alert,
     Linking,
     Animated,
     Dimensions,
@@ -22,6 +21,7 @@ import { Card } from '../../components/Card';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { ListingStatus, OrderStatus } from '../../types';
+import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 
 type Params = {
     DriverTracking: {
@@ -197,7 +197,7 @@ export default function DriverTrackingScreen() {
 
     const makeCall = async (phone?: string | null) => {
         if (!phone) {
-            Alert.alert('Unavailable', 'Phone number not available');
+            showInfoAlert('Phone number not available', 'Unavailable');
             return;
         }
         const clean = phone.replace(/[^+\d]/g, '');
@@ -205,7 +205,7 @@ export default function DriverTrackingScreen() {
         try {
             await Linking.openURL(url);
         } catch {
-            Alert.alert('Error', 'Unable to open dialer');
+            showErrorAlert('Unable to open dialer', 'Error');
         }
     };
 

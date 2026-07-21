@@ -6,7 +6,6 @@ import {
   Pressable,
   Image,
   Linking,
-  Alert,
   Dimensions,
   ActivityIndicator,
   RefreshControl,
@@ -33,7 +32,8 @@ import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { palette } from '@/theme/colors';
 import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { showErrorAlert, showSuccessAlert, showInfoAlert } from '@/utils/apiError';
+import { showConfirmAlert } from '@/store/appAlertStore';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
@@ -150,7 +150,7 @@ export function ProfileScreen() {
         setLogo(uri);
       }
     } catch (error: any) {
-      Alert.alert('Image selection failed', 'Please try again.');
+      showErrorAlert('Please try again.', 'Image selection failed');
     }
   };
 
@@ -245,16 +245,16 @@ export function ProfileScreen() {
           Number.isFinite(longitude);
 
         if (trimmedAddress && !hasCoordinates) {
-          Alert.alert(
-            'Update location',
+          showInfoAlert(
             'Please use Search Address or Use My Location so latitude and longitude update with the address.',
+            'Update location',
           );
           return;
         }
 
         if (usesSiteAddress) {
           if (!siteId) {
-            Alert.alert('Error', 'Site not found');
+            showErrorAlert('Site not found', 'Error');
             return;
           }
           await sitesService.updateSite(siteId, {
@@ -263,7 +263,7 @@ export function ProfileScreen() {
           });
         } else if (isCharity || isFarmerConsumer) {
           if (!siteId) {
-            Alert.alert('Error', 'Location not found');
+            showErrorAlert('Location not found', 'Error');
             return;
           }
           await updateLocation(siteId, {
@@ -313,7 +313,7 @@ export function ProfileScreen() {
       try {
         const orgId = authUser?.profile?.organisation?.id;
         if (!orgId) {
-          Alert.alert('Error', 'Organisation not found');
+          showErrorAlert('Organisation not found', 'Error');
           return;
         }
 
@@ -321,7 +321,7 @@ export function ProfileScreen() {
         const hasBrandingChange = formData.branding.trim().length > 0;
 
         if (!hasBrandingChange && !hasNewLogo) {
-          Alert.alert('Nothing to save', 'Update branding or choose a logo first.');
+          showInfoAlert('Update branding or choose a logo first.', 'Nothing to save');
           return;
         }
 
@@ -355,7 +355,7 @@ export function ProfileScreen() {
     try {
       await logout();
     } catch {
-      Alert.alert('Logout failed', 'Please try again.');
+      showErrorAlert('Please try again.', 'Logout failed');
       setLoggingOut(false);
     }
   };
@@ -365,18 +365,14 @@ export function ProfileScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => void runLogout(),
-        },
-      ],
-    );
+    showConfirmAlert({
+      title: 'Delete Account',
+      message: 'Are you sure you want to delete your account?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+      onConfirm: () => void runLogout(),
+    });
   };
 
   const toggle = (key: string) => {

@@ -106,6 +106,10 @@ export const charityService = {
         return api.delete(`/charity/users/${userId}`);
     },
 
+    removeUserFromLocation(userId: number, locationId: number) {
+        return api.delete(`/charity/users/${userId}/locations/${locationId}`);
+    },
+
     resendInvite(userId: number, data: ResendInvitePayload,) {
         return api.post(`/charity/users/${userId}/resend-invite`, data,);
     },

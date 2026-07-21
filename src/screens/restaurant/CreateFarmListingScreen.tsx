@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Dimensions,
   Image,
   Linking,
@@ -22,12 +21,13 @@ import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
 import { useListingsStore } from '../../store/listingsStore';
-import { formatApiError, getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
+import { getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
 import { estimateCo2AvoidedKg, estimateMealsSaved, formatCo2AvoidedKg } from '../../utils/foodListing';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getFarmRelistFormValues } from '../../utils/listingRelist';
+import { showErrorAlert } from '../../utils/apiError';
 import {
   getListingDateErrors,
   getListingFoodItemsError,
@@ -361,7 +361,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
     const resolvedSiteId = await resolveListingSiteId(authUser);
     if (!resolvedSiteId) {
-      Alert.alert('Site not found', 'Please set up your business site first.');
+      showErrorAlert('Please set up your business site first.', 'Site not found');
       return;
     }
 
@@ -425,10 +425,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
         navigation.replace('RestaurantListings');
       } catch (error: any) {
         console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
-        Alert.alert(
-          'Could not create listing',
-          formatApiError(error, 'Please try again.'),
-        );
+        showErrorAlert(error, 'Could not create listing', 'Please try again.');
       }
     });
   };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -27,7 +27,8 @@ import { spacing } from '@/theme/spacing';
 import { useSitesStore } from '@/store/sitesStore';
 import { InputField } from '@/components/InputField';
 import { Skeleton } from '@/components/Skeleton';
-import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
+import { fetchCurrentLocation } from '@/utils/currentLocation';
+import { resolveLocationDetails } from '@/utils/postcode';
 import { getUserFriendlyErrorMessage, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 
@@ -53,7 +54,8 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-const inputProps = { compact: true as const, labelVariant: 'label' as const };
+const inputPropsBase = { compact: true as const, labelVariant: 'label' as const };
+const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
 
 function validateManagerPassword(
   password: string,
@@ -118,8 +120,74 @@ export default function CreateSiteScreen() {
   const createdSiteIdRef = useRef<number | null>(null);
   const submittingRef = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const activeFieldRef = useRef<View | null>(null);
+  const keyboardHeightRef = useRef(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const locationAlreadyCreated = createdSiteId != null;
+
+  const scrollActiveFieldIntoView = useCallback(() => {
+    const field = activeFieldRef.current;
+    if (!field) return;
+
+    requestAnimationFrame(() => {
+      field.measureInWindow((_x, fieldY, _w, fieldH) => {
+        const gap = hp(2);
+        const activeKeyboardHeight = keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
+        const visibleBottom = height - activeKeyboardHeight - gap;
+        const fieldBottom = fieldY + fieldH;
+
+        if (fieldBottom > visibleBottom) {
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, scrollYRef.current + (fieldBottom - visibleBottom)),
+            animated: true,
+          });
+        }
+      });
+    });
+  }, []);
+
+  const handleFieldFocus = useCallback(
+    (field: View) => {
+      activeFieldRef.current = field;
+      const shortDelay = Platform.OS === 'ios' ? 80 : 150;
+      const longDelay = Platform.OS === 'ios' ? 320 : 420;
+      setTimeout(scrollActiveFieldIntoView, shortDelay);
+      setTimeout(scrollActiveFieldIntoView, longDelay);
+    },
+    [scrollActiveFieldIntoView],
+  );
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      keyboardHeightRef.current = event.endCoordinates.height;
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+      setTimeout(scrollActiveFieldIntoView, Platform.OS === 'ios' ? 80 : 150);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      keyboardHeightRef.current = 0;
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      activeFieldRef.current = null;
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [scrollActiveFieldIntoView]);
+
+  const inputProps = {
+    ...inputPropsBase,
+    onFieldFocus: handleFieldFocus,
+  };
 
   const clearFieldError = (key: FieldKey) => {
     setFieldErrors((prev) => {
@@ -241,35 +309,16 @@ export default function CreateSiteScreen() {
     clearFieldError('address');
     setMapCenter({ latitude, longitude });
     setMarker({ latitude, longitude });
-    setSiteForm((prev) => ({ ...prev, latitude, longitude }));
 
-    if (address) {
-      setSelectedAddress(address);
-      setSiteForm((prev) => ({
-        ...prev,
-        address,
-        postcode: postcode ?? prev.postcode,
-      }));
-      return;
-    }
-
-    const label = await reverseGeocodeAddress(latitude, longitude);
-    setSelectedAddress(label);
-
-    try {
-      const places = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (places.length > 0) {
-        setSiteForm((prev) => ({
-          ...prev,
-          address: label,
-          postcode: places[0].postalCode || prev.postcode,
-        }));
-      } else {
-        setSiteForm((prev) => ({ ...prev, address: label }));
-      }
-    } catch {
-      setSiteForm((prev) => ({ ...prev, address: label }));
-    }
+    const resolved = await resolveLocationDetails(latitude, longitude, { address, postcode });
+    setSelectedAddress(resolved.address);
+    setSiteForm((prev) => ({
+      ...prev,
+      latitude,
+      longitude,
+      address: resolved.address,
+      postcode: resolved.postcode,
+    }));
   };
 
   const goToCurrentLocation = async () => {
@@ -278,7 +327,12 @@ export default function CreateSiteScreen() {
     try {
       const location = await fetchCurrentLocation();
       if (!location) return;
-      await applyMapLocation(location.latitude, location.longitude, location.address);
+      await applyMapLocation(
+        location.latitude,
+        location.longitude,
+        location.address,
+        location.postcode,
+      );
     } finally {
       setGpsLoading(false);
     }
@@ -334,9 +388,11 @@ export default function CreateSiteScreen() {
     // Location step already done — only validate manager fields for retry.
     if (!alreadyCreatedId) {
       if (!siteName.trim()) nextErrors.siteName = 'Please enter a site name.';
-      if (!postcode.trim()) nextErrors.postcode = 'Please enter a postcode.';
       if (!address.trim() || latitude == null || longitude == null) {
         nextErrors.address = 'Please set the site location on the map.';
+      } else if (!postcode.trim()) {
+        nextErrors.address =
+          'We could not detect a postcode from this pin. Search for a full address and try again.';
       }
     }
     if (!managerFirstName.trim()) nextErrors.firstName = 'Please enter a first name.';
@@ -522,6 +578,11 @@ export default function CreateSiteScreen() {
           </Pressable>
         </View>
       ) : null}
+      {siteForm.postcode ? (
+        <AppText variant="caption" style={styles.mapHintText}>
+          Postcode auto-filled: {siteForm.postcode}
+        </AppText>
+      ) : null}
       {renderFieldError('address')}
 
       <AppText style={styles.mapHintText}>Tap the map to fine-tune the pin</AppText>
@@ -640,11 +701,10 @@ export default function CreateSiteScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === 'ios' ? normalize(12) : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? normalize(8) : 0}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
           <Modal
             visible={showPlacesSearch}
             transparent
@@ -710,9 +770,18 @@ export default function CreateSiteScreen() {
 
           <ScrollView
             ref={scrollRef}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            onScroll={(event) => {
+              scrollYRef.current = event.nativeEvent.contentOffset.y;
+            }}
+            scrollEventThrottle={16}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingBottom: keyboardVisible ? keyboardHeight + hp(4) : hp(32),
+              },
+            ]}
           >
             <StackHeroHeader
               title={isAssignMode ? 'Assign Site Manager' : 'Add Location'}
@@ -764,11 +833,6 @@ export default function CreateSiteScreen() {
                         setManagerForm({ ...managerForm, phoneNumber: value });
                       } else {
                         setManagerForm({ ...managerForm, [key]: value });
-                      }
-                      if (key === 'password' || key === 'confirmPassword') {
-                        requestAnimationFrame(() => {
-                          scrollRef.current?.scrollToEnd({ animated: true });
-                        });
                       }
                     },
                   )}
@@ -826,18 +890,6 @@ export default function CreateSiteScreen() {
                     />
                     {renderFieldError('siteName')}
 
-                    <InputField
-                      label="Postcode"
-                      placeholder="Enter postcode"
-                      {...inputProps}
-                      value={siteForm.postcode}
-                      onChangeText={(v) => {
-                        clearFieldError('postcode');
-                        setSiteForm({ ...siteForm, postcode: v });
-                      }}
-                    />
-                    {renderFieldError('postcode')}
-
                     {renderLocationSection()}
                   </>
                 )}
@@ -873,11 +925,6 @@ export default function CreateSiteScreen() {
                     if (field) {
                       setSiteForm({ ...siteForm, [field]: value });
                     }
-                    if (key === 'password' || key === 'confirmPassword') {
-                      requestAnimationFrame(() => {
-                        scrollRef.current?.scrollToEnd({ animated: true });
-                      });
-                    }
                   },
                 )}
 
@@ -905,15 +952,13 @@ export default function CreateSiteScreen() {
               </View>
             )}
           </ScrollView>
-        </Screen>
-      </TouchableWithoutFeedback>
+      </Screen>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: hp(32),
     flexGrow: 1,
   },
   inlineError: {

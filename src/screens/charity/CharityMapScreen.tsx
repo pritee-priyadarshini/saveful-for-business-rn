@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Alert,
   FlatList,
   StyleSheet,
   TouchableOpacity,
@@ -25,7 +24,7 @@ import type { ClaimMode } from '../../services/claims.service';
 import { palette } from '../../theme/colors';
 import { useAppContext } from '../../store/AppContext';
 import { useDiscoverStore } from '../../store/discoverStore';
-import { showErrorAlert } from '@/utils/apiError';
+import { showErrorAlert, showInfoAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import {
   isFoodListingNotification,
@@ -266,9 +265,9 @@ export function CharityMapScreen({ navigation }: any) {
     (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
       const items = buildPartialClaimItems(listing, claimItems);
       if (!items.length) {
-        Alert.alert(
-          'Select quantities',
+        showInfoAlert(
           'Use the + / − buttons to choose how much of each food item you want to claim.',
+          'Select quantities',
         );
         return;
       }
@@ -285,9 +284,9 @@ export function CharityMapScreen({ navigation }: any) {
   const openFullClaim = useCallback(
     (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
       if (!claimItems.length) {
-        Alert.alert(
-          'Items not ready',
+        showInfoAlert(
           'Food items are still loading. Please wait a moment and try again.',
+          'Items not ready',
         );
         return;
       }
@@ -340,9 +339,9 @@ export function CharityMapScreen({ navigation }: any) {
         showErrorAlert(e, 'Claim submitted', 'Could not refresh listings');
       }
 
-      Alert.alert(
-        'Claim submitted',
+      showSuccessAlert(
         'The restaurant will review and confirm your claim soon.',
+        'Claim submitted',
       );
     },
     [storeFetchListings, refreshListingFoodItems],

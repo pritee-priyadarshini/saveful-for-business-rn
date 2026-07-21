@@ -7,7 +7,6 @@ import {
   ImageBackground,
   Image,
   Modal,
-  Alert,
   Linking,
   Dimensions,
   ViewStyle,
@@ -18,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { palette } from '../../theme/colors';
+import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -259,20 +259,20 @@ export default function CharityPickupScreen({ navigation }: any) {
 
   const makeCall = async (phone?: string | null) => {
     if (!phone) {
-      Alert.alert('Unavailable', 'Phone number not available');
+      showInfoAlert('Phone number not available', 'Unavailable');
       return;
     }
     const url = `tel:${phone.replace(/[^+\d]/g, '')}`;
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Error', 'Unable to open dialer');
+      showErrorAlert('Unable to open dialer', 'Error');
     }
   };
 
   const sendMessage = async (phone?: string | null) => {
     if (!phone) {
-      Alert.alert('Unavailable', 'Phone number not available');
+      showInfoAlert('Phone number not available', 'Unavailable');
       return;
     }
     await Linking.openURL(`sms:${phone}`);

@@ -1,4 +1,4 @@
-﻿import { Alert, AppState, Linking, Platform } from 'react-native';
+﻿import { AppState, Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 
@@ -8,6 +8,7 @@ import {
   type RegisterPushTokenPayload,
 } from './notifications.service';
 import type { UserRole } from '../types';
+import { showConfirmAlert, useAppAlertStore } from '@/store/appAlertStore';
 
 
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
@@ -47,46 +48,49 @@ function showNotificationSettingsAlert(): void {
   if (permissionSettingsAlertShown) return;
   permissionSettingsAlertShown = true;
 
-  Alert.alert(
-    'Enable notifications',
-    NOTIFICATION_PERMISSION_MESSAGE,
-    [
-      {
-        text: 'Not now',
-        style: 'cancel',
-        onPress: () => {
-          permissionSettingsAlertShown = false;
-        },
-      },
-      {
-        text: 'Open Settings',
-        onPress: () => {
-          permissionSettingsAlertShown = false;
-          Linking.openSettings();
-        },
-      },
-    ],
-  );
+  showConfirmAlert({
+    title: 'Enable notifications',
+    message: NOTIFICATION_PERMISSION_MESSAGE,
+    confirmLabel: 'Open Settings',
+    cancelLabel: 'Not now',
+    onConfirm: () => {
+      Linking.openSettings();
+    },
+  });
+
+  const unsubscribe = useAppAlertStore.subscribe((state, prev) => {
+    if (prev.visible && !state.visible) {
+      permissionSettingsAlertShown = false;
+      unsubscribe();
+    }
+  });
 }
 
 function askNotificationPermissionApproval(): Promise<boolean> {
   return new Promise((resolve) => {
-    Alert.alert(
-      'Notification approval',
-      NOTIFICATION_PERMISSION_MESSAGE,
-      [
-        {
-          text: "Don't allow",
-          style: 'cancel',
-          onPress: () => resolve(false),
-        },
-        {
-          text: 'Allow',
-          onPress: () => resolve(true),
-        },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    showConfirmAlert({
+      title: 'Notification approval',
+      message: NOTIFICATION_PERMISSION_MESSAGE,
+      confirmLabel: 'Allow',
+      cancelLabel: "Don't allow",
+      onConfirm: () => {
+        finish(true);
+      },
+    });
+
+    const unsubscribe = useAppAlertStore.subscribe((state, prev) => {
+      if (prev.visible && !state.visible) {
+        unsubscribe();
+        finish(false);
+      }
+    });
   });
 }
 

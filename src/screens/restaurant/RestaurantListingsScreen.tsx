@@ -6,7 +6,6 @@ import {
   Pressable,
   Image,
   Modal,
-  Alert,
   Platform,
   RefreshControl,
 } from 'react-native';
@@ -39,6 +38,7 @@ import {
   resolveListingStatus,
 } from '../../utils/foodListing';
 import { showErrorAlert } from '../../utils/apiError';
+import { showConfirmAlert } from '../../store/appAlertStore';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
 import { fetchListingDetail } from '../../services/foodListing.service';
@@ -297,28 +297,24 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
   const handleCancelListing = (id: number) => {
     if (cancellingId !== null) return;
-    Alert.alert(
-      'Cancel Listing',
-      'Are you sure you want to cancel this listing? This cannot be undone.',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            if (cancellingId !== null) return;
-            setCancellingId(id);
-            try {
-              await storeCancelListing(id);
-            } catch (error: unknown) {
-              showErrorAlert(error, 'Could not cancel listing', 'Failed to cancel listing');
-            } finally {
-              setCancellingId(null);
-            }
-          },
-        },
-      ],
-    );
+    showConfirmAlert({
+      title: 'Cancel Listing',
+      message: 'Are you sure you want to cancel this listing? This cannot be undone.',
+      confirmLabel: 'Yes, Cancel',
+      cancelLabel: 'No',
+      destructive: true,
+      onConfirm: async () => {
+        if (cancellingId !== null) return;
+        setCancellingId(id);
+        try {
+          await storeCancelListing(id);
+        } catch (error: unknown) {
+          showErrorAlert(error, 'Could not cancel listing', 'Failed to cancel listing');
+        } finally {
+          setCancellingId(null);
+        }
+      },
+    });
   };
 
   const openItemsModal = async (listing: any) => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -13,33 +13,77 @@ import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { AuthStackParamList } from '../../navigation/types';
+import { useAppContext } from '../../store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleReady'>;
+type StepIcon = keyof typeof Ionicons.glyphMap;
 
-const nextSteps = [
+type NextStep = {
+  icon: StepIcon;
+  title: string;
+  description: string;
+};
+
+type Audience = 'restaurant' | 'charity' | 'farm_producer' | 'farmer';
+
+function resolveAudience(role: string | null | undefined): Audience {
+  if (role === 'charity_single' || role === 'charity_multi') return 'charity';
+  if (role === 'farm_business') return 'farm_producer';
+  if (role === 'farmer') return 'farmer';
+  return 'restaurant';
+}
+
+const sharedSteps: NextStep[] = [
   {
-    icon: 'person-outline' as const,
+    icon: 'person-outline',
     title: 'Complete your profile',
     description: 'Add a few details to get started',
   },
   {
-    icon: 'shield-checkmark-outline' as const,
+    icon: 'shield-checkmark-outline',
     title: 'Verify who you are',
     description: 'Quick verification builds trust in the community',
   },
-  {
-    icon: 'search-outline' as const,
-    title: 'Start listing or browsing',
-    description:
-      'List surplus food for redistribution to communities and/or food not fit for human consumption for farm livestock feed',
-  },
 ];
+
+const thirdStepByAudience: Record<Audience, NextStep> = {
+  restaurant: {
+    icon: 'restaurant-outline',
+    title: 'Start listing surplus food',
+    description:
+      'List surplus food for redistribution to communities, and reduce waste from your business',
+  },
+  charity: {
+    icon: 'search-outline',
+    title: 'Start browsing and collecting',
+    description:
+      'Find nearby surplus food listings and arrange collections to support your community',
+  },
+  farm_producer: {
+    icon: 'leaf-outline',
+    title: 'Start listing farm surplus',
+    description:
+      'List produce and food not fit for human consumption for redistribution or farm livestock feed',
+  },
+  farmer: {
+    icon: 'nutrition-outline',
+    title: 'Start collecting livestock feed',
+    description:
+      'Find food not suitable for human consumption to feed farm livestock near you',
+  },
+};
 
 export function RoleReadyScreen({ navigation }: Props) {
   useTransparentStatusBar('light');
+  const { selectedRole } = useAppContext();
+
+  const nextSteps = useMemo(() => {
+    const audience = resolveAudience(selectedRole);
+    return [...sharedSteps, thirdStepByAudience[audience]];
+  }, [selectedRole]);
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop contentStyle={styles.screenContent}>

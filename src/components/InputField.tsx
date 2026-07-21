@@ -1,5 +1,14 @@
 import React, { useState, useRef } from 'react';
-import { KeyboardTypeOptions, StyleSheet, TextInput, View, Pressable, FocusEvent } from 'react-native';
+import {
+  KeyboardTypeOptions,
+  StyleSheet,
+  TextInput,
+  View,
+  Pressable,
+  FocusEvent,
+  TextInputProps,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
@@ -26,6 +35,9 @@ type InputFieldProps = {
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoCorrect?: boolean;
+  textContentType?: TextInputProps['textContentType'];
+  autoComplete?: TextInputProps['autoComplete'];
+  passwordRules?: TextInputProps['passwordRules'];
 };
 
 export function InputField({
@@ -44,12 +56,23 @@ export function InputField({
   keyboardType,
   autoCapitalize,
   autoCorrect,
+  textContentType,
+  autoComplete,
+  passwordRules,
 }: InputFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<View>(null);
 
-  const [hidden, setHidden] = useState(secureTextEntry);
+  // Password fields must start masked; `secureTextEntry` is often omitted when using `isPassword`.
+  const [hidden, setHidden] = useState(isPassword ? true : Boolean(secureTextEntry));
   const useFormLabel = compact || labelVariant === 'label';
+
+  const resolvedTextContentType =
+    textContentType ??
+    (isPassword ? 'newPassword' : undefined);
+  const resolvedAutoComplete =
+    autoComplete ??
+    (isPassword ? (Platform.OS === 'android' ? 'password-new' : 'new-password') : undefined);
 
   const handleFocus = (_e: FocusEvent) => {
     setIsFocused(true);
@@ -84,22 +107,28 @@ export function InputField({
             compact && styles.inputCompact,
             useFormLabel && !compact && styles.inputForm,
             multiline && styles.multiline,
-            isFocused && styles.inputFocused, 
+            isFocused && styles.inputFocused,
           ]}
           value={value}
           onChangeText={onChangeText}
           onFocus={handleFocus}
           onBlur={() => setIsFocused(false)}
           keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={autoCorrect}
+          autoCapitalize={autoCapitalize ?? (isPassword ? 'none' : undefined)}
+          autoCorrect={autoCorrect ?? (isPassword ? false : undefined)}
+          textContentType={resolvedTextContentType}
+          autoComplete={resolvedAutoComplete}
+          passwordRules={passwordRules}
+          importantForAutofill={isPassword ? 'yes' : 'auto'}
         />
 
-        {/* 👁 Eye icon */}
         {isPassword && (
           <Pressable
             style={styles.eye}
             onPress={() => setHidden((prev) => !prev)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={hidden ? 'Show password' : 'Hide password'}
           >
             <Ionicons
               name={hidden ? 'eye-off-outline' : 'eye-outline'}
@@ -171,7 +200,7 @@ const styles = StyleSheet.create({
   },
 
   inputFocused: {
-    borderColor: palette.primary, 
+    borderColor: palette.primary,
   },
 
   multiline: {

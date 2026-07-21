@@ -1,10 +1,15 @@
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 import * as Location from 'expo-location';
+
+import { showConfirmAlert } from '@/store/appAlertStore';
+import { showErrorAlert } from '@/utils/apiError';
+import { resolveLocationDetails } from '@/utils/postcode';
 
 export type CurrentLocationResult = {
   latitude: number;
   longitude: number;
   address: string;
+  postcode: string;
 };
 
 function formatAddress(place: Location.LocationGeocodedAddress): string {
@@ -38,14 +43,15 @@ export async function fetchCurrentLocation(): Promise<CurrentLocationResult | nu
     }
 
     if (permission.status !== 'granted') {
-      Alert.alert(
-        'Location Permission Required',
-        'Please enable location permission from app settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ],
-      );
+      showConfirmAlert({
+        title: 'Location Permission Required',
+        message: 'Please enable location permission from app settings.',
+        confirmLabel: 'Open Settings',
+        cancelLabel: 'Cancel',
+        onConfirm: () => {
+          Linking.openSettings();
+        },
+      });
       return null;
     }
 
@@ -54,11 +60,11 @@ export async function fetchCurrentLocation(): Promise<CurrentLocationResult | nu
     });
 
     const { latitude, longitude } = position.coords;
-    const address = await reverseGeocodeAddress(latitude, longitude);
+    const { address, postcode } = await resolveLocationDetails(latitude, longitude);
 
-    return { latitude, longitude, address };
+    return { latitude, longitude, address, postcode };
   } catch {
-    Alert.alert('Location Error', 'Unable to get your location. Please try again.');
+    showErrorAlert('Unable to get your location. Please try again.', 'Location Error');
     return null;
   }
 }

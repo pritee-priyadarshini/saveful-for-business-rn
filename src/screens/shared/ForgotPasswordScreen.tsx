@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
-    Alert,
     Pressable,
     StyleSheet,
     TextInput,
@@ -197,12 +196,11 @@ export default function ForgotPasswordScreen() {
 
             const res = await authService.resetPassword(trimmedEmail, enteredOtp, password);
 
-            Alert.alert('Success', res.data.message || 'Password updated successfully.', [
-                {
-                    text: 'OK',
-                    onPress: () => navigation.goBack(),
-                },
-            ]);
+            showSuccessAlert(
+                res.data.message || 'Password updated successfully.',
+                'Success',
+                () => navigation.goBack(),
+            );
         } catch (error: unknown) {
             setFormError(
                 getOtpVerificationErrorMessage(

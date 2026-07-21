@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   Modal,
-  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -83,7 +82,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       const email = resolveVerificationEmail();
 
       if (!email) {
-        Alert.alert('Missing email', 'Please enter your email to verify.');
+        showErrorAlert('Please enter your email to verify.', 'Missing email');
         setLoading(false);
         return;
       }
@@ -139,7 +138,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
     const email = resolveVerificationEmail();
 
     if (!email) {
-      Alert.alert('Missing email', 'Please enter your email to resend the code.');
+      showErrorAlert('Please enter your email to resend the code.', 'Missing email');
       return;
     }
 

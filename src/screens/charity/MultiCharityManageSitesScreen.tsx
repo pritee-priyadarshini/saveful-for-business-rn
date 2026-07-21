@@ -6,7 +6,6 @@ import {
     StyleSheet,
     Image,
     Linking,
-    Alert,
     TextInput,
     RefreshControl,
 } from 'react-native';
@@ -25,8 +24,8 @@ import {
 } from '../../components/LocationSetupModal';
 import { useAppContext } from '@/store/AppContext';
 import { useCharityStore, type CharityMember } from '@/store/charityStore';
+import { showConfirmAlert, showAppAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
 import { Ionicons } from '@expo/vector-icons';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -55,17 +54,22 @@ type Site = {
 
 function findLocationAdmin(users: CharityMember[], locationId: number) {
     const activeUsers = users.filter((user) => user.isActive === true);
-    return activeUsers.find(
-        (user) =>
-            user.role === 'LOCATION_ADMIN' &&
+    return (
+        activeUsers.find(
+            (user) =>
+                user.role === 'LOCATION_ADMIN' &&
+                user.locations?.some((loc: any) => loc.id === locationId),
+        ) ??
+        activeUsers.find((user) =>
             user.locations?.some((loc: any) => loc.id === locationId),
-    ) ?? activeUsers.find((user) =>
-        user.locations?.some((loc: any) => loc.id === locationId),
-    ) ?? null;
+        ) ??
+        null
+    );
 }
+
 export default function MultiCharityManageSitesScreen() {
     useTransparentStatusBar('light');
-    const safeBottomPadding = useSafeBottomPadding(hp(4));
+    const safeBottomPadding = useSafeBottomPadding(hp(1.5));
     const navigation = useNavigation<NavigationProp>();
     const { logout, currentProfile, authUser } = useAppContext();
     const {
@@ -77,16 +81,16 @@ export default function MultiCharityManageSitesScreen() {
         fetchUsers,
         updateLocation,
         deactivateLocation,
-        deleteUser,
+        removeUserFromLocation,
     } = useCharityStore();
 
-    const [showPassword, setShowPassword] = useState(false);
     const [editingSiteId, setEditingSiteId] = useState<number | null>(null);
     const [editForm, setEditForm] = useState<any>({});
     const [refreshing, setRefreshing] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
     const [locationModalVisible, setLocationModalVisible] = useState(false);
+
     const refreshProfile = useAuthStore((s) => s.refreshProfile);
     const businessLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
     const brandName =
@@ -110,7 +114,9 @@ export default function MultiCharityManageSitesScreen() {
                 tradingName: location.locationName,
                 address: location.address,
                 postCode: location.postcode,
-                contactName: admin ? `${admin.firstName} ${admin.lastName}`.trim() : 'No manager assigned',
+                contactName: admin
+                    ? `${admin.firstName} ${admin.lastName}`.trim()
+                    : 'No manager assigned',
                 email: admin?.email || location.contactEmail || '-',
                 mobile: admin?.mobile || location.contactMobile || '-',
                 latitude: location.latitude,
@@ -121,6 +127,11 @@ export default function MultiCharityManageSitesScreen() {
             };
         });
     }, [locations, users, businessLogo]);
+
+    const managedCount = useMemo(
+        () => sites.filter((site) => site.hasManager).length,
+        [sites],
+    );
 
     const actions = [
         { label: 'Add Location', route: 'CreateCharitySite', primary: true },
@@ -152,9 +163,126 @@ export default function MultiCharityManageSitesScreen() {
             loadData(true).catch((e) =>
                 showErrorAlert(e, 'Could not load locations', 'Could not load locations'),
             );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+            // eslint-disable-next-line react-hooks/exhaustive-deps
         }, []),
     );
+
+    const toggleExpanded = (siteId: number) => {
+        if (expandedSite === siteId) {
+            setExpandedSite(null);
+            setEditingSiteId(null);
+            return;
+        }
+        setEditingSiteId(null);
+        setExpandedSite(siteId);
+    };
+
+    const startEditing = (site: Site) => {
+        const location = locations.find((loc) => loc.id === site.id);
+        if (!location) {
+            showErrorAlert('Failed to load location details', 'Something went wrong');
+            return;
+        }
+
+        setEditingSiteId(site.id);
+        setEditForm({
+            tradingName: String(location?.locationName || ''),
+            address: String(location?.address || ''),
+            postCode: String(location?.postcode || ''),
+            radiusKm: String(location?.pickupRadiusKm || ''),
+            latitude: location?.latitude || '',
+            longitude: location?.longitude || '',
+        });
+        setExpandedSite(site.id);
+    };
+
+    const handleSaveLocation = async () => {
+        if (actionLoading || !editingSiteId) return;
+        setActionLoading(true);
+        try {
+            const latitude = Number(editForm.latitude);
+            const longitude = Number(editForm.longitude);
+            const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+
+            await updateLocation(editingSiteId, {
+                locationName: editForm.tradingName,
+                address: editForm.address,
+                postcode: editForm.postCode,
+                radiusKm: Number(editForm.radiusKm),
+                ...(hasCoordinates ? { latitude, longitude } : {}),
+            });
+
+            const orgId = authUser?.profile?.organisation?.id;
+            if (orgId && hasCoordinates) {
+                await organizationService.updateCoordinates(orgId, {
+                    latitude,
+                    longitude,
+                });
+                await refreshProfile();
+            }
+
+            await loadData(true);
+            setEditingSiteId(null);
+            setEditForm({});
+            showSuccessAlert('Location updated successfully');
+        } catch (err: unknown) {
+            showErrorAlert(err, 'Could not update location', 'Could not update location');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const requestDeleteLocation = (siteId: number) => {
+        showConfirmAlert({
+            title: 'Delete location?',
+            message:
+                'This removes the site from your charity. Managers linked only to this site may lose access.',
+            confirmLabel: 'Delete location',
+            destructive: true,
+            onConfirm: async () => {
+                try {
+                    await deactivateLocation(siteId);
+                    setExpandedSite(null);
+                    setEditingSiteId(null);
+                    await loadData(true);
+                    showSuccessAlert('Site removed successfully', 'Deleted');
+                } catch (err) {
+                    showErrorAlert(err, 'Could not remove location', 'Could not remove location');
+                    throw err;
+                }
+            },
+        });
+    };
+
+    const requestRemoveManager = (siteId: number) => {
+        showConfirmAlert({
+            title: 'Remove manager?',
+            message:
+                'They will be removed from this site only. If they manage other sites, those stay unchanged.',
+            confirmLabel: 'Remove manager',
+            destructive: true,
+            onConfirm: async () => {
+                try {
+                    await fetchUsers(true);
+                    const admin = findLocationAdmin(useCharityStore.getState().users, siteId);
+                    if (!admin?.id) {
+                        showAppAlert({
+                            variant: 'info',
+                            title: 'Nothing to remove',
+                            message: 'No manager assigned to this site',
+                        });
+                        return;
+                    }
+                    await removeUserFromLocation(admin.id, siteId);
+                    await loadData(true);
+                    showSuccessAlert('Manager removed from this site');
+                } catch (err: unknown) {
+                    showErrorAlert(err, 'Could not remove manager', 'Could not remove manager');
+                    throw err;
+                }
+            },
+        });
+    };
 
     const renderSkeleton = () => (
         <View style={styles.skeletonWrap}>
@@ -182,16 +310,16 @@ export default function MultiCharityManageSitesScreen() {
                 <View key={i} style={[styles.siteCard, styles.skeletonSiteCard]}>
                     <View style={styles.siteHeader}>
                         <View style={styles.siteLeft}>
-                            <Skeleton width={normalize(48)} height={normalize(48)} borderRadius={normalize(24)} />
+                            <Skeleton
+                                width={normalize(48)}
+                                height={normalize(48)}
+                                borderRadius={normalize(24)}
+                            />
                             <View style={{ flex: 1, gap: normalize(6) }}>
                                 <Skeleton width="70%" height={normalize(18)} />
                                 <Skeleton width="90%" height={normalize(14)} />
                                 <Skeleton width="40%" height={normalize(14)} />
                             </View>
-                        </View>
-                        <View style={{ gap: hp(0.7) }}>
-                            <Skeleton width={normalize(56)} height={normalize(32)} borderRadius={normalize(8)} />
-                            <Skeleton width={normalize(56)} height={normalize(32)} borderRadius={normalize(8)} />
                         </View>
                     </View>
                 </View>
@@ -211,6 +339,7 @@ export default function MultiCharityManageSitesScreen() {
     return (
         <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
             <StatusBar style="light" translucent backgroundColor="transparent" />
+
             <LocationSetupModal
                 visible={locationModalVisible}
                 onClose={() => setLocationModalVisible(false)}
@@ -222,56 +351,79 @@ export default function MultiCharityManageSitesScreen() {
                               latitude: Number(editForm.latitude),
                               longitude: Number(editForm.longitude),
                               address: String(editForm.address || ''),
+                              postcode: String(editForm.postCode || ''),
                           }
                         : null
                 }
-                onConfirm={async ({ latitude, longitude, address }: SelectedLocation) => {
+                onConfirm={async ({ latitude, longitude, address, postcode }: SelectedLocation) => {
                     setEditForm((prev: any) => ({
                         ...prev,
                         address,
                         latitude,
                         longitude,
+                        postCode: postcode || prev.postCode,
                     }));
                     setLocationModalVisible(false);
                 }}
             />
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: safeBottomPadding }]}
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-
-                {/* HERO HEADER */}
                 <HeroHeader
                     source={require('../../../assets/placeholder/kale-header.png')}
-                    style={{ marginBottom: hp(2.5) }}
+                    height={hp(14)}
+                    style={{ marginBottom: hp(1.2) }}
                 >
-                    <View style={[styles.topBar, { paddingTop: hp(2) }]}>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                            <AppText variant="h6" style={styles.whiteText}>
-                                {brandName}
-                            </AppText>
+                    <View style={styles.heroContent}>
+                        <View style={styles.heroTopRow}>
+                            <View style={styles.heroTextBlock}>
+                                <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                                    {brandName}
+                                </AppText>
+                                <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                                    Your sites
+                                </AppText>
+                                <HeaderAddressRow
+                                    address={brandAddress}
+                                    iconSize={normalize(15)}
+                                    style={styles.heroAddressRow}
+                                    textStyle={styles.heroAddress}
+                                />
+                            </View>
 
-                            <HeaderAddressRow
-                                address={brandAddress}
-                                iconSize={normalize(24)}
-                                textStyle={styles.location}
-                            />
+                            <Pressable
+                                style={styles.heroIconCircle}
+                                onPress={() => navigation.navigate('Account')}
+                                accessibilityRole="button"
+                                accessibilityLabel="Open account profile"
+                            >
+                                {businessLogo ? (
+                                    <Image
+                                        source={{ uri: businessLogo }}
+                                        style={styles.logoImage}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <AppText style={styles.logoFallback}>{brandName[0] || 'S'}</AppText>
+                                )}
+                            </Pressable>
                         </View>
 
-                        <View style={styles.logoCircle}>
-                            {businessLogo ? (
-                                <Image source={{ uri: businessLogo }} style={styles.logoImage} />
-                            ) : (
-                                <AppText style={styles.logoFallback}>
-                                    {brandName[0] || 'S'}
-                                </AppText>
-                            )}
+                        <View style={styles.heroStatsPill}>
+                            <Ionicons name="business-outline" size={normalize(14)} color={palette.white} />
+                            <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
+                                {sites.length === 0
+                                    ? 'No locations yet'
+                                    : `${managedCount} of ${sites.length} sites managed`}
+                            </AppText>
                         </View>
                     </View>
                 </HeroHeader>
 
-                {/* ACTIONS */}
                 <AppText variant="subheading" style={styles.sectionTitle}>
                     What to do today !
                 </AppText>
@@ -299,130 +451,142 @@ export default function MultiCharityManageSitesScreen() {
                     ))}
                 </View>
 
-                {/* SITES */}
-                <AppText variant="subheading" style={styles.sectionTitle}>
-                    Your Sites
-                </AppText>
-
-                {sites.length === 0 && (
-                    <View style={{ paddingHorizontal: wp(5), marginTop: hp(1.2) }}>
-                        <AppText variant="bodyLarge">
-                            No charity locations added yet
+                <View style={styles.sitesHeader}>
+                    <View style={styles.sitesHeaderLeft}>
+                        <AppText variant="subheading" style={styles.sitesTitle}>
+                            Your Sites
                         </AppText>
-                    </View>
-                )}
-
-                {sites.map((site, index) => (
-                    <View key={site.id} style={styles.siteCard}>
-
-                        <AppText variant="bodyBold" style={styles.siteIndex}>
-                            Site {index + 1}
-                        </AppText>
-
-                        <View style={styles.siteHeader}>
-
-                            <View style={styles.siteLeft}>
-                                <View style={styles.siteLogoWrap}>
-                                    <Image
-                                        source={
-                                            site.logoUrl
-                                                ? { uri: site.logoUrl }
-                                                : require('../../../assets/intro/charity_logo.png')
-                                        }
-                                        style={styles.siteLogo}
-                                    />
-                                </View>
-
-                                <View style={{ flex: 1 }}>
-                                    <AppText variant="bodyBold" style={styles.siteName}>
-                                        {site.tradingName}
-                                    </AppText>
-
-                                    <AppText variant="bodySmall" style={styles.siteAddress}>
-                                        {site.address}
-                                    </AppText>
-
-                                    <AppText variant="bodySmall" style={styles.siteAddress}>
-                                        {site.postCode}
-                                    </AppText>
-                                </View>
-                            </View>
-
-                            <View style={{ alignItems: 'flex-end', gap: hp(0.7) }}>
-
-                                {/* VIEW */}
-                                <Pressable
-                                    style={styles.viewBtn}
-                                    onPress={() => {
-                                        setEditingSiteId(null); 
-                                        setExpandedSite(expandedSite === site.id ? null : site.id);
-                                    }}
-                                >
-                                    <AppText variant="bodyBold" style={styles.viewText}>
-                                        View
-                                    </AppText>
-                                </Pressable>
-
-                                {/* EDIT */}
-                                <Pressable
-                                    style={styles.editBtn}
-                                    onPress={() => {
-                                        const location = locations.find((loc) => loc.id === site.id);
-                                        if (!location) {
-                                            Alert.alert('Error', 'Failed to load location details');
-                                            return;
-                                        }
-
-                                        setEditingSiteId(site.id);
-                                        setEditForm({
-                                            tradingName: String(location?.locationName || ''),
-                                            address: String(location?.address || ''),
-                                            postCode: String(location?.postcode || ''),
-                                            radiusKm: String(location?.pickupRadiusKm || ''),
-                                            latitude: location?.latitude || '',
-                                            longitude: location?.longitude || '',
-                                        });
-                                        setExpandedSite(site.id);
-                                    }}
-                                >
-                                    <AppText variant="bodyBold" style={{ color: 'white' }} >
-                                        Edit
-                                    </AppText>
-                                </Pressable>
-
-                            </View>
+                        <View style={styles.countBadge}>
+                            <AppText variant="bodySmall" style={styles.countBadgeText}>
+                                {sites.length}
+                            </AppText>
                         </View>
+                    </View>
+                    <Pressable
+                        style={styles.addLink}
+                        onPress={() => navigation.navigate('CreateCharitySite' as any)}
+                        hitSlop={8}
+                    >
+                        <Ionicons name="add" size={normalize(16)} color={palette.kale} />
+                        <AppText variant="bodyBold" style={styles.addLinkText}>
+                            Add
+                        </AppText>
+                    </Pressable>
+                </View>
 
-                        {expandedSite === site.id && (
-                            <View style={styles.details}>
-                                {editingSiteId === site.id ? (
-                                    <>
-                                        {[
-                                            {
-                                                key: 'tradingName',
-                                                label: 'Location Name',
-                                            },
-                                            {
-                                                key: 'postCode',
-                                                label: 'Post Code',
-                                            },
-                                            {
-                                                key: 'radiusKm',
-                                                label: 'Pickup Radius (km)',
-                                            },
-                                        ].map((field: any) => (
+                {sites.length === 0 ? (
+                    <View style={styles.emptyCard}>
+                        <View style={styles.emptyIcon}>
+                            <Ionicons name="business-outline" size={normalize(26)} color={palette.kale} />
+                        </View>
+                        <AppText variant="bodyBold" style={styles.emptyTitle}>
+                            No locations yet
+                        </AppText>
+                        <AppText variant="bodySmall" style={styles.emptyCopy}>
+                            Add your first charity site so teams can collect surplus food nearby.
+                        </AppText>
+                        <Pressable
+                            style={styles.emptyCta}
+                            onPress={() => navigation.navigate('CreateCharitySite' as any)}
+                        >
+                            <AppText variant="bodyBold" style={styles.emptyCtaText}>
+                                Add Location
+                            </AppText>
+                        </Pressable>
+                    </View>
+                ) : null}
+
+                {sites.map((site, index) => {
+                    const isExpanded = expandedSite === site.id;
+                    const isEditing = editingSiteId === site.id;
+
+                    return (
+                        <View key={site.id} style={[styles.siteCard, isExpanded && styles.siteCardExpanded]}>
+                            <Pressable
+                                style={styles.siteHeader}
+                                onPress={() => toggleExpanded(site.id)}
+                            >
+                                <View style={styles.siteLeft}>
+                                    <View style={styles.siteLogoWrap}>
+                                        <Image
+                                            source={
+                                                site.logoUrl
+                                                    ? { uri: site.logoUrl }
+                                                    : require('../../../assets/intro/charity_logo.png')
+                                            }
+                                            style={styles.siteLogo}
+                                        />
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <View style={styles.siteTitleRow}>
+                                            <AppText variant="bodySmall" style={styles.siteIndex}>
+                                                Site {index + 1}
+                                            </AppText>
                                             <View
-                                                key={field.key}
-                                                style={{ marginBottom: hp(1.2) }}
+                                                style={[
+                                                    styles.statusChip,
+                                                    site.hasManager
+                                                        ? styles.statusChipOk
+                                                        : styles.statusChipWarn,
+                                                ]}
                                             >
-                                                <AppText variant="bodyBold">
-                                                    {field.label}
+                                                <AppText
+                                                    variant="bodySmall"
+                                                    style={[
+                                                        styles.statusChipText,
+                                                        site.hasManager
+                                                            ? styles.statusChipTextOk
+                                                            : styles.statusChipTextWarn,
+                                                    ]}
+                                                    numberOfLines={1}
+                                                >
+                                                    {site.hasManager ? 'Managed' : 'Needs manager'}
                                                 </AppText>
+                                            </View>
+                                        </View>
 
-                                                <View style={styles.inputWrapper}>
+                                        <AppText
+                                            variant="bodyBold"
+                                            style={styles.siteName}
+                                            numberOfLines={1}
+                                            ellipsizeMode="tail"
+                                        >
+                                            {site.tradingName}
+                                        </AppText>
+
+                                        <AppText
+                                            variant="bodySmall"
+                                            style={styles.siteAddress}
+                                            numberOfLines={2}
+                                            ellipsizeMode="tail"
+                                        >
+                                            {[site.address, site.postCode].filter(Boolean).join(' · ')}
+                                        </AppText>
+                                    </View>
+                                </View>
+
+                                <Ionicons
+                                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                    size={normalize(20)}
+                                    color={palette.midgray}
+                                />
+                            </Pressable>
+
+                            {isExpanded ? (
+                                <View style={styles.details}>
+                                    {isEditing ? (
+                                        <>
+                                            {[
+                                                { key: 'tradingName', label: 'Location Name' },
+                                                { key: 'radiusKm', label: 'Pickup Radius (km)' },
+                                            ].map((field) => (
+                                                <View key={field.key} style={styles.fieldBlock}>
+                                                    <AppText variant="bodyBold" style={styles.fieldLabel}>
+                                                        {field.label}
+                                                    </AppText>
                                                     <TextInput
-                                                        value={String(editForm[field.key] || '')
-                                                        }
+                                                        value={String(editForm[field.key] || '')}
                                                         onChangeText={(v) =>
                                                             setEditForm({
                                                                 ...editForm,
@@ -430,168 +594,152 @@ export default function MultiCharityManageSitesScreen() {
                                                             })
                                                         }
                                                         style={styles.input}
+                                                        keyboardType={
+                                                            field.key === 'radiusKm'
+                                                                ? 'decimal-pad'
+                                                                : 'default'
+                                                        }
                                                     />
                                                 </View>
-                                            </View>
-                                        ))}
+                                            ))}
 
-                                        <View style={{ marginBottom: hp(1.2) }}>
-                                            <AppText variant="bodyBold">Address / Location</AppText>
-                                            <AppText variant="bodySmall" style={{ color: palette.textMuted, marginTop: hp(0.3) }}>
-                                                Use map search so latitude and longitude update with the address.
-                                            </AppText>
-                                            {!!editForm.address && (
-                                                <AppText variant="bodySmall" style={{ marginTop: hp(0.6) }}>
-                                                    {String(editForm.address)}
+                                            <View style={styles.fieldBlock}>
+                                                <AppText variant="bodyBold" style={styles.fieldLabel}>
+                                                    Post Code
                                                 </AppText>
-                                            )}
+                                                <AppText variant="bodySmall" style={styles.helperText}>
+                                                    Auto-filled when you update the map location.
+                                                </AppText>
+                                                <TextInput
+                                                    value={String(editForm.postCode || '')}
+                                                    editable={false}
+                                                    style={[styles.input, styles.inputReadonly]}
+                                                    placeholder="Set location on map"
+                                                    placeholderTextColor={palette.textMuted}
+                                                />
+                                            </View>
+
+                                            <View style={styles.fieldBlock}>
+                                                <AppText variant="bodyBold" style={styles.fieldLabel}>
+                                                    Address / Location
+                                                </AppText>
+                                                <AppText variant="bodySmall" style={styles.helperText}>
+                                                    Use map search so latitude, longitude, and postcode
+                                                    update with the address.
+                                                </AppText>
+                                                {!!editForm.address ? (
+                                                    <AppText
+                                                        variant="bodySmall"
+                                                        style={styles.addressPreview}
+                                                    >
+                                                        {String(editForm.address)}
+                                                    </AppText>
+                                                ) : null}
+                                                <Pressable
+                                                    style={styles.mapBtn}
+                                                    onPress={() => setLocationModalVisible(true)}
+                                                >
+                                                    <Ionicons
+                                                        name="map-outline"
+                                                        size={normalize(16)}
+                                                        color={palette.white}
+                                                    />
+                                                    <AppText variant="bodyBold" style={styles.mapBtnText}>
+                                                        Update on Map
+                                                    </AppText>
+                                                </Pressable>
+                                            </View>
+
+                                            <View style={styles.detailActions}>
+                                                <Pressable
+                                                    style={[styles.secondaryBtn, actionLoading && styles.btnDisabled]}
+                                                    disabled={actionLoading}
+                                                    onPress={() => {
+                                                        setEditingSiteId(null);
+                                                        setEditForm({});
+                                                    }}
+                                                >
+                                                    <AppText variant="bodyBold" style={styles.secondaryBtnText}>
+                                                        Cancel
+                                                    </AppText>
+                                                </Pressable>
+                                                <Pressable
+                                                    style={[styles.primaryBtn, actionLoading && styles.btnDisabled]}
+                                                    disabled={actionLoading}
+                                                    onPress={handleSaveLocation}
+                                                >
+                                                    <AppText variant="bodyBold" style={styles.primaryBtnText}>
+                                                        {actionLoading ? 'Saving…' : 'Save changes'}
+                                                    </AppText>
+                                                </Pressable>
+                                            </View>
+
                                             <Pressable
-                                                style={[styles.editBtn, { marginTop: hp(1), alignSelf: 'flex-start' }]}
-                                                onPress={() => setLocationModalVisible(true)}
+                                                style={[styles.dangerOutlineBtn, actionLoading && styles.btnDisabled]}
+                                                disabled={actionLoading}
+                                                onPress={() => requestDeleteLocation(site.id)}
                                             >
-                                                <AppText variant="bodyBold" style={{ color: 'white' }}>
-                                                    Update on Map
+                                                <AppText variant="bodyBold" style={styles.dangerOutlineText}>
+                                                    Delete location
                                                 </AppText>
                                             </Pressable>
-                                        </View>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <View style={styles.metaGrid}>
+                                                <View style={styles.metaRow}>
+                                                    <AppText variant="bodySmall" style={styles.metaLabel}>
+                                                        Manager
+                                                    </AppText>
+                                                    <AppText variant="bodyBold" style={styles.metaValue}>
+                                                        {site.contactName}
+                                                    </AppText>
+                                                </View>
+                                                <View style={styles.metaRow}>
+                                                    <AppText variant="bodySmall" style={styles.metaLabel}>
+                                                        Email
+                                                    </AppText>
+                                                    <AppText variant="bodyBold" style={styles.metaValue}>
+                                                        {site.email}
+                                                    </AppText>
+                                                </View>
+                                                <View style={styles.metaRow}>
+                                                    <AppText variant="bodySmall" style={styles.metaLabel}>
+                                                        Mobile
+                                                    </AppText>
+                                                    <AppText variant="bodyBold" style={styles.metaValue}>
+                                                        {site.mobile}
+                                                    </AppText>
+                                                </View>
+                                                {!!site.radiusKm ? (
+                                                    <View style={styles.metaRow}>
+                                                        <AppText variant="bodySmall" style={styles.metaLabel}>
+                                                            Pickup radius
+                                                        </AppText>
+                                                        <AppText variant="bodyBold" style={styles.metaValue}>
+                                                            {site.radiusKm} km
+                                                        </AppText>
+                                                    </View>
+                                                ) : null}
+                                            </View>
 
-                                        {/* SAVE */}
-                                        <Pressable
-                                            style={[styles.saveBtn, actionLoading && { opacity: 0.65 }]}
-                                            disabled={actionLoading}
-                                            onPress={async () => {
-                                                if (actionLoading || !editingSiteId) return;
-                                                setActionLoading(true);
-                                                try {
-                                                    const latitude = Number(editForm.latitude);
-                                                    const longitude = Number(editForm.longitude);
-                                                    const hasCoordinates =
-                                                        Number.isFinite(latitude) && Number.isFinite(longitude);
-
-                                                    await updateLocation(editingSiteId, {
-                                                        locationName: editForm.tradingName,
-                                                        address: editForm.address,
-                                                        postcode: editForm.postCode,
-                                                        radiusKm: Number(editForm.radiusKm),
-                                                        ...(hasCoordinates
-                                                            ? { latitude, longitude }
-                                                            : {}),
-                                                    });
-
-                                                    const orgId = authUser?.profile?.organisation?.id;
-                                                    if (orgId && hasCoordinates) {
-                                                        await organizationService.updateCoordinates(orgId, {
-                                                            latitude,
-                                                            longitude,
-                                                        });
-                                                        await refreshProfile();
-                                                    }
-
-                                                    await loadData(true);
-
-                                                    setEditingSiteId(null);
-                                                    setEditForm({});
-
-                                                    showSuccessAlert('Location updated successfully');
-                                                } catch (err: unknown) {
-                                                    showErrorAlert(
-                                                        err,
-                                                        'Could not update location',
-                                                        'Failed to update location',
-                                                    );
-                                                } finally {
-                                                    setActionLoading(false);
-                                                }
-                                            }}
-                                        >
-                                            <AppText variant="bodyBold" style={{ color: 'white' }} >
-                                                {actionLoading ? 'Saving...' : 'Save'}
-                                            </AppText>
-                                        </Pressable>
-
-                                        {/* DELETE */}
-                                        <Pressable
-                                            style={[
-                                                styles.saveBtn,
-                                                {
-                                                    backgroundColor: '#D9534F',
-                                                    marginTop: hp(1.2),
-                                                },
-                                                actionLoading && { opacity: 0.65 },
-                                            ]}
-                                            disabled={actionLoading}
-                                            onPress={() => {
-                                                Alert.alert(
-                                                    'Delete Location',
-                                                    'Are you sure you want to delete this location?',
-                                                    [
-                                                        {
-                                                            text: 'Cancel',
-                                                            style: 'cancel',
-                                                        },
-                                                        {
-                                                            text: 'Delete',
-                                                            style: 'destructive',
-                                                            onPress: async () => {
-                                                                if (actionLoading) return;
-                                                                setActionLoading(true);
-                                                                try {
-                                                                    await deactivateLocation(site.id);
-                                                                    setExpandedSite(null);
-                                                                    setEditingSiteId(null);
-                                                                    showSuccessAlert('Site removed successfully', 'Deleted');
-                                                                    await loadData(true);
-                                                                } catch (err) {
-                                                                    showErrorAlert(
-                                                                        err,
-                                                                        'Could not remove location',
-                                                                        'Failed to remove location',
-                                                                    );
-                                                                } finally {
-                                                                    setActionLoading(false);
-                                                                }
-                                                            },
-                                                        },
-                                                    ]
-                                                );
-                                            }}
-                                        >
-                                            <AppText variant="bodyBold" style={{ color: 'white' }} >
-                                                {actionLoading ? 'Deleting...' : 'Delete Location'}
-                                            </AppText>
-                                        </Pressable>
-                                    </>
-                                ) : (
-                                    <>
-                                        <AppText variant="bodyBold">
-                                            Manager: {site.contactName}
-                                        </AppText>
-
-                                        <AppText variant="bodyBold">
-                                            Email: {site.email}
-                                        </AppText>
-
-                                        <AppText variant="bodyBold">
-                                            Mobile: {site.mobile}
-                                        </AppText>
-
-                                        {!!site.radiusKm && (
-                                            <AppText variant="bodyBold">
-                                                Pickup Radius: {site.radiusKm} km
-                                            </AppText>
-                                        )}
-
-                                        <View style={{ flexDirection: 'row', gap: wp(2.5), marginTop: hp(1.8) }}>
-                                            {!site.hasManager ? (
+                                            <View style={styles.detailActions}>
                                                 <Pressable
-                                                    style={[
-                                                        styles.saveBtn,
-                                                        {
-                                                            flex: 1,
-                                                            marginTop: 0,
-                                                            backgroundColor: palette.middlegreen,
-                                                        },
-                                                    ]}
+                                                    style={styles.secondaryBtn}
+                                                    onPress={() => startEditing(site)}
+                                                >
+                                                    <Ionicons
+                                                        name="create-outline"
+                                                        size={normalize(16)}
+                                                        color={palette.black}
+                                                    />
+                                                    <AppText variant="bodyBold" style={styles.secondaryBtnText}>
+                                                        Edit
+                                                    </AppText>
+                                                </Pressable>
+
+                                                <Pressable
+                                                    style={styles.primaryBtn}
                                                     onPress={() =>
                                                         navigation.navigate('CreateCharitySite', {
                                                             mode: 'assign-manager',
@@ -599,161 +747,127 @@ export default function MultiCharityManageSitesScreen() {
                                                         })
                                                     }
                                                 >
-                                                    <AppText variant="bodyBold" style={{ color: 'white' }}>
-                                                        Assign manager
+                                                    <AppText variant="bodyBold" style={styles.primaryBtnText}>
+                                                        {site.hasManager ? 'Update manager' : 'Assign manager'}
                                                     </AppText>
                                                 </Pressable>
-                                            ) : (
+                                            </View>
+
+                                            {site.hasManager ? (
                                                 <Pressable
-                                                    style={[
-                                                        styles.saveBtn,
-                                                        {
-                                                            flex: 1,
-                                                            marginTop: 0,
-                                                            backgroundColor: '#D9534F',
-                                                        },
-                                                    ]}
-                                                    onPress={() => {
-                                                    Alert.alert(
-                                                        'Remove Manager',
-                                                        'Are you sure you want to remove this manager?',
-                                                        [
-                                                            {
-                                                                text: 'Cancel',
-                                                                style: 'cancel',
-                                                            },
-                                                            {
-                                                                text: 'Remove',
-                                                                style: 'destructive',
-                                                                onPress: async () => {
-                                                                    if (actionLoading) return;
-                                                                    setActionLoading(true);
-                                                                    try {
-                                                                        await fetchUsers(true);
-                                                                        const admin = findLocationAdmin(
-                                                                            useCharityStore.getState().users,
-                                                                            site.id,
-                                                                        );
-
-                                                                        if (!admin?.id) {
-                                                                            Alert.alert('No manager assigned to this site');
-                                                                            return;
-                                                                        }
-
-                                                                        await deleteUser(admin.id);
-                                                                        await loadData(true);
-                                                                        showSuccessAlert('Manager removed successfully');
-                                                                    } catch (err: unknown) {
-                                                                        showErrorAlert(
-                                                                            err,
-                                                                            'Could not remove manager',
-                                                                            'Failed to remove manager',
-                                                                        );
-                                                                    } finally {
-                                                                        setActionLoading(false);
-                                                                    }
-                                                                },
-                                                            },
-                                                        ]
-                                                    );
-                                                }}
+                                                    style={styles.dangerOutlineBtn}
+                                                    onPress={() => requestRemoveManager(site.id)}
                                                 >
-                                                    <AppText variant="bodyBold" style={{ color: 'white' }}>
+                                                    <AppText variant="bodyBold" style={styles.dangerOutlineText}>
                                                         Remove manager
                                                     </AppText>
                                                 </Pressable>
-                                            )}
-                                        </View>
-                                    </>
-                                )}
-
-                            </View>
-                        )}
-                    </View>
-                ))}
-
-                {/* FOOTER */}
-                <View style={styles.bottomActions}>
-
-                    <Pressable style={styles.logoutBtn} onPress={logout}>
-                        <AppText variant="bodyBold" style={{ color: palette.black }}>
-                            Logout
-                        </AppText>
-                    </Pressable>
-
-                    <Pressable
-                        style={styles.logoutBtn}
-                        onPress={() =>
-                            Alert.alert(
-                                'Delete Account',
-                                'Are you sure you want to delete your account?',
-                                [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    {
-                                        text: 'Yes, Delete',
-                                        style: 'destructive',
-                                        onPress: logout,
-                                    },
-                                ]
-                            )
-                        }
-                    >
-                        <AppText variant="bodyBold" style={{ color: palette.black }}>
-                            Delete My Account
-                        </AppText>
-                    </Pressable>
-                </View>
+                                            ) : null}
+                                        </>
+                                    )}
+                                </View>
+                            ) : null}
+                        </View>
+                    );
+                })}
             </ScrollView>
+
+            <View style={[styles.stickyFooter, { paddingBottom: safeBottomPadding }]}>
+                <Pressable style={styles.logoutBtn} onPress={logout}>
+                    <AppText variant="bodyBold" style={styles.logoutText}>
+                        Logout
+                    </AppText>
+                </Pressable>
+            </View>
         </Screen>
     );
 }
 
 const styles = StyleSheet.create({
+    scroll: {
+        flex: 1,
+    },
     scrollContent: {
         flexGrow: 1,
+        paddingBottom: hp(2),
     },
-    topBar: {
+    heroContent: {
+        flex: 1,
+        paddingHorizontal: wp(5),
+        justifyContent: 'flex-end',
+        paddingBottom: hp(1.6),
+        gap: hp(0.8),
+    },
+    heroTopRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
         gap: wp(3),
-        paddingLeft: wp(4),
+        width: '100%',
     },
-    locationRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginTop: hp(0.8),
-        gap: wp(1),
+    heroTextBlock: {
+        flex: 1,
+        minWidth: 0,
+        gap: hp(0.15),
     },
-    whiteText: {
-        color: 'white',
-        fontSize: normalize(20),
+    heroEyebrow: {
+        color: 'rgba(255,255,255,0.85)',
+        textTransform: 'none',
+        letterSpacing: 0.3,
+        fontSize: normalize(12),
     },
-    location: {
-        color: 'white',
-        opacity: 0.8,
-        fontSize: normalize(18),
-        paddingTop: hp(0.5),
+    heroTitle: {
+        color: palette.white,
+        textTransform: 'none',
+        fontSize: normalize(24),
+        lineHeight: normalize(28),
     },
-    logoCircle: {
-        width: normalize(50),
-        height: normalize(50),
-        borderRadius: normalize(25),
+    heroAddressRow: {
+        marginTop: hp(0.2),
+        maxWidth: '100%',
+    },
+    heroAddress: {
+        color: 'rgba(255,255,255,0.9)',
+        opacity: 1,
+        fontSize: normalize(13),
+        lineHeight: normalize(17),
+        paddingTop: 0,
+    },
+    heroIconCircle: {
+        width: normalize(46),
+        height: normalize(46),
+        borderRadius: normalize(23),
         flexShrink: 0,
-        backgroundColor: 'white',
-        justifyContent: 'center',
+        backgroundColor: palette.white,
         alignItems: 'center',
+        justifyContent: 'center',
         overflow: 'hidden',
     },
     logoImage: {
         width: '100%',
         height: '100%',
-        borderRadius: normalize(25),
     },
     logoFallback: {
-        color: '#7B3FE4',
+        color: palette.eggplant,
         fontWeight: 'bold',
         fontSize: normalize(18),
+    },
+    heroStatsPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: wp(1.5),
+        backgroundColor: 'rgba(0,0,0,0.22)',
+        paddingVertical: hp(0.6),
+        paddingHorizontal: wp(3),
+        borderRadius: normalize(20),
+        maxWidth: '100%',
+    },
+    heroStatsText: {
+        color: palette.white,
+        flexShrink: 1,
+        textTransform: 'none',
+        fontSize: normalize(13),
     },
     sectionTitle: {
         marginHorizontal: wp(6),
@@ -785,43 +899,140 @@ const styles = StyleSheet.create({
     actionTextPrimary: {
         color: palette.white,
     },
-    bottomActions: {
-        marginTop: hp(2),
+    sitesHeader: {
+        marginHorizontal: wp(4),
+        marginBottom: hp(1.2),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    sitesHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+    },
+    sitesTitle: {
+        textAlign: 'left',
+        marginBottom: 0,
+    },
+    countBadge: {
+        minWidth: normalize(24),
+        height: normalize(24),
+        borderRadius: normalize(12),
+        paddingHorizontal: wp(1.5),
+        backgroundColor: '#E8F3EC',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    countBadgeText: {
+        color: palette.kale,
+        fontWeight: '700',
+        textTransform: 'none',
+    },
+    addLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(0.5),
+        paddingVertical: hp(0.4),
+        paddingHorizontal: wp(1),
+    },
+    addLinkText: {
+        color: palette.kale,
+        textTransform: 'none',
+    },
+    emptyCard: {
+        marginHorizontal: wp(4),
+        marginBottom: hp(2),
+        backgroundColor: palette.white,
+        borderRadius: normalize(16),
+        borderWidth: 1,
+        borderColor: palette.strokecream,
+        paddingVertical: hp(3),
+        paddingHorizontal: wp(5),
+        alignItems: 'center',
+        gap: hp(0.8),
+    },
+    emptyIcon: {
+        width: normalize(52),
+        height: normalize(52),
+        borderRadius: normalize(26),
+        backgroundColor: '#E8F3EC',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.4),
+    },
+    emptyTitle: {
+        textTransform: 'none',
+        textAlign: 'center',
+    },
+    emptyCopy: {
+        textAlign: 'center',
+        color: palette.textMuted,
+        textTransform: 'none',
+        lineHeight: normalize(18),
+    },
+    emptyCta: {
+        marginTop: hp(1),
+        backgroundColor: palette.kale,
+        borderRadius: normalize(12),
+        paddingHorizontal: wp(5),
+        paddingVertical: hp(1.2),
+    },
+    emptyCtaText: {
+        color: palette.white,
+        textTransform: 'none',
+    },
+    stickyFooter: {
+        borderTopWidth: 1,
+        borderTopColor: palette.strokecream,
+        backgroundColor: palette.creme,
+        paddingTop: hp(1.2),
         paddingHorizontal: wp(4),
-        gap: hp(1),
     },
     logoutBtn: {
-        backgroundColor: palette.creme,
+        backgroundColor: palette.white,
         paddingVertical: hp(1.5),
-        marginHorizontal: wp(4),
         borderRadius: normalize(12),
         alignItems: 'center',
         borderWidth: 1,
         borderColor: palette.border,
     },
+    logoutText: {
+        color: palette.black,
+        textTransform: 'none',
+    },
     siteCard: {
         backgroundColor: 'white',
         marginHorizontal: wp(4),
-        marginBottom: hp(1.4),
-        padding: wp(4),
-        borderRadius: normalize(12),
+        marginBottom: hp(1.2),
+        paddingHorizontal: wp(3.5),
+        paddingVertical: hp(1.4),
+        borderRadius: normalize(14),
+        borderWidth: 1,
+        borderColor: palette.strokecream,
+    },
+    siteCardExpanded: {
+        borderColor: '#B7DCC4',
     },
     siteHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        gap: wp(2),
     },
     siteLeft: {
         flexDirection: 'row',
         flex: 1,
         alignItems: 'center',
+        gap: wp(2.5),
+        minWidth: 0,
     },
     siteLogoWrap: {
         width: normalize(48),
         height: normalize(48),
         borderRadius: normalize(24),
         overflow: 'hidden',
-        marginRight: wp(2.5),
+        flexShrink: 0,
         backgroundColor: palette.white,
         alignItems: 'center',
         justifyContent: 'center',
@@ -833,63 +1044,168 @@ const styles = StyleSheet.create({
         height: '100%',
         resizeMode: 'cover',
     },
+    siteTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        marginBottom: hp(0.35),
+        flexWrap: 'wrap',
+    },
     siteIndex: {
         color: palette.primary,
-        marginBottom: hp(0.7),
+        textTransform: 'none',
+    },
+    statusChip: {
+        borderRadius: normalize(999),
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.2),
+    },
+    statusChipOk: {
+        backgroundColor: '#E8F3EC',
+    },
+    statusChipWarn: {
+        backgroundColor: '#FFF4E5',
+    },
+    statusChipText: {
+        fontSize: normalize(11),
+        textTransform: 'none',
+        fontWeight: '700',
+    },
+    statusChipTextOk: {
+        color: palette.kale,
+    },
+    statusChipTextWarn: {
+        color: '#B45309',
     },
     siteName: {
         flexShrink: 1,
+        textTransform: 'none',
+        marginBottom: hp(0.2),
     },
     siteAddress: {
-        color: '#777',
-    },
-    viewBtn: {
-        backgroundColor: palette.middlegreen,
-        paddingHorizontal: wp(3),
-        paddingVertical: hp(0.7),
-        borderRadius: normalize(8),
-    },
-    viewText: {
-        color: 'white',
-    },
-
-    editBtn: {
-        backgroundColor: '#3b82f6',
-        paddingHorizontal: wp(3),
-        paddingVertical: hp(0.7),
-        borderRadius: normalize(8),
-    },
-
-    input: {
-        backgroundColor: '#FAFAFA',
-        padding: normalize(10),
-        borderRadius: normalize(8),
-        borderWidth: 1,
-        borderColor: '#eee',
-    },
-
-    inputWrapper: {
-        position: 'relative',
-        justifyContent: 'center',
-    },
-
-    eyeIcon: {
-        position: 'absolute',
-        right: wp(3),
-    },
-
-    saveBtn: {
-        marginTop: hp(1.2),
-        backgroundColor: palette.middlegreen,
-        padding: normalize(12),
-        borderRadius: normalize(8),
-        alignItems: 'center',
+        color: palette.textMuted,
+        textTransform: 'none',
+        lineHeight: normalize(17),
     },
     details: {
         marginTop: hp(1.2),
         borderTopWidth: 1,
         borderTopColor: '#eee',
         paddingTop: hp(1.2),
+        gap: hp(1.2),
+    },
+    metaGrid: {
+        gap: hp(0.9),
+    },
+    metaRow: {
+        gap: hp(0.15),
+    },
+    metaLabel: {
+        color: palette.textMuted,
+        textTransform: 'none',
+    },
+    metaValue: {
+        textTransform: 'none',
+    },
+    fieldBlock: {
+        gap: hp(0.4),
+    },
+    fieldLabel: {
+        textTransform: 'none',
+    },
+    helperText: {
+        color: palette.textMuted,
+        textTransform: 'none',
+    },
+    input: {
+        backgroundColor: '#FAFAFA',
+        paddingHorizontal: normalize(12),
+        paddingVertical: normalize(11),
+        borderRadius: normalize(10),
+        borderWidth: 1,
+        borderColor: '#eee',
+    },
+    inputReadonly: {
+        backgroundColor: '#F4FAF6',
+    },
+    addressPreview: {
+        textTransform: 'none',
+        color: palette.black,
+        lineHeight: normalize(18),
+    },
+    mapBtn: {
+        marginTop: hp(0.4),
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1.5),
+        backgroundColor: '#3b82f6',
+        paddingHorizontal: wp(3.5),
+        paddingVertical: hp(0.9),
+        borderRadius: normalize(10),
+    },
+    mapBtnText: {
+        color: palette.white,
+        textTransform: 'none',
+    },
+    detailActions: {
+        flexDirection: 'row',
+        gap: wp(2.5),
+    },
+    primaryBtn: {
+        flex: 1,
+        minHeight: normalize(44),
+        backgroundColor: palette.middlegreen,
+        borderRadius: normalize(10),
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: wp(2),
+    },
+    primaryBtnText: {
+        color: palette.white,
+        textTransform: 'none',
+        textAlign: 'center',
+    },
+    secondaryBtn: {
+        flex: 1,
+        minHeight: normalize(44),
+        backgroundColor: palette.white,
+        borderWidth: 1,
+        borderColor: palette.border,
+        borderRadius: normalize(10),
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: wp(1.5),
+        paddingHorizontal: wp(2),
+    },
+    secondaryBtnText: {
+        color: palette.black,
+        textTransform: 'none',
+    },
+    dangerBtn: {
+        flex: 1,
+        minHeight: normalize(44),
+        backgroundColor: palette.danger,
+        borderRadius: normalize(10),
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: wp(2),
+    },
+    dangerOutlineBtn: {
+        minHeight: normalize(44),
+        borderRadius: normalize(10),
+        borderWidth: 1,
+        borderColor: palette.danger,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dangerOutlineText: {
+        color: palette.danger,
+        textTransform: 'none',
+    },
+    btnDisabled: {
+        opacity: 0.65,
     },
     skeletonWrap: {
         paddingBottom: hp(4),

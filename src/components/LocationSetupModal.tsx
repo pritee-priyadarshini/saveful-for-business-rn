@@ -17,6 +17,7 @@ import { OsmMapView } from './OsmMapView';
 import { PlacesSearchInput } from './PlacesSearchInput';
 import { palette } from '../theme/colors';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
+import { resolveLocationDetails } from '@/utils/postcode';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -29,6 +30,7 @@ export type SelectedLocation = {
   latitude: number;
   longitude: number;
   address: string;
+  postcode?: string;
 };
 
 type Props = {
@@ -50,6 +52,7 @@ export function LocationSetupModal({
 }: Props) {
   const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedAddress, setSelectedAddress] = useState('');
+  const [selectedPostcode, setSelectedPostcode] = useState('');
 
   const slideAnim = useRef(new Animated.Value(MODAL_HEIGHT)).current;
 
@@ -62,6 +65,7 @@ export function LocationSetupModal({
         longitude: initialLocation.longitude,
       });
       setSelectedAddress(initialLocation.address);
+      setSelectedPostcode(initialLocation.postcode || '');
     }
 
     slideAnim.setValue(MODAL_HEIGHT);
@@ -102,31 +106,40 @@ export function LocationSetupModal({
     latitude: number,
     longitude: number,
     address?: string,
+    postcode?: string,
   ) => {
     setMarker({ latitude, longitude });
-
-    if (address) {
-      setSelectedAddress(address);
-      return;
-    }
-
-    const label = await reverseGeocodeAddress(latitude, longitude);
-    setSelectedAddress(label);
+    const resolved = await resolveLocationDetails(latitude, longitude, { address, postcode });
+    setSelectedAddress(resolved.address);
+    setSelectedPostcode(resolved.postcode);
   };
 
   const handleGpsLocation = async () => {
     const location = await fetchCurrentLocation();
     if (!location) return;
-    await applyCoords(location.latitude, location.longitude, location.address);
+    await applyCoords(location.latitude, location.longitude, location.address, location.postcode);
   };
 
   const handleConfirm = async () => {
     if (!marker) return;
 
+    let postcode = selectedPostcode;
+    let address = selectedAddress;
+    if (!postcode.trim()) {
+      const resolved = await resolveLocationDetails(marker.latitude, marker.longitude, {
+        address,
+      });
+      address = resolved.address;
+      postcode = resolved.postcode;
+      setSelectedAddress(address);
+      setSelectedPostcode(postcode);
+    }
+
     await onConfirm({
       latitude: marker.latitude,
       longitude: marker.longitude,
-      address: selectedAddress,
+      address,
+      postcode,
     });
   };
 
@@ -157,8 +170,8 @@ export function LocationSetupModal({
             <PlacesSearchInput
               placeholder={searchPlaceholder}
               autoFocus={visible}
-              onPlaceSelected={({ latitude, longitude, address }) => {
-                applyCoords(latitude, longitude, address);
+              onPlaceSelected={({ latitude, longitude, address, postcode }) => {
+                void applyCoords(latitude, longitude, address, postcode);
                 Keyboard.dismiss();
               }}
             />
@@ -176,7 +189,7 @@ export function LocationSetupModal({
               marker={marker}
               selectable
               onLocationSelect={(latitude, longitude) => {
-                applyCoords(latitude, longitude);
+                void applyCoords(latitude, longitude);
               }}
             />
             {!marker && (

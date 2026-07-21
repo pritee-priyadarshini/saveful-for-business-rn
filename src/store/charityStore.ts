@@ -214,6 +214,7 @@ interface CharityActions {
   addMember: (data: AddCharityMemberPayload) => Promise<any>;
   updateUser: (userId: number, data: UpdateCharityMemberPayload) => Promise<any>;
   deleteUser: (userId: number) => Promise<void>;
+  removeUserFromLocation: (userId: number, locationId: number) => Promise<void>;
   updateOrganisation: (orgId: number | string, data: FormData) => Promise<any>;
   invalidateLocations: () => void;
   invalidateUsers: () => void;
@@ -385,6 +386,21 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
       set({ users, usersLastFetched: Date.now() });
     } catch {
       // Keep optimistic removal if refetch fails.
+    }
+  },
+
+  removeUserFromLocation: async (userId, locationId) => {
+    await charityService.removeUserFromLocation(userId, locationId);
+    get().invalidateUsers();
+
+    try {
+      const res = await charityService.listUsers();
+      set({
+        users: normalizeCharityUsers(res.data),
+        usersLastFetched: Date.now(),
+      });
+    } catch {
+      // Caller can refetch if needed.
     }
   },
 

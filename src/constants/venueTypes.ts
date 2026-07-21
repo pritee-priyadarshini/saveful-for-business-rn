@@ -1,14 +1,26 @@
-/** Venue / business types from restaurant signup. */
+/** Venue / business types accepted by the backend VenueType enum. */
 export const BUSINESS_VENUE_OPTIONS = [
   { label: 'Bakery', value: 'BAKERY' },
   { label: 'Cafe / Restaurant', value: 'CAFE_RESTAURANT' },
-  { label: 'Caterer', value: 'CATERING_SERVICE' },
+  { label: 'Caterer', value: 'CATERER' },
+  { label: 'Catering Service', value: 'CATERING_SERVICE' },
   { label: 'Cloud Kitchen', value: 'CLOUD_KITCHEN' },
-  { label: 'Event Venue', value: 'EVENT_VENUE' },
   { label: 'Food Truck', value: 'FOOD_TRUCK' },
   { label: 'Grocery Store', value: 'GROCERY_STORE' },
   { label: 'Hotel', value: 'HOTEL' },
   { label: 'Wedding Venue', value: 'WEDDING_VENUE' },
+  { label: 'Farm', value: 'FARM' },
+  { label: 'Other', value: 'OTHER' },
+] as const;
+
+/** Farmer signup options — backend VenueType must include these values. */
+export const FARMER_VENUE_OPTIONS = [
+  { label: 'Farm', value: 'FARM' },
+  { label: 'Produce / Market Garden', value: 'PRODUCE_MARKET_GARDEN' },
+  { label: 'Livestock Farm', value: 'LIVESTOCK_FARM' },
+  { label: 'Mixed Farm', value: 'MIXED_FARM' },
+  { label: 'Orchard', value: 'ORCHARD' },
+  { label: 'Processing / Packing Facility', value: 'PROCESSING_FACILITY' },
   { label: 'Other', value: 'OTHER' },
 ] as const;
 

@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   Image,
-  Alert,
   Dimensions,
   Platform,
   Linking,
@@ -35,7 +34,8 @@ import { spacing } from '@/theme/spacing';
 import { COUNTRY_CODES, findCountryByIso, appendSignupMobileFields } from '@/data/countryCodes';
 import type { CountryCode } from '@/data/countryCodes';
 import { fetchCurrentLocation } from '@/utils/currentLocation';
-import { getUserFriendlyErrorMessage } from '@/utils/apiError';
+import { resolveLocationDetails } from '@/utils/postcode';
+import { getUserFriendlyErrorMessage, showErrorAlert } from '@/utils/apiError';
 import { REGION_OPTIONS, getRegionLabel, appendSignupRegionAndCoordinates, isSelectableRegion } from '@/data/regions';
 import type { Region } from '@/types';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -239,7 +239,10 @@ function VenueTypeSelector({
                 <Pressable
                   key={option.value}
                   style={[styles.venueOptionRow, isSelected && styles.venueOptionRowSelected]}
-                  onPress={() => onChange(option.value)}
+                  onPress={() => {
+                    onChange(option.value);
+                    setExpanded(false);
+                  }}
                 >
                   <View style={[styles.venueRadio, isSelected && styles.venueRadioActive]}>
                     {isSelected ? <View style={styles.venueRadioInner} /> : null}
@@ -257,7 +260,7 @@ function VenueTypeSelector({
   );
 }
 
-const inputPropsBase = { compact: true as const, labelVariant: 'label' as const };
+const inputPropsBase = { compact: false as const, labelVariant: 'label' as const };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
@@ -448,10 +451,25 @@ export function AuthScreen() {
     }
   };
 
-  const handleAuthLocationConfirm = async ({ latitude, longitude, address }: SelectedLocation) => {
+  const handleAuthLocationConfirm = async ({
+    latitude,
+    longitude,
+    address,
+    postcode,
+  }: SelectedLocation) => {
     updateLocationCoords(String(latitude), String(longitude));
     updateLocationAddress(address);
     setSelectedAddress(address);
+
+    const resolved =
+      postcode?.trim()
+        ? { address, postcode: postcode.trim() }
+        : await resolveLocationDetails(latitude, longitude, { address, postcode });
+
+    if (!isRestaurant && !isFarmer) {
+      updateCharityField('postcodes', resolved.postcode);
+    }
+
     setShowPlacesSearch(false);
   };
 
@@ -466,6 +484,7 @@ export function AuthScreen() {
     } else {
       updateCharityField('latitude', '');
       updateCharityField('longitude', '');
+      updateCharityField('postcodes', '');
     }
   };
 
@@ -482,7 +501,7 @@ export function AuthScreen() {
         updateCharityField('logo' as any, uri);
       }
     } catch (error: any) {
-      Alert.alert('Image selection failed', 'Please try again.');
+      showErrorAlert('Please try again.', 'Image selection failed');
     }
   };
 
@@ -622,8 +641,7 @@ export function AuthScreen() {
           } as any);
         }
 
-        form.append('pickupRadiusKm', String(DEFAULT_PICKUP_RADIUS_KM));
-
+        // Farmer consumer DTO does not accept pickupRadiusKm.
         await authService.registerFarmerConsumer(form);
 
       } else {
@@ -687,9 +705,9 @@ export function AuthScreen() {
   const venueOptions = [
     { label: 'Bakery', value: 'BAKERY' },
     { label: 'Cafe / Restaurant', value: 'CAFE_RESTAURANT' },
-    { label: 'Caterer', value: 'CATERING_SERVICE' },
+    { label: 'Caterer', value: 'CATERER' },
+    { label: 'Catering Service', value: 'CATERING_SERVICE' },
     { label: 'Cloud Kitchen', value: 'CLOUD_KITCHEN' },
-    { label: 'Event Venue', value: 'EVENT_VENUE' },
     { label: 'Food Truck', value: 'FOOD_TRUCK' },
     { label: 'Grocery Store', value: 'GROCERY_STORE' },
     { label: 'Hotel', value: 'HOTEL' },
@@ -801,9 +819,11 @@ export function AuthScreen() {
       if (!charityForm.charityName.trim()) return 'Please enter your charity name.';
       if (!charityForm.charityAddress.trim()) return 'Please enter your charity address.';
       if (!charityForm.registrationNumber.trim()) return 'Please enter your registration number.';
-      if (!charityForm.postcodes.trim()) return 'Please enter your postcode.';
       if (!charityForm.latitude.trim() || !charityForm.longitude.trim()) {
         return 'Please set your charity location using Location Recommendation.';
+      }
+      if (!charityForm.postcodes.trim()) {
+        return 'We could not detect a postcode from this pin. Search for a full address and try again.';
       }
     }
 
@@ -1286,13 +1306,19 @@ export function AuthScreen() {
                     onChangeText={(v) => updateCharityField('registrationNumber', v)}
                   />
 
-                  <InputField
-                    label="Postcode"
-                    placeholder="Enter postcode"
-                    {...inputProps}
-                    value={charityForm.postcodes}
-                    onChangeText={(v) => updateCharityField('postcodes', v)}
-                  />
+                  {charityForm.postcodes.trim() ? (
+                    <View style={styles.autofilledPostcodeBox}>
+                      <AppText variant="label" style={styles.autofilledPostcodeLabel}>
+                        Postcode
+                      </AppText>
+                      <AppText variant="body1" style={styles.autofilledPostcodeValue}>
+                        {charityForm.postcodes}
+                      </AppText>
+                      <AppText variant="bodySmall" style={styles.logoHint}>
+                        Auto-filled from your map location
+                      </AppText>
+                    </View>
+                  ) : null}
                 </>
               )}
 
@@ -1365,36 +1391,37 @@ export function AuthScreen() {
 
           {currentStep === 3 && (
             <View style={styles.formCard}>
-              {(isRestaurant || isFarmerProducer) ? (
+              {isRestaurant || isFarmerProducer || isFarmerConsumer ? (
                 <VenueTypeSelector
-                  label={isFarmerProducer ? 'Please select Venue Type (optional)' : 'Please select Venue Type'}
-                  value={isFarmerProducer ? farmerForm.venueType : restaurantForm.venueType}
-                  options={isFarmerProducer ? farmerVenueOptions : venueOptions}
-                  optional={isFarmerProducer}
+                  label={
+                    isRestaurant
+                      ? 'Please select Venue Type'
+                      : 'Please select Venue Type (optional)'
+                  }
+                  value={
+                    isRestaurant ? restaurantForm.venueType : farmerForm.venueType
+                  }
+                  options={isRestaurant ? venueOptions : farmerVenueOptions}
+                  optional={!isRestaurant}
                   onChange={(v) =>
-                    isFarmerProducer
-                      ? updateFarmerField('venueType', v)
-                      : updateRestaurantField('venueType', v)
+                    isRestaurant
+                      ? updateRestaurantField('venueType', v)
+                      : updateFarmerField('venueType', v)
                   }
                 />
               ) : (
-                <InputField
-                  label="Pickup Radius (km)"
-                  {...inputProps}
-                  value={String(DEFAULT_PICKUP_RADIUS_KM)}
-                  editable={false}
-                />
+                <>
+                  <InputField
+                    label="Pickup Radius (km)"
+                    {...inputProps}
+                    value={String(DEFAULT_PICKUP_RADIUS_KM)}
+                    editable={false}
+                  />
+                  <AppText variant="bodySmall" style={styles.logoHint}>
+                    Fixed at {DEFAULT_PICKUP_RADIUS_KM} km for now for ease of operations.
+                  </AppText>
+                </>
               )}
-
-              {isFarmerConsumer ? (
-                <VenueTypeSelector
-                  label="Please select Venue Type (optional)"
-                  value={farmerForm.venueType}
-                  options={farmerVenueOptions}
-                  optional
-                  onChange={(v) => updateFarmerField('venueType', v)}
-                />
-              ) : null}
 
               <RegionSelector
                 value={getCurrentRegion()}
@@ -1473,7 +1500,7 @@ const styles = StyleSheet.create({
     color: palette.white,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
-    fontSize: normalize(14),
+    fontSize: normalize(15),
   },
 
   mobileFieldWrap: {
@@ -1483,12 +1510,13 @@ const styles = StyleSheet.create({
   mobileLabel: {
     textTransform: 'none',
     color: palette.black,
+    fontSize: normalize(14),
   },
 
   mobileInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: normalize(44),
+    minHeight: normalize(48),
     borderWidth: 1,
     borderColor: '#D9D9D9',
     borderRadius: normalize(10),
@@ -1516,7 +1544,7 @@ const styles = StyleSheet.create({
   },
 
   countryDialCode: {
-    fontSize: normalize(14),
+    fontSize: normalize(15),
     color: palette.black,
     textTransform: 'none',
   },
@@ -1524,7 +1552,7 @@ const styles = StyleSheet.create({
   mobileTextInput: {
     flex: 1,
     paddingHorizontal: wp(3.5),
-    fontSize: normalize(14),
+    fontSize: normalize(15),
     color: palette.text,
   },
 
@@ -1613,6 +1641,7 @@ const styles = StyleSheet.create({
   venueSelectorLabel: {
     color: palette.black,
     textTransform: 'none',
+    fontSize: normalize(14),
   },
 
   venueSelectorBox: {
@@ -1632,8 +1661,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(3.5),
-    paddingVertical: hp(1.2),
-    minHeight: normalize(44),
+    paddingVertical: hp(1.25),
+    minHeight: normalize(48),
   },
 
   venueSelectorValue: {
@@ -1641,6 +1670,8 @@ const styles = StyleSheet.create({
     color: palette.black,
     textTransform: 'none',
     paddingRight: wp(2),
+    fontSize: normalize(15),
+    lineHeight: normalize(21),
   },
 
   venueOptionsList: {
@@ -1654,7 +1685,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: wp(2.5),
     paddingHorizontal: wp(3.5),
-    paddingVertical: hp(1.1),
+    paddingVertical: hp(1.15),
     borderBottomWidth: 1,
     borderBottomColor: '#F2F2F2',
   },
@@ -1688,12 +1719,14 @@ const styles = StyleSheet.create({
     flex: 1,
     color: palette.black,
     textTransform: 'none',
-    lineHeight: normalize(20),
+    fontSize: normalize(15),
+    lineHeight: normalize(21),
   },
 
   dropdownHint: {
     color: palette.stone,
     textTransform: 'none',
+    fontSize: normalize(13),
     lineHeight: normalize(18),
     marginBottom: hp(0.4),
   },
@@ -1721,6 +1754,28 @@ const styles = StyleSheet.create({
   logoHint: {
     color: palette.stone,
     lineHeight: normalize(16),
+  },
+
+  autofilledPostcodeBox: {
+    gap: hp(0.35),
+  },
+
+  autofilledPostcodeLabel: {
+    color: palette.black,
+    textTransform: 'none',
+    fontSize: normalize(14),
+  },
+
+  autofilledPostcodeValue: {
+    borderWidth: 1,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(10),
+    backgroundColor: '#F4FAF6',
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.2),
+    color: palette.kale,
+    fontSize: normalize(15),
+    textTransform: 'none',
   },
 
   uploadField: {

@@ -11,6 +11,7 @@ import { useFonts } from 'expo-font';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { CircularImageCropHost } from './src/components/CircularImageCropModal';
+import { AppAlertHost } from './src/components/AppAlertModal';
 
 export default function App() {
   const [splashTimerDone, setSplashTimerDone] = useState(false);
@@ -49,6 +50,7 @@ export default function App() {
         <AppProvider>
           <StatusBar style="dark" backgroundColor={palette.background} />
           <AppNavigator />
+          <AppAlertHost />
           <CircularImageCropHost />
         </AppProvider>
       </SafeAreaProvider>

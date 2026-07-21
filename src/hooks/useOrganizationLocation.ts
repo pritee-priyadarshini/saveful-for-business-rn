@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useAppContext } from '../store/AppContext';
@@ -93,7 +92,7 @@ export function useOrganizationLocation() {
   ) => {
     const organizationId = profile?.organisation?.id ?? profile?.organization?.id;
     if (!organizationId) {
-      Alert.alert('Unable to Save', 'Could not find your organisation to update.');
+      showErrorAlert('Could not find your organisation to update.', 'Unable to Save');
       return false;
     }
 

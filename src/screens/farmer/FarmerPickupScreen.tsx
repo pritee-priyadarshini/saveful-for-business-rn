@@ -7,7 +7,6 @@ import {
   ImageBackground,
   Image,
   Modal,
-  Alert,
   Linking,
   Dimensions,
   ViewStyle,
@@ -19,6 +18,7 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
+import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -261,20 +261,20 @@ export default function FarmerPickupScreen({ navigation }: any) {
 
   const makeCall = async (phone?: string | null) => {
     if (!phone) {
-      Alert.alert('Unavailable', 'Phone number not available');
+      showInfoAlert('Phone number not available', 'Unavailable');
       return;
     }
     const url = `tel:${phone.replace(/[^+\d]/g, '')}`;
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Error', 'Unable to open dialer');
+      showErrorAlert('Unable to open dialer', 'Error');
     }
   };
 
   const sendMessage = async (phone?: string | null) => {
     if (!phone) {
-      Alert.alert('Unavailable', 'Phone number not available');
+      showInfoAlert('Phone number not available', 'Unavailable');
       return;
     }
     await Linking.openURL(`sms:${phone}`);

@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Image,
   Linking,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -20,8 +19,9 @@ import { AppText } from '../../components/AppText';
 import { Skeleton } from '../../components/Skeleton';
 import { useAppContext } from '@/store/AppContext';
 import { useSitesStore } from '@/store/sitesStore';
+import { showConfirmAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
-import { showErrorAlert } from '@/utils/apiError';
+import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
@@ -79,25 +79,25 @@ export default function ManageSitesScreen() {
   };
 
   const handleRemoveManager = async (siteId: number, userId: number) => {
-    Alert.alert('Remove Manager', 'Are you sure you want to remove this manager?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          if (removingManagerSiteId !== null) return;
-          setRemovingManagerSiteId(siteId);
-          try {
-            await removeAccess(siteId, userId);
-            await fetchSitesWithManagers(true);
-          } catch (err) {
-            showErrorAlert(err, 'Could not remove manager', 'Failed to remove manager');
-          } finally {
-            setRemovingManagerSiteId(null);
-          }
-        },
+    showConfirmAlert({
+      title: 'Remove Manager',
+      message: 'Are you sure you want to remove this manager?',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      destructive: true,
+      onConfirm: async () => {
+        if (removingManagerSiteId !== null) return;
+        setRemovingManagerSiteId(siteId);
+        try {
+          await removeAccess(siteId, userId);
+          await fetchSitesWithManagers(true);
+        } catch (err) {
+          showErrorAlert(err, 'Could not remove manager', 'Failed to remove manager');
+        } finally {
+          setRemovingManagerSiteId(null);
+        }
       },
-    ]);
+    });
   };
 
   const handleAssignManager = (siteId: number) => {
@@ -108,7 +108,7 @@ export default function ManageSitesScreen() {
   };
 
   const handleDeleteSite = (_siteId: number) => {
-    Alert.alert('Delete Site', 'API to be integrated', [{ text: 'OK' }]);
+    showInfoAlert('API to be integrated', 'Delete Site');
   };
 
   const renderSkeleton = () => (
@@ -355,10 +355,14 @@ export default function ManageSitesScreen() {
           <Pressable
             style={styles.logoutBtn}
             onPress={() =>
-              Alert.alert('Delete Account', 'Are you sure you want to delete your account?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Yes, Delete', style: 'destructive', onPress: logout },
-              ])
+              showConfirmAlert({
+                title: 'Delete Account',
+                message: 'Are you sure you want to delete your account?',
+                confirmLabel: 'Yes, Delete',
+                cancelLabel: 'Cancel',
+                destructive: true,
+                onConfirm: logout,
+              })
             }
           >
             <AppText variant="bodyBold" style={{ color: palette.black }}>

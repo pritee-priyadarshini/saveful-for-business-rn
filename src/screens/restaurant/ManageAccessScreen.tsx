@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   Pressable,
-  Alert,
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -23,6 +22,7 @@ import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { useSitesStore } from '@/store/sitesStore';
+import { showConfirmAlert } from '@/store/appAlertStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -80,17 +80,17 @@ export default function ManageAccessScreen() {
 
     try {
       if (!siteId) {
-        Alert.alert('Error', 'No site found');
+        showErrorAlert('No site found', 'Error');
         return;
       }
 
       if (!form.firstName.trim() || !form.lastName.trim()) {
-        Alert.alert('Error', 'First name and last name are required');
+        showErrorAlert('First name and last name are required', 'Error');
         return;
       }
 
       if (!form.email.trim() || !form.password.trim() || !form.role) {
-        Alert.alert('Error', 'Email, password, and role are required');
+        showErrorAlert('Email, password, and role are required', 'Error');
         return;
       }
 
@@ -132,29 +132,25 @@ export default function ManageAccessScreen() {
   const handleDelete = (userId: number) => {
     if (!siteId) return;
 
-    Alert.alert(
-      'Remove user',
-      'Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            if (deletingId !== null) return;
-            setDeletingId(userId);
-            try {
-              await removeAccess(siteId, userId);
-              await fetchFirstSiteTeam(true);
-            } catch (err) {
-              showErrorAlert(err, 'Could not remove user', 'Failed to remove user');
-            } finally {
-              setDeletingId(null);
-            }
-          },
-        },
-      ]
-    );
+    showConfirmAlert({
+      title: 'Remove user',
+      message: 'Are you sure?',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      destructive: true,
+      onConfirm: async () => {
+        if (deletingId !== null) return;
+        setDeletingId(userId);
+        try {
+          await removeAccess(siteId, userId);
+          await fetchFirstSiteTeam(true);
+        } catch (err) {
+          showErrorAlert(err, 'Could not remove user', 'Failed to remove user');
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   useEffect(() => {

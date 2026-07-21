@@ -7,7 +7,6 @@ import {
   StyleSheet,
   View,
   Image,
-  Alert,
   Linking,
   Platform,
 } from 'react-native';
@@ -21,6 +20,7 @@ import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
 import { PostPickupSurveyModal } from './components/postPickupSurveyModal';
 import { estimateMealsSaved } from '../../utils/foodListing';
+import { showErrorAlert } from '@/utils/apiError';
 import { hp, normalize, wp } from '@/utils/responsive';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
@@ -222,20 +222,20 @@ export function RestaurantUpdatesScreen() {
 
   const makeCall = async (phone?: string | null) => {
     if (!phone) {
-      Alert.alert('Unavailable', 'Phone number not available');
+      showErrorAlert('Phone number not available', 'Unavailable');
       return;
     }
     const cleanPhone = phone.replace(/[^+\d]/g, '');
     try {
       await Linking.openURL(`tel:${cleanPhone}`);
     } catch {
-      Alert.alert('Error', 'Unable to open dialer');
+      showErrorAlert('Unable to open dialer', 'Error');
     }
   };
 
   const sendMessage = async (phone?: string | null) => {
     if (!phone) {
-      Alert.alert('Unavailable', 'Phone number not available');
+      showErrorAlert('Phone number not available', 'Unavailable');
       return;
     }
     const url = `sms:${phone}`;

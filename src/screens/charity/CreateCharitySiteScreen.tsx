@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     View,
     ScrollView,
@@ -30,15 +30,16 @@ import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 
 import { CharityMemberRole } from '@/services/charity.service';
-import { useCharityStore } from '@/store/charityStore';
-import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
+import { useCharityStore, type CharityMember } from '@/store/charityStore';
+import { fetchCurrentLocation } from '@/utils/currentLocation';
+import { resolveLocationDetails } from '@/utils/postcode';
 import { InputField } from '@/components/InputField';
 import { Skeleton } from '@/components/Skeleton';
 import { getUserFriendlyErrorMessage, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { DEFAULT_PICKUP_RADIUS_KM } from '@/utils/authSession';
 
-const MIN_PASSWORD_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 8;
 
 type FieldKey =
     | 'locationName'
@@ -51,6 +52,21 @@ type FieldKey =
     | 'password'
     | 'confirmPassword';
 
+function findLocationAdmin(users: CharityMember[], locationId: number) {
+    const activeUsers = users.filter((user) => user.isActive !== false);
+    return (
+        activeUsers.find(
+            (user) =>
+                user.role === 'LOCATION_ADMIN' &&
+                user.locations?.some((loc: { id: number }) => loc.id === locationId),
+        ) ??
+        activeUsers.find((user) =>
+            user.locations?.some((loc: { id: number }) => loc.id === locationId),
+        ) ??
+        null
+    );
+}
+
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
 const hp = (p: number) => (height * p) / 100;
@@ -59,7 +75,8 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
-const inputProps = { compact: true as const, labelVariant: 'label' as const };
+const inputPropsBase = { compact: true as const, labelVariant: 'label' as const };
+const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
 
 function validateManagerPassword(
     password: string,
@@ -88,17 +105,86 @@ export default function CreateCharitySiteScreen() {
 
     const {
         locations: storeLocations,
+        users,
         fetchLocations,
+        fetchUsers,
         addLocation,
         addMember,
+        removeUserFromLocation,
         isFetchingLocations,
     } = useCharityStore();
 
     const [loading, setLoading] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
     const [formError, setFormError] = useState<string | null>(null);
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
     const submittingRef = useRef(false);
     const scrollRef = useRef<ScrollView>(null);
+    const scrollYRef = useRef(0);
+    const activeFieldRef = useRef<View | null>(null);
+    const keyboardHeightRef = useRef(0);
+
+    const scrollActiveFieldIntoView = useCallback(() => {
+        const field = activeFieldRef.current;
+        if (!field) return;
+
+        requestAnimationFrame(() => {
+            field.measureInWindow((_x, fieldY, _w, fieldH) => {
+                const gap = hp(2);
+                const activeKeyboardHeight = keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
+                const visibleBottom = height - activeKeyboardHeight - gap;
+                const fieldBottom = fieldY + fieldH;
+
+                if (fieldBottom > visibleBottom) {
+                    scrollRef.current?.scrollTo({
+                        y: Math.max(0, scrollYRef.current + (fieldBottom - visibleBottom)),
+                        animated: true,
+                    });
+                }
+            });
+        });
+    }, []);
+
+    const handleFieldFocus = useCallback(
+        (field: View) => {
+            activeFieldRef.current = field;
+            const shortDelay = Platform.OS === 'ios' ? 80 : 150;
+            const longDelay = Platform.OS === 'ios' ? 320 : 420;
+            setTimeout(scrollActiveFieldIntoView, shortDelay);
+            setTimeout(scrollActiveFieldIntoView, longDelay);
+        },
+        [scrollActiveFieldIntoView],
+    );
+
+    useEffect(() => {
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+        const showSub = Keyboard.addListener(showEvent, (event) => {
+            keyboardHeightRef.current = event.endCoordinates.height;
+            setKeyboardVisible(true);
+            setKeyboardHeight(event.endCoordinates.height);
+            setTimeout(scrollActiveFieldIntoView, Platform.OS === 'ios' ? 80 : 150);
+        });
+
+        const hideSub = Keyboard.addListener(hideEvent, () => {
+            keyboardHeightRef.current = 0;
+            setKeyboardVisible(false);
+            setKeyboardHeight(0);
+            activeFieldRef.current = null;
+        });
+
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, [scrollActiveFieldIntoView]);
+
+    const inputProps = {
+        ...inputPropsBase,
+        onFieldFocus: handleFieldFocus,
+    };
 
     const clearFieldError = (key: FieldKey) => {
         setFieldErrors((prev) => {
@@ -121,6 +207,11 @@ export default function CreateCharitySiteScreen() {
         () => locations.find((site) => site.id === assignSiteId) ?? null,
         [locations, assignSiteId],
     );
+    const existingManager = useMemo(() => {
+        if (!assignSiteId) return null;
+        return findLocationAdmin(users, Number(assignSiteId));
+    }, [users, assignSiteId]);
+    const isReplaceMode = isAssignMode && !!existingManager;
 
     const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
     const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -170,35 +261,16 @@ export default function CreateCharitySiteScreen() {
         clearFieldError('address');
         setMapCenter({ latitude, longitude });
         setMarker({ latitude, longitude });
-        setSiteForm((prev) => ({ ...prev, latitude, longitude }));
 
-        if (address) {
-            setSelectedAddress(address);
-            setSiteForm((prev) => ({
-                ...prev,
-                address,
-                postcode: postcode ?? prev.postcode,
-            }));
-            return;
-        }
-
-        const label = await reverseGeocodeAddress(latitude, longitude);
-        setSelectedAddress(label);
-
-        try {
-            const places = await Location.reverseGeocodeAsync({ latitude, longitude });
-            if (places.length > 0) {
-                setSiteForm((prev) => ({
-                    ...prev,
-                    address: label,
-                    postcode: places[0].postalCode || prev.postcode,
-                }));
-            } else {
-                setSiteForm((prev) => ({ ...prev, address: label }));
-            }
-        } catch {
-            setSiteForm((prev) => ({ ...prev, address: label }));
-        }
+        const resolved = await resolveLocationDetails(latitude, longitude, { address, postcode });
+        setSelectedAddress(resolved.address);
+        setSiteForm((prev) => ({
+            ...prev,
+            latitude,
+            longitude,
+            address: resolved.address,
+            postcode: resolved.postcode,
+        }));
     };
 
     const goToCurrentLocation = async () => {
@@ -208,7 +280,12 @@ export default function CreateCharitySiteScreen() {
         try {
             const location = await fetchCurrentLocation();
             if (!location) return;
-            await applyMapLocation(location.latitude, location.longitude, location.address);
+            await applyMapLocation(
+                location.latitude,
+                location.longitude,
+                location.address,
+                location.postcode,
+            );
         } finally {
             setGpsLoading(false);
         }
@@ -240,9 +317,9 @@ export default function CreateCharitySiteScreen() {
 
     useEffect(() => {
         if (isAssignMode) {
-            fetchLocations(true).catch(() => {});
+            Promise.all([fetchLocations(true), fetchUsers(true)]).catch(() => {});
         }
-    }, [fetchLocations, isAssignMode]);
+    }, [fetchLocations, fetchUsers, isAssignMode]);
 
     useEffect(() => {
         if (isAssignMode) return;
@@ -283,9 +360,11 @@ export default function CreateCharitySiteScreen() {
 
         const nextErrors: Partial<Record<FieldKey, string>> = {};
         if (!locationName.trim()) nextErrors.locationName = 'Please enter a site name.';
-        if (!postcode.trim()) nextErrors.postcode = 'Please enter a postcode.';
         if (!address.trim() || !latitude || !longitude) {
             nextErrors.address = 'Please set the site location on the map.';
+        } else if (!postcode.trim()) {
+            nextErrors.address =
+                'We could not detect a postcode from this pin. Search for a full address and try again.';
         }
         if (!managerFirstName.trim()) nextErrors.firstName = 'Please enter a first name.';
         if (!managerLastName.trim()) nextErrors.lastName = 'Please enter a last name.';
@@ -366,6 +445,11 @@ export default function CreateCharitySiteScreen() {
         setLoading(true);
 
         try {
+            // Replace: remove current manager from this site only (keep other sites).
+            if (existingManager?.id) {
+                await removeUserFromLocation(existingManager.id, Number(assignSiteId));
+            }
+
             await addMember({
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
@@ -378,18 +462,27 @@ export default function CreateCharitySiteScreen() {
             });
 
             showSuccessAlert(
-                'Site manager assigned. We emailed them their login email and password.',
-                'Done',
+                isReplaceMode
+                    ? 'Site manager updated. We emailed the new manager their login email and password.'
+                    : 'Site manager assigned. We emailed them their login email and password.',
+                'Success!',
                 () => navigation.goBack(),
             );
 
             try {
-                await fetchLocations(true);
+                await Promise.all([fetchLocations(true), fetchUsers(true)]);
             } catch {
                 // Non-fatal refresh after successful assign.
             }
         } catch (err: unknown) {
-            setFormError(getUserFriendlyErrorMessage(err, 'Could not assign manager. Please try again.'));
+            setFormError(
+                getUserFriendlyErrorMessage(
+                    err,
+                    isReplaceMode
+                        ? 'Could not update manager. Please try again.'
+                        : 'Could not assign manager. Please try again.',
+                ),
+            );
         } finally {
             submittingRef.current = false;
             setLoading(false);
@@ -446,6 +539,11 @@ export default function CreateCharitySiteScreen() {
                         <Ionicons name="close-circle" size={normalize(18)} color="#aaa" />
                     </Pressable>
                 </View>
+            ) : null}
+            {siteForm.postcode ? (
+                <AppText style={styles.mapHintText}>
+                    Postcode auto-filled: {siteForm.postcode}
+                </AppText>
             ) : null}
             {renderFieldError('address')}
 
@@ -527,7 +625,7 @@ export default function CreateCharitySiteScreen() {
             {renderFieldError('mobile')}
             <InputField
                 label="Password"
-                placeholder="Enter password"
+                placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
                 {...inputProps}
                 value={values.password}
                 onChangeText={(v) => {
@@ -565,11 +663,10 @@ export default function CreateCharitySiteScreen() {
     return (
         <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior="padding"
-            keyboardVerticalOffset={Platform.OS === 'ios' ? normalize(12) : 0}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? normalize(8) : 0}
         >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+            <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
                     <Modal
                         visible={showPlacesSearch}
                         transparent
@@ -635,16 +732,35 @@ export default function CreateCharitySiteScreen() {
 
                     <ScrollView
                         ref={scrollRef}
-                        keyboardShouldPersistTaps="handled"
-                        keyboardDismissMode="on-drag"
-                        contentContainerStyle={styles.scrollContent}
+                        keyboardShouldPersistTaps="always"
+                        keyboardDismissMode="none"
+                        onScroll={(event) => {
+                            scrollYRef.current = event.nativeEvent.contentOffset.y;
+                        }}
+                        scrollEventThrottle={16}
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            {
+                                paddingBottom: keyboardVisible
+                                    ? keyboardHeight + hp(4)
+                                    : hp(32),
+                            },
+                        ]}
                     >
                         <StackHeroHeader
-                            title={isAssignMode ? 'Assign Site Manager' : 'Add Location'}
+                            title={
+                                isReplaceMode
+                                    ? 'Update Site Manager'
+                                    : isAssignMode
+                                      ? 'Assign Site Manager'
+                                      : 'Add Location'
+                            }
                             subtitle={
-                                isAssignMode
-                                    ? 'Add a manager to an existing location'
-                                    : 'Set up the location, map pin, and manager in one step'
+                                isReplaceMode
+                                    ? 'Replace the current manager for this location'
+                                    : isAssignMode
+                                      ? 'Add a manager to an existing location'
+                                      : 'Set up the location, map pin, and manager in one step'
                             }
                             height={hp(16)}
                         />
@@ -672,16 +788,31 @@ export default function CreateCharitySiteScreen() {
                                     Manager details
                                 </AppText>
                                 <AppText variant="bodySmall" style={styles.sectionHint}>
-                                    This person will manage pickups and day-to-day operations for this site.
+                                    {isReplaceMode
+                                        ? 'Current manager will be replaced. Enter the new manager’s details below.'
+                                        : 'This person will manage pickups and day-to-day operations for this site.'}
                                 </AppText>
+
+                                {isReplaceMode && existingManager ? (
+                                    <View style={styles.siteBanner}>
+                                        <AppText variant="label" style={styles.siteBannerLabel}>
+                                            Current manager
+                                        </AppText>
+                                        <AppText variant="bodyBold">
+                                            {[existingManager.firstName, existingManager.lastName]
+                                                .filter(Boolean)
+                                                .join(' ') || 'Assigned manager'}
+                                        </AppText>
+                                        {existingManager.email ? (
+                                            <AppText variant="bodySmall" style={styles.sectionHint}>
+                                                {existingManager.email}
+                                            </AppText>
+                                        ) : null}
+                                    </View>
+                                ) : null}
 
                                 {renderManagerFields(managerForm, (key, value) => {
                                     setManagerForm({ ...managerForm, [key]: value });
-                                    if (key === 'password' || key === 'confirmPassword') {
-                                        requestAnimationFrame(() => {
-                                            scrollRef.current?.scrollToEnd({ animated: true });
-                                        });
-                                    }
                                 })}
 
                                 {formError ? (
@@ -696,7 +827,13 @@ export default function CreateCharitySiteScreen() {
                                     onPress={handleAssignManager}
                                 >
                                     <AppText style={styles.btnText}>
-                                        {loading ? 'Assigning...' : 'Assign manager'}
+                                        {loading
+                                            ? isReplaceMode
+                                                ? 'Updating...'
+                                                : 'Assigning...'
+                                            : isReplaceMode
+                                              ? 'Update manager'
+                                              : 'Assign manager'}
                                     </AppText>
                                 </Pressable>
                             </View>
@@ -718,18 +855,6 @@ export default function CreateCharitySiteScreen() {
                                     }}
                                 />
                                 {renderFieldError('locationName')}
-
-                                <InputField
-                                    label="Postcode"
-                                    placeholder="Enter postcode"
-                                    {...inputProps}
-                                    value={siteForm.postcode}
-                                    onChangeText={(v) => {
-                                        clearFieldError('postcode');
-                                        setSiteForm({ ...siteForm, postcode: v });
-                                    }}
-                                />
-                                {renderFieldError('postcode')}
 
                                 <View style={styles.radiusBlock}>
                                     <AppText variant="label" style={styles.radiusLabel}>
@@ -777,11 +902,6 @@ export default function CreateCharitySiteScreen() {
                                         if (field) {
                                             setSiteForm({ ...siteForm, [field]: value });
                                         }
-                                        if (key === 'password' || key === 'confirmPassword') {
-                                            requestAnimationFrame(() => {
-                                                scrollRef.current?.scrollToEnd({ animated: true });
-                                            });
-                                        }
                                     },
                                 )}
 
@@ -803,15 +923,13 @@ export default function CreateCharitySiteScreen() {
                             </View>
                         )}
                     </ScrollView>
-                </Screen>
-            </TouchableWithoutFeedback>
+            </Screen>
         </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
     scrollContent: {
-        paddingBottom: hp(32),
         flexGrow: 1,
     },
     inlineError: {

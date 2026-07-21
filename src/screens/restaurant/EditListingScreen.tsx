@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   Linking,
@@ -44,7 +43,7 @@ import {
 } from '../../utils/listingFormPrefill';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { useListingsStore } from '../../store/listingsStore';
-import { showErrorAlert } from '../../utils/apiError';
+import { showErrorAlert, showSuccessAlert } from '../../utils/apiError';
 import {
   getListingDateErrors,
   getListingFoodItemsError,
@@ -383,7 +382,7 @@ function EditPeopleListingForm({
     if (step === 1) {
       const foodError = getListingFoodItemsError(totalQuantity);
       if (foodError) {
-        Alert.alert('Food details missing', foodError);
+        showErrorAlert(foodError, 'Food details missing');
         return;
       }
       setStep(2);
@@ -393,7 +392,7 @@ function EditPeopleListingForm({
     if (step === 2) {
       const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
       if (hasListingDateErrors(dateErrors)) {
-        Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
+        showErrorAlert(Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.', 'Invalid dates');
         return;
       }
       setStep(3);
@@ -418,24 +417,24 @@ function EditPeopleListingForm({
     if (submitting) return;
 
     if (!confirmedSafe) {
-      Alert.alert('Confirmation required', 'Please confirm this food is safe for donation.');
+      showErrorAlert('Please confirm this food is safe for donation.', 'Confirmation required');
       return;
     }
     const foodError = getListingFoodItemsError(totalQuantity);
     if (foodError) {
-      Alert.alert('Food details missing', foodError);
+      showErrorAlert(foodError, 'Food details missing');
       setStep(1);
       return;
     }
 
     const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
     if (hasListingDateErrors(dateErrors)) {
-      Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
+      showErrorAlert(Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.', 'Invalid dates');
       setStep(2);
       return;
     }
     if (!location.trim()) {
-      Alert.alert('Missing location', 'Please enter a pickup address.');
+      showErrorAlert('Please enter a pickup address.', 'Missing location');
       setStep(2);
       return;
     }
@@ -466,9 +465,9 @@ function EditPeopleListingForm({
         });
         invalidateListingDetail(listingId);
         useListingsStore.getState().invalidateSite();
-        Alert.alert('Updated', 'Listing updated successfully', [
-          { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
-        ]);
+        showSuccessAlert('Listing updated successfully', 'Updated', () =>
+          navigation.navigate('RestaurantListings'),
+        );
       } catch (error: unknown) {
         showErrorAlert(error, 'Could not update listing', 'Please try again.');
       }
@@ -1182,7 +1181,7 @@ function EditFarmListingForm({
     if (step === 1) {
       const foodError = getListingFoodItemsError(totalQuantity);
       if (foodError) {
-        Alert.alert('Food details missing', foodError);
+        showErrorAlert(foodError, 'Food details missing');
         return;
       }
       setStep(2);
@@ -1192,7 +1191,7 @@ function EditFarmListingForm({
     if (step === 2) {
       const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
       if (hasListingDateErrors(dateErrors)) {
-        Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
+        showErrorAlert(Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.', 'Invalid dates');
         return;
       }
       setStep(3);
@@ -1203,24 +1202,27 @@ function EditFarmListingForm({
     if (submitting) return;
 
     if (!confirmedSafe) {
-      Alert.alert('Confirmation required', 'Please confirm this material is for livestock/agricultural use.');
+      showErrorAlert(
+        'Please confirm this material is for livestock/agricultural use.',
+        'Confirmation required',
+      );
       return;
     }
     const foodError = getListingFoodItemsError(totalQuantity);
     if (foodError) {
-      Alert.alert('Food details missing', foodError);
+      showErrorAlert(foodError, 'Food details missing');
       setStep(1);
       return;
     }
 
     const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
     if (hasListingDateErrors(dateErrors)) {
-      Alert.alert('Invalid dates', Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.');
+      showErrorAlert(Object.values(dateErrors).find(Boolean) || 'Please review pickup dates.', 'Invalid dates');
       setStep(2);
       return;
     }
     if (!location.trim()) {
-      Alert.alert('Missing location', 'Please enter a pickup address.');
+      showErrorAlert('Please enter a pickup address.', 'Missing location');
       setStep(2);
       return;
     }
@@ -1250,9 +1252,9 @@ function EditFarmListingForm({
         });
         invalidateListingDetail(listingId);
         useListingsStore.getState().invalidateSite();
-        Alert.alert('Updated', 'Listing updated successfully', [
-          { text: 'OK', onPress: () => navigation.navigate('RestaurantListings') },
-        ]);
+        showSuccessAlert('Listing updated successfully', 'Updated', () =>
+          navigation.navigate('RestaurantListings'),
+        );
       } catch (error: unknown) {
         showErrorAlert(error, 'Could not update listing', 'Please try again.');
       }

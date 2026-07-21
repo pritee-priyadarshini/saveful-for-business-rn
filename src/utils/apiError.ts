@@ -1,5 +1,6 @@
-import { Alert } from 'react-native';
 import { isAxiosError } from 'axios';
+
+import { showAppAlert } from '@/store/appAlertStore';
 
 export const FORGOT_PASSWORD_ACCOUNT_NOT_FOUND_MESSAGE =
   'No account found for this email. Please check the email or sign up for a new account.';
@@ -30,9 +31,24 @@ const TECHNICAL_PATTERNS = [
   /HTTP \d{3}/i,
 ];
 
+function looksLikeHtml(message: string): boolean {
+  const trimmed = message.trim().toLowerCase();
+  return (
+    trimmed.startsWith('<!doctype') ||
+    trimmed.startsWith('<html') ||
+    trimmed.includes('<html') ||
+    trimmed.includes('</html>') ||
+    trimmed.includes('<head>') ||
+    trimmed.includes('bad gateway') && trimmed.includes('<')
+  );
+}
+
 function humanizeRawMessage(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) return '';
+
+  // Nginx / gateway HTML pages should never surface in alerts.
+  if (looksLikeHtml(trimmed)) return '';
 
   const lower = trimmed.toLowerCase();
 
@@ -117,10 +133,16 @@ export function getUserFriendlyErrorMessage(
   }
 
   if (isAxiosError(error)) {
+    const status = error.response?.status;
     const apiMessage = extractApiMessage(error.response?.data);
+
+    // Prefer friendly status copy for gateway/proxy failures even if body is HTML.
+    if (status && (status === 502 || status === 503 || status === 504)) {
+      return STATUS_MESSAGES[status] || fallback;
+    }
+
     if (apiMessage) return apiMessage;
 
-    const status = error.response?.status;
     if (status && STATUS_MESSAGES[status]) {
       return STATUS_MESSAGES[status];
     }
@@ -172,7 +194,26 @@ export function showErrorAlert(
   title = 'Something went wrong',
   fallback?: string,
 ) {
-  Alert.alert(title, getUserFriendlyErrorMessage(error, fallback));
+  showAppAlert({
+    variant: 'error',
+    title,
+    message: getUserFriendlyErrorMessage(error, fallback),
+    confirmLabel: 'Ok',
+  });
+}
+
+export function showInfoAlert(
+  message: string,
+  title = 'Notice',
+  onOk?: () => void,
+) {
+  showAppAlert({
+    variant: 'info',
+    title,
+    message,
+    confirmLabel: 'Ok',
+    onDismiss: onOk,
+  });
 }
 
 export function getOtpVerificationErrorMessage(
@@ -191,10 +232,16 @@ export function getOtpVerificationErrorMessage(
 
 export function showSuccessAlert(
   message: string,
-  title = 'Done',
+  title = 'Success!',
   onOk?: () => void,
 ) {
-  Alert.alert(title, message, [{ text: 'OK', onPress: onOk }]);
+  showAppAlert({
+    variant: 'success',
+    title,
+    message,
+    confirmLabel: 'Ok',
+    onDismiss: onOk,
+  });
 }
 
 export function formatApiErrorMessage(message: unknown, fallback: string) {

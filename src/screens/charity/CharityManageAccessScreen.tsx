@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   Pressable,
-  Alert,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -221,25 +220,25 @@ export default function CharityManageAccessScreen() {
       const finalRole = activeTab === 'driver' ? 'driver' : form.role;
 
       if (!form.firstName.trim() || !form.lastName.trim() || !form.mobile.trim()) {
-        Alert.alert('Error', 'First name, last name, and mobile are required');
+        showErrorAlert('First name, last name, and mobile are required', 'Error');
         return;
       }
 
       if (!editingId) {
         if (!form.email.trim() || !form.password || !finalRole) {
-          Alert.alert('Error', 'Please fill all required fields');
+          showErrorAlert('Please fill all required fields', 'Error');
           return;
         }
 
         const passwordError = validatePassword(form.password, form.confirmPassword);
         if (passwordError) {
-          Alert.alert('Error', passwordError);
+          showErrorAlert(passwordError, 'Error');
           return;
         }
       }
 
       if (!effectiveLocationId) {
-        Alert.alert('Error', 'Please select a site before adding a team member');
+        showErrorAlert('Please select a site before adding a team member', 'Error');
         return;
       }
 

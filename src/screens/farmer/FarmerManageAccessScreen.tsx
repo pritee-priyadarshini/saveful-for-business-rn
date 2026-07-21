@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   Pressable,
-  Alert,
   StyleSheet,
   Dimensions,
   ActivityIndicator,
@@ -151,19 +150,19 @@ export default function FarmerManageAccessScreen() {
       const finalRole = activeTab === 'driver' ? 'driver' : form.role;
 
       if (!form.firstName.trim() || !form.lastName.trim() || !form.mobile.trim()) {
-        Alert.alert('Error', 'First name, last name, and mobile are required');
+        showErrorAlert('First name, last name, and mobile are required', 'Error');
         return;
       }
 
       if (!editingId) {
         if (!form.email.trim() || !form.password || !finalRole) {
-          Alert.alert('Error', 'Please fill all required fields');
+          showErrorAlert('Please fill all required fields', 'Error');
           return;
         }
       }
 
       if (!effectiveLocationId) {
-        Alert.alert('Error', 'No location found for this account');
+        showErrorAlert('No location found for this account', 'Error');
         return;
       }
 
