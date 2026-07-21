@@ -110,6 +110,7 @@ export default {
 
     android: {
       package: 'com.saveful.business.app',
+      softwareKeyboardLayoutMode: 'resize',
       ...(androidGoogleServicesFile && { googleServicesFile: androidGoogleServicesFile }),
       adaptiveIcon: {
         foregroundImage: './assets/intro/Saveful-for-Business-logo.png',

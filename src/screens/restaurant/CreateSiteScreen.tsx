@@ -4,7 +4,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
@@ -29,11 +28,22 @@ import { useSitesStore } from '@/store/sitesStore';
 import { InputField } from '@/components/InputField';
 import { Skeleton } from '@/components/Skeleton';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { getUserFriendlyErrorMessage, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 
 /** Matches AssignSiteManagerDto MinLength(8) in svforb sites.dto.ts */
 const MIN_PASSWORD_LENGTH = 8;
+
+type FieldKey =
+  | 'siteName'
+  | 'postcode'
+  | 'address'
+  | 'firstName'
+  | 'lastName'
+  | 'email'
+  | 'mobile'
+  | 'password'
+  | 'confirmPassword';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -45,25 +55,39 @@ const normalize = (size: number) => {
 
 const inputProps = { compact: true as const, labelVariant: 'label' as const };
 
-function validateManagerPassword(password: string, confirmPassword: string): string | null {
-  if (!password) return 'Please enter a password.';
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+function validateManagerPassword(
+  password: string,
+  confirmPassword: string,
+): Partial<Record<'password' | 'confirmPassword', string>> {
+  const errors: Partial<Record<'password' | 'confirmPassword', string>> = {};
+  if (!password) {
+    errors.password = 'Please enter a password.';
+  } else if (password.length < MIN_PASSWORD_LENGTH) {
+    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
-  if (!confirmPassword) return 'Please confirm the password.';
-  if (password !== confirmPassword) return 'Passwords do not match.';
-  return null;
+  if (!confirmPassword) {
+    errors.confirmPassword = 'Please confirm the password.';
+  } else if (password && password !== confirmPassword) {
+    errors.confirmPassword = 'Passwords do not match.';
+  }
+  return errors;
 }
 
 function extractCreatedSiteId(res: any): number | null {
-  const raw =
-    res?.data?.site?.id ??
-    res?.site?.id ??
-    res?.data?.id ??
-    res?.id ??
-    null;
-  const id = Number(raw);
-  return Number.isFinite(id) && id > 0 ? id : null;
+  // Axios returns { data: <body> }; body shapes vary by API version.
+  const candidates = [
+    res?.data?.site?.id,
+    res?.data?.data?.site?.id,
+    res?.data?.data?.id,
+    res?.data?.id,
+    res?.site?.id,
+    res?.id,
+  ];
+  for (const raw of candidates) {
+    const id = Number(raw);
+    if (Number.isFinite(id) && id > 0) return id;
+  }
+  return null;
 }
 
 export default function CreateSiteScreen() {
@@ -84,6 +108,35 @@ export default function CreateSiteScreen() {
   } = useSitesStore();
 
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  /**
+   * After createSite succeeds, we keep this id for the rest of the screen session.
+   * Any later submit only calls assignManager — createSite is never called twice.
+   */
+  const [createdSiteId, setCreatedSiteId] = useState<number | null>(null);
+  const createdSiteIdRef = useRef<number | null>(null);
+  const submittingRef = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const locationAlreadyCreated = createdSiteId != null;
+
+  const clearFieldError = (key: FieldKey) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    if (formError) setFormError(null);
+  };
+
+  const renderFieldError = (key: FieldKey) =>
+    fieldErrors[key] ? (
+      <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+        {fieldErrors[key]}
+      </AppText>
+    ) : null;
 
   const assignSite = useMemo(() => {
     if (!assignSiteId) return null;
@@ -185,6 +238,7 @@ export default function CreateSiteScreen() {
     address?: string,
     postcode?: string,
   ) => {
+    clearFieldError('address');
     setMapCenter({ latitude, longitude });
     setMarker({ latitude, longitude });
     setSiteForm((prev) => ({ ...prev, latitude, longitude }));
@@ -258,7 +312,7 @@ export default function CreateSiteScreen() {
   }, [isAssignMode]);
 
   const handleCreateSiteAndManager = async () => {
-    if (loading) return;
+    if (loading || submittingRef.current) return;
 
     const {
       siteName,
@@ -274,44 +328,57 @@ export default function CreateSiteScreen() {
       longitude,
     } = siteForm;
 
-    if (
-      !siteName.trim() ||
-      !address.trim() ||
-      !postcode.trim() ||
-      !managerFirstName.trim() ||
-      !managerLastName.trim() ||
-      !adminEmail.trim() ||
-      !adminPassword ||
-      latitude == null ||
-      longitude == null
-    ) {
-      Alert.alert('Error', 'Please fill all fields and set the site location on the map');
+    const alreadyCreatedId = createdSiteIdRef.current;
+    const nextErrors: Partial<Record<FieldKey, string>> = {};
+
+    // Location step already done — only validate manager fields for retry.
+    if (!alreadyCreatedId) {
+      if (!siteName.trim()) nextErrors.siteName = 'Please enter a site name.';
+      if (!postcode.trim()) nextErrors.postcode = 'Please enter a postcode.';
+      if (!address.trim() || latitude == null || longitude == null) {
+        nextErrors.address = 'Please set the site location on the map.';
+      }
+    }
+    if (!managerFirstName.trim()) nextErrors.firstName = 'Please enter a first name.';
+    if (!managerLastName.trim()) nextErrors.lastName = 'Please enter a last name.';
+    if (!adminEmail.trim()) nextErrors.email = 'Please enter an email.';
+    Object.assign(nextErrors, validateManagerPassword(adminPassword, adminConfirmPassword));
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      setFormError('Please fix the highlighted fields and try again.');
       return;
     }
 
-    const passwordError = validateManagerPassword(adminPassword, adminConfirmPassword);
-    if (passwordError) {
-      Alert.alert('Error', passwordError);
-      return;
-    }
-
+    setFieldErrors({});
+    setFormError(null);
+    submittingRef.current = true;
     setLoading(true);
-    try {
-      // CreateSiteDto: siteName, address, postcode, latitude, longitude only
-      // https://github.com/appu900/svforb/blob/main/src/modules/sites/dto/sites.dto.ts
-      const createRes = await createSite({
-        siteName: siteName.trim(),
-        address: address.trim(),
-        postcode: postcode.trim(),
-        latitude,
-        longitude,
-      });
 
-      const siteId = extractCreatedSiteId(createRes);
+    try {
+      let siteId = alreadyCreatedId;
+
+      // Step 1 — create location at most once per screen session.
       if (!siteId) {
-        throw new Error('Site was created but the server response was missing an id');
+        const createRes = await createSite({
+          siteName: siteName.trim(),
+          address: address.trim(),
+          postcode: postcode.trim(),
+          latitude: latitude!,
+          longitude: longitude!,
+        });
+
+        siteId = extractCreatedSiteId(createRes);
+        if (!siteId) {
+          throw new Error('Location was created but the server response was missing an id');
+        }
+
+        // Lock immediately so any later failure / retry never creates again.
+        createdSiteIdRef.current = siteId;
+        setCreatedSiteId(siteId);
       }
 
+      // Step 2 — assign manager (safe to retry).
       await assignManager(siteId, {
         firstName: managerFirstName.trim(),
         lastName: managerLastName.trim(),
@@ -321,7 +388,7 @@ export default function CreateSiteScreen() {
       });
 
       showSuccessAlert(
-        'Site and manager created. Login credentials were sent to the manager by email.',
+        'Location and manager created. We emailed the manager their login email and password.',
         'Done',
         () => navigation.goBack(),
       );
@@ -332,33 +399,49 @@ export default function CreateSiteScreen() {
         // Non-fatal refresh after successful create.
       }
     } catch (err: unknown) {
-      showErrorAlert(err, 'Could not create site', 'Failed to create site');
+      if (createdSiteIdRef.current) {
+        try {
+          await fetchSitesWithManagers(true);
+        } catch {
+          // ignore
+        }
+        setFormError(
+          `${getUserFriendlyErrorMessage(err, 'Manager could not be assigned.')} Location is already saved. Fix the manager details below and tap Assign manager — the location will not be created again.`,
+        );
+      } else {
+        setFormError(getUserFriendlyErrorMessage(err, 'Could not add location. Please try again.'));
+      }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
 
   const handleAssignManager = async () => {
-    if (loading) return;
+    if (loading || submittingRef.current) return;
 
     if (!assignSiteId || !assignSite) {
-      Alert.alert('Error', 'Could not find the selected site');
+      setFormError('Could not find the selected site.');
       return;
     }
 
     const { firstName, lastName, email, password, confirmPassword, phoneNumber } = managerForm;
 
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
-      Alert.alert('Error', 'Please fill all required manager fields');
+    const nextErrors: Partial<Record<FieldKey, string>> = {};
+    if (!firstName.trim()) nextErrors.firstName = 'Please enter a first name.';
+    if (!lastName.trim()) nextErrors.lastName = 'Please enter a last name.';
+    if (!email.trim()) nextErrors.email = 'Please enter an email.';
+    Object.assign(nextErrors, validateManagerPassword(password, confirmPassword));
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      setFormError('Please fix the highlighted fields and try again.');
       return;
     }
 
-    const passwordError = validateManagerPassword(password, confirmPassword);
-    if (passwordError) {
-      Alert.alert('Error', passwordError);
-      return;
-    }
-
+    setFieldErrors({});
+    setFormError(null);
+    submittingRef.current = true;
     setLoading(true);
     try {
       await assignManager(assignSiteId, {
@@ -369,7 +452,11 @@ export default function CreateSiteScreen() {
         ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
       });
 
-      showSuccessAlert('Site manager assigned successfully', 'Done', () => navigation.goBack());
+      showSuccessAlert(
+        'Site manager assigned. We emailed them their login email and password.',
+        'Done',
+        () => navigation.goBack(),
+      );
 
       try {
         await fetchSitesWithManagers(true);
@@ -377,8 +464,9 @@ export default function CreateSiteScreen() {
         // Non-fatal refresh after successful assign.
       }
     } catch (err: unknown) {
-      showErrorAlert(err, 'Could not assign manager', 'Failed to assign manager');
+      setFormError(getUserFriendlyErrorMessage(err, 'Could not assign manager. Please try again.'));
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -434,6 +522,7 @@ export default function CreateSiteScreen() {
           </Pressable>
         </View>
       ) : null}
+      {renderFieldError('address')}
 
       <AppText style={styles.mapHintText}>Tap the map to fine-tune the pin</AppText>
 
@@ -468,49 +557,73 @@ export default function CreateSiteScreen() {
         placeholder="Enter first name"
         {...inputProps}
         value={values.firstName}
-        onChangeText={(v) => onChange('firstName', v)}
+        onChangeText={(v) => {
+          clearFieldError('firstName');
+          onChange('firstName', v);
+        }}
       />
+      {renderFieldError('firstName')}
       <InputField
         label="Last name"
         placeholder="Enter last name"
         {...inputProps}
         value={values.lastName}
-        onChangeText={(v) => onChange('lastName', v)}
+        onChangeText={(v) => {
+          clearFieldError('lastName');
+          onChange('lastName', v);
+        }}
       />
+      {renderFieldError('lastName')}
       <InputField
         label="Email"
         placeholder="Enter email"
         {...inputProps}
         value={values.email}
-        onChangeText={(v) => onChange('email', v)}
+        onChangeText={(v) => {
+          clearFieldError('email');
+          onChange('email', v);
+        }}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
       />
+      {renderFieldError('email')}
       <InputField
         label="Mobile"
         placeholder="Enter mobile number"
         {...inputProps}
         value={values.mobile}
-        onChangeText={(v) => onChange('mobile', v)}
+        onChangeText={(v) => {
+          clearFieldError('mobile');
+          onChange('mobile', v);
+        }}
         keyboardType="phone-pad"
       />
+      {renderFieldError('mobile')}
       <InputField
         label="Password"
         placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
         {...inputProps}
         value={values.password}
-        onChangeText={(v) => onChange('password', v)}
+        onChangeText={(v) => {
+          clearFieldError('password');
+          onChange('password', v);
+        }}
         isPassword
       />
+      {renderFieldError('password')}
       <InputField
         label="Confirm password"
         placeholder="Re-enter password"
         {...inputProps}
         value={values.confirmPassword}
-        onChangeText={(v) => onChange('confirmPassword', v)}
+        onChangeText={(v) => {
+          clearFieldError('confirmPassword');
+          onChange('confirmPassword', v);
+        }}
         isPassword
       />
+      {renderFieldError('confirmPassword')}
     </>
   );
 
@@ -527,8 +640,8 @@ export default function CreateSiteScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={normalize(20)}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? normalize(12) : 0}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
@@ -596,15 +709,17 @@ export default function CreateSiteScreen() {
           </Modal>
 
           <ScrollView
-            keyboardShouldPersistTaps="always"
+            ref={scrollRef}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={styles.scrollContent}
           >
             <StackHeroHeader
-              title={isAssignMode ? 'Assign Site Manager' : 'Add Site'}
+              title={isAssignMode ? 'Assign Site Manager' : 'Add Location'}
               subtitle={
                 isAssignMode
-                  ? 'Add a manager to an existing site'
-                  : 'Set up the site, location, and manager in one step'
+                  ? 'Add a manager to an existing location'
+                  : 'Set up the location, map pin, and manager in one step'
               }
               height={hp(16)}
             />
@@ -647,11 +762,22 @@ export default function CreateSiteScreen() {
                     (key, value) => {
                       if (key === 'mobile') {
                         setManagerForm({ ...managerForm, phoneNumber: value });
-                        return;
+                      } else {
+                        setManagerForm({ ...managerForm, [key]: value });
                       }
-                      setManagerForm({ ...managerForm, [key]: value });
+                      if (key === 'password' || key === 'confirmPassword') {
+                        requestAnimationFrame(() => {
+                          scrollRef.current?.scrollToEnd({ animated: true });
+                        });
+                      }
                     },
                   )}
+
+                  {formError ? (
+                    <AppText variant="caption" color={palette.danger} style={styles.formError}>
+                      {formError}
+                    </AppText>
+                  ) : null}
 
                   <Pressable
                     style={[styles.createBtn, loading && { opacity: 0.65 }]}
@@ -670,30 +796,59 @@ export default function CreateSiteScreen() {
                   Site details
                 </AppText>
 
-                <InputField
-                  label="Site name"
-                  placeholder="Enter site name"
-                  {...inputProps}
-                  value={siteForm.siteName}
-                  onChangeText={(v) => setSiteForm({ ...siteForm, siteName: v })}
-                />
+                {locationAlreadyCreated ? (
+                  <View style={styles.siteBanner}>
+                    <AppText variant="label" style={styles.siteBannerLabel}>
+                      Location saved
+                    </AppText>
+                    <AppText variant="bodyBold">{siteForm.siteName || 'New location'}</AppText>
+                    {siteForm.address ? (
+                      <AppText variant="bodySmall" style={styles.sectionHint}>
+                        {siteForm.address}
+                      </AppText>
+                    ) : null}
+                    <AppText variant="bodySmall" style={styles.sectionHint}>
+                      Only the manager step is left. Fix any details below and assign again — this
+                      will not create another location.
+                    </AppText>
+                  </View>
+                ) : (
+                  <>
+                    <InputField
+                      label="Site name"
+                      placeholder="Enter site name"
+                      {...inputProps}
+                      value={siteForm.siteName}
+                      onChangeText={(v) => {
+                        clearFieldError('siteName');
+                        setSiteForm({ ...siteForm, siteName: v });
+                      }}
+                    />
+                    {renderFieldError('siteName')}
 
-                <InputField
-                  label="Postcode"
-                  placeholder="Enter postcode"
-                  {...inputProps}
-                  value={siteForm.postcode}
-                  onChangeText={(v) => setSiteForm({ ...siteForm, postcode: v })}
-                />
+                    <InputField
+                      label="Postcode"
+                      placeholder="Enter postcode"
+                      {...inputProps}
+                      value={siteForm.postcode}
+                      onChangeText={(v) => {
+                        clearFieldError('postcode');
+                        setSiteForm({ ...siteForm, postcode: v });
+                      }}
+                    />
+                    {renderFieldError('postcode')}
 
-                {renderLocationSection()}
+                    {renderLocationSection()}
+                  </>
+                )}
 
                 <AppText variant="bodyBold" style={styles.sectionHeading}>
                   Site manager
                 </AppText>
                 <AppText variant="bodySmall" style={styles.sectionHint}>
-                  A manager account is created with the site. They will receive login details by
-                  email.
+                  {locationAlreadyCreated
+                    ? 'Update manager details if needed, then tap Assign manager.'
+                    : 'A manager account is created with this location. After you tap Add location, we email them their login email and password.'}
                 </AppText>
 
                 {renderManagerFields(
@@ -718,8 +873,19 @@ export default function CreateSiteScreen() {
                     if (field) {
                       setSiteForm({ ...siteForm, [field]: value });
                     }
+                    if (key === 'password' || key === 'confirmPassword') {
+                      requestAnimationFrame(() => {
+                        scrollRef.current?.scrollToEnd({ animated: true });
+                      });
+                    }
                   },
                 )}
+
+                {formError ? (
+                  <AppText variant="caption" color={palette.danger} style={styles.formError}>
+                    {formError}
+                  </AppText>
+                ) : null}
 
                 <Pressable
                   style={[styles.createBtn, loading && { opacity: 0.65 }]}
@@ -727,7 +893,13 @@ export default function CreateSiteScreen() {
                   onPress={handleCreateSiteAndManager}
                 >
                   <AppText style={styles.btnText}>
-                    {loading ? 'Creating site...' : 'Create site & manager'}
+                    {loading
+                      ? locationAlreadyCreated
+                        ? 'Assigning manager...'
+                        : 'Adding location...'
+                      : locationAlreadyCreated
+                        ? 'Assign manager'
+                        : 'Add location & manager'}
                   </AppText>
                 </Pressable>
               </View>
@@ -741,7 +913,16 @@ export default function CreateSiteScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: hp(14),
+    paddingBottom: hp(32),
+    flexGrow: 1,
+  },
+  inlineError: {
+    marginTop: hp(-0.4),
+    marginBottom: hp(0.2),
+  },
+  formError: {
+    marginTop: hp(0.4),
+    lineHeight: normalize(18),
   },
   formCard: {
     marginHorizontal: wp(4),

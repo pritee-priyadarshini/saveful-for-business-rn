@@ -53,7 +53,7 @@ export default function ManageSitesScreen() {
   const businessLogo = organisation?.logoUrl || currentProfile.logo || null;
 
   const actions = [
-    { label: 'Add Site & Manager', route: 'CreateSite' },
+    { label: 'Add Location', route: 'CreateSite', primary: true },
     { label: 'View Analytics', route: 'SiteAnalytics' },
     { label: 'Your Profile', route: 'Account' },
     { label: 'Contact Saveful', action: () => Linking.openURL('https://www.saveful.com/contact') },
@@ -214,13 +214,16 @@ export default function ManageSitesScreen() {
           {actions.map((item) => (
             <Pressable
               key={item.label}
-              style={styles.actionCard}
+              style={[styles.actionCard, item.primary && styles.actionCardPrimary]}
               onPress={() => {
                 if (item.route) navigation.navigate(item.route as any);
                 else item.action?.();
               }}
             >
-              <AppText variant="bodyBold" style={styles.actionText}>
+              <AppText
+                variant="bodyBold"
+                style={[styles.actionText, item.primary && styles.actionTextPrimary]}
+              >
                 {item.label}
               </AppText>
             </Pressable>
@@ -434,9 +437,15 @@ const styles = StyleSheet.create({
     minHeight: normalize(64),
     elevation: 2,
   },
+  actionCardPrimary: {
+    backgroundColor: palette.kale,
+  },
   actionText: {
     textAlign: 'center',
     fontSize: normalize(13),
+  },
+  actionTextPrimary: {
+    color: palette.white,
   },
   bottomActions: {
     marginTop: hp(2),

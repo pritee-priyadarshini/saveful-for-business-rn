@@ -4,7 +4,6 @@ import {
     ScrollView,
     Pressable,
     StyleSheet,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     TouchableWithoutFeedback,
@@ -35,10 +34,22 @@ import { useCharityStore } from '@/store/charityStore';
 import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
 import { InputField } from '@/components/InputField';
 import { Skeleton } from '@/components/Skeleton';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { getUserFriendlyErrorMessage, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { DEFAULT_PICKUP_RADIUS_KM } from '@/utils/authSession';
 
 const MIN_PASSWORD_LENGTH = 6;
+
+type FieldKey =
+    | 'locationName'
+    | 'postcode'
+    | 'address'
+    | 'firstName'
+    | 'lastName'
+    | 'email'
+    | 'mobile'
+    | 'password'
+    | 'confirmPassword';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -50,14 +61,22 @@ const normalize = (size: number) => {
 
 const inputProps = { compact: true as const, labelVariant: 'label' as const };
 
-function validateManagerPassword(password: string, confirmPassword: string): string | null {
-    if (!password) return 'Please enter a password.';
-    if (password.length < MIN_PASSWORD_LENGTH) {
-        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+function validateManagerPassword(
+    password: string,
+    confirmPassword: string,
+): Partial<Record<'password' | 'confirmPassword', string>> {
+    const errors: Partial<Record<'password' | 'confirmPassword', string>> = {};
+    if (!password) {
+        errors.password = 'Please enter a password.';
+    } else if (password.length < MIN_PASSWORD_LENGTH) {
+        errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
     }
-    if (!confirmPassword) return 'Please confirm the password.';
-    if (password !== confirmPassword) return 'Passwords do not match.';
-    return null;
+    if (!confirmPassword) {
+        errors.confirmPassword = 'Please confirm the password.';
+    } else if (password && password !== confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match.';
+    }
+    return errors;
 }
 
 export default function CreateCharitySiteScreen() {
@@ -76,6 +95,27 @@ export default function CreateCharitySiteScreen() {
     } = useCharityStore();
 
     const [loading, setLoading] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
+    const [formError, setFormError] = useState<string | null>(null);
+    const submittingRef = useRef(false);
+    const scrollRef = useRef<ScrollView>(null);
+
+    const clearFieldError = (key: FieldKey) => {
+        setFieldErrors((prev) => {
+            if (!prev[key]) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
+        if (formError) setFormError(null);
+    };
+
+    const renderFieldError = (key: FieldKey) =>
+        fieldErrors[key] ? (
+            <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {fieldErrors[key]}
+            </AppText>
+        ) : null;
     const locations = storeLocations;
     const assignSite = useMemo(
         () => locations.find((site) => site.id === assignSiteId) ?? null,
@@ -127,6 +167,7 @@ export default function CreateCharitySiteScreen() {
         address?: string,
         postcode?: string,
     ) => {
+        clearFieldError('address');
         setMapCenter({ latitude, longitude });
         setMarker({ latitude, longitude });
         setSiteForm((prev) => ({ ...prev, latitude, longitude }));
@@ -183,7 +224,7 @@ export default function CreateCharitySiteScreen() {
         adminMobile: '',
         adminPassword: '',
         adminConfirmPassword: '',
-        radiusKm: '10',
+        radiusKm: String(DEFAULT_PICKUP_RADIUS_KM),
         latitude: null as number | null,
         longitude: null as number | null,
     });
@@ -224,46 +265,46 @@ export default function CreateCharitySiteScreen() {
     }, [isAssignMode]);
 
     const handleCreateLocation = async () => {
-        if (loading) return;
+        if (loading || submittingRef.current) return;
+
+        const {
+            locationName,
+            address,
+            postcode,
+            managerFirstName,
+            managerLastName,
+            adminEmail,
+            adminMobile,
+            adminPassword,
+            adminConfirmPassword,
+            latitude,
+            longitude,
+        } = siteForm;
+
+        const nextErrors: Partial<Record<FieldKey, string>> = {};
+        if (!locationName.trim()) nextErrors.locationName = 'Please enter a site name.';
+        if (!postcode.trim()) nextErrors.postcode = 'Please enter a postcode.';
+        if (!address.trim() || !latitude || !longitude) {
+            nextErrors.address = 'Please set the site location on the map.';
+        }
+        if (!managerFirstName.trim()) nextErrors.firstName = 'Please enter a first name.';
+        if (!managerLastName.trim()) nextErrors.lastName = 'Please enter a last name.';
+        if (!adminEmail.trim()) nextErrors.email = 'Please enter an email.';
+        if (!adminMobile.trim()) nextErrors.mobile = 'Please enter a mobile number.';
+        Object.assign(nextErrors, validateManagerPassword(adminPassword, adminConfirmPassword));
+
+        if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            setFormError('Please fix the highlighted fields and try again.');
+            return;
+        }
+
+        setFieldErrors({});
+        setFormError(null);
+        submittingRef.current = true;
+        setLoading(true);
+
         try {
-            const {
-                locationName,
-                address,
-                postcode,
-                managerFirstName,
-                managerLastName,
-                adminEmail,
-                adminMobile,
-                adminPassword,
-                adminConfirmPassword,
-                radiusKm,
-                latitude,
-                longitude,
-            } = siteForm;
-
-            if (
-                !locationName.trim() ||
-                !address.trim() ||
-                !postcode.trim() ||
-                !managerFirstName.trim() ||
-                !managerLastName.trim() ||
-                !adminEmail.trim() ||
-                !adminMobile.trim() ||
-                !adminPassword ||
-                !latitude ||
-                !longitude
-            ) {
-                Alert.alert('Error', 'Please fill all fields and set the site location on the map');
-                return;
-            }
-
-            const passwordError = validateManagerPassword(adminPassword, adminConfirmPassword);
-            if (passwordError) {
-                Alert.alert('Error', passwordError);
-                return;
-            }
-
-            setLoading(true);
             await addLocation({
                 locationName: locationName.trim(),
                 address: address.trim(),
@@ -272,13 +313,13 @@ export default function CreateCharitySiteScreen() {
                 adminEmail: adminEmail.trim().toLowerCase(),
                 adminMobile: adminMobile.trim(),
                 adminPassword,
-                radiusKm: Number(radiusKm) || 10,
-                latitude,
-                longitude,
+                radiusKm: DEFAULT_PICKUP_RADIUS_KM,
+                latitude: latitude!,
+                longitude: longitude!,
             });
 
             showSuccessAlert(
-                'Site and manager created. Login credentials were sent to the manager by email.',
+                'Location and manager created. We emailed the manager their login email and password.',
                 'Done',
                 () => navigation.goBack(),
             );
@@ -289,35 +330,42 @@ export default function CreateCharitySiteScreen() {
                 // Non-fatal refresh after successful create.
             }
         } catch (err: unknown) {
-            showErrorAlert(err, 'Could not create site', 'Failed to create site');
+            // Show the real API message inline — do not block by matching existing addresses.
+            setFormError(getUserFriendlyErrorMessage(err, 'Could not add location. Please try again.'));
         } finally {
+            submittingRef.current = false;
             setLoading(false);
         }
     };
 
     const handleAssignManager = async () => {
-        if (loading) return;
+        if (loading || submittingRef.current) return;
 
         if (!assignSiteId || !assignSite) {
-            Alert.alert('Error', 'Could not find the selected site');
+            setFormError('Could not find the selected site.');
             return;
         }
 
+        const { firstName, lastName, email, password, confirmPassword, mobile } = managerForm;
+
+        const nextErrors: Partial<Record<FieldKey, string>> = {};
+        if (!firstName.trim()) nextErrors.firstName = 'Please enter a first name.';
+        if (!lastName.trim()) nextErrors.lastName = 'Please enter a last name.';
+        if (!email.trim()) nextErrors.email = 'Please enter an email.';
+        Object.assign(nextErrors, validateManagerPassword(password, confirmPassword));
+
+        if (Object.keys(nextErrors).length > 0) {
+            setFieldErrors(nextErrors);
+            setFormError('Please fix the highlighted fields and try again.');
+            return;
+        }
+
+        setFieldErrors({});
+        setFormError(null);
+        submittingRef.current = true;
+        setLoading(true);
+
         try {
-            const { firstName, lastName, email, password, confirmPassword, mobile } = managerForm;
-
-            if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
-                Alert.alert('Error', 'Please fill all required manager fields');
-                return;
-            }
-
-            const passwordError = validateManagerPassword(password, confirmPassword);
-            if (passwordError) {
-                Alert.alert('Error', passwordError);
-                return;
-            }
-
-            setLoading(true);
             await addMember({
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
@@ -329,7 +377,11 @@ export default function CreateCharitySiteScreen() {
                 canClaimPickupsDirectly: true,
             });
 
-            showSuccessAlert('Site manager assigned successfully', 'Done', () => navigation.goBack());
+            showSuccessAlert(
+                'Site manager assigned. We emailed them their login email and password.',
+                'Done',
+                () => navigation.goBack(),
+            );
 
             try {
                 await fetchLocations(true);
@@ -337,8 +389,9 @@ export default function CreateCharitySiteScreen() {
                 // Non-fatal refresh after successful assign.
             }
         } catch (err: unknown) {
-            showErrorAlert(err, 'Could not assign manager', 'Failed to assign manager');
+            setFormError(getUserFriendlyErrorMessage(err, 'Could not assign manager. Please try again.'));
         } finally {
+            submittingRef.current = false;
             setLoading(false);
         }
     };
@@ -394,6 +447,7 @@ export default function CreateCharitySiteScreen() {
                     </Pressable>
                 </View>
             ) : null}
+            {renderFieldError('address')}
 
             <AppText style={styles.mapHintText}>Tap the map to fine-tune the pin</AppText>
 
@@ -428,49 +482,73 @@ export default function CreateCharitySiteScreen() {
                 placeholder="Enter first name"
                 {...inputProps}
                 value={values.firstName}
-                onChangeText={(v) => onChange('firstName', v)}
+                onChangeText={(v) => {
+                    clearFieldError('firstName');
+                    onChange('firstName', v);
+                }}
             />
+            {renderFieldError('firstName')}
             <InputField
                 label="Last name"
                 placeholder="Enter last name"
                 {...inputProps}
                 value={values.lastName}
-                onChangeText={(v) => onChange('lastName', v)}
+                onChangeText={(v) => {
+                    clearFieldError('lastName');
+                    onChange('lastName', v);
+                }}
             />
+            {renderFieldError('lastName')}
             <InputField
                 label="Email"
                 placeholder="Enter email"
                 {...inputProps}
                 value={values.email}
-                onChangeText={(v) => onChange('email', v)}
+                onChangeText={(v) => {
+                    clearFieldError('email');
+                    onChange('email', v);
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
             />
+            {renderFieldError('email')}
             <InputField
                 label="Mobile"
                 placeholder="Enter mobile number"
                 {...inputProps}
                 value={values.mobile}
-                onChangeText={(v) => onChange('mobile', v)}
+                onChangeText={(v) => {
+                    clearFieldError('mobile');
+                    onChange('mobile', v);
+                }}
                 keyboardType="phone-pad"
             />
+            {renderFieldError('mobile')}
             <InputField
                 label="Password"
                 placeholder="Enter password"
                 {...inputProps}
                 value={values.password}
-                onChangeText={(v) => onChange('password', v)}
+                onChangeText={(v) => {
+                    clearFieldError('password');
+                    onChange('password', v);
+                }}
                 isPassword
             />
+            {renderFieldError('password')}
             <InputField
                 label="Confirm password"
                 placeholder="Re-enter password"
                 {...inputProps}
                 value={values.confirmPassword}
-                onChangeText={(v) => onChange('confirmPassword', v)}
+                onChangeText={(v) => {
+                    clearFieldError('confirmPassword');
+                    onChange('confirmPassword', v);
+                }}
                 isPassword
             />
+            {renderFieldError('confirmPassword')}
         </>
     );
 
@@ -487,8 +565,8 @@ export default function CreateCharitySiteScreen() {
     return (
         <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={normalize(20)}
+            behavior="padding"
+            keyboardVerticalOffset={Platform.OS === 'ios' ? normalize(12) : 0}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
@@ -556,15 +634,17 @@ export default function CreateCharitySiteScreen() {
                     </Modal>
 
                     <ScrollView
-                        keyboardShouldPersistTaps="always"
+                        ref={scrollRef}
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="on-drag"
                         contentContainerStyle={styles.scrollContent}
                     >
                         <StackHeroHeader
-                            title={isAssignMode ? 'Assign Site Manager' : 'Add Charity Site'}
+                            title={isAssignMode ? 'Assign Site Manager' : 'Add Location'}
                             subtitle={
                                 isAssignMode
-                                    ? 'Add a manager to an existing site'
-                                    : 'Set up the site, location, and manager in one step'
+                                    ? 'Add a manager to an existing location'
+                                    : 'Set up the location, map pin, and manager in one step'
                             }
                             height={hp(16)}
                         />
@@ -595,9 +675,20 @@ export default function CreateCharitySiteScreen() {
                                     This person will manage pickups and day-to-day operations for this site.
                                 </AppText>
 
-                                {renderManagerFields(managerForm, (key, value) =>
-                                    setManagerForm({ ...managerForm, [key]: value }),
-                                )}
+                                {renderManagerFields(managerForm, (key, value) => {
+                                    setManagerForm({ ...managerForm, [key]: value });
+                                    if (key === 'password' || key === 'confirmPassword') {
+                                        requestAnimationFrame(() => {
+                                            scrollRef.current?.scrollToEnd({ animated: true });
+                                        });
+                                    }
+                                })}
+
+                                {formError ? (
+                                    <AppText variant="caption" color={palette.danger} style={styles.formError}>
+                                        {formError}
+                                    </AppText>
+                                ) : null}
 
                                 <Pressable
                                     style={[styles.createBtn, loading && { opacity: 0.65 }]}
@@ -621,25 +712,38 @@ export default function CreateCharitySiteScreen() {
                                     placeholder="Enter site name"
                                     {...inputProps}
                                     value={siteForm.locationName}
-                                    onChangeText={(v) => setSiteForm({ ...siteForm, locationName: v })}
+                                    onChangeText={(v) => {
+                                        clearFieldError('locationName');
+                                        setSiteForm({ ...siteForm, locationName: v });
+                                    }}
                                 />
+                                {renderFieldError('locationName')}
 
                                 <InputField
                                     label="Postcode"
                                     placeholder="Enter postcode"
                                     {...inputProps}
                                     value={siteForm.postcode}
-                                    onChangeText={(v) => setSiteForm({ ...siteForm, postcode: v })}
+                                    onChangeText={(v) => {
+                                        clearFieldError('postcode');
+                                        setSiteForm({ ...siteForm, postcode: v });
+                                    }}
                                 />
+                                {renderFieldError('postcode')}
 
-                                <InputField
-                                    label="Pickup radius (km)"
-                                    placeholder="10"
-                                    {...inputProps}
-                                    value={siteForm.radiusKm}
-                                    onChangeText={(v) => setSiteForm({ ...siteForm, radiusKm: v })}
-                                    keyboardType="numeric"
-                                />
+                                <View style={styles.radiusBlock}>
+                                    <AppText variant="label" style={styles.radiusLabel}>
+                                        Pickup radius
+                                    </AppText>
+                                    <View style={styles.radiusValueBox}>
+                                        <AppText style={styles.radiusValue}>
+                                            {DEFAULT_PICKUP_RADIUS_KM} km
+                                        </AppText>
+                                    </View>
+                                    <AppText style={styles.radiusHelper}>
+                                        Fixed at {DEFAULT_PICKUP_RADIUS_KM} km for now for ease of operations.
+                                    </AppText>
+                                </View>
 
                                 {renderLocationSection()}
 
@@ -647,7 +751,8 @@ export default function CreateCharitySiteScreen() {
                                     Site manager
                                 </AppText>
                                 <AppText variant="bodySmall" style={styles.sectionHint}>
-                                    A manager account is created with the site. They will receive login details by email.
+                                    A manager account is created with this location. After you tap Add location, we
+                                    email them their login email and password.
                                 </AppText>
 
                                 {renderManagerFields(
@@ -672,8 +777,19 @@ export default function CreateCharitySiteScreen() {
                                         if (field) {
                                             setSiteForm({ ...siteForm, [field]: value });
                                         }
+                                        if (key === 'password' || key === 'confirmPassword') {
+                                            requestAnimationFrame(() => {
+                                                scrollRef.current?.scrollToEnd({ animated: true });
+                                            });
+                                        }
                                     },
                                 )}
+
+                                {formError ? (
+                                    <AppText variant="caption" color={palette.danger} style={styles.formError}>
+                                        {formError}
+                                    </AppText>
+                                ) : null}
 
                                 <Pressable
                                     style={[styles.createBtn, loading && { opacity: 0.65 }]}
@@ -681,7 +797,7 @@ export default function CreateCharitySiteScreen() {
                                     onPress={handleCreateLocation}
                                 >
                                     <AppText style={styles.btnText}>
-                                        {loading ? 'Creating site...' : 'Create site & manager'}
+                                        {loading ? 'Adding location...' : 'Add location & manager'}
                                     </AppText>
                                 </Pressable>
                             </View>
@@ -695,7 +811,16 @@ export default function CreateCharitySiteScreen() {
 
 const styles = StyleSheet.create({
     scrollContent: {
-        paddingBottom: hp(14),
+        paddingBottom: hp(32),
+        flexGrow: 1,
+    },
+    inlineError: {
+        marginTop: hp(-0.4),
+        marginBottom: hp(0.2),
+    },
+    formError: {
+        marginTop: hp(0.4),
+        lineHeight: normalize(18),
     },
     formCard: {
         marginHorizontal: wp(4),
@@ -706,6 +831,33 @@ const styles = StyleSheet.create({
         borderColor: palette.border,
         backgroundColor: palette.white,
         gap: spacing.md,
+    },
+    radiusBlock: {
+        gap: hp(0.55),
+    },
+    radiusLabel: {
+        textTransform: 'none',
+    },
+    radiusValueBox: {
+        borderWidth: 1,
+        borderColor: palette.border,
+        borderRadius: normalize(10),
+        backgroundColor: '#F4FAF6',
+        paddingHorizontal: wp(3.5),
+        paddingVertical: hp(1.2),
+    },
+    radiusValue: {
+        fontFamily: 'Saveful-Bold',
+        fontSize: normalize(15),
+        color: palette.kale,
+        textTransform: 'none',
+    },
+    radiusHelper: {
+        fontFamily: 'Saveful-Regular',
+        fontSize: normalize(12),
+        lineHeight: normalize(17),
+        color: palette.midgray,
+        textTransform: 'none',
     },
     siteBanner: {
         padding: wp(3.5),

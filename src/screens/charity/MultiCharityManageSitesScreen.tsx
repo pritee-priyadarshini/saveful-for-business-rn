@@ -123,7 +123,7 @@ export default function MultiCharityManageSitesScreen() {
     }, [locations, users, businessLogo]);
 
     const actions = [
-        { label: 'Create Site', route: 'CreateCharitySite' },
+        { label: 'Add Location', route: 'CreateCharitySite', primary: true },
         { label: 'View Analytics', route: 'CharitySiteAnalytics' },
         { label: 'Your Profile', route: 'Account' },
         {
@@ -280,7 +280,7 @@ export default function MultiCharityManageSitesScreen() {
                     {actions.map((item) => (
                         <Pressable
                             key={item.label}
-                            style={styles.actionCard}
+                            style={[styles.actionCard, item.primary && styles.actionCardPrimary]}
                             onPress={() => {
                                 if (item.route) {
                                     navigation.navigate(item.route as any);
@@ -289,7 +289,10 @@ export default function MultiCharityManageSitesScreen() {
                                 }
                             }}
                         >
-                            <AppText variant="bodyBold" style={styles.actionText}>
+                            <AppText
+                                variant="bodyBold"
+                                style={[styles.actionText, item.primary && styles.actionTextPrimary]}
+                            >
                                 {item.label}
                             </AppText>
                         </Pressable>
@@ -773,8 +776,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         elevation: 2,
     },
+    actionCardPrimary: {
+        backgroundColor: palette.kale,
+    },
     actionText: {
         textAlign: 'center',
+    },
+    actionTextPrimary: {
+        color: palette.white,
     },
     bottomActions: {
         marginTop: hp(2),
