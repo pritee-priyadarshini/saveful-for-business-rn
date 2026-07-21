@@ -6,6 +6,9 @@ node_modules
 dist
 web-build
 *.log
+*.swp
+*.swo
+*~
 
 android/
 ios/

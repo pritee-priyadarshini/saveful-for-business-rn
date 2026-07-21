@@ -12,7 +12,7 @@ import { Screen } from '../../components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
-
+import { Ionicons } from '@expo/vector-icons';
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
 const hp = (p: number) => (height * p) / 100;
