@@ -21,7 +21,6 @@ let appStateUnsubscribe: (() => void) | null = null;
 let permissionSettingsAlertShown = false;
 let tokenRegistrationInFlight = false;
 let permissionOsPromptInFlight = false;
-let permissionOsPromptAttempted = false;
 
 function isPermissionGranted(
   permissions: { granted?: boolean; status?: string },
@@ -70,29 +69,31 @@ function showNotificationSettingsAlert(): void {
 
 /**
  * Requests the OS notification permission when not yet granted.
- * Shows the system dialog once on first ask; directs to Settings if permanently denied.
- * Do not show a custom pre-prompt — that causes a double ask (custom + system).
+ * Only uses the system permission dialog — no custom pre-prompt.
+ * On each login we try the system dialog again when still not granted.
+ * Settings is never forced from the login flow.
  */
 export async function ensureNotificationPermission(
-  options: { prompt?: boolean } = {},
+  options: { prompt?: boolean; openSettingsIfDenied?: boolean } = {},
 ): Promise<boolean> {
-  const { prompt = true } = options;
+  const { prompt = true, openSettingsIfDenied = false } = options;
   const Notifications = getNotificationsModule();
 
   await setupAndroidNotificationChannel();
 
   let permissions = await Notifications.getPermissionsAsync();
 
-  if (!isPermissionGranted(permissions) && prompt && permissions.canAskAgain !== false) {
-    if (permissionOsPromptAttempted || permissionOsPromptInFlight) {
-      console.log('[Push] OS permission prompt already shown this session, skipping duplicate');
-      return isPermissionGranted(await Notifications.getPermissionsAsync());
+  if (!isPermissionGranted(permissions) && prompt) {
+    if (permissionOsPromptInFlight) {
+      console.log('[Push] OS permission prompt already in progress, skipping duplicate');
+      return false;
     }
 
+    // Always ask the OS. If the platform still allows a dialog, it shows.
+    // If permanently blocked, this returns denied without a dialog (no Settings push here).
     permissionOsPromptInFlight = true;
-    permissionOsPromptAttempted = true;
     try {
-      console.log('[Push] Requesting notification permission');
+      console.log('[Push] Requesting notification permission (system dialog)');
       permissions = await Notifications.requestPermissionsAsync({
         ios: {
           allowAlert: true,
@@ -110,7 +111,11 @@ export async function ensureNotificationPermission(
       status: permissions.status,
       canAskAgain: permissions.canAskAgain,
     });
-    if (prompt && permissions.canAskAgain === false) {
+    if (
+      prompt &&
+      openSettingsIfDenied &&
+      permissions.canAskAgain === false
+    ) {
       showNotificationSettingsAlert();
     }
     return false;
@@ -127,7 +132,9 @@ export async function ensureNotificationPermission(
       authStatus === AuthorizationStatus.PROVISIONAL;
     if (!enabled) {
       console.log('[Push] iOS remote notification permission not granted');
-      if (prompt) showNotificationSettingsAlert();
+      if (prompt && openSettingsIfDenied) {
+        showNotificationSettingsAlert();
+      }
       return false;
     }
   }
@@ -185,9 +192,12 @@ export async function requestNotificationPermissionFromSettings(): Promise<Notif
     return readNotificationPermissionState();
   }
 
-  // User explicitly tapped enable in settings — allow another OS prompt.
-  permissionOsPromptAttempted = false;
-  const granted = await ensureNotificationPermission({ prompt: true });
+  const current = await readNotificationPermissionState();
+  // Profile "Turn on" — try system dialog first; only offer Settings if OS blocks re-prompt.
+  const granted = await ensureNotificationPermission({
+    prompt: true,
+    openSettingsIfDenied: !current.canAskAgain,
+  });
   if (granted) {
     await registerDeviceToken({ prompt: false });
   }
@@ -266,7 +276,10 @@ export async function registerDeviceToken(
     const { default: messaging } =
       require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
 
-    const permitted = await ensureNotificationPermission({ prompt: options.prompt !== false });
+    const permitted = await ensureNotificationPermission({
+      prompt: options.prompt !== false,
+      openSettingsIfDenied: false,
+    });
     if (!permitted) return;
 
     const fcmToken = await messaging().getToken();
@@ -297,8 +310,6 @@ export async function registerDeviceToken(
 
 export async function unregisterDeviceToken(): Promise<void> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
-
-  permissionOsPromptAttempted = false;
 
   if (tokenRefreshUnsubscribe) {
     tokenRefreshUnsubscribe();
