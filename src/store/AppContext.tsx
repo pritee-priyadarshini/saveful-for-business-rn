@@ -63,6 +63,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     if (!isAuthenticated) return;
 
     const notificationsStore = useNotificationsStore.getState();
+    // Prompt at most once after login; handlers stay active for the session.
     void notificationsStore.registerDeviceToken({ prompt: true });
     notificationsStore.setupPushHandlers();
 

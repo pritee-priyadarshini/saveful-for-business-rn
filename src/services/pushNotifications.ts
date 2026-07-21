@@ -20,6 +20,8 @@ let tapUnsubscribe: (() => void) | null = null;
 let appStateUnsubscribe: (() => void) | null = null;
 let permissionSettingsAlertShown = false;
 let tokenRegistrationInFlight = false;
+let permissionOsPromptInFlight = false;
+let permissionOsPromptAttempted = false;
 
 function isPermissionGranted(
   permissions: { granted?: boolean; status?: string },
@@ -66,37 +68,10 @@ function showNotificationSettingsAlert(): void {
   });
 }
 
-function askNotificationPermissionApproval(): Promise<boolean> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (value: boolean) => {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
-
-    showConfirmAlert({
-      title: 'Notification approval',
-      message: NOTIFICATION_PERMISSION_MESSAGE,
-      confirmLabel: 'Allow',
-      cancelLabel: "Don't allow",
-      onConfirm: () => {
-        finish(true);
-      },
-    });
-
-    const unsubscribe = useAppAlertStore.subscribe((state, prev) => {
-      if (prev.visible && !state.visible) {
-        unsubscribe();
-        finish(false);
-      }
-    });
-  });
-}
-
 /**
  * Requests the OS notification permission when not yet granted.
- * Shows the system dialog on first ask; directs to Settings if permanently denied.
+ * Shows the system dialog once on first ask; directs to Settings if permanently denied.
+ * Do not show a custom pre-prompt — that causes a double ask (custom + system).
  */
 export async function ensureNotificationPermission(
   options: { prompt?: boolean } = {},
@@ -108,20 +83,26 @@ export async function ensureNotificationPermission(
 
   let permissions = await Notifications.getPermissionsAsync();
 
-  if (!isPermissionGranted(permissions) && prompt) {
-    const approved = await askNotificationPermissionApproval();
-    if (!approved) {
-      return false;
+  if (!isPermissionGranted(permissions) && prompt && permissions.canAskAgain !== false) {
+    if (permissionOsPromptAttempted || permissionOsPromptInFlight) {
+      console.log('[Push] OS permission prompt already shown this session, skipping duplicate');
+      return isPermissionGranted(await Notifications.getPermissionsAsync());
     }
 
-    console.log('[Push] Requesting notification permission');
-    permissions = await Notifications.requestPermissionsAsync({
-      ios: {
-        allowAlert: true,
-        allowBadge: true,
-        allowSound: true,
-      },
-    });
+    permissionOsPromptInFlight = true;
+    permissionOsPromptAttempted = true;
+    try {
+      console.log('[Push] Requesting notification permission');
+      permissions = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+        },
+      });
+    } finally {
+      permissionOsPromptInFlight = false;
+    }
   }
 
   if (!isPermissionGranted(permissions)) {
@@ -204,6 +185,8 @@ export async function requestNotificationPermissionFromSettings(): Promise<Notif
     return readNotificationPermissionState();
   }
 
+  // User explicitly tapped enable in settings — allow another OS prompt.
+  permissionOsPromptAttempted = false;
   const granted = await ensureNotificationPermission({ prompt: true });
   if (granted) {
     await registerDeviceToken({ prompt: false });
@@ -314,6 +297,8 @@ export async function registerDeviceToken(
 
 export async function unregisterDeviceToken(): Promise<void> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
+
+  permissionOsPromptAttempted = false;
 
   if (tokenRefreshUnsubscribe) {
     tokenRefreshUnsubscribe();
