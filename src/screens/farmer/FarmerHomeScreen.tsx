@@ -26,14 +26,10 @@ import { DiscoverListingDetailModal } from '../../components/DiscoverListingDeta
 import { useAppContext } from '../../store/AppContext';
 import { useAuthStore } from '../../store/authStore';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
-import { useDiscoverStore } from '../../store/discoverStore';
+import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
-import {
-  isFoodListingNotification,
-  subscribeNotificationReceived,
-} from '@/services/pushNotifications';
 import { mapDiscoverListing } from '../../services/foodListing.service';
 import { driversService, type LiveDriver } from '@/services/drivers.service';
 import { normalizeAuthProfile } from '@/utils/coordinates';
@@ -90,9 +86,13 @@ export function FarmerHomeScreen() {
   const displayAddress = (currentProfile.address || capturedAddress || '').trim();
 
   const {
-    animal: { listings, isFetching: loading },
-    fetchListings: storeFetchListings,
-  } = useDiscoverStore();
+    listings,
+    loading,
+    mode,
+    notificationsOn,
+    locationRequired,
+    reload,
+  } = useAvailableFoodFeed({ audience: 'animal' });
 
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<HomeTab>('list');
@@ -130,13 +130,6 @@ export function FarmerHomeScreen() {
     }
   }, [siteIds]);
 
-  useEffect(() => {
-    if (!authUser?.accessToken) return;
-    storeFetchListings('animal').catch((e) =>
-      showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
-    );
-  }, [authUser?.accessToken, storeFetchListings]);
-
   useFocusEffect(
     useCallback(() => {
       refreshProfile().catch(() => undefined);
@@ -149,25 +142,13 @@ export function FarmerHomeScreen() {
     void loadLiveDrivers();
   }, [authUser?.accessToken, loadLiveDrivers, viewMode]);
 
-  const reloadListings = useCallback(() => {
-    storeFetchListings('animal', true).catch(() => undefined);
-  }, [storeFetchListings]);
-
-  useEffect(() => {
-    return subscribeNotificationReceived((payload) => {
-      if (isFoodListingNotification(payload)) {
-        reloadListings();
-      }
-    });
-  }, [reloadListings]);
-
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       if (viewMode === 'drivers') {
         await loadLiveDrivers();
       } else {
-        await storeFetchListings('animal', true);
+        await reload();
       }
     } catch (e) {
       if (viewMode === 'list') {
@@ -506,10 +487,29 @@ export function FarmerHomeScreen() {
           contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
-              <AppText variant="h7">No livestock feed available</AppText>
-              <AppText variant="bodySmall">
-                There are currently no farm surplus listings near you
-              </AppText>
+              {loading && !refreshing ? (
+                <ActivityIndicator color={palette.primary} />
+              ) : locationRequired ? (
+                <>
+                  <AppText variant="h7">Location needed</AppText>
+                  <AppText variant="bodySmall" style={styles.emptyCopy}>
+                    Set your site location to see nearby livestock feed.
+                  </AppText>
+                </>
+              ) : (
+                <>
+                  <AppText variant="h7">
+                    {mode === 'nearby_fallback'
+                      ? 'No food available nearby right now'
+                      : 'No livestock feed available'}
+                  </AppText>
+                  <AppText variant="bodySmall" style={styles.emptyCopy}>
+                    {notificationsOn
+                      ? 'There are currently no farm surplus listings near you'
+                      : 'Turn on notifications to get alerts when new surplus is listed.'}
+                  </AppText>
+                </>
+              )}
             </View>
           )}
           refreshControl={

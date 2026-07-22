@@ -23,16 +23,12 @@ import { DiscoverListingDetailModal } from '../../components/DiscoverListingDeta
 
 import { useAppContext } from '../../store/AppContext';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
-import { useDiscoverStore } from '../../store/discoverStore';
 import { useCharityStore } from '../../store/charityStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
-import {
-  isFoodListingNotification,
-  subscribeNotificationReceived,
-} from '@/services/pushNotifications';
 import { useNavigation } from '@react-navigation/native';
 import { mapDiscoverListing } from '../../services/foodListing.service';
 import { driversService, type LiveDriver } from '@/services/drivers.service';
@@ -97,9 +93,13 @@ export function CharityDiscoverScreen() {
   } = useOrganizationLocation();
 
   const {
-    people: { listings, isFetching: loading },
-    fetchListings: storeFetchListings,
-  } = useDiscoverStore();
+    listings,
+    loading,
+    mode,
+    notificationsOn,
+    locationRequired,
+    reload,
+  } = useAvailableFoodFeed({ audience: 'people' });
   const { locations, fetchLocations } = useCharityStore();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -148,11 +148,8 @@ export function CharityDiscoverScreen() {
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
-    storeFetchListings('people').catch((e) =>
-      showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
-    );
     fetchLocations().catch(() => undefined);
-  }, [authUser?.accessToken, fetchLocations, storeFetchListings]);
+  }, [authUser?.accessToken, fetchLocations]);
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
@@ -160,25 +157,13 @@ export function CharityDiscoverScreen() {
     void loadLiveDrivers();
   }, [authUser?.accessToken, loadLiveDrivers, viewMode]);
 
-  const reloadListings = useCallback(() => {
-    storeFetchListings('people', true).catch(() => undefined);
-  }, [storeFetchListings]);
-
-  useEffect(() => {
-    return subscribeNotificationReceived((payload) => {
-      if (isFoodListingNotification(payload)) {
-        reloadListings();
-      }
-    });
-  }, [reloadListings]);
-
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       if (viewMode === 'drivers') {
         await loadLiveDrivers();
       } else {
-        await storeFetchListings('people', true);
+        await reload();
       }
     } catch (e) {
       if (viewMode === 'list') {
@@ -497,8 +482,29 @@ export function CharityDiscoverScreen() {
           contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
-              <AppText variant="h7">No surplus available</AppText>
-              <AppText variant="bodySmall">There are currently no food listings near you</AppText>
+              {loading && !refreshing ? (
+                <ActivityIndicator color={palette.primary} />
+              ) : locationRequired ? (
+                <>
+                  <AppText variant="h7">Location needed</AppText>
+                  <AppText variant="bodySmall" style={styles.emptyCopy}>
+                    Set your site location to see nearby surplus food.
+                  </AppText>
+                </>
+              ) : (
+                <>
+                  <AppText variant="h7">
+                    {mode === 'nearby_fallback'
+                      ? 'No food available nearby right now'
+                      : 'No surplus available'}
+                  </AppText>
+                  <AppText variant="bodySmall" style={styles.emptyCopy}>
+                    {notificationsOn
+                      ? 'There are currently no food listings near you'
+                      : 'Turn on notifications to get alerts when new surplus is listed.'}
+                  </AppText>
+                </>
+              )}
             </View>
           )}
           refreshControl={

@@ -187,6 +187,12 @@ export async function readNotificationPermissionState(): Promise<NotificationPer
   };
 }
 
+/** True only when OS notification permission is granted (primary push Available Food flow). */
+export async function areDeviceNotificationsOn(): Promise<boolean> {
+  const state = await readNotificationPermissionState();
+  return state.granted === true;
+}
+
 export async function requestNotificationPermissionFromSettings(): Promise<NotificationPermissionState> {
   if (!isPushSupportedOnDevice()) {
     return readNotificationPermissionState();

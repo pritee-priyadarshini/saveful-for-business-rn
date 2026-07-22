@@ -6,6 +6,7 @@ import {
   View,
   Pressable,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -20,17 +21,14 @@ import {
   ClaimConfirmModal,
   type ClaimLineItem,
 } from '../../components/ClaimConfirmModal';
+import { LocationSetupModal } from '../../components/LocationSetupModal';
 import type { ClaimMode } from '../../services/claims.service';
 import { palette } from '../../theme/colors';
-import { useAppContext } from '../../store/AppContext';
-import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert, showInfoAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import {
-  isFoodListingNotification,
-  subscribeNotificationReceived,
-} from '@/services/pushNotifications';
-import { fetchListingDetail, mapDiscoverListing, type FoodItem, invalidateListingDetail, clearListingDetailCache } from '../../services/foodListing.service';
+import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
+import { useOrganizationLocation } from '@/hooks/useOrganizationLocation';
+import { fetchListingDetail, mapDiscoverListing, type FoodItem, invalidateListingDetail } from '../../services/foodListing.service';
 import {
   haversineDistanceKm,
   normalizeAuthProfile,
@@ -38,6 +36,7 @@ import {
   resolveProfileCoordinates,
 } from '@/utils/coordinates';
 import { hp, normalize, wp } from '@/utils/responsive';
+import { useAppContext } from '../../store/AppContext';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 type ClaimState = Record<string, number>;
@@ -111,9 +110,11 @@ export function CharityMapScreen({ navigation }: any) {
   useTransparentStatusBar('light');
   const { authUser } = useAppContext();
   const {
-    people: { listings, isFetching: loading },
-    fetchListings: storeFetchListings,
-  } = useDiscoverStore();
+    modalVisible,
+    setModalVisible,
+    saving,
+    saveLocation,
+  } = useOrganizationLocation();
 
   const [claimState, setClaimState] = useState<ClaimState>({});
   const [foodItemsByListing, setFoodItemsByListing] = useState<Record<string, ClaimFoodItem[]>>({});
@@ -131,6 +132,23 @@ export function CharityMapScreen({ navigation }: any) {
   const pendingClaimRef = useRef<PendingClaim | null>(null);
   const fetchedListingIds = useRef(new Set<string>());
   const listingSnapshotRef = useRef<Record<string, string>>({});
+
+  const {
+    listings,
+    loading,
+    mode,
+    notificationsOn,
+    locationRequired,
+    reload,
+  } = useAvailableFoodFeed({
+    audience: 'people',
+    onBeforeReload: () => {
+      fetchedListingIds.current.clear();
+      listingSnapshotRef.current = {};
+      setFoodItemsByListing({});
+      setClaimState({});
+    },
+  });
 
   useEffect(() => {
     pendingClaimRef.current = pendingClaim;
@@ -161,13 +179,6 @@ export function CharityMapScreen({ navigation }: any) {
   );
 
   useEffect(() => {
-    if (!authUser?.accessToken) return;
-    storeFetchListings('people').catch((e) =>
-      showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
-    );
-  }, [authUser?.accessToken]);
-
-  useEffect(() => {
     listings.forEach((listing) => {
       const snapshot = `${listing.remainingQtyKg ?? listing.quantityKg}:${listing.statusRaw}`;
       const snapshotChanged = listingSnapshotRef.current[listing.id] !== snapshot;
@@ -194,31 +205,13 @@ export function CharityMapScreen({ navigation }: any) {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      fetchedListingIds.current.clear();
-      listingSnapshotRef.current = {};
-      clearListingDetailCache();
-      setFoodItemsByListing({});
-      setClaimState({});
-      await storeFetchListings('people', true);
+      await reload();
     } catch (e) {
       showErrorAlert(e, 'Could not load listings', 'Could not load listings');
     } finally {
       setRefreshing(false);
     }
-  }, [storeFetchListings]);
-
-  const reloadFromNotification = useCallback(() => {
-    void handleRefresh();
-  }, [handleRefresh]);
-
-  useEffect(() => {
-    return subscribeNotificationReceived((payload) => {
-      if (isFoodListingNotification(payload)) {
-        reloadFromNotification();
-      }
-    });
-  }, [reloadFromNotification]);
-
+  }, [reload]);
   const getKey = (listingId: string, foodItemId: number) => `${listingId}-${foodItemId}`;
 
   const updateQty = (
@@ -329,7 +322,7 @@ export function CharityMapScreen({ navigation }: any) {
       }
 
       try {
-        await storeFetchListings('people', true);
+        await reload();
 
         if (claimedListing) {
           await refreshListingFoodItems(claimedListing, { refresh: true });
@@ -344,7 +337,7 @@ export function CharityMapScreen({ navigation }: any) {
         'Claim submitted',
       );
     },
-    [storeFetchListings, refreshListingFoodItems],
+    [reload, refreshListingFoodItems],
   );
 
   const charityCoords = useMemo(() => {
@@ -741,6 +734,16 @@ export function CharityMapScreen({ navigation }: any) {
         </AppText>
       </Pressable>
 
+      {!notificationsOn ? (
+        <View style={styles.fallbackHint}>
+          <Ionicons name="notifications-off-outline" size={normalize(16)} color={palette.kale} />
+          <AppText variant="caption" style={styles.fallbackHintText}>
+            Notifications are off — showing nearby food instead. Turn on notifications to get
+            alerts.
+          </AppText>
+        </View>
+      ) : null}
+
       <View style={styles.activeRow}>
         <AppText variant="h7">Active Listings</AppText>
         <View style={styles.activeBadge}>
@@ -784,6 +787,18 @@ export function CharityMapScreen({ navigation }: any) {
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
 
+      <LocationSetupModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onConfirm={async ({ latitude, longitude, address }) => {
+          await saveLocation(latitude, longitude, address);
+          setModalVisible(false);
+          await handleRefresh();
+        }}
+        confirming={saving}
+        searchPlaceholder="Search charity address..."
+      />
+
       <DiscoverListingDetailModal
         visible={!!selectedListing}
         listing={selectedListing}
@@ -814,11 +829,44 @@ export function CharityMapScreen({ navigation }: any) {
         ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <AppText variant="h7">No surplus available</AppText>
-            <AppText variant="bodySmall">Check again later for new listings near you</AppText>
+            {loading && !refreshing ? (
+              <ActivityIndicator color={palette.primary} />
+            ) : locationRequired ? (
+              <>
+                <AppText variant="h7">Location needed</AppText>
+                <AppText variant="bodySmall" style={styles.emptyCopy}>
+                  Set your site location to see nearby surplus food.
+                </AppText>
+                <Pressable style={styles.locationCta} onPress={() => setModalVisible(true)}>
+                  <AppText variant="label" style={styles.locationCtaText}>
+                    Set Location
+                  </AppText>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <AppText variant="h7">
+                  {mode === 'nearby_fallback'
+                    ? 'No food available nearby right now'
+                    : 'No surplus available'}
+                </AppText>
+                {mode === 'push' ? (
+                  <AppText variant="bodySmall">
+                    Check again later for new listings near you
+                  </AppText>
+                ) : null}
+              </>
+            )}
           </View>
         }
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[palette.primary]} tintColor={palette.primary} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
       />
     </Screen>
@@ -837,6 +885,45 @@ const styles = StyleSheet.create({
 
   emptyList: {
     flexGrow: 1,
+  },
+
+  fallbackHint: {
+    marginHorizontal: wp(4),
+    marginTop: hp(1.2),
+    marginBottom: hp(0.5),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    borderRadius: normalize(10),
+    backgroundColor: '#EEF7F1',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2),
+  },
+
+  fallbackHintText: {
+    flex: 1,
+    color: palette.kale,
+    textTransform: 'none',
+    lineHeight: normalize(18),
+  },
+
+  emptyCopy: {
+    textAlign: 'center',
+    color: palette.textMuted,
+    marginTop: hp(0.6),
+    paddingHorizontal: wp(8),
+  },
+
+  locationCta: {
+    marginTop: hp(1.5),
+    backgroundColor: palette.primary,
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(1.1),
+    borderRadius: normalize(10),
+  },
+
+  locationCtaText: {
+    color: palette.white,
   },
 
   heroContent: {

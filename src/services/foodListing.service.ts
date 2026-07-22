@@ -348,8 +348,201 @@ export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
     foodItems: item.foodItems || [],
     lat: Number(item.pickupLat) || 20.2961,
     lng: Number(item.pickupLng) || 85.8245,
-    distance: (item as any).distance || '—',
+    distance:
+      (item as any).distance ||
+      ((item as any).distanceKm != null && Number.isFinite(Number((item as any).distanceKm))
+        ? `${Number((item as any).distanceKm).toFixed(1)} km`
+        : '—'),
   };
+}
+
+export type NearbyListing = {
+  id: number;
+  listingType: FoodListingType;
+  totalQtyKg: number;
+  remainingQtyKg: number;
+  pickupAddress: string;
+  pickupFromTime: string | null;
+  pickupByTime: string | null;
+  bestBefore: string;
+  photoUrls: string[];
+  status: 'ACTIVE' | 'PARTIAL';
+  foodItems: Array<{
+    id: number;
+    name: string;
+    totalQtyKg: number;
+    remainingQtyKg: number;
+    unit: string | null;
+    category: string | null;
+  }>;
+  organisation: {
+    id: number;
+    name: string;
+    logoUrl: string | null;
+    ratingAvg?: number;
+    ratingCount?: number;
+  };
+  site: {
+    id: number;
+    address: string;
+    postcode: string | null;
+    organisationName: string;
+  };
+  distanceKm: number | null;
+};
+
+export type NearbyListingsResponse = {
+  listings: NearbyListing[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  radiusKm: number;
+  searchCoordinates: { lat: number; lng: number };
+  region: string;
+};
+
+export function isLocationRequiredError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const maybe = error as { status?: number; code?: string; response?: { status?: number } };
+  return (
+    maybe.code === 'LOCATION_REQUIRED' ||
+    maybe.status === 400 ||
+    maybe.response?.status === 400
+  );
+}
+
+function mapNearbyListingToFoodListing(item: NearbyListing): FoodListing {
+  return {
+    id: item.id,
+    siteId: item.site?.id,
+    organisationId: item.organisation?.id,
+    listingType: item.listingType,
+    status: item.status,
+    totalQtyKg: item.totalQtyKg,
+    remainingQtyKg: item.remainingQtyKg,
+    pickupAddress: item.pickupAddress,
+    pickupPostcode: item.site?.postcode ?? undefined,
+    bestBefore: item.bestBefore,
+    pickupFromTime: item.pickupFromTime ?? undefined,
+    pickupByTime: item.pickupByTime ?? undefined,
+    photoUrls: item.photoUrls ?? [],
+    foodItems: (item.foodItems ?? []).map((food) => ({
+      id: food.id,
+      name: food.name,
+      category: food.category ?? undefined,
+      totalQtyKg: food.totalQtyKg,
+      remainingQtyKg: food.remainingQtyKg,
+      unit: food.unit ?? undefined,
+    })),
+    // Fields consumed by mapDiscoverListing
+    ...( {
+      organisation: item.organisation,
+      site: item.site,
+      distanceKm: item.distanceKm,
+      distance:
+        item.distanceKm != null && Number.isFinite(item.distanceKm)
+          ? `${item.distanceKm.toFixed(1)} km`
+          : '—',
+    } as any),
+  };
+}
+
+/**
+ * Fallback Available Food when device notifications are off.
+ * Backend already filters by org type — do not client-filter listing types.
+ */
+export async function fetchNearbyListings(params: {
+  page?: number;
+  limit?: number;
+  radiusKm?: number;
+} = {}): Promise<NearbyListingsResponse> {
+  const page = params.page ?? 1;
+  const limit = params.limit ?? 20;
+  const query: Record<string, number> = { page, limit };
+  if (params.radiusKm != null) {
+    query.radiusKm = params.radiusKm;
+  }
+
+  try {
+    const res = await api.get('/food-listings/nearby', { params: query });
+    const raw = res.data;
+
+    const listings = Array.isArray(raw?.listings)
+      ? raw.listings
+      : Array.isArray(raw?.data?.listings)
+        ? raw.data.listings
+        : Array.isArray(raw)
+          ? raw
+          : [];
+
+    return {
+      listings,
+      total: Number(raw?.total ?? raw?.data?.total ?? listings.length) || listings.length,
+      page: Number(raw?.page ?? raw?.data?.page ?? page) || page,
+      limit: Number(raw?.limit ?? raw?.data?.limit ?? limit) || limit,
+      totalPages: Number(raw?.totalPages ?? raw?.data?.totalPages ?? 1) || 1,
+      radiusKm: Number(raw?.radiusKm ?? raw?.data?.radiusKm ?? 50) || 50,
+      searchCoordinates: raw?.searchCoordinates ?? raw?.data?.searchCoordinates ?? { lat: 0, lng: 0 },
+      region: String(raw?.region ?? raw?.data?.region ?? ''),
+    };
+  } catch (error: unknown) {
+    const status = (error as any)?.response?.status;
+    if (status === 400) {
+      const message =
+        (error as any)?.response?.data?.message ||
+        'Set your site location to see nearby food.';
+      throw Object.assign(new Error(message), {
+        status: 400,
+        code: 'LOCATION_REQUIRED',
+        response: (error as any)?.response,
+      });
+    }
+    if (status === 403) {
+      const message =
+        (error as any)?.response?.data?.message ||
+        'You do not have access to nearby listings.';
+      throw Object.assign(new Error(message), {
+        status: 403,
+        code: 'FORBIDDEN',
+        response: (error as any)?.response,
+      });
+    }
+    throw error;
+  }
+}
+
+/** Fetch nearby pages into FoodListing shape for discover/map screens. */
+export async function fetchNearbyDiscoverListings(
+  params: { page?: number; limit?: number; radiusKm?: number; allPages?: boolean } = {},
+): Promise<FoodListing[]> {
+  const limit = params.limit ?? 20;
+  const first = await fetchNearbyListings({
+    page: params.page ?? 1,
+    limit,
+    radiusKm: params.radiusKm,
+  });
+
+  let listings = first.listings.filter((item) => isAvailableListingStatus(item.status));
+
+  if (params.allPages !== false && first.totalPages > 1) {
+    const pages = await Promise.all(
+      Array.from({ length: first.totalPages - 1 }, (_, index) =>
+        fetchNearbyListings({
+          page: index + 2,
+          limit,
+          radiusKm: params.radiusKm,
+        }),
+      ),
+    );
+    for (const page of pages) {
+      listings = listings.concat(
+        page.listings.filter((item) => isAvailableListingStatus(item.status)),
+      );
+    }
+  }
+
+  return listings.map(mapNearbyListingToFoodListing);
 }
 
 export async function fetchDiscoverListings(
@@ -380,8 +573,11 @@ export const foodListingService = {
 
   getSiteListings: () => api.get('/food-listings/site'),
 
-  getNotificationListings: (params?: Pick<GetListingsParams, 'page' | 'limit'>) =>
+    getNotificationListings: (params?: Pick<GetListingsParams, 'page' | 'limit'>) =>
     api.get('/food-listings/notifications', { params }),
+
+  getNearbyListings: (params?: Pick<GetListingsParams, 'page' | 'limit'> & { radiusKm?: number }) =>
+    api.get('/food-listings/nearby', { params }),
 
   getListingById: (id: number) =>
     api.get(`/food-listings/${id}`),
