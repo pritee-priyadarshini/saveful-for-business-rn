@@ -834,7 +834,9 @@ export function FarmerMapScreen({ navigation }: any) {
               <ActivityIndicator color={palette.primary} />
             ) : locationRequired ? (
               <>
-                <AppText variant="h7">Location needed</AppText>
+                <AppText variant="h7" style={styles.emptyTitle}>
+                  Location needed
+                </AppText>
                 <AppText variant="bodySmall" style={styles.emptyCopy}>
                   Set your site location to see nearby livestock feed.
                 </AppText>
@@ -846,13 +848,13 @@ export function FarmerMapScreen({ navigation }: any) {
               </>
             ) : (
               <>
-                <AppText variant="h7">
+                <AppText variant="h7" style={styles.emptyTitle}>
                   {mode === 'nearby_fallback'
                     ? 'No food available nearby right now'
                     : 'No livestock feed available'}
                 </AppText>
                 {mode === 'push' ? (
-                  <AppText variant="bodySmall">
+                  <AppText variant="bodySmall" style={styles.emptyCopy}>
                     Check again later for new feed listings near you
                   </AppText>
                 ) : null}
@@ -910,9 +912,15 @@ const styles = StyleSheet.create({
 
   emptyCopy: {
     textAlign: 'center',
+    width: '100%',
     color: palette.textMuted,
     marginTop: hp(0.6),
     paddingHorizontal: wp(8),
+  },
+
+  emptyTitle: {
+    textAlign: 'center',
+    width: '100%',
   },
 
   locationCta: {
@@ -1286,6 +1294,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(8),
     paddingTop: hp(6),
     gap: hp(0.8),
+    width: '100%',
   },
 
   skeletonWrap: {
