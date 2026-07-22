@@ -20,18 +20,19 @@ import { Skeleton } from '../../components/Skeleton';
 import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
+import { AssignDriverModal } from '@/components/AssignDriverModal';
 
 import { useAppContext } from '../../store/AppContext';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useCharityStore } from '../../store/charityStore';
-import { showErrorAlert } from '@/utils/apiError';
+import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { useNavigation } from '@react-navigation/native';
 import { mapDiscoverListing } from '../../services/foodListing.service';
-import { driversService, type LiveDriver } from '@/services/drivers.service';
+import { driversService, type SiteDriver } from '@/services/drivers.service';
 import { normalizeAuthProfile } from '@/utils/coordinates';
 
 import { palette } from '../../theme/colors';
@@ -40,7 +41,7 @@ import { hp, normalize, wp } from '@/utils/responsive';
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 type HomeTab = 'list' | 'drivers';
 
-type LiveDriverRow = LiveDriver & { siteId: number };
+type SiteDriverRow = SiteDriver & { siteId: number };
 
 function resolveCharitySiteIds(authUser: any, locations: any[]): number[] {
   const profile = normalizeAuthProfile(authUser);
@@ -64,12 +65,10 @@ function resolveCharitySiteIds(authUser: any, locations: any[]): number[] {
   return Array.from(new Set(fromLocations));
 }
 
-function dedupeLiveDrivers(rows: LiveDriverRow[]): LiveDriverRow[] {
+function dedupeSiteDrivers(rows: SiteDriverRow[]): SiteDriverRow[] {
   const seen = new Set<number>();
   return rows.filter((driver) => {
     if (!driver?.id || seen.has(driver.id)) return false;
-    // API is site-scoped "live"; still require online when the flag is present.
-    if (driver.online === false) return false;
     seen.add(driver.id);
     return true;
   });
@@ -105,16 +104,17 @@ export function CharityDiscoverScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<HomeTab>('list');
   const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
-  const [liveDrivers, setLiveDrivers] = useState<LiveDriverRow[]>([]);
+  const [siteDrivers, setSiteDrivers] = useState<SiteDriverRow[]>([]);
   const [driversLoading, setDriversLoading] = useState(false);
   const [driversError, setDriversError] = useState<string | null>(null);
+  const [assignDriver, setAssignDriver] = useState<SiteDriverRow | null>(null);
 
   const siteIds = useMemo(
     () => resolveCharitySiteIds(authUser, locations),
     [authUser, locations],
   );
 
-  const loadLiveDrivers = useCallback(async () => {
+  const loadSiteDrivers = useCallback(async () => {
     setDriversLoading(true);
     setDriversError(null);
     try {
@@ -125,22 +125,22 @@ export function CharityDiscoverScreen() {
       }
 
       if (ids.length === 0) {
-        setLiveDrivers([]);
-        setDriversError('No charity site found for live drivers.');
+        setSiteDrivers([]);
+        setDriversError('No charity site found for drivers.');
         return;
       }
 
       const batches = await Promise.all(
         ids.map(async (siteId) => {
-          const drivers = await driversService.getLiveDriversForSite(siteId);
+          const drivers = await driversService.getDriversForSite(siteId);
           return drivers.map((driver) => ({ ...driver, siteId }));
         }),
       );
 
-      setLiveDrivers(dedupeLiveDrivers(batches.flat()));
+      setSiteDrivers(dedupeSiteDrivers(batches.flat()));
     } catch (e) {
-      setDriversError('Could not load live drivers');
-      showErrorAlert(e, 'Could not load drivers', 'Could not load live drivers');
+      setDriversError('Could not load drivers');
+      showErrorAlert(e, 'Could not load drivers', 'Could not load drivers');
     } finally {
       setDriversLoading(false);
     }
@@ -154,14 +154,14 @@ export function CharityDiscoverScreen() {
   useEffect(() => {
     if (!authUser?.accessToken) return;
     if (viewMode !== 'drivers') return;
-    void loadLiveDrivers();
-  }, [authUser?.accessToken, loadLiveDrivers, viewMode]);
+    void loadSiteDrivers();
+  }, [authUser?.accessToken, loadSiteDrivers, viewMode]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       if (viewMode === 'drivers') {
-        await loadLiveDrivers();
+        await loadSiteDrivers();
       } else {
         await reload();
       }
@@ -229,8 +229,8 @@ export function CharityDiscoverScreen() {
             {item.businessName}
           </AppText>
         </View>
-        <View style={styles.statusBadge}>
-          <AppText variant="caption" style={styles.statusBadgeText}>
+        <View style={styles.listingStatusBadge}>
+          <AppText variant="caption" style={styles.listingStatusBadgeText}>
             {item.status}
           </AppText>
         </View>
@@ -288,7 +288,15 @@ export function CharityDiscoverScreen() {
     </View>
   );
 
-  const renderDriver = ({ item }: { item: LiveDriverRow }) => (
+  const openAssign = (driver: SiteDriverRow) => {
+    if (!driver.online) {
+      showInfoAlert('Driver must be live to assign a pickup', 'Driver offline');
+      return;
+    }
+    setAssignDriver(driver);
+  };
+
+  const renderDriver = ({ item }: { item: SiteDriverRow }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.driverIdentity}>
@@ -304,10 +312,13 @@ export function CharityDiscoverScreen() {
             </AppText>
           </View>
         </View>
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <AppText variant="caption" style={styles.liveBadgeText}>
-            Live
+        <View style={[styles.statusBadge, item.online ? styles.onlineBadge : styles.offlineBadge]}>
+          <View style={[styles.statusDot, item.online ? styles.onlineDot : styles.offlineDot]} />
+          <AppText
+            variant="caption"
+            style={item.online ? styles.onlineBadgeText : styles.offlineBadgeText}
+          >
+            {item.online ? 'Online' : 'Offline'}
           </AppText>
         </View>
       </View>
@@ -319,7 +330,10 @@ export function CharityDiscoverScreen() {
         </AppText>
       </View>
 
-      {Number.isFinite(item.lat) && Number.isFinite(item.lng) ? (
+      {item.lat != null &&
+      item.lng != null &&
+      Number.isFinite(item.lat) &&
+      Number.isFinite(item.lng) ? (
         <View style={styles.driverMetaRow}>
           <Ionicons name="navigate-outline" size={normalize(16)} color={palette.middlegreen} />
           <AppText variant="caption" style={styles.coordsText}>
@@ -329,15 +343,20 @@ export function CharityDiscoverScreen() {
       ) : null}
 
       <View style={styles.cardFooter}>
-        <AppText variant="caption" style={styles.storageText}>
-          Assigned to your charity site
-        </AppText>
         <Button
           label="Call"
           size="compact"
+          variant="secondary"
           style={styles.detailsBtn}
           disabled={!item.phone?.trim()}
           onPress={() => callDriver(item.phone)}
+        />
+        <Button
+          label="Assign"
+          size="compact"
+          style={styles.detailsBtn}
+          disabled={!item.online}
+          onPress={() => openAssign(item)}
         />
       </View>
     </View>
@@ -409,7 +428,7 @@ export function CharityDiscoverScreen() {
           style={styles.headingBg}
         />
         <AppText variant="heading" style={styles.headingText}>
-          {viewMode === 'list' ? 'Surplus Food Near You' : 'Your Live Drivers'}
+          {viewMode === 'list' ? 'Surplus Food Near You' : 'Your Drivers'}
         </AppText>
       </View>
 
@@ -445,7 +464,7 @@ export function CharityDiscoverScreen() {
         </AppText>
         <View style={styles.activeBadge}>
           <AppText variant="h7" style={{ color: palette.white }}>
-            {viewMode === 'list' ? listings.length : liveDrivers.length}
+            {viewMode === 'list' ? listings.length : siteDrivers.length}
           </AppText>
         </View>
       </View>
@@ -486,14 +505,16 @@ export function CharityDiscoverScreen() {
                 <ActivityIndicator color={palette.primary} />
               ) : locationRequired ? (
                 <>
-                  <AppText variant="h7">Location needed</AppText>
+                  <AppText variant="h7" style={styles.emptyTitle}>
+                    Location needed
+                  </AppText>
                   <AppText variant="bodySmall" style={styles.emptyCopy}>
                     Set your site location to see nearby surplus food.
                   </AppText>
                 </>
               ) : (
                 <>
-                  <AppText variant="h7">
+                  <AppText variant="h7" style={styles.emptyTitle}>
                     {mode === 'nearby_fallback'
                       ? 'No food available nearby right now'
                       : 'No surplus available'}
@@ -518,7 +539,7 @@ export function CharityDiscoverScreen() {
         />
       ) : (
         <FlatList
-          data={liveDrivers}
+          data={siteDrivers}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderDriver}
           style={styles.list}
@@ -530,10 +551,12 @@ export function CharityDiscoverScreen() {
                 <ActivityIndicator color={palette.primary} />
               ) : (
                 <>
-                  <AppText variant="h7">No live drivers</AppText>
+                  <AppText variant="h7" style={styles.emptyTitle}>
+                    No drivers yet
+                  </AppText>
                   <AppText variant="bodySmall" style={styles.emptyCopy}>
                     {driversError ||
-                      'Only drivers belonging to your charity who are currently live will appear here.'}
+                      'Drivers added to your charity sites will appear here with Online/Offline status.'}
                   </AppText>
                 </>
               )}
@@ -549,6 +572,15 @@ export function CharityDiscoverScreen() {
           }
         />
       )}
+
+      <AssignDriverModal
+        visible={!!assignDriver}
+        driver={assignDriver}
+        onClose={() => setAssignDriver(null)}
+        onAssigned={() => {
+          void loadSiteDrivers();
+        }}
+      />
     </Screen>
   );
 }
@@ -741,37 +773,56 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 
-  statusBadge: {
+  listingStatusBadge: {
     backgroundColor: '#E8F3EC',
     paddingHorizontal: wp(2.5),
     paddingVertical: hp(0.5),
     borderRadius: normalize(12),
   },
 
-  statusBadgeText: {
+  listingStatusBadgeText: {
     color: palette.middlegreen,
     fontWeight: '600',
   },
 
-  liveBadge: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.2),
-    backgroundColor: '#E8F3EC',
     paddingHorizontal: wp(2.5),
     paddingVertical: hp(0.5),
     borderRadius: normalize(12),
   },
 
-  liveDot: {
+  onlineBadge: {
+    backgroundColor: '#E8F3EC',
+  },
+
+  offlineBadge: {
+    backgroundColor: '#F2F2F2',
+  },
+
+  statusDot: {
     width: normalize(8),
     height: normalize(8),
     borderRadius: normalize(4),
+  },
+
+  onlineDot: {
     backgroundColor: palette.middlegreen,
   },
 
-  liveBadgeText: {
+  offlineDot: {
+    backgroundColor: '#9E9E9E',
+  },
+
+  onlineBadgeText: {
     color: palette.middlegreen,
+    fontWeight: '700',
+  },
+
+  offlineBadgeText: {
+    color: '#666',
     fontWeight: '700',
   },
 
@@ -869,10 +920,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: wp(8),
     gap: hp(0.8),
+    width: '100%',
+  },
+
+  emptyTitle: {
+    textAlign: 'center',
+    width: '100%',
   },
 
   emptyCopy: {
     textAlign: 'center',
+    width: '100%',
     color: '#666',
   },
 
