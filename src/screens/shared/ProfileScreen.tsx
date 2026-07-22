@@ -62,6 +62,13 @@ const normalize = (size: number) => {
   return Math.round(size * scale);
 };
 
+/** Local gallery/crop URIs (not remote https). */
+function isLocalImageUri(uri: string | null | undefined): boolean {
+  if (!uri?.trim()) return false;
+  const value = uri.trim();
+  return !(value.startsWith('http://') || value.startsWith('https://'));
+}
+
 function buildProfileForm(
   authUser: ReturnType<typeof useAuthStore.getState>['authUser'],
   options?: { preferOrganisation?: boolean },
@@ -128,9 +135,11 @@ export function ProfileScreen() {
     const remoteLogo = currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
 
     setLogo((current) => {
-      if (!remoteLogo) return current;
-      if (current?.startsWith('file') || current?.startsWith('content')) return current;
-      return remoteLogo;
+      // Once the server has a logo URL, prefer it over a local file URI
+      // so headers across the app stay in sync after upload.
+      if (remoteLogo && isLocalImageUri(current)) return remoteLogo;
+      if (isLocalImageUri(current)) return current;
+      return remoteLogo ?? current;
     });
   }, [currentProfile.logo, authUser?.profile?.organisation?.logoUrl]);
 
@@ -317,8 +326,10 @@ export function ProfileScreen() {
           return;
         }
 
-        const hasNewLogo = logo && (logo.startsWith('file') || logo.startsWith('content'));
-        const hasBrandingChange = formData.branding.trim().length > 0;
+        const hasNewLogo = isLocalImageUri(logo);
+        const currentBrandName = (authUser?.profile?.organisation?.brandName || '').trim();
+        const brandingValue = formData.branding.trim();
+        const hasBrandingChange = brandingValue !== currentBrandName;
 
         if (!hasBrandingChange && !hasNewLogo) {
           showInfoAlert('Update branding or choose a logo first.', 'Nothing to save');
@@ -327,10 +338,10 @@ export function ProfileScreen() {
 
         const form = new FormData();
         if (hasBrandingChange) {
-          form.append('brandName', formData.branding.trim());
+          form.append('brandName', brandingValue);
         }
 
-        if (hasNewLogo) {
+        if (hasNewLogo && logo) {
           form.append('logo', {
             uri: logo,
             name: 'logo.jpg',
@@ -338,7 +349,32 @@ export function ProfileScreen() {
           } as any);
         }
 
-        await organizationService.updateOrganisation(orgId, form);
+        const res = await organizationService.updateOrganisation(orgId, form);
+        const updatedOrg = (res as any)?.data?.organisation;
+        const nextLogoUrl =
+          (typeof updatedOrg?.logoUrl === 'string' && updatedOrg.logoUrl) ||
+          null;
+
+        // Patch auth immediately so home/impact headers update without waiting.
+        const currentAuth = useAuthStore.getState().authUser;
+        if (currentAuth?.profile?.organisation) {
+          useAuthStore.getState().setAuthUser({
+            ...currentAuth,
+            profile: {
+              ...currentAuth.profile,
+              organisation: {
+                ...currentAuth.profile.organisation,
+                ...(hasBrandingChange ? { brandName: brandingValue } : {}),
+                ...(nextLogoUrl ? { logoUrl: nextLogoUrl } : {}),
+              },
+            },
+          });
+        }
+
+        if (nextLogoUrl) {
+          setLogo(nextLogoUrl);
+        }
+
         await refreshProfile();
         showSuccessAlert('Branding updated');
       } catch (err) {
@@ -513,7 +549,7 @@ export function ProfileScreen() {
               </AppText>
             </View>
 
-            <Pressable style={styles.profileCircleWrap} onPress={pickImage}>
+            <View style={styles.profileCircleWrap}>
               <View style={styles.profileCircle}>
                 {logo ? (
                   <Image source={{ uri: logo }} style={styles.profileImage} resizeMode="cover" />
@@ -523,10 +559,7 @@ export function ProfileScreen() {
                   </AppText>
                 )}
               </View>
-              <View style={styles.profilePlus}>
-                <Ionicons name="add" size={12} color="white" />
-              </View>
-            </Pressable>
+            </View>
           </View>
         </View>
 
@@ -1018,20 +1051,6 @@ const styles = StyleSheet.create({
 
   profileInitial: {
     color: palette.primary,
-  },
-
-  profilePlus: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: normalize(18),
-    height: normalize(18),
-    borderRadius: normalize(9),
-    backgroundColor: palette.eggplant,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: palette.white,
   },
 
   supportBtn: {

@@ -8,16 +8,21 @@ import {
   TouchableOpacity,
   ImageSourcePropType,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { useNavigation } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Skeleton } from '../../components/Skeleton';
+import { HeroHeader } from '@/components/HeroHeader';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppContext } from '../../store/AppContext';
+import { useAuthStore } from '../../store/authStore';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
@@ -25,18 +30,12 @@ import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
-import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
+import { hp, normalize, wp } from '@/utils/responsive';
 
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
+const { width } = Dimensions.get('window');
 const chartWidth = width - wp(8) - wp(7);
 
 const ANALYTICS_ICONS = {
@@ -87,14 +86,24 @@ const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = 
 ];
 
 export function FarmerAnalyticsScreen() {
+  useTransparentStatusBar('light');
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { currentProfile } = useAppContext();
+  const { currentProfile, authUser } = useAppContext();
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const bottomPadding = useBottomTabPadding(hp(2));
+  const businessLogo =
+    currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
 
   const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
   const [selectedSiteId, setSelectedSiteId] = React.useState<number | null>(null);
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('feedCollected');
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [foodsRefreshNonce, setFoodsRefreshNonce] = React.useState(0);
+
+  React.useEffect(() => {
+    refreshProfile().catch(() => undefined);
+  }, [refreshProfile]);
 
   const {
     loading,
@@ -103,16 +112,26 @@ export function FarmerAnalyticsScreen() {
     stats,
     getChartSeries,
     sites,
+    isMultiSite,
+    reload,
     filterLabel,
   } = useImpactAnalytics({ filter, chartPeriod: range, siteId: selectedSiteId });
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([reload(), refreshProfile()]);
+      setFoodsRefreshNonce((n) => n + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reload, refreshProfile]);
 
   const chartSeries = getChartSeries(METRIC_TO_CHART[selectedMetric]);
   const activeMetric = IMPACT_METRICS.find((m) => m.key === selectedMetric)!;
   const displayStats = toFarmerStats(stats);
 
   const organization = currentProfile.organization || 'Your farm';
-  const address = currentProfile.address || '';
-  const logoInitial = organization?.[0] || 'S';
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
@@ -130,7 +149,8 @@ export function FarmerAnalyticsScreen() {
 
   if (loading) {
     return (
-      <Screen backgroundColor={palette.creme}>
+      <Screen backgroundColor={palette.creme} transparentTop>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           {renderSkeleton()}
         </ScrollView>
@@ -207,65 +227,88 @@ export function FarmerAnalyticsScreen() {
   );
 
   return (
-    <Screen backgroundColor={palette.creme}>
+    <Screen backgroundColor={palette.creme} transparentTop scrollable={false}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroContainer}>
-          <Image
-            source={require('../../../assets/placeholder/feed-bg.png')}
-            style={styles.heroBg}
-            resizeMode="cover"
+        bounces
+        alwaysBounceVertical
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
           />
-
+        }
+      >
+        <HeroHeader
+          source={require('../../../assets/placeholder/kale-header.png')}
+          height={hp(22)}
+        >
           <View style={styles.heroContent}>
-            <View style={styles.topBar}>
-              <View style={styles.topBarLeft}>
-                <AppText variant="h6" style={styles.brandText}>
-                  {organization.toUpperCase()}
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroTextBlock}>
+                <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                  {organization}
                 </AppText>
-
-                <HeaderAddressRow address={address} uppercase />
+                <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                  Your insights
+                </AppText>
+                <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
+                  See the difference your collections make
+                </AppText>
               </View>
 
-              <View style={styles.logoCircle}>
-                {currentProfile.logo ? (
+              <Pressable
+                style={styles.heroIconCircle}
+                onPress={() => navigation.navigate('Account')}
+                accessibilityRole="button"
+                accessibilityLabel="Open account profile"
+              >
+                {businessLogo ? (
                   <Image
-                    source={{ uri: currentProfile.logo }}
+                    key={businessLogo}
+                    source={{ uri: businessLogo }}
                     style={styles.logoImage}
                     resizeMode="cover"
                   />
                 ) : (
-                  <AppText style={styles.logoFallback}>{logoInitial}</AppText>
+                  <Ionicons name="bar-chart" size={normalize(26)} color={palette.eggplant} />
                 )}
-              </View>
+              </Pressable>
             </View>
 
-            <View style={styles.headerCenter}>
-              <AppText variant="h4" style={styles.heroTitle}>
-                YOUR DASHBOARD
+            <View style={styles.heroStatsPill}>
+              <Ionicons name="leaf-outline" size={normalize(14)} color={palette.white} />
+              <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
+                {selectedSiteId == null && isMultiSite ? 'All sites · ' : ''}
+                {formatNumber(displayStats.mealsCreated)} meals ·{' '}
+                {formatNumber(displayStats.feedCollectedKg)} kg · {filterLabel}
               </AppText>
             </View>
           </View>
-        </View>
+        </HeroHeader>
 
-        <Pressable
-          style={styles.ctaButton}
-          onPress={() => navigation.navigate('FarmerHistory')}
-        >
-          <AppText variant="bodyLarge" style={styles.ctaText}>
-            View Collections History
-          </AppText>
-        </Pressable>
+        <View style={styles.mainContent}>
+          <Pressable
+            style={styles.ctaButton}
+            onPress={() => navigation.navigate('FarmerHistory')}
+          >
+            <AppText variant="bodyLarge" style={styles.ctaText}>
+              View Collections History
+            </AppText>
+          </Pressable>
 
-        <View style={styles.topSection}>
           <View style={styles.siteSelectorSlot}>
             <ImpactSiteSelector
               sites={sites}
               selectedSiteId={selectedSiteId}
               onChange={setSelectedSiteId}
               loading={sitesLoading}
+              includeAllSites
+              label="Site"
             />
           </View>
           <ImpactDateFilter filter={filter} onChange={setFilter} />
@@ -273,7 +316,6 @@ export function FarmerAnalyticsScreen() {
             filter.mode === 'all_time' ? 'All-time impact' : `Impact · ${filterLabel}`,
             displayStats,
           )}
-        </View>
 
         <View style={styles.impactOverTimeSection}>
           <AppText variant="h8" style={styles.impactOverTimeTitle}>
@@ -352,12 +394,15 @@ export function FarmerAnalyticsScreen() {
           </View>
         </View>
 
+        </View>
+
         <View style={styles.lifetimeSection}>
           <SpecificFoodSavings
             filter={filter}
             siteId={selectedSiteId}
             peoplePercent={stats.peoplePercent}
             animalPercent={stats.animalPercent}
+            refreshNonce={foodsRefreshNonce}
           />
         </View>
       </ScrollView>
@@ -391,90 +436,80 @@ const chartConfig = {
 
 const styles = StyleSheet.create({
   container: {
-    gap: hp(2),
-  },
-  heroContainer: {
-    minHeight: hp(20),
-    width: '100%',
-    paddingTop: hp(2),
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroBg: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+    flexGrow: 1,
+    marginTop: -hp(2),
   },
   heroContent: {
-    zIndex: 1,
-    paddingHorizontal: wp(4),
-    gap: hp(1),
+    flex: 1,
+    paddingHorizontal: wp(5),
+    justifyContent: 'flex-end',
+    paddingBottom: hp(3),
+    gap: hp(1.2),
   },
-  topBar: {
+  heroTopRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: wp(2),
+    gap: wp(3),
   },
-  topBarLeft: {
+  heroTextBlock: {
     flex: 1,
+    gap: hp(0.3),
     minWidth: 0,
   },
-  brandText: {
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'none',
+    letterSpacing: 0.3,
+    fontSize: normalize(13),
+  },
+  heroTitle: {
     color: palette.white,
-    fontSize: normalize(18),
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    textTransform: 'none',
+    fontSize: normalize(30),
+    lineHeight: normalize(38),
   },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: hp(0.6),
-    gap: wp(1.5),
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'none',
+    fontSize: normalize(15),
+    lineHeight: normalize(22),
   },
-  location: {
-    color: palette.white,
-    opacity: 0.9,
-    flex: 1,
-    minWidth: 0,
-    textTransform: 'uppercase',
-  },
-  logoCircle: {
-    width: normalize(48),
-    height: normalize(48),
-    borderRadius: normalize(24),
-    marginLeft: wp(2),
+  heroIconCircle: {
+    width: normalize(52),
+    height: normalize(52),
+    borderRadius: normalize(26),
     backgroundColor: palette.white,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
   logoImage: {
     width: '100%',
     height: '100%',
   },
-  logoFallback: {
-    color: palette.primary,
-    fontWeight: 'bold',
-    fontSize: normalize(18),
-  },
-  headerCenter: {
+  heroStatsPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: hp(0.5),
-    marginTop: hp(0.5),
+    alignSelf: 'flex-start',
+    gap: wp(1.5),
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(20),
+    maxWidth: '100%',
   },
-  heroTitle: {
+  heroStatsText: {
     color: palette.white,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingTop: hp(0.5),
+    flexShrink: 1,
+    textTransform: 'none',
+    fontSize: normalize(13),
   },
-  topSection: {
-
-    paddingHorizontal: wp(4),
-    gap: hp(1.5),
-    marginTop: -hp(1.5),
+  mainContent: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    gap: hp(2),
+    paddingBottom: hp(1),
   },
   siteSelectorSlot: {
     marginBottom: hp(0.5),

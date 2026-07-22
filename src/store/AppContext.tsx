@@ -117,7 +117,10 @@ export function AppProvider({ children }: PropsWithChildren) {
               : resolveProfileDisplayAddress(authUser.profile),
           verificationStatus: 'Verified',
           phone: profileUser?.phoneNumber || '',
-          logo: authUser.profile.organisation?.logoUrl || '',
+          logo:
+            authUser.profile.organisation?.logoUrl ||
+            (authUser.profile.organisation as { logo?: string } | undefined)?.logo ||
+            '',
           memberSince: profileUser?.createdAt,
           email: profileUser?.email || '',
         }

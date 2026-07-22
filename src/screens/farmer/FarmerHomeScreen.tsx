@@ -8,9 +8,11 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
@@ -22,17 +24,16 @@ import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 
 import { useAppContext } from '../../store/AppContext';
+import { useAuthStore } from '../../store/authStore';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
-import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import {
   isFoodListingNotification,
   subscribeNotificationReceived,
 } from '@/services/pushNotifications';
-import { useNavigation } from '@react-navigation/native';
 import { mapDiscoverListing } from '../../services/foodListing.service';
 import { driversService, type LiveDriver } from '@/services/drivers.service';
 import { normalizeAuthProfile } from '@/utils/coordinates';
@@ -71,6 +72,7 @@ export function FarmerHomeScreen() {
   const navigation = useNavigation<any>();
   const bottomPadding = useBottomTabPadding(hp(2));
   const { currentProfile, authUser } = useAppContext();
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const {
     showBanner,
     setBannerClosed,
@@ -82,6 +84,10 @@ export function FarmerHomeScreen() {
     useGpsLocation,
     saveLocation,
   } = useOrganizationLocation();
+
+  const businessLogo =
+    currentProfile.logo || authUser?.profile?.organisation?.logoUrl || null;
+  const displayAddress = (currentProfile.address || capturedAddress || '').trim();
 
   const {
     animal: { listings, isFetching: loading },
@@ -130,6 +136,12 @@ export function FarmerHomeScreen() {
       showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
     );
   }, [authUser?.accessToken, storeFetchListings]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfile().catch(() => undefined);
+    }, [refreshProfile]),
+  );
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
@@ -337,45 +349,59 @@ export function FarmerHomeScreen() {
 
   const Header = () => (
     <View>
-      <HeroHeader source={require('../../../assets/placeholder/kale-header.png')}>
-        <View style={[styles.topBar, { paddingTop: hp(2) }]}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <AppText variant="h6" style={styles.whiteText}>
-              {currentProfile.organization || 'Your Organisation'}
-            </AppText>
+      <HeroHeader
+        source={require('../../../assets/placeholder/kale-header.png')}
+        height={hp(15)}
+      >
+        <View style={styles.heroContent}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroTextBlock}>
+              <AppText variant="caption" style={styles.heroGreeting}>
+                {greeting}
+              </AppText>
+              <AppText variant="h6" style={styles.heroName} numberOfLines={1}>
+                {firstName}
+              </AppText>
+              <AppText variant="bodySmall" style={styles.heroOrg} numberOfLines={1}>
+                {currentProfile.organization || 'Your farm'}
+              </AppText>
+            </View>
 
-            <HeaderAddressRow
-              address={currentProfile.address || capturedAddress || 'No address available'}
-              style={styles.locationHeaderRow}
-              textStyle={styles.headerLocation}
-            />
+            <Pressable
+              style={styles.logoCircle}
+              onPress={() => navigation.navigate('Account')}
+              accessibilityRole="button"
+              accessibilityLabel="Open account profile"
+            >
+              {businessLogo ? (
+                <Image
+                  key={businessLogo}
+                  source={{ uri: businessLogo }}
+                  style={styles.logoImage}
+                />
+              ) : (
+                <AppText style={styles.logoFallback}>
+                  {currentProfile.organization?.[0] || 'F'}
+                </AppText>
+              )}
+            </Pressable>
           </View>
 
-          <Pressable
-            style={styles.logoCircle}
-            onPress={() => navigation.navigate('Account')}
-            accessibilityRole="button"
-            accessibilityLabel="Open account profile"
-          >
-            {currentProfile.logo ? (
-              <Image source={{ uri: currentProfile.logo }} style={styles.logoImage} />
-            ) : (
-              <AppText style={styles.logoFallback}>
-                {currentProfile.organization?.[0] || 'S'}
+          {!!displayAddress && (
+            <View style={styles.locationPill}>
+              <Ionicons name="location-outline" size={normalize(14)} color={palette.white} />
+              <AppText
+                variant="caption"
+                style={styles.locationPillText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {displayAddress}
               </AppText>
-            )}
-          </Pressable>
+            </View>
+          )}
         </View>
       </HeroHeader>
-
-      <View style={styles.welcomeSection}>
-        <AppText variant="h5">
-          {greeting}, {firstName}
-        </AppText>
-        <AppText variant="bodyLarge" style={styles.welcomeSub}>
-          We are helping good food go further, together
-        </AppText>
-      </View>
 
       {showBanner && (
         <LocationRequiredBanner
@@ -389,8 +415,14 @@ export function FarmerHomeScreen() {
 
       {!!capturedAddress && !showBanner && (
         <View style={styles.locationCapturedPill}>
-          <AppText variant="caption" numberOfLines={2} ellipsizeMode="tail">
-            Location set: {capturedAddress}
+          <Ionicons name="checkmark-circle" size={normalize(16)} color={palette.middlegreen} />
+          <AppText
+            variant="caption"
+            style={styles.locationCapturedText}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {capturedAddress}
           </AppText>
         </View>
       )}
@@ -536,62 +568,98 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  topBar: {
+  heroContent: {
+    flex: 1,
+    paddingHorizontal: wp(5),
+    justifyContent: 'flex-start',
+    paddingTop: hp(1),
+    paddingBottom: hp(1.5),
+    gap: hp(0.8),
+  },
+
+  heroTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: wp(4),
+    justifyContent: 'space-between',
+    gap: wp(3),
   },
 
-  whiteText: {
+  heroTextBlock: {
+    flex: 1,
+    gap: hp(0.2),
+    minWidth: 0,
+  },
+
+  heroGreeting: {
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'none',
+    letterSpacing: 0.3,
+  },
+
+  heroName: {
     color: palette.white,
-    fontSize: normalize(20),
+    fontSize: normalize(22),
+    lineHeight: normalize(28),
+    textTransform: 'none',
   },
 
-  locationHeaderRow: {
-    marginTop: hp(0.8),
+  heroOrg: {
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'none',
   },
 
-  headerLocation: {
+  locationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: wp(1.5),
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingVertical: hp(0.5),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(20),
+    maxWidth: '100%',
+  },
+
+  locationPillText: {
     color: palette.white,
-    opacity: 0.85,
-    fontSize: normalize(15),
-    lineHeight: normalize(20),
+    flex: 1,
+    minWidth: 0,
+    fontSize: normalize(12),
+    lineHeight: normalize(17),
+    textTransform: 'none',
   },
 
   logoCircle: {
-    width: normalize(50),
-    height: normalize(50),
-    borderRadius: normalize(25),
-    marginLeft: wp(3),
+    width: normalize(52),
+    height: normalize(52),
+    borderRadius: normalize(26),
     backgroundColor: palette.white,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: palette.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
 
   logoImage: {
     width: '100%',
     height: '100%',
+    borderRadius: normalize(26),
   },
 
   logoFallback: {
-    color: '#7B3FE4',
+    color: palette.primary,
     fontWeight: 'bold',
-    fontSize: normalize(18),
-  },
-
-  welcomeSection: {
-    paddingHorizontal: wp(4),
-    paddingTop: hp(2),
-    gap: hp(0.6),
-    alignItems: 'center',
-  },
-
-  welcomeSub: {
-    color: '#666',
-    fontSize: normalize(15),
-    lineHeight: normalize(20),
-    textAlign: 'center',
+    fontSize: normalize(20),
   },
 
   locationCapturedPill: {
@@ -600,6 +668,14 @@ const styles = StyleSheet.create({
     borderRadius: normalize(10),
     backgroundColor: '#ECF8F1',
     padding: wp(2.5),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+  },
+
+  locationCapturedText: {
+    flex: 1,
+    color: palette.text,
   },
 
   headingContainer: {

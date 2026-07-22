@@ -4,16 +4,18 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  ImageBackground,
   Pressable,
   RefreshControl,
-  Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
+import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 import {
   ClaimConfirmModal,
   type ClaimLineItem,
@@ -23,28 +25,23 @@ import { palette } from '../../theme/colors';
 import { useAppContext } from '../../store/AppContext';
 import { useDiscoverStore } from '../../store/discoverStore';
 import { showErrorAlert, showInfoAlert, showSuccessAlert } from '@/utils/apiError';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import {
   isFoodListingNotification,
   subscribeNotificationReceived,
 } from '@/services/pushNotifications';
+import { fetchListingDetail, mapDiscoverListing, type FoodItem, invalidateListingDetail, clearListingDetailCache } from '../../services/foodListing.service';
 import {
-  fetchListingDetail,
-  mapDiscoverListing,
-  type FoodItem,
-  invalidateListingDetail,
-  clearListingDetailCache,
-} from '../../services/foodListing.service';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+  haversineDistanceKm,
+  normalizeAuthProfile,
+  parseDistanceKm,
+  resolveProfileCoordinates,
+} from '@/utils/coordinates';
+import { hp, normalize, wp } from '@/utils/responsive';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 type ClaimState = Record<string, number>;
+type QuantityOrder = 'asc' | 'desc';
 
 type ClaimFoodItem = {
   foodItemId: number;
@@ -95,6 +92,13 @@ function toClaimFoodItems(
     );
 }
 
+function getAvailableKg(listing: DiscoverListing, claimItems: ClaimFoodItem[]) {
+  if (claimItems.length) {
+    return roundKg(claimItems.reduce((sum, item) => sum + item.quantityKg, 0));
+  }
+  return roundKg(listing.remainingQtyKg ?? listing.quantityKg);
+}
+
 async function loadListingFoodItems(
   listing: DiscoverListing,
   options?: { refresh?: boolean },
@@ -104,6 +108,7 @@ async function loadListingFoodItems(
 }
 
 export function FarmerMapScreen({ navigation }: any) {
+  useTransparentStatusBar('light');
   const { authUser } = useAppContext();
   const {
     animal: { listings, isFetching: loading },
@@ -113,8 +118,15 @@ export function FarmerMapScreen({ navigation }: any) {
   const [claimState, setClaimState] = useState<ClaimState>({});
   const [foodItemsByListing, setFoodItemsByListing] = useState<Record<string, ClaimFoodItem[]>>({});
   const [loadingFoodItems, setLoadingFoodItems] = useState<Record<string, boolean>>({});
-  const [activeFilter, setActiveFilter] = useState<'distance' | 'surplus' | null>(null);
+  const [sortByDistance, setSortByDistance] = useState(true);
+  const [sortByQuantity, setSortByQuantity] = useState(true);
+  const [quantityOrder, setQuantityOrder] = useState<QuantityOrder>('desc');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
+  const [expandedClaimSections, setExpandedClaimSections] = useState<Record<string, boolean>>({});
+  const [activeClaimItemByListing, setActiveClaimItemByListing] = useState<
+    Record<string, number | null>
+  >({});
   const [pendingClaim, setPendingClaim] = useState<PendingClaim | null>(null);
   const pendingClaimRef = useRef<PendingClaim | null>(null);
   const fetchedListingIds = useRef(new Set<string>());
@@ -335,251 +347,100 @@ export function FarmerMapScreen({ navigation }: any) {
     [storeFetchListings, refreshListingFoodItems],
   );
 
+  const charityCoords = useMemo(() => {
+    const profile = normalizeAuthProfile(authUser);
+    return resolveProfileCoordinates(profile);
+  }, [authUser]);
+
+  const getListingDistanceKm = useCallback(
+    (listing: DiscoverListing) => {
+      if (charityCoords) {
+        return haversineDistanceKm(
+          charityCoords.lat,
+          charityCoords.lng,
+          listing.lat,
+          listing.lng,
+        );
+      }
+
+      return parseDistanceKm(listing.distance) ?? Number.MAX_SAFE_INTEGER;
+    },
+    [charityCoords],
+  );
+
   const sortedListings = useMemo(() => {
-    let data = [...listings];
+    const seen = new Set<string>();
+    const unique = listings.filter((listing) => {
+      if (seen.has(listing.id)) return false;
+      seen.add(listing.id);
+      return true;
+    });
 
-    if (activeFilter === 'distance') {
-      data.sort(
-        (a, b) =>
-          parseFloat(String(a.distance || '0')) - parseFloat(String(b.distance || '0')),
-      );
-    }
+    const data = [...unique];
 
-    if (activeFilter === 'surplus') {
-      data.sort((a, b) => (b.quantityKg || 0) - (a.quantityKg || 0));
-    }
+    data.sort((a, b) => {
+      if (sortByDistance) {
+        const distanceDiff = getListingDistanceKm(a) - getListingDistanceKm(b);
+        if (distanceDiff !== 0) return distanceDiff;
+      }
+
+      if (sortByQuantity) {
+        const quantityDiff = (a.quantityKg || 0) - (b.quantityKg || 0);
+        return quantityOrder === 'asc' ? quantityDiff : -quantityDiff;
+      }
+
+      return 0;
+    });
 
     return data;
-  }, [listings, activeFilter]);
+  }, [listings, sortByDistance, sortByQuantity, quantityOrder, getListingDistanceKm]);
 
-  const ListHeader = () => (
-    <View style={styles.headerWrapper}>
-      <ImageBackground
-        source={require('../../../assets/placeholder/feed-bg.png')}
-        style={styles.headerBg}
-      >
-        <AppText variant="h5" style={styles.white}>
-          Surplus Available
-        </AppText>
-      </ImageBackground>
+  const handleDistanceSortPress = () => {
+    if (sortByDistance && !sortByQuantity) return;
+    setSortByDistance((value) => !value);
+  };
 
-      <Pressable
-        style={styles.pickupBtn}
-        onPress={() => navigation.navigate('FarmerPickup')}
-      >
-        <AppText variant="bodyBold" style={styles.pickupBtnText}>
-          View Your Pickups
-        </AppText>
-      </Pressable>
+  const handleQuantitySortPress = () => {
+    if (!sortByQuantity) {
+      setSortByQuantity(true);
+      setQuantityOrder('desc');
+      return;
+    }
 
-      <View style={styles.activeRow}>
-        <AppText variant="h7">Active Listings</AppText>
+    if (quantityOrder === 'desc') {
+      setQuantityOrder('asc');
+      return;
+    }
 
-        <View style={styles.activeBadge}>
-          <AppText variant="h7" color="white">
-            {listings.length}
-          </AppText>
-        </View>
-      </View>
+    if (sortByDistance) {
+      setSortByQuantity(false);
+      setQuantityOrder('desc');
+    } else {
+      setQuantityOrder('desc');
+    }
+  };
 
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[
-            styles.filterPill,
-            activeFilter === 'distance' && styles.filterPillActive,
-          ]}
-          onPress={() =>
-            setActiveFilter(activeFilter === 'distance' ? null : 'distance')
-          }
-        >
-          <AppText
-            variant="caption"
-            style={
-              activeFilter === 'distance'
-                ? styles.filterTextActive
-                : styles.filterText
-            }
-          >
-            Sort by Distance
-          </AppText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterPill,
-            activeFilter === 'surplus' && styles.filterPillActive,
-          ]}
-          onPress={() =>
-            setActiveFilter(activeFilter === 'surplus' ? null : 'surplus')
-          }
-        >
-          <AppText
-            variant="caption"
-            style={
-              activeFilter === 'surplus'
-                ? styles.filterTextActive
-                : styles.filterText
-            }
-          >
-            by Surplus Available
-          </AppText>
-        </TouchableOpacity>
-      </View>
+  const renderSkeleton = () => (
+    <View style={styles.skeletonWrap}>
+      <Skeleton width="100%" height={hp(14)} borderRadius={0} />
+      <Skeleton width={wp(90)} height={normalize(40)} style={styles.skeletonCenter} />
+      {[1, 2].map((i) => (
+        <Skeleton
+          key={i}
+          width={wp(92)}
+          height={normalize(220)}
+          borderRadius={normalize(20)}
+          style={styles.skeletonCard}
+        />
+      ))}
     </View>
   );
 
-  const renderItemRow = (
-    listing: DiscoverListing,
-    item: ClaimFoodItem,
-  ) => {
-    const key = getKey(listing.id, item.foodItemId);
-    const qty = claimState[key] || 0;
-
-    return (
-      <View key={item.foodItemId} style={styles.itemCard}>
-        <View style={{ flex: 1 }}>
-          <AppText variant="label">{item.name}</AppText>
-          <AppText variant="bodySmall">
-            Available: {formatKg(item.quantityKg)} kg
-          </AppText>
-        </View>
-
-        <View style={styles.stepper}>
-          <TouchableOpacity
-            onPress={() =>
-              updateQty(listing.id, item.foodItemId, item.quantityKg, -QTY_STEP)
-            }
-            style={styles.stepBtn}
-          >
-            <AppText variant="label">−</AppText>
-          </TouchableOpacity>
-
-          <View style={styles.qtyPill}>
-            <AppText variant="label">{formatKg(qty)}</AppText>
-          </View>
-
-          <TouchableOpacity
-            onPress={() =>
-              updateQty(listing.id, item.foodItemId, item.quantityKg, QTY_STEP)
-            }
-            style={styles.stepBtn}
-          >
-            <AppText variant="label">＋</AppText>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  const renderListing = ({ item }: { item: DiscoverListing }) => {
-    const claimItems = foodItemsByListing[item.id] ?? [];
-    const isLoadingItems = loadingFoodItems[item.id];
-    const totalSelected = getTotalSelected(item.id);
-    const hasSelection = totalSelected > 0;
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <AppText variant="bodyBold">{item.title || item.businessName}</AppText>
-            <AppText variant="bodySmall">
-              {item.businessName} · {item.pickupAddress}
-            </AppText>
-          </View>
-
-          <View style={styles.distanceChip}>
-            <AppText variant="bodySmall">📍 {item.distance}</AppText>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <View style={styles.infoCard}>
-            <AppText variant="label">Quantity</AppText>
-            <AppText variant="bodySmall">{formatKg(item.quantityKg)} kg</AppText>
-          </View>
-
-          <View style={styles.infoCard}>
-            <AppText variant="label">Pickup Date</AppText>
-            <AppText variant="bodySmall">{item.bestBeforeLabel}</AppText>
-          </View>
-
-          <View style={styles.infoCard}>
-            <AppText variant="label">Pickup Time</AppText>
-            <AppText variant="bodySmall">{item.pickupWindow}</AppText>
-          </View>
-        </View>
-
-        <View style={styles.storageRow}>
-          <AppText variant="label">Storage:</AppText>
-          <AppText variant="bodySmall"> {item.storage}</AppText>
-        </View>
-
-        <View style={styles.section}>
-          <AppText variant="label" style={styles.sectionTitle}>
-            Select quantity
-          </AppText>
-          {isLoadingItems ? (
-            <AppText variant="bodySmall" style={styles.loadingItemsText}>
-              Loading food items…
-            </AppText>
-          ) : claimItems.length === 0 ? (
-            <AppText variant="bodySmall" style={styles.loadingItemsText}>
-              No items available to claim
-            </AppText>
-          ) : (
-            claimItems.map((foodItem) => renderItemRow(item, foodItem))
-          )}
-        </View>
-
-        <View style={styles.ctaRow}>
-          <Button
-            label={`Claim ${formatKg(totalSelected)} kg`}
-            disabled={!hasSelection || isLoadingItems}
-            style={styles.flexBtn}
-            onPress={() => openPartialClaim(item, claimItems)}
-          />
-
-          <Button
-            label="Claim All"
-            variant="primary"
-            disabled={isLoadingItems || claimItems.length === 0}
-            style={styles.flexBtn}
-            onPress={() => openFullClaim(item, claimItems)}
-          />
-        </View>
-      </View>
-    );
-  };
-
   if (loading && !refreshing && listings.length === 0) {
     return (
-      <Screen backgroundColor={palette.creme} scrollable={false}>
-        <View style={styles.skeletonWrap}>
-          <Skeleton width="100%" height={hp(20)} borderRadius={0} />
-          <Skeleton
-            width={wp(70)}
-            height={normalize(44)}
-            borderRadius={normalize(14)}
-            style={styles.skeletonCenter}
-          />
-          <View style={styles.skeletonActiveRow}>
-            <Skeleton width={wp(35)} height={normalize(18)} />
-            <Skeleton width={wp(16)} height={hp(4.2)} borderRadius={normalize(12)} />
-          </View>
-          <View style={styles.skeletonFilterRow}>
-            <Skeleton width={wp(42)} height={normalize(36)} borderRadius={normalize(20)} />
-            <Skeleton width={wp(42)} height={normalize(36)} borderRadius={normalize(20)} />
-          </View>
-          {[1, 2].map((i) => (
-            <Skeleton
-              key={i}
-              width={wp(92)}
-              height={normalize(280)}
-              borderRadius={normalize(20)}
-              style={styles.skeletonCard}
-            />
-          ))}
-        </View>
+      <Screen backgroundColor={palette.creme} transparentTop>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
+        {renderSkeleton()}
 
         <ClaimConfirmModal
           visible={!!pendingClaim}
@@ -596,8 +457,339 @@ export function FarmerMapScreen({ navigation }: any) {
     );
   }
 
+  const toggleClaimSection = (listingId: string) => {
+    setExpandedClaimSections((prev) => ({ ...prev, [listingId]: !prev[listingId] }));
+  };
+
+  const toggleActiveClaimItem = (listingId: string, foodItemId: number) => {
+    setActiveClaimItemByListing((prev) => ({
+      ...prev,
+      [listingId]: prev[listingId] === foodItemId ? null : foodItemId,
+    }));
+  };
+
+  const getSelectedSummary = (listingId: string, claimItems: ClaimFoodItem[]) => {
+    const selectedCount = claimItems.filter(
+      (item) => (claimState[getKey(listingId, item.foodItemId)] || 0) > 0,
+    ).length;
+    const totalSelected = getTotalSelected(listingId);
+    return { selectedCount, totalSelected };
+  };
+
+  const renderQtyStepper = (
+    listing: DiscoverListing,
+    item: ClaimFoodItem,
+    compact = false,
+  ) => {
+    const key = getKey(listing.id, item.foodItemId);
+    const qty = claimState[key] || 0;
+
+    return (
+      <View style={[styles.stepper, compact && styles.stepperCompact]}>
+        <Pressable
+          onPress={() => updateQty(listing.id, item.foodItemId, item.quantityKg, -QTY_STEP)}
+          style={styles.stepBtn}
+          hitSlop={6}
+        >
+          <Ionicons name="remove" size={normalize(22)} color={palette.middlegreen} />
+        </Pressable>
+
+        <View style={styles.qtyPill}>
+          <AppText variant="bodyBold" style={styles.qtyText} numberOfLines={1}>
+            {formatKg(qty)}
+          </AppText>
+          <AppText variant="caption" style={styles.qtyUnit}>
+            kg
+          </AppText>
+        </View>
+
+        <Pressable
+          onPress={() => updateQty(listing.id, item.foodItemId, item.quantityKg, QTY_STEP)}
+          style={styles.stepBtn}
+          hitSlop={6}
+        >
+          <Ionicons name="add" size={normalize(22)} color={palette.middlegreen} />
+        </Pressable>
+      </View>
+    );
+  };
+
+  const renderClaimPanel = (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
+    const isLoadingItems = loadingFoodItems[listing.id];
+    const isExpanded =
+      expandedClaimSections[listing.id] ?? claimItems.length <= 2;
+    const activeItemId = activeClaimItemByListing[listing.id];
+    const { selectedCount, totalSelected } = getSelectedSummary(listing.id, claimItems);
+
+    if (isLoadingItems) {
+      return (
+        <AppText variant="bodySmall" style={styles.loadingItemsText}>
+          Loading food items…
+        </AppText>
+      );
+    }
+
+    if (claimItems.length === 0) {
+      return (
+        <AppText variant="bodySmall" style={styles.loadingItemsText}>
+          No items available to claim
+        </AppText>
+      );
+    }
+
+    if (claimItems.length === 1) {
+      const onlyItem = claimItems[0];
+      return (
+        <View style={styles.singleItemPanel}>
+          <View style={styles.itemHeaderRow}>
+            <AppText variant="label" style={styles.itemName} numberOfLines={2}>
+              {onlyItem.name}
+            </AppText>
+            <AppText variant="caption" style={styles.itemAvail}>
+              {formatKg(onlyItem.quantityKg)} kg avail.
+            </AppText>
+          </View>
+          {renderQtyStepper(listing, onlyItem)}
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.claimPanel}>
+        <Pressable style={styles.claimToggle} onPress={() => toggleClaimSection(listing.id)}>
+          <View style={styles.claimToggleLeft}>
+            <Ionicons
+              name="restaurant-outline"
+              size={normalize(18)}
+              color={palette.middlegreen}
+            />
+            <View style={styles.claimToggleTextWrap}>
+              <AppText variant="label">
+                {claimItems.length} food items
+              </AppText>
+              <AppText variant="caption" style={styles.claimToggleSub}>
+                {selectedCount > 0
+                  ? `${selectedCount} selected · ${formatKg(totalSelected)} kg`
+                  : 'Tap to choose quantities'}
+              </AppText>
+            </View>
+          </View>
+          <Ionicons
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={normalize(20)}
+            color="#666"
+          />
+        </Pressable>
+
+        {isExpanded && (
+          <View style={styles.claimItemList}>
+            {claimItems.map((claimItem) => {
+              const itemQty = claimState[getKey(listing.id, claimItem.foodItemId)] || 0;
+              const isActive = activeItemId === claimItem.foodItemId;
+
+              return (
+                <View key={claimItem.foodItemId} style={styles.claimItemBlock}>
+                  <Pressable
+                    style={[styles.claimItemRow, isActive && styles.claimItemRowActive]}
+                    onPress={() => toggleActiveClaimItem(listing.id, claimItem.foodItemId)}
+                  >
+                    <View style={styles.claimItemMeta}>
+                      <AppText variant="label" numberOfLines={1} style={styles.itemName}>
+                        {claimItem.name}
+                      </AppText>
+                      <AppText variant="caption" style={styles.itemAvail}>
+                        {formatKg(claimItem.quantityKg)} kg avail.
+                        {itemQty > 0 ? ` · ${formatKg(itemQty)} kg picked` : ''}
+                      </AppText>
+                    </View>
+                    <Ionicons
+                      name={isActive ? 'chevron-up' : 'chevron-down'}
+                      size={normalize(18)}
+                      color="#888"
+                    />
+                  </Pressable>
+
+                  {isActive && renderQtyStepper(listing, claimItem, true)}
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderListing = ({ item }: { item: DiscoverListing }) => {
+    const claimItems = foodItemsByListing[item.id] ?? [];
+    const isLoadingItems = loadingFoodItems[item.id];
+    const totalSelected = getTotalSelected(item.id);
+    const hasSelection = totalSelected > 0;
+    const availableKg = getAvailableKg(item, claimItems);
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleWrap}>
+            <AppText variant="bodyBold" numberOfLines={2}>
+              {item.title}
+            </AppText>
+            <AppText variant="bodySmall" style={styles.businessName} numberOfLines={1}>
+              {item.businessName}
+            </AppText>
+          </View>
+          <View style={styles.statusBadge}>
+            <AppText variant="caption" style={styles.statusBadgeText}>
+              {item.status}
+            </AppText>
+          </View>
+        </View>
+
+        <View style={styles.locationRow}>
+          <Ionicons name="location-outline" size={normalize(16)} color={palette.middlegreen} />
+          <AppText variant="bodySmall" style={styles.locationText} numberOfLines={2}>
+            {item.pickupAddress}
+          </AppText>
+        </View>
+
+        <View style={styles.infoGrid}>
+          <View style={styles.infoCell}>
+            <AppText variant="caption" style={styles.infoLabel}>
+              Quantity
+            </AppText>
+            <AppText variant="bodyBold">{formatKg(availableKg)} kg</AppText>
+          </View>
+
+          <View style={styles.infoCell}>
+            <AppText variant="caption" style={styles.infoLabel}>
+              Best before
+            </AppText>
+            <AppText variant="bodySmall" style={styles.infoValue}>
+              {item.bestBeforeLabel}
+            </AppText>
+          </View>
+
+          <View style={styles.infoCell}>
+            <AppText variant="caption" style={styles.infoLabel}>
+              Pickup window
+            </AppText>
+            <AppText variant="bodySmall" style={styles.infoValue} numberOfLines={2}>
+              {item.pickupWindow}
+            </AppText>
+          </View>
+        </View>
+
+        <View style={styles.storageRow}>
+          <Ionicons name="thermometer-outline" size={normalize(14)} color="#666" />
+          <AppText variant="caption" style={styles.storageText}>
+            {item.storage}
+          </AppText>
+          <Pressable onPress={() => setSelectedListing(item)} hitSlop={8}>
+            <AppText variant="caption" style={styles.detailsLink}>
+              View details
+            </AppText>
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <AppText variant="label" style={styles.sectionTitle}>
+            Select quantity per item
+          </AppText>
+          {renderClaimPanel(item, claimItems)}
+        </View>
+
+        <View style={styles.ctaRow}>
+          <Button
+            label={`Claim ${formatKg(totalSelected)} kg`}
+            size="compact"
+            disabled={!hasSelection || isLoadingItems}
+            style={styles.flexBtn}
+            onPress={() => openPartialClaim(item, claimItems)}
+          />
+
+          <Button
+            label="Claim All"
+            size="compact"
+            disabled={isLoadingItems || claimItems.length === 0}
+            style={styles.flexBtn}
+            onPress={() => openFullClaim(item, claimItems)}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  const ListHeader = () => (
+    <View>
+      <HeroHeader
+        source={require('../../../assets/placeholder/kale-header.png')}
+        height={hp(14)}
+      >
+        <View style={styles.heroContent}>
+          <AppText variant="h5" style={styles.whiteText}>
+            Surplus Available
+          </AppText>
+          <AppText variant="body" style={styles.heroSubtext}>
+            Browse and claim livestock feed near your farm
+          </AppText>
+        </View>
+      </HeroHeader>
+
+      <Pressable style={styles.pickupBtn} onPress={() => navigation.navigate('FarmerPickup')}>
+        <Ionicons name="car-outline" size={normalize(18)} color={palette.white} />
+        <AppText variant="label" style={styles.pickupBtnText}>
+          View Your Pickups
+        </AppText>
+      </Pressable>
+
+      <View style={styles.activeRow}>
+        <AppText variant="h7">Active Listings</AppText>
+        <View style={styles.activeBadge}>
+          <AppText variant="h7" style={{ color: palette.white }}>
+            {listings.length}
+          </AppText>
+        </View>
+      </View>
+
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[styles.filterPill, sortByDistance && styles.filterPillActive]}
+          onPress={handleDistanceSortPress}
+        >
+          <AppText
+            variant="caption"
+            style={sortByDistance ? styles.filterTextActive : styles.filterText}
+          >
+            Sort by Distance
+          </AppText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterPill, sortByQuantity && styles.filterPillActive]}
+          onPress={handleQuantitySortPress}
+        >
+          <AppText
+            variant="caption"
+            style={sortByQuantity ? styles.filterTextActive : styles.filterText}
+          >
+            {sortByQuantity
+              ? `By Quantity ${quantityOrder === 'desc' ? '↓' : '↑'}`
+              : 'By Quantity'}
+          </AppText>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
-    <Screen backgroundColor={palette.creme} scrollable={false}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+
+      <DiscoverListingDetailModal
+        visible={!!selectedListing}
+        listing={selectedListing}
+        onClose={() => setSelectedListing(null)}
+      />
+
       <ClaimConfirmModal
         visible={!!pendingClaim}
         listing={pendingClaim?.listing ?? null}
@@ -614,22 +806,19 @@ export function FarmerMapScreen({ navigation }: any) {
         data={sortedListings}
         keyExtractor={(item) => item.id}
         renderItem={renderListing}
+        style={styles.list}
         ListHeaderComponent={ListHeader}
         contentContainerStyle={[
           styles.container,
-          sortedListings.length === 0 && { flex: 1 },
+          sortedListings.length === 0 && styles.emptyList,
         ]}
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-            <AppText variant="h7">No surplus available</AppText>
-            <AppText variant="bodySmall" style={{ marginTop: hp(0.7) }}>
-              No surplus available. Check again later.
-            </AppText>
+          <View style={styles.emptyContainer}>
+            <AppText variant="h7">No livestock feed available</AppText>
+            <AppText variant="bodySmall">Check again later for new feed listings near you</AppText>
           </View>
         }
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[palette.primary]} tintColor={palette.primary} />}
         showsVerticalScrollIndicator={false}
       />
     </Screen>
@@ -637,76 +826,99 @@ export function FarmerMapScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  list: {
+    flex: 1,
+    backgroundColor: palette.creme,
+  },
+
   container: {
     paddingBottom: hp(4),
   },
 
-  headerWrapper: {
-    paddingHorizontal: wp(4),
+  emptyList: {
+    flexGrow: 1,
   },
 
-  headerBg: {
-    height: hp(20),
+  heroContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: -wp(4),
+    paddingHorizontal: wp(4),
+    gap: hp(0.5),
+  },
+
+  whiteText: {
+    color: palette.white,
+    textAlign: 'center',
+  },
+
+  heroSubtext: {
+    color: palette.white,
+    opacity: 0.92,
+    textAlign: 'center',
+    fontSize: normalize(16),
+    lineHeight: normalize(22),
   },
 
   pickupBtn: {
-    marginHorizontal: wp(4),
-    marginTop: hp(1.5),
-    marginBottom: hp(1.5),
-    backgroundColor: palette.primary,
-    paddingVertical: hp(1.4),
-    borderRadius: normalize(14),
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2),
+    marginHorizontal: wp(4),
+    marginTop: hp(2),
+    backgroundColor: palette.middlegreen,
+    paddingVertical: hp(1.2),
+    borderRadius: normalize(12),
   },
 
   pickupBtnText: {
     color: palette.white,
   },
 
-  white: {
-    color: palette.white,
-    textAlign: 'center',
-  },
-
   activeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: hp(1.5),
+    marginTop: hp(2),
+    marginHorizontal: wp(4),
   },
 
   activeBadge: {
     backgroundColor: palette.middlegreen,
-    minWidth: wp(18),
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(0.9),
-    borderRadius: normalize(10),
+    minWidth: wp(12),
+    height: hp(4),
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(12),
   },
 
   filterRow: {
     flexDirection: 'row',
-    gap: wp(2.5),
+    gap: wp(2),
     marginTop: hp(1.5),
+    marginHorizontal: wp(4),
+    marginBottom: hp(0.5),
   },
 
   filterPill: {
     flex: 1,
-    backgroundColor: palette.radish,
-    paddingVertical: hp(1.2),
+    backgroundColor: palette.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    paddingVertical: hp(1),
     borderRadius: normalize(20),
     alignItems: 'center',
-    justifyContent: 'center',
   },
+
   filterText: {
-    color: palette.primary,
+    color: palette.black,
   },
 
   filterPillActive: {
-    backgroundColor: palette.primary,
+    backgroundColor: palette.middlegreen,
+    borderColor: palette.middlegreen,
   },
 
   filterTextActive: {
@@ -719,49 +931,116 @@ const styles = StyleSheet.create({
     marginTop: hp(1.5),
     padding: wp(4),
     borderRadius: normalize(20),
-    borderWidth: 1,
-    borderColor: palette.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
 
-  headerRow: {
+  cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: hp(1),
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: wp(2),
   },
 
-  distanceChip: {
-    backgroundColor: palette.radish,
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1.1),
-    borderRadius: normalize(8),
-  },
-
-  infoRow: {
-    flexDirection: 'row',
-    gap: wp(2.5),
-    marginVertical: hp(1),
-  },
-
-  infoCard: {
+  cardTitleWrap: {
     flex: 1,
-    backgroundColor: palette.radish,
-    padding: wp(2.5),
-    gap: hp(0.8),
+    gap: hp(0.3),
+  },
+
+  businessName: {
+    color: '#666',
+  },
+
+  statusBadge: {
+    backgroundColor: '#E8F3EC',
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.5),
+    borderRadius: normalize(12),
+  },
+
+  statusBadgeText: {
+    color: palette.middlegreen,
+    fontWeight: '600',
+  },
+
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(1.5),
+    marginTop: hp(1.2),
+    paddingTop: hp(1.2),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F3F3',
+  },
+
+  locationText: {
+    flex: 1,
+    color: '#444',
+    lineHeight: normalize(18),
+  },
+
+  infoGrid: {
+    flexDirection: 'row',
+    gap: wp(2),
+    marginTop: hp(1.5),
+  },
+
+  infoCell: {
+    flex: 1,
+    backgroundColor: palette.creme,
     borderRadius: normalize(14),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2),
+    alignItems: 'center',
+    gap: hp(0.4),
+  },
+
+  infoLabel: {
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    fontSize: normalize(10),
+  },
+
+  infoValue: {
+    textAlign: 'center',
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
   },
 
   storageRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: hp(0.6),
+    gap: wp(1),
+    marginTop: hp(1.2),
+    paddingTop: hp(1),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F3F3',
+  },
+
+  storageText: {
+    color: '#666',
+    flex: 1,
+  },
+
+  detailsLink: {
+    color: palette.middlegreen,
+    fontWeight: '600',
   },
 
   section: {
-    marginTop: hp(1),
+    marginTop: hp(1.2),
   },
 
   sectionTitle: {
-    marginBottom: hp(1),
+    marginBottom: hp(0.8),
   },
 
   loadingItemsText: {
@@ -769,39 +1048,143 @@ const styles = StyleSheet.create({
     marginBottom: hp(0.5),
   },
 
-  itemCard: {
+  claimPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    borderRadius: normalize(14),
+    overflow: 'hidden',
+    backgroundColor: palette.creme,
+  },
+
+  claimToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAFAFB',
-    padding: wp(2.5),
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.2),
+    gap: wp(2),
+  },
+
+  claimToggleLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+  },
+
+  claimToggleTextWrap: {
+    flex: 1,
+    gap: hp(0.2),
+  },
+
+  claimToggleSub: {
+    color: '#666',
+  },
+
+  claimItemList: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#D9D9D9',
+  },
+
+  claimItemBlock: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#D9D9D9',
+  },
+
+  claimItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    gap: wp(2),
+    backgroundColor: palette.creme,
+  },
+
+  claimItemRowActive: {
+    backgroundColor: '#F3FAF5',
+  },
+
+  claimItemMeta: {
+    flex: 1,
+    gap: hp(0.2),
+  },
+
+  singleItemPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
     borderRadius: normalize(14),
-    marginBottom: hp(1),
+    backgroundColor: palette.creme,
+    padding: wp(3),
+    gap: hp(1),
+  },
+
+  itemHeaderRow: {
+    gap: hp(0.3),
+  },
+
+  itemName: {
+    flexShrink: 1,
+  },
+
+  itemAvail: {
+    color: '#666',
   },
 
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#F1F1F4',
-    borderRadius: normalize(20),
-    paddingHorizontal: wp(1.5),
+    borderRadius: normalize(16),
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.6),
+    gap: wp(2),
+  },
+
+  stepperCompact: {
+    marginHorizontal: wp(3),
+    marginBottom: hp(1),
   },
 
   stepBtn: {
-    padding: normalize(6),
+    width: normalize(44),
+    height: normalize(44),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: normalize(22),
+    backgroundColor: palette.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
   },
 
   qtyPill: {
+    flex: 1,
+    minWidth: wp(24),
     backgroundColor: palette.white,
     borderRadius: normalize(12),
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.5),
-    marginHorizontal: wp(1),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  qtyText: {
+    fontSize: normalize(18),
+    lineHeight: normalize(22),
+  },
+
+  qtyUnit: {
+    color: '#666',
+    marginTop: hp(0.1),
   },
 
   ctaRow: {
     flexDirection: 'row',
-    gap: wp(2.5),
-    marginTop: hp(1.5),
+    gap: wp(2),
+    marginTop: hp(1.2),
   },
 
   flexBtn: {
@@ -809,24 +1192,23 @@ const styles = StyleSheet.create({
     backgroundColor: palette.middlegreen,
   },
 
-  skeletonWrap: {
-    paddingBottom: hp(4),
-    gap: hp(1.2),
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(8),
+    paddingTop: hp(6),
+    gap: hp(0.8),
   },
+
+  skeletonWrap: {
+    gap: hp(1.6),
+  },
+
   skeletonCenter: {
     alignSelf: 'center',
+    marginTop: hp(1),
   },
-  skeletonActiveRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: wp(4),
-  },
-  skeletonFilterRow: {
-    flexDirection: 'row',
-    gap: wp(2.5),
-    paddingHorizontal: wp(4),
-  },
+
   skeletonCard: {
     alignSelf: 'center',
   },

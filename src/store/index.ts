@@ -6,6 +6,7 @@ export { useDashboardStore } from './dashboardStore';
 export { useImpactStore } from './impactStore';
 export { useSitesStore } from './sitesStore';
 export { useCharityStore } from './charityStore';
+export { useFarmerConsumerStore } from './farmerConsumerStore';
 export { useNotificationsStore } from './notificationsStore';
 
 export type {
@@ -24,6 +25,7 @@ import { useDashboardStore } from './dashboardStore';
 import { useImpactStore } from './impactStore';
 import { useSitesStore } from './sitesStore';
 import { useCharityStore } from './charityStore';
+import { useFarmerConsumerStore } from './farmerConsumerStore';
 import { useNotificationsStore } from './notificationsStore';
 import { clearListingDetailCache } from '../services/foodListing.service';
 
@@ -35,5 +37,6 @@ export function resetAllDataStores(): void {
   useImpactStore.getState().reset();
   useSitesStore.getState().reset();
   useCharityStore.getState().reset();
+  useFarmerConsumerStore.getState().reset();
   useNotificationsStore.getState().reset();
 }
