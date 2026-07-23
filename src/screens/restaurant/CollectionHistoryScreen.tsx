@@ -135,14 +135,26 @@ function getCollectedTime(listing: any) {
   );
 }
 
-function getOrgName(listing: any) {
-  if (isCancelledListing(listing)) return 'No collector accepted';
-  return (
-    listing?.foodClaims?.[0]?.charityName ||
-    listing?.foodClaims?.[0]?.farmName ||
-    listing?.foodClaims?.[0]?.claimerName ||
-    'Unknown collector'
-  );
+function getCollectorLabel(listing: any): string | null {
+  // Expired / cancelled were never collected — don't show a collector name.
+  if (isExpiredListing(listing) || isCancelledListing(listing)) return null;
+  if (!isCompletedListing(listing)) return null;
+
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  const preferred =
+    claims.find((claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED') ||
+    claims[0];
+
+  const name =
+    preferred?.claimantOrg?.name ||
+    preferred?.charityName ||
+    preferred?.farmName ||
+    preferred?.claimerName ||
+    preferred?.organisation?.name ||
+    null;
+
+  if (!name || !String(name).trim()) return null;
+  return `Collected by ${String(name).trim()}`;
 }
 
 export default function CollectionHistoryScreen({ navigation }: any) {
@@ -450,6 +462,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const categoryIcon = animal
       ? require('../../../assets/placeholder/cow_front.png')
       : require('../../../assets/placeholder/people_icon.png');
+    const collectorLabel = getCollectorLabel(item);
 
     return (
       <View style={[styles.collectionCard, ts.collectionCard]}>
@@ -469,9 +482,18 @@ export default function CollectionHistoryScreen({ navigation }: any) {
               </View>
             ) : null}
           </View>
-          <AppText variant="bodyBold" style={styles.orgNameText} numberOfLines={2} ellipsizeMode="tail">
-            {getOrgName(item)}
-          </AppText>
+          {collectorLabel ? (
+            <View style={styles.orgNameWrap}>
+              <AppText
+                variant="bodyBold"
+                style={styles.orgNameText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {collectorLabel}
+              </AppText>
+            </View>
+          ) : null}
         </View>
 
         <View style={[styles.metaRow, cancelled && styles.metaRowCancelled]}>
@@ -1002,10 +1024,9 @@ const styles = StyleSheet.create({
 
   cardTopRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: wp(1.5),
+    gap: wp(2),
     minWidth: 0,
   },
   cardTopLeft: {
@@ -1013,8 +1034,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: wp(1.5),
-    flexShrink: 0,
-    maxWidth: '100%',
+    flexShrink: 1,
+    maxWidth: '58%',
   },
 
   statusBadge: {
@@ -1048,11 +1069,15 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
 
+  orgNameWrap: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+
   orgNameText: {
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: wp(28),
-    minWidth: wp(24),
+    width: '100%',
     fontSize: normalize(13),
     color: palette.black,
     textTransform: 'none',

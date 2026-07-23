@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -109,7 +109,7 @@ export function AssignDriverModal({ visible, driver, onClose, onAssigned }: Prop
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => setDropdownOpen(false)}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <AppText variant="h7">Assign pickup</AppText>
             <Pressable onPress={onClose} hitSlop={8}>
@@ -139,10 +139,7 @@ export function AssignDriverModal({ visible, driver, onClose, onAssigned }: Prop
             <View style={styles.dropdown}>
               <Pressable
                 style={styles.dropdownHeader}
-                onPress={(event) => {
-                  event.stopPropagation?.();
-                  setDropdownOpen((open) => !open);
-                }}
+                onPress={() => setDropdownOpen((open) => !open)}
               >
                 <AppText
                   variant="bodySmall"
@@ -159,25 +156,38 @@ export function AssignDriverModal({ visible, driver, onClose, onAssigned }: Prop
               </Pressable>
 
               {dropdownOpen ? (
-                <ScrollView style={styles.options} nestedScrollEnabled>
-                  {claims.map((claim) => {
-                    const selected = claim.claimId === selectedClaimId;
-                    return (
-                      <Pressable
-                        key={claim.claimId}
-                        style={[styles.optionRow, selected && styles.optionRowSelected]}
-                        onPress={() => {
-                          setSelectedClaimId(claim.claimId);
-                          setDropdownOpen(false);
-                        }}
-                      >
-                        <AppText variant="bodySmall" style={styles.optionText} numberOfLines={3}>
-                          {claimLabel(claim)}
-                        </AppText>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                <View style={styles.optionsWrap}>
+                  <FlatList
+                    data={claims}
+                    keyExtractor={(claim) => String(claim.claimId)}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator
+                    bounces={claims.length > 4}
+                    style={styles.optionsList}
+                    contentContainerStyle={styles.optionsContent}
+                    renderItem={({ item: claim }) => {
+                      const selected = claim.claimId === selectedClaimId;
+                      return (
+                        <Pressable
+                          style={[styles.optionRow, selected && styles.optionRowSelected]}
+                          onPress={() => {
+                            setSelectedClaimId(claim.claimId);
+                            setDropdownOpen(false);
+                          }}
+                        >
+                          <AppText
+                            variant="bodySmall"
+                            style={styles.optionText}
+                            numberOfLines={3}
+                          >
+                            {claimLabel(claim)}
+                          </AppText>
+                        </Pressable>
+                      );
+                    }}
+                  />
+                </View>
               ) : null}
             </View>
           )}
@@ -267,10 +277,16 @@ const styles = StyleSheet.create({
     color: palette.black,
     textTransform: 'none',
   },
-  options: {
-    maxHeight: hp(28),
+  optionsWrap: {
+    maxHeight: normalize(220),
     borderTopWidth: 1,
     borderTopColor: '#ECECEC',
+  },
+  optionsList: {
+    flexGrow: 0,
+  },
+  optionsContent: {
+    flexGrow: 0,
   },
   optionRow: {
     paddingHorizontal: wp(3),

@@ -114,47 +114,57 @@ export function ImpactDateFilter({ filter, onChange }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <AppText variant="bodyBold" style={styles.title}>
-        Select time period
-      </AppText>
-
-      <Pressable
-        style={[styles.allTimeChip, filter.mode === 'all_time' && styles.allTimeChipActive]}
-        onPress={() => onChange({ mode: 'all_time' })}
-        accessibilityRole="button"
-        accessibilityState={{ selected: filter.mode === 'all_time' }}
-      >
-        <Ionicons
-          name="infinite-outline"
-          size={normalize(16)}
-          color={filter.mode === 'all_time' ? palette.white : palette.kale}
-        />
-        <AppText
-          style={[
-            styles.allTimeText,
-            filter.mode === 'all_time' && styles.allTimeTextActive,
-          ]}
-        >
-          All time
+      <View style={styles.headerRow}>
+        <AppText variant="bodyBold" style={styles.title} numberOfLines={1}>
+          Select time period
         </AppText>
-      </Pressable>
+
+        <Pressable
+          style={[styles.allTimeChip, filter.mode === 'all_time' && styles.allTimeChipActive]}
+          onPress={() => onChange({ mode: 'all_time' })}
+          accessibilityRole="button"
+          accessibilityState={{ selected: filter.mode === 'all_time' }}
+          hitSlop={6}
+        >
+          <Ionicons
+            name="infinite-outline"
+            size={normalize(15)}
+            color={filter.mode === 'all_time' ? palette.white : palette.kale}
+          />
+          <AppText
+            style={[
+              styles.allTimeText,
+              filter.mode === 'all_time' && styles.allTimeTextActive,
+            ]}
+            numberOfLines={1}
+          >
+            All time
+          </AppText>
+        </Pressable>
+      </View>
 
       <View style={styles.dateRow}>
-        <Pressable style={styles.dateField} onPress={() => openPicker('from')}>
+        <Pressable
+          style={[styles.dateField, filter.mode === 'custom' && styles.dateFieldActive]}
+          onPress={() => openPicker('from')}
+        >
           <AppText style={styles.dateLabel}>From</AppText>
           <View style={styles.dateValueRow}>
             <Ionicons name="calendar-outline" size={normalize(15)} color={palette.kale} />
-            <AppText style={styles.dateValue}>
+            <AppText style={styles.dateValue} numberOfLines={1}>
               {formatDisplayDate(filter.mode === 'custom' ? filter.startDate : undefined)}
             </AppText>
           </View>
         </Pressable>
 
-        <Pressable style={styles.dateField} onPress={() => openPicker('to')}>
+        <Pressable
+          style={[styles.dateField, filter.mode === 'custom' && styles.dateFieldActive]}
+          onPress={() => openPicker('to')}
+        >
           <AppText style={styles.dateLabel}>To</AppText>
           <View style={styles.dateValueRow}>
             <Ionicons name="calendar-outline" size={normalize(15)} color={palette.kale} />
-            <AppText style={styles.dateValue}>
+            <AppText style={styles.dateValue} numberOfLines={1}>
               {formatDisplayDate(filter.mode === 'custom' ? filter.endDate : undefined)}
             </AppText>
           </View>
@@ -211,22 +221,31 @@ const styles = StyleSheet.create({
     gap: hp(1),
     marginBottom: hp(0.5),
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(3),
+    minWidth: 0,
+  },
   title: {
+    flex: 1,
+    minWidth: 0,
     color: palette.black,
     fontSize: normalize(14),
     textTransform: 'none',
   },
   allTimeChip: {
-    alignSelf: 'flex-start',
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1.5),
+    gap: wp(1.2),
     borderWidth: 1.5,
     borderColor: palette.kale,
     backgroundColor: palette.creme,
     borderRadius: normalize(20),
-    paddingHorizontal: wp(3.5),
-    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.7),
   },
   allTimeChipActive: {
     backgroundColor: palette.kale,
@@ -246,6 +265,7 @@ const styles = StyleSheet.create({
   },
   dateField: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: `${palette.kale}44`,
@@ -253,6 +273,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     gap: hp(0.35),
+  },
+  dateFieldActive: {
+    borderColor: palette.kale,
+    backgroundColor: '#F7FAF7',
   },
   dateLabel: {
     fontFamily: 'Saveful-SemiBold',
@@ -264,8 +288,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.5),
+    minWidth: 0,
   },
   dateValue: {
+    flex: 1,
+    minWidth: 0,
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(13),
     color: palette.black,

@@ -354,7 +354,7 @@ export default function ManageAccessScreen() {
               (isLimitReached || submitting) && { backgroundColor: '#ccc' },
             ]}
           >
-            <AppText variant="bodyBold" style={styles.white}>
+            <AppText variant="bodyBold" style={styles.addBtnText}>
               {submitting ? 'Adding...' : '+ Add User'}
             </AppText>
           </Pressable>
@@ -526,6 +526,13 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: 8,
     alignItems: 'center',
+  },
+
+  addBtnText: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(16),
+    
   },
 
   memberRow: {

@@ -180,6 +180,8 @@ export function ProfileScreen() {
   const isFarmerConsumer = selectedRole === 'farmer';
   const isFarmBusiness = selectedRole === 'farm_business';
   const isCollector = isCharity || isFarmerConsumer;
+  // Farmer signup never collects registration number — hide it on profile.
+  const supportsRegistrationNumber = isRestaurant || isCharity;
   // Multi head-office profile is organisation-scoped (same fields as single), not a site.
   const usesSiteAddress = selectedRole === 'restaurant_single' || isFarmBusiness;
 
@@ -291,12 +293,12 @@ export function ProfileScreen() {
 
         if (
           orgId &&
-          (formData.registration.trim() ||
+          ((supportsRegistrationNumber && formData.registration.trim()) ||
             (isRestaurant && formData.venueType.trim()) ||
             (isRestaurantMulti && trimmedAddress))
         ) {
           const form = new FormData();
-          if (formData.registration.trim()) {
+          if (supportsRegistrationNumber && formData.registration.trim()) {
             form.append('registrationNumber', formData.registration.trim());
           }
           if (isRestaurant && formData.venueType.trim()) {
@@ -445,16 +447,20 @@ export function ProfileScreen() {
       title: isCharity ? 'Charity Details' : isFarmerConsumer ? 'Farm Details' : 'Business Details',
       fields: isCollector
         ? [
-          { label: 'Name', value: currentProfile.organization, editable: false },
-          { label: 'Address', value: currentProfile.address, editable: true },
-          { label: 'Registration No.', value: formData.registration, editable: true },
-        ]
+            { label: 'Name', value: currentProfile.organization, editable: false },
+            { label: 'Address', value: currentProfile.address, editable: true },
+            ...(isCharity
+              ? [{ label: 'Registration No.', value: formData.registration, editable: true }]
+              : []),
+          ]
         : [
-          { label: 'Name', value: currentProfile.organization, editable: false },
-          { label: 'Address', value: currentProfile.address, editable: true },
-          { label: 'Registration No.', value: formData.registration, editable: true },
-          { label: 'Venue Type', value: formData.venueType || '—', editable: true },
-        ],
+            { label: 'Name', value: currentProfile.organization, editable: false },
+            { label: 'Address', value: currentProfile.address, editable: true },
+            ...(!isFarmBusiness
+              ? [{ label: 'Registration No.', value: formData.registration, editable: true }]
+              : []),
+            { label: 'Venue Type', value: formData.venueType || '—', editable: true },
+          ],
     },
     {
       key: 'extra',
@@ -688,12 +694,14 @@ export function ProfileScreen() {
                         ) : null}
                       </View>
 
-                      <InputField
-                        label="Registration No."
-                        value={formData.registration}
-                        editable={true}
-                        onChangeText={(v) => updateField('registration', v)}
-                      />
+                      {supportsRegistrationNumber ? (
+                        <InputField
+                          label="Registration No."
+                          value={formData.registration}
+                          editable={true}
+                          onChangeText={(v) => updateField('registration', v)}
+                        />
+                      ) : null}
 
                       {!isCollector && (
                         <>

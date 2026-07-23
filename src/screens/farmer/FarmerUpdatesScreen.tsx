@@ -42,7 +42,7 @@ const FEEDBACK_ICON = require('../../../assets/placeholder/chat_orange_icon.png'
 
 const FILTER_ROW_1: { key: UpdateFilter; label: string; type?: UpdateType }[] = [
   { key: 'all', label: 'All' },
-  { key: 'new_surplus', label: 'New Surplus', type: 'new_surplus' },
+  { key: 'new_surplus', label: 'Surplus', type: 'new_surplus' },
   { key: 'pickup', label: 'Pick ups', type: 'pickup' },
 ];
 
@@ -114,7 +114,7 @@ const CARD_THEMES: Record<
     qtyBorder: '#B8DCC4',
     qtyBg: '#F2F8F4',
     btn: palette.middlegreen,
-    badgeLabel: 'NEW SURPLUS',
+    badgeLabel: 'SURPLUS',
   },
   pickup: {
     badgeBg: '#EFEAFE',
@@ -422,7 +422,7 @@ export function FarmerUpdatesScreen() {
   }
 
   return (
-    <Screen backgroundColor={palette.creme} scrollable={false}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <FlatList
         data={sections}
         keyExtractor={(item) => item.title}
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
 
   headerBg: {
     width: '100%',
-    height: hp(14),
+    height: hp(18),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -507,6 +507,7 @@ const styles = StyleSheet.create({
     color: palette.white,
     fontSize: normalize(24),
     letterSpacing: 0.5,
+    paddingTop: hp(2),
   },
 
   filterWrap: {

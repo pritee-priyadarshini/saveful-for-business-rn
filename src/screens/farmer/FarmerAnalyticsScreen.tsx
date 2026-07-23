@@ -36,7 +36,6 @@ import { palette } from '../../theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 
 const { width } = Dimensions.get('window');
-const chartWidth = width - wp(8) - wp(7);
 
 const ANALYTICS_ICONS = {
   feedCollected: require('../../../assets/placeholder/storage_box_green.png'),
@@ -135,23 +134,31 @@ export function FarmerAnalyticsScreen() {
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
-      <Skeleton width="100%" height={hp(16)} borderRadius={0} />
-      <Skeleton width={wp(70)} height={normalize(48)} borderRadius={normalize(14)} style={styles.skeletonCenter} />
-      <View style={styles.skeletonGrid}>
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} width="47%" height={normalize(90)} borderRadius={normalize(12)} />
-        ))}
+      <Skeleton width="100%" height={hp(22)} borderRadius={0} />
+      <View style={styles.skeletonBody}>
+        <Skeleton width="100%" height={normalize(48)} borderRadius={normalize(12)} />
+        <Skeleton width="100%" height={hp(24)} borderRadius={normalize(12)} />
+        <Skeleton width="100%" height={hp(30)} borderRadius={normalize(12)} />
       </View>
-      <Skeleton width={wp(55)} height={normalize(18)} style={styles.skeletonPad} />
-      <Skeleton width="92%" height={normalize(220)} borderRadius={normalize(12)} style={styles.skeletonCenter} />
     </View>
   );
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
-      <Screen backgroundColor={palette.creme} transparentTop>
+      <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[palette.primary]}
+              tintColor={palette.primary}
+            />
+          }
+        >
           {renderSkeleton()}
         </ScrollView>
       </Screen>
@@ -317,86 +324,99 @@ export function FarmerAnalyticsScreen() {
             displayStats,
           )}
 
-        <View style={styles.impactOverTimeSection}>
-          <AppText variant="h8" style={styles.impactOverTimeTitle}>
-            Impact over time
-          </AppText>
+          <View style={styles.chartCard}>
+            <AppText variant="bodyBold" style={styles.chartSectionTitle}>
+              Impact over time
+            </AppText>
 
-          <View style={styles.timeFilterRow}>
-            {TIME_RANGES.map(({ key, label }) => {
-              const isActive = range === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => setRange(key)}
-                  activeOpacity={0.8}
-                  style={[styles.timeFilterPill, isActive && styles.filterPillActive]}
-                >
-                  <AppText style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                    {label}
-                  </AppText>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.metricFilterRow}>
-            {IMPACT_METRICS.map(({ key, label }) => {
-              const isActive = selectedMetric === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => setSelectedMetric(key)}
-                  activeOpacity={0.8}
-                  style={[styles.metricFilterPill, isActive && styles.filterPillActive]}
-                >
-                  <AppText
-                    style={[styles.metricFilterPillText, isActive && styles.filterPillTextActive]}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.8}
+            <View style={styles.timeFilterRow}>
+              {TIME_RANGES.map(({ key, label }) => {
+                const isActive = range === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    onPress={() => setRange(key)}
+                    activeOpacity={0.8}
+                    style={[styles.timeFilterPill, isActive && styles.filterPillActive]}
                   >
-                    {label}
+                    <AppText
+                      style={[styles.filterPillText, isActive && styles.filterPillTextActive]}
+                    >
+                      {label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.metricFilterScroll}
+            >
+              {IMPACT_METRICS.map(({ key, label }) => {
+                const isActive = selectedMetric === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    onPress={() => setSelectedMetric(key)}
+                    activeOpacity={0.8}
+                    style={[styles.metricFilterPill, isActive && styles.filterPillActive]}
+                  >
+                    <AppText
+                      style={[styles.metricFilterPillText, isActive && styles.filterPillTextActive]}
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
+                      {label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.chartContainer}>
+              <LineChart
+                key={`${range}-${selectedMetric}-${selectedSiteId ?? 'all'}`}
+                data={{
+                  labels: chartSeries.labels,
+                  datasets: toLineChartDatasets(chartSeries.values),
+                }}
+                width={width - wp(10) - wp(8)}
+                height={hp(24)}
+                yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
+                yLabelsOffset={4}
+                chartConfig={{
+                  ...chartConfig,
+                  decimalPlaces:
+                    selectedMetric === 'mealsCreated' ||
+                    selectedMetric === 'collectionsCompleted'
+                      ? 1
+                      : 0,
+                }}
+                bezier
+                fromZero
+                segments={4}
+                withInnerLines
+                withOuterLines={false}
+                withVerticalLines
+                withHorizontalLines
+                style={StyleSheet.flatten([
+                  styles.chart,
+                  chartLoading && styles.chartDimmed,
+                ])}
+              />
+              {chartLoading ? (
+                <View style={styles.chartLoadingOverlay}>
+                  <AppText variant="caption" style={styles.chartEmptyText}>
+                    Updating…
                   </AppText>
-                </TouchableOpacity>
-              );
-            })}
+                </View>
+              ) : null}
+            </View>
           </View>
 
-          <View style={styles.chartContainer}>
-            <LineChart
-              key={`${range}-${selectedMetric}`}
-              data={{
-                labels: chartSeries.labels,
-                datasets: toLineChartDatasets(chartSeries.values),
-              }}
-              width={chartWidth + wp(5)}
-              height={hp(26)}
-              yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
-              yLabelsOffset={4}
-              chartConfig={chartConfig}
-              bezier
-              fromZero
-              segments={4}
-              withInnerLines
-              withOuterLines={false}
-              withVerticalLines
-              withHorizontalLines
-              style={[styles.chart, chartLoading && styles.chartDimmed]}
-            />
-            {chartLoading ? (
-              <View style={styles.chartLoadingOverlay}>
-                <AppText variant="caption" style={styles.chartEmptyText}>
-                  Updating…
-                </AppText>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        </View>
-
-        <View style={styles.lifetimeSection}>
           <SpecificFoodSavings
             filter={filter}
             siteId={selectedSiteId}
@@ -422,7 +442,7 @@ const chartConfig = {
   fillShadowGradientToOpacity: 0.01,
   strokeWidth: 2,
   propsForDots: {
-    r: '6',
+    r: '5',
     strokeWidth: '0',
     stroke: palette.kale,
     fill: palette.kale,
@@ -519,9 +539,11 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     marginTop: hp(0.5),
   },
-  lifetimeSection: {
-    paddingHorizontal: wp(4),
-    gap: hp(1.5),
+  chartSectionTitle: {
+    fontSize: normalize(18),
+    textTransform: 'none',
+    color: palette.black,
+    letterSpacing: 0.2,
   },
   metricsGrid: {
     gap: hp(1.2),
@@ -536,7 +558,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     borderRadius: normalize(16),
     borderWidth: 1,
-    borderColor: palette.middlegreen,
+    borderColor: palette.strokecream,
     paddingVertical: hp(1.4),
     paddingHorizontal: wp(2.5),
     flexDirection: 'row',
@@ -577,9 +599,9 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: '48.5%',
     backgroundColor: palette.white,
-    borderRadius: normalize(12),
-    borderWidth: normalize(1),
-    borderColor: '#E0E0E0',
+    borderRadius: normalize(16),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
     paddingVertical: hp(1.4),
     paddingHorizontal: wp(2.5),
     flexDirection: 'row',
@@ -590,72 +612,69 @@ const styles = StyleSheet.create({
     width: normalize(24),
     height: normalize(24),
   },
-  impactOverTimeSection: {
-    marginHorizontal: wp(2),
-    backgroundColor: palette.creme,
-    borderRadius: normalize(16),
-    paddingHorizontal: wp(3.5),
-    paddingTop: hp(2),
-    paddingBottom: hp(1.2),
+  chartCard: {
+    backgroundColor: palette.white,
+    borderRadius: normalize(20),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.8),
     gap: hp(1.2),
-  },
-  impactOverTimeTitle: {
-    color: palette.black,
-    textTransform: 'none',
-    letterSpacing: 0,
   },
   timeFilterRow: {
     flexDirection: 'row',
     width: '100%',
     gap: wp(2),
   },
-  metricFilterRow: {
+  metricFilterScroll: {
     flexDirection: 'row',
-    width: '100%',
-    gap: wp(1),
+    gap: wp(2),
+    paddingVertical: hp(0.2),
   },
   timeFilterPill: {
     flex: 1,
-    paddingVertical: hp(0.85),
-    borderRadius: normalize(8),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(20),
     backgroundColor: palette.white,
     borderWidth: 1,
-    borderColor: palette.kale,
+    borderColor: palette.strokecream,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: normalize(38),
   },
   metricFilterPill: {
-    flex: 1,
     minWidth: 0,
-    paddingHorizontal: wp(1),
-    paddingVertical: hp(0.85),
-    borderRadius: normalize(8),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.9),
+    borderRadius: normalize(20),
     backgroundColor: palette.white,
     borderWidth: 1,
-    borderColor: palette.kale,
+    borderColor: palette.strokecream,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: normalize(36),
   },
   filterPillActive: {
     backgroundColor: palette.eggplant,
     borderColor: palette.eggplant,
   },
   filterPillText: {
-    color: palette.kale,
-    textTransform: 'none',
-    letterSpacing: 0,
-    fontSize: normalize(14),
-    lineHeight: normalize(16),
-    fontFamily: 'Saveful-SemiBold',
-    textAlign: 'center',
-  },
-  metricFilterPillText: {
-    color: palette.kale,
+    color: palette.stone,
     textTransform: 'none',
     letterSpacing: 0,
     fontSize: normalize(13),
-    lineHeight: normalize(16),
-    fontFamily: 'Saveful-SemiBold',
+    lineHeight: normalize(18),
+    fontFamily: 'Saveful-Bold',
+    textAlign: 'center',
+  },
+  metricFilterPillText: {
+    color: palette.stone,
+    textTransform: 'none',
+    letterSpacing: 0,
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
+    fontFamily: 'Saveful-Bold',
     textAlign: 'center',
   },
   filterPillTextActive: {
@@ -664,17 +683,9 @@ const styles = StyleSheet.create({
   chartContainer: {
     width: '100%',
     overflow: 'hidden',
-    marginTop: hp(0.5),
-    paddingHorizontal: wp(2),
-    minHeight: hp(22),
-    justifyContent: 'center',
-  },
-  chartEmpty: {
-    width: '100%',
-    minHeight: hp(18),
     alignItems: 'center',
+    minHeight: hp(24),
     justifyContent: 'center',
-    paddingHorizontal: wp(4),
   },
   chartEmptyText: {
     color: palette.midgray,
@@ -692,35 +703,25 @@ const styles = StyleSheet.create({
   },
   chart: {
     borderRadius: normalize(12),
-    marginLeft: -wp(5),
+    marginLeft: -wp(2),
   },
   ctaButton: {
-    marginHorizontal: wp(8),
-    backgroundColor: palette.kale,
-    padding: hp(1.5),
-    borderRadius: normalize(14),
+    backgroundColor: palette.eggplant,
+    borderRadius: normalize(16),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(5),
     alignItems: 'center',
-    marginVertical: hp(1),
   },
   ctaText: {
     color: palette.white,
-    fontSize: normalize(18),
+    textTransform: 'none',
   },
   skeletonWrap: {
     gap: hp(1.2),
     paddingBottom: hp(3),
   },
-  skeletonCenter: {
-    alignSelf: 'center',
-  },
-  skeletonPad: {
-    marginLeft: wp(4),
-  },
-  skeletonGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: wp(4),
-    gap: hp(1),
+  skeletonBody: {
+    padding: wp(5),
+    gap: hp(1.5),
   },
 });
