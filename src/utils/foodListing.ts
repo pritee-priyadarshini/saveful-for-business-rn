@@ -104,6 +104,46 @@ export function isListingCollected(listing: any): boolean {
   return resolveListingStatus(listing) === 'CLAIMED';
 }
 
+/** True when at least one non-cancelled claim on the listing is COLLECTED. */
+export function listingHasCollectedClaim(listing: any): boolean {
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  if (
+    claims.some((claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED')
+  ) {
+    return true;
+  }
+  const claimStatus = String(listing?.claimStatus || '').toUpperCase();
+  return claimStatus === 'COLLECTED' || claimStatus === 'COMPLETED';
+}
+
+/** Kg from COLLECTED claims only (falls back to listing food items if claim qty missing). */
+export function getCollectedClaimKg(listing: any): number {
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  const collected = claims.filter(
+    (claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED',
+  );
+  if (collected.length === 0) return 0;
+
+  const fromClaims = collected.reduce((sum: number, claim: any) => {
+    if (Number.isFinite(Number(claim?.qtyKg))) {
+      return sum + Number(claim.qtyKg);
+    }
+    const items = Array.isArray(claim?.claimItems) ? claim.claimItems : [];
+    const itemKg = items.reduce(
+      (itemSum: number, item: any) => itemSum + Number(item?.qtyKg || 0),
+      0,
+    );
+    return sum + itemKg;
+  }, 0);
+
+  if (fromClaims > 0) return fromClaims;
+
+  return (listing?.foodItems || []).reduce(
+    (sum: number, item: any) => sum + Number(item.totalQtyKg || 0),
+    0,
+  );
+}
+
 export function isListingExpired(listing: any): boolean {
   return resolveListingStatus(listing) === 'EXPIRED';
 }

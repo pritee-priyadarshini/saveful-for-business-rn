@@ -20,7 +20,7 @@ import { Skeleton } from '../../components/Skeleton';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
-import { estimateMealsSaved, getListingAudience, isAnimalListing, isListingCancelled, isListingCollected, isListingExpired, isPeopleListing } from '../../utils/foodListing';
+import { estimateMealsSaved, getCollectedClaimKg, getListingAudience, isAnimalListing, isListingCancelled, isListingExpired, listingHasCollectedClaim, isPeopleListing } from '../../utils/foodListing';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
 import { showErrorAlert } from '@/utils/apiError';
@@ -94,7 +94,8 @@ function isExpiredListing(listing: any) {
 }
 
 function isCompletedListing(listing: any) {
-  return isListingCollected(listing);
+  // Impact / home only count COLLECTED claims — keep history totals in sync.
+  return listingHasCollectedClaim(listing);
 }
 
 function getCardTheme(listing: any): CardTheme {
@@ -124,14 +125,30 @@ function formatShortTime(value?: string | null) {
 }
 
 function getCollectedDate(listing: any) {
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  const collectedClaim = claims.find(
+    (claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED',
+  );
   return formatShortDate(
-    listing?.collectedAt || listing?.updatedAt || listing?.pickupFromTime || listing?.createdAt,
+    collectedClaim?.collectedAt ||
+      listing?.collectedAt ||
+      listing?.updatedAt ||
+      listing?.pickupFromTime ||
+      listing?.createdAt,
   );
 }
 
 function getCollectedTime(listing: any) {
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  const collectedClaim = claims.find(
+    (claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED',
+  );
   return formatShortTime(
-    listing?.collectedAt || listing?.updatedAt || listing?.pickupFromTime || listing?.createdAt,
+    collectedClaim?.collectedAt ||
+      listing?.collectedAt ||
+      listing?.updatedAt ||
+      listing?.pickupFromTime ||
+      listing?.createdAt,
   );
 }
 
@@ -221,10 +238,10 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
   const totals = useMemo(() => {
     const completed = history.filter((item) => isCompletedListing(item));
-    const totalKg = completed.reduce((sum, item) => sum + getTotalKg(item), 0);
+    const totalKg = completed.reduce((sum, item) => sum + getCollectedClaimKg(item), 0);
     const peopleKg = completed
       .filter((item) => isPeopleListing(item))
-      .reduce((sum, item) => sum + getTotalKg(item), 0);
+      .reduce((sum, item) => sum + getCollectedClaimKg(item), 0);
     return {
       redistributedKg: Math.round(totalKg),
       mealsCreated: estimateMealsSaved(peopleKg),
@@ -450,14 +467,21 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const ts = themeStyles[cardTheme];
     const cancelled = cardTheme === 'cancelled';
     const expired = isExpiredListing(item);
+    const completed = isCompletedListing(item);
     const animal = cardTheme === 'animal';
-    const totalKg = getTotalKg(item);
+    const totalKg = completed ? getCollectedClaimKg(item) : getTotalKg(item);
     const meals = estimateMealsSaved(totalKg);
     const co2 = Math.round(totalKg * 4);
     const collectedDate = getCollectedDate(item);
     const collectedTime = getCollectedTime(item);
     const collectedInline = collectedTime ? `${collectedDate} • ${collectedTime}` : collectedDate;
-    const statusLabel = cancelled && !expired ? 'Cancelled' : expired ? 'Expired' : 'Completed';
+    const statusLabel = cancelled && !expired
+      ? 'Cancelled'
+      : expired
+        ? 'Expired'
+        : completed
+          ? 'Completed'
+          : 'Claimed';
     const categoryLabel = animal ? 'For Animals' : 'For People';
     const categoryIcon = animal
       ? require('../../../assets/placeholder/cow_front.png')
@@ -496,8 +520,8 @@ export default function CollectionHistoryScreen({ navigation }: any) {
           ) : null}
         </View>
 
-        <View style={[styles.metaRow, cancelled && styles.metaRowCancelled]}>
-          {cancelled ? (
+        <View style={[styles.metaRow, (cancelled || !completed) && styles.metaRowCancelled]}>
+          {cancelled || !completed ? (
             <>
               {renderMetaBox(
                 cardTheme,
