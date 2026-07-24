@@ -44,6 +44,10 @@ export type TopFoodItem = {
   unit: string;
   category: string | null;
   totalKg: number;
+  peopleKg?: number;
+  animalKg?: number;
+  peoplePercent?: number;
+  animalPercent?: number;
   co2AvoidedKg: number;
   mealsCreated: number;
   totalFoodSavedUsd: number;
@@ -52,6 +56,7 @@ export type TopFoodItem = {
 export type TopFoodsResponse = {
   siteId: number | null;
   organisationId: number | null;
+  mode?: 'DONOR' | 'RECEIVER';
   rangeStart: string | null;
   rangeEnd: string;
   topFoods: TopFoodItem[];
@@ -67,6 +72,22 @@ export const impactService = {
   /** Custom range — backend: GET /impact/sites/:siteId/range */
   getSiteImpactByRange(siteId: number, range: ImpactDateRange) {
     return api.get<SiteImpactResponse>(`/impact/sites/${siteId}/range`, {
+      params: {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      },
+    });
+  },
+
+  /** Org-wide (All sites) — GET /impact/organisations/:orgId */
+  getOrgImpact(orgId: number, period: Exclude<ImpactPeriod, 'range'> = 'week') {
+    return api.get<SiteImpactResponse>(`/impact/organisations/${orgId}`, {
+      params: { period },
+    });
+  },
+
+  getOrgImpactByRange(orgId: number, range: ImpactDateRange) {
+    return api.get<SiteImpactResponse>(`/impact/organisations/${orgId}/range`, {
       params: {
         startDate: range.startDate,
         endDate: range.endDate,

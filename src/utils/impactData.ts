@@ -166,19 +166,58 @@ export function aggregateSiteImpacts(
 export async function fetchAggregatedSiteImpact(
   siteIds: number[],
   period: Exclude<ImpactPeriod, 'range'>,
+  options?: { orgId?: number | null; preferOrgScope?: boolean },
 ): Promise<SiteImpactResponse | null> {
-  if (siteIds.length === 0) return null;
+  const orgId = options?.orgId ?? null;
 
-  const responses = await Promise.all(
+  // Charity/farmer "All sites": one org-wide request (includes untagged legacy claims).
+  if (options?.preferOrgScope && orgId != null && siteIds.length !== 1) {
+    const res = await impactService.getOrgImpact(orgId, period);
+    return res.data ?? null;
+  }
+
+  if (siteIds.length === 0) {
+    if (options?.preferOrgScope && orgId != null) {
+      const res = await impactService.getOrgImpact(orgId, period);
+      return res.data ?? null;
+    }
+    return null;
+  }
+
+  if (siteIds.length === 1) {
+    const res = await impactService.getSiteImpact(siteIds[0], period);
+    return res.data ?? null;
+  }
+
+  const settled = await Promise.allSettled(
     siteIds.map(async (siteId) => {
       const res = await impactService.getSiteImpact(siteId, period);
       return res.data;
     }),
   );
 
-  // Receiver impact is org-scoped; fetching every site would double-count the same claims.
+  const responses = settled
+    .filter(
+      (result): result is PromiseFulfilledResult<SiteImpactResponse> =>
+        result.status === 'fulfilled' && !!result.value,
+    )
+    .map((result) => result.value);
+
+  if (responses.length === 0) {
+    const firstError = settled.find((result) => result.status === 'rejected') as
+      | PromiseRejectedResult
+      | undefined;
+    if (firstError) throw firstError.reason;
+    return null;
+  }
+
+  // Receiver: prefer org endpoint when available; otherwise sum site partitions.
   if (responses.some((response) => response?.mode === 'RECEIVER')) {
-    return responses.find((response) => response?.mode === 'RECEIVER') ?? responses[0] ?? null;
+    if (orgId != null) {
+      const res = await impactService.getOrgImpact(orgId, period);
+      return res.data ?? null;
+    }
+    return aggregateSiteImpacts(responses.filter((r) => r.mode === 'RECEIVER'));
   }
 
   return aggregateSiteImpacts(responses);
@@ -187,18 +226,56 @@ export async function fetchAggregatedSiteImpact(
 export async function fetchAggregatedSiteImpactByRange(
   siteIds: number[],
   range: { startDate: string; endDate: string },
+  options?: { orgId?: number | null; preferOrgScope?: boolean },
 ): Promise<SiteImpactResponse | null> {
-  if (siteIds.length === 0) return null;
+  const orgId = options?.orgId ?? null;
 
-  const responses = await Promise.all(
+  if (options?.preferOrgScope && orgId != null && siteIds.length !== 1) {
+    const res = await impactService.getOrgImpactByRange(orgId, range);
+    return res.data ?? null;
+  }
+
+  if (siteIds.length === 0) {
+    if (options?.preferOrgScope && orgId != null) {
+      const res = await impactService.getOrgImpactByRange(orgId, range);
+      return res.data ?? null;
+    }
+    return null;
+  }
+
+  if (siteIds.length === 1) {
+    const res = await impactService.getSiteImpactByRange(siteIds[0], range);
+    return res.data ?? null;
+  }
+
+  const settled = await Promise.allSettled(
     siteIds.map(async (siteId) => {
       const res = await impactService.getSiteImpactByRange(siteId, range);
       return res.data;
     }),
   );
 
+  const responses = settled
+    .filter(
+      (result): result is PromiseFulfilledResult<SiteImpactResponse> =>
+        result.status === 'fulfilled' && !!result.value,
+    )
+    .map((result) => result.value);
+
+  if (responses.length === 0) {
+    const firstError = settled.find((result) => result.status === 'rejected') as
+      | PromiseRejectedResult
+      | undefined;
+    if (firstError) throw firstError.reason;
+    return null;
+  }
+
   if (responses.some((response) => response?.mode === 'RECEIVER')) {
-    return responses.find((response) => response?.mode === 'RECEIVER') ?? responses[0] ?? null;
+    if (orgId != null) {
+      const res = await impactService.getOrgImpactByRange(orgId, range);
+      return res.data ?? null;
+    }
+    return aggregateSiteImpacts(responses.filter((r) => r.mode === 'RECEIVER'));
   }
 
   return aggregateSiteImpacts(responses);

@@ -62,23 +62,73 @@ function isCharityOrg(authUser: any): boolean {
   return orgType.startsWith('CHARITY');
 }
 
+function isBusinessMultiOrg(authUser: any): boolean {
+  const orgType = String(
+    authUser?.orgType ?? normalizeAuthProfile(authUser)?.organisation?.organizationType ?? '',
+  ).toUpperCase();
+  return orgType === 'BUSINESS_MULTI' || orgType === 'FARMER_PRODUCER';
+}
+
+function mergeSites(...groups: AccessibleSite[][]): AccessibleSite[] {
+  const byId = new Map<number, AccessibleSite>();
+  for (const group of groups) {
+    for (const site of group) {
+      byId.set(site.id, site);
+    }
+  }
+  return [...byId.values()];
+}
+
 export async function resolveAccessibleSites(authUser: any): Promise<AccessibleSite[]> {
   const fromProfile = sitesFromProfile(authUser);
-  if (fromProfile.length > 0) return fromProfile;
 
   if (isCharityOrg(authUser)) {
-    const charityStore = useCharityStore.getState();
-    await charityStore.fetchLocations();
-    return charityStore.locations
-      .map((location: any) => {
-        const id = parseSiteId(location?.id ?? location?.locationId);
-        if (!id) return null;
-        return { id, name: getSiteDisplayName(location) };
-      })
-      .filter((site: AccessibleSite | null): site is AccessibleSite => site !== null);
+    // Multi-charity SUPER_ADMIN often has no siteAccess rows in the profile.
+    // Always load charity locations so Impact can query every org site.
+    try {
+      const charityStore = useCharityStore.getState();
+      await charityStore.fetchLocations(true);
+      const fromLocations = charityStore.locations
+        .map((location: any) => {
+          const id = parseSiteId(location?.id ?? location?.locationId);
+          if (!id) return null;
+          return { id, name: getSiteDisplayName(location) };
+        })
+        .filter((site: AccessibleSite | null): site is AccessibleSite => site !== null);
+
+      if (fromLocations.length > 0) {
+        return mergeSites(fromProfile, fromLocations);
+      }
+    } catch {
+      // Fall through to profile sites.
+    }
   }
 
-  // Farmer producer/consumer and business orgs use the organisation sites endpoint.
+  if (isBusinessMultiOrg(authUser)) {
+    // Multi-restaurant / farm-business SUPER_ADMIN may lack siteAccess on every site.
+    // Always load organisation sites for Impact site picker + aggregation.
+    try {
+      const sitesStore = useSitesStore.getState();
+      await sitesStore.fetchOrganisation(true);
+      const fromOrg = (sitesStore.sites ?? [])
+        .map((site: any) => {
+          const id = parseSiteId(site?.id);
+          if (!id) return null;
+          return { id, name: getSiteDisplayName(site) };
+        })
+        .filter((site: AccessibleSite | null): site is AccessibleSite => site !== null);
+
+      if (fromOrg.length > 0) {
+        return mergeSites(fromProfile, fromOrg);
+      }
+    } catch {
+      // Fall through.
+    }
+  }
+
+  if (fromProfile.length > 0) return fromProfile;
+
+  // Farmer consumer and single-site business orgs use the organisation sites endpoint.
   const sitesStore = useSitesStore.getState();
   await sitesStore.fetchOrganisation();
   return (sitesStore.sites ?? [])

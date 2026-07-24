@@ -259,12 +259,36 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
         return;
       }
 
+      const orgId =
+        authUser?.profile?.organisation?.id ??
+        authUser?.profile?.organization?.id ??
+        authUser?.orgId ??
+        null;
+      const orgType = String(
+        authUser?.orgType ??
+          authUser?.profile?.organisation?.organizationType ??
+          authUser?.profile?.organization?.organizationType ??
+          '',
+      ).toUpperCase();
+      // All sites → org endpoint for charity/farmer receivers and multi-site donors.
+      const preferOrgScope =
+        orgType.startsWith('CHARITY') ||
+        orgType === 'FARMER_CONSUMER' ||
+        orgType === 'BUSINESS_MULTI' ||
+        orgType === 'FARMER_PRODUCER';
+
       const impact =
         filter.mode === 'all_time'
-          ? await fetchAggregatedSiteImpact(siteIds, 'lifetime')
+          ? await fetchAggregatedSiteImpact(siteIds, 'lifetime', {
+              orgId: orgId != null ? Number(orgId) : null,
+              preferOrgScope,
+            })
           : await fetchAggregatedSiteImpactByRange(siteIds, {
               startDate: filter.startDate!,
               endDate: filter.endDate!,
+            }, {
+              orgId: orgId != null ? Number(orgId) : null,
+              preferOrgScope,
             });
 
       const prev = get().scopeKey === nextScope ? get().cache : null;
@@ -327,7 +351,28 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
     set({ isChartLoading: cachedPeriod === undefined, error: null });
 
     try {
-      const periodImpact = await fetchAggregatedSiteImpact(siteIds, period);
+      const authUser = useAuthStore.getState().authUser;
+      const orgId =
+        authUser?.profile?.organisation?.id ??
+        authUser?.profile?.organization?.id ??
+        authUser?.orgId ??
+        null;
+      const orgType = String(
+        authUser?.orgType ??
+          authUser?.profile?.organisation?.organizationType ??
+          authUser?.profile?.organization?.organizationType ??
+          '',
+      ).toUpperCase();
+      const preferOrgScope =
+        orgType.startsWith('CHARITY') ||
+        orgType === 'FARMER_CONSUMER' ||
+        orgType === 'BUSINESS_MULTI' ||
+        orgType === 'FARMER_PRODUCER';
+
+      const periodImpact = await fetchAggregatedSiteImpact(siteIds, period, {
+        orgId: orgId != null ? Number(orgId) : null,
+        preferOrgScope,
+      });
       const current = get().cache;
       if (!current || get().scopeKey !== nextScope) return;
 
