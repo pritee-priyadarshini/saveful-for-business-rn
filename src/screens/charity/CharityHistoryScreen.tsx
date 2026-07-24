@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,14 +11,19 @@ import {
   Dimensions,
   ViewStyle,
   TextStyle,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
 import { estimateMealsSaved } from '../../utils/foodListing';
+import { claimsService } from '../../services/claims.service';
+import { showErrorAlert } from '@/utils/apiError';
 
 const { width, height } = Dimensions.get('window');
 const wp = (p: number) => (width * p) / 100;
@@ -31,6 +36,7 @@ const normalize = (size: number) => {
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH_INDEX = new Date().getMonth();
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const HISTORY_PAGE_SIZE = 100;
 
 const STAT_ICONS = {
   foodRecovered: require('../../../assets/placeholder/storage_box_green.png'),
@@ -66,58 +72,13 @@ type ThemeStyleSet = {
   viewDetailsText: TextStyle;
 };
 
-const historyData = [
-  {
-    id: '1',
-    business: 'Harvest Cafe',
-    date: '2026-05-18T11:30:00',
-    status: 'Completed',
-    items: [
-      { name: 'Prepared meals', qty: 10 },
-      { name: 'Bread', qty: 8 },
-    ],
-  },
-  {
-    id: '2',
-    business: 'Market Kitchen',
-    date: '2026-03-29T17:00:00',
-    status: 'Cancelled',
-    items: [
-      { name: 'Pasta', qty: 2 },
-      { name: 'Salad', qty: 2 },
-    ],
-  },
-  {
-    id: '3',
-    business: 'Saveful Bakery',
-    date: '2026-04-01T16:30:00',
-    status: 'Completed',
-    items: [
-      { name: 'Rice', qty: 3 },
-      { name: 'Bread', qty: 3 },
-    ],
-  },
-  {
-    id: '4',
-    business: 'My Cloud Kitchen',
-    date: '2026-02-29T20:00:00',
-    status: 'Completed',
-    items: [
-      { name: 'Fresh Fruits', qty: 6 },
-      { name: 'Meat', qty: 5 },
-    ],
-  },
-  {
-    id: '5',
-    business: 'Billy Billy Kitchen',
-    date: '2026-01-20T13:00:00',
-    status: 'Cancelled',
-    items: [
-      { name: 'Cooked Food', qty: 9 },
-      { name: 'Cooked Meat', qty: 4 },
-    ],
-  },
-];
+type HistoryItem = {
+  id: string;
+  business: string;
+  date: string;
+  status: 'Completed' | 'Cancelled' | 'In progress';
+  items: { name: string; qty: number }[];
+};
 
 const getMonthsForYear = (year: string) => {
   if (year === 'All') return ['All'];
@@ -132,6 +93,10 @@ function getTotalQty(items: { qty: number }[]) {
 
 function isCancelled(item: { status: string }) {
   return item.status === 'Cancelled';
+}
+
+function isCompleted(item: { status: string }) {
+  return item.status === 'Completed';
 }
 
 function getCardTheme(item: { status: string }): CardTheme {
@@ -152,21 +117,92 @@ function formatShortTime(value?: string | null) {
     .toLowerCase();
 }
 
+function mapClaimToHistoryItem(claim: any): HistoryItem {
+  const statusRaw = String(claim?.status || '').toUpperCase();
+  const status: HistoryItem['status'] =
+    statusRaw === 'CANCELLED'
+      ? 'Cancelled'
+      : statusRaw === 'COLLECTED'
+        ? 'Completed'
+        : 'In progress';
+
+  return {
+    id: String(claim.id),
+    business: claim.listing?.organisation?.name || claim.listing?.organization?.name || 'Business',
+    date:
+      claim.collectedAt ||
+      claim.updatedAt ||
+      claim.createdAt ||
+      new Date().toISOString(),
+    status,
+    items: (claim.claimItems || []).map((ci: any) => ({
+      name: ci.foodItem?.name || 'Food',
+      qty: Number(ci.qtyKg) || 0,
+    })),
+  };
+}
+
+function unwrapClaimsPayload(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.claims)) return payload.claims;
+  if (Array.isArray(payload?.data?.claims)) return payload.data.claims;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
+
 export function CharityHistoryScreen() {
   const navigation = useNavigation<any>();
 
+  const [historyData, setHistoryData] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedYear, setSelectedYear] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [modalVisible, setModalVisible] = useState(false);
-  const [impactModalVisible, setImpactModalVisible] = useState(false);
-  const [selectedCollection, setSelectedCollection] = useState<(typeof historyData)[0] | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<HistoryItem | null>(null);
   const [yearDropdownAnchor, setYearDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const [monthDropdownAnchor, setMonthDropdownAnchor] = useState<DropdownAnchor | null>(null);
   const yearDropdownRef = useRef<View>(null);
   const monthDropdownRef = useRef<View>(null);
+
+  const loadHistory = useCallback(async (forceRefresh = false) => {
+    if (forceRefresh) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const allClaims: any[] = [];
+      let page = 1;
+      let totalPages = 1;
+
+      do {
+        const payload = await claimsService.getMyClaims({
+          page,
+          limit: HISTORY_PAGE_SIZE,
+        });
+        const claims = unwrapClaimsPayload(payload);
+        allClaims.push(...claims);
+        totalPages = Math.max(1, Number(payload?.totalPages ?? payload?.data?.totalPages ?? 1));
+        page += 1;
+      } while (page <= totalPages && page <= 20);
+
+      setHistoryData(allClaims.map(mapClaimToHistoryItem));
+    } catch (err) {
+      showErrorAlert(err, 'Could not load collection history', 'Could not load collection history');
+      setHistoryData([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadHistory();
+    }, [loadHistory]),
+  );
 
   const months = getMonthsForYear(selectedYear);
 
@@ -176,17 +212,19 @@ export function CharityHistoryScreen() {
     ];
     uniqueYears.sort((a, b) => Number(b) - Number(a));
     return ['All', ...uniqueYears];
-  }, []);
+  }, [historyData]);
 
   const totals = useMemo(() => {
-    const completed = historyData.filter((item) => !isCancelled(item));
+    // Match Impact: only COLLECTED claims count toward recovered food.
+    const completed = historyData.filter((item) => isCompleted(item));
     const totalKg = completed.reduce((sum, item) => sum + getTotalQty(item.items), 0);
     return {
       foodRecoveredKg: Math.round(totalKg),
-      mealsCreated: estimateMealsSaved(totalKg),
+      // Same formula as backend impact (MEAL_WEIGHT_KG = 0.42).
+      mealsCreated: Math.round(totalKg / 0.42),
       collectionsCompleted: completed.length,
     };
-  }, []);
+  }, [historyData]);
 
   const filteredData = useMemo(() => {
     return historyData
@@ -198,12 +236,12 @@ export function CharityHistoryScreen() {
         const monthMatch = selectedMonth === 'All' || itemMonth === selectedMonth;
         const statusMatch =
           statusFilter === 'all' ||
-          (statusFilter === 'completed' && !isCancelled(item)) ||
+          (statusFilter === 'completed' && isCompleted(item)) ||
           (statusFilter === 'cancelled' && isCancelled(item));
         return yearMatch && monthMatch && statusMatch;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [selectedMonth, selectedYear, statusFilter]);
+  }, [historyData, selectedMonth, selectedYear, statusFilter]);
 
   const closeDropdowns = () => {
     setShowYearDropdown(false);
@@ -370,7 +408,7 @@ export function CharityHistoryScreen() {
     );
   };
 
-  const renderCollectionCard = (item: (typeof historyData)[0]) => {
+  const renderCollectionCard = (item: HistoryItem) => {
     const cardTheme = getCardTheme(item);
     const ts = themeStyles[cardTheme];
     const cancelled = cardTheme === 'cancelled';
@@ -378,7 +416,12 @@ export function CharityHistoryScreen() {
     const meals = estimateMealsSaved(totalKg);
     const collectedDate = formatShortDate(item.date);
     const collectedTime = formatShortTime(item.date);
-    const statusLabel = cancelled ? 'Cancelled' : 'Completed';
+    const statusLabel =
+      item.status === 'Cancelled'
+        ? 'Cancelled'
+        : item.status === 'Completed'
+          ? 'Completed'
+          : 'In progress';
 
     return (
       <View style={[styles.collectionCard, ts.collectionCard]}>
@@ -462,7 +505,10 @@ export function CharityHistoryScreen() {
           )}
         </View>
 
-        <Pressable style={[styles.impactBtn, styles.impactBtnPrimary]} onPress={() => setImpactModalVisible(true)}>
+        <Pressable
+          style={[styles.impactBtn, styles.impactBtnPrimary]}
+          onPress={() => navigation.navigate('Tabs', { screen: 'Impact' })}
+        >
           <AppText variant="bodyBold" style={styles.impactLinkTextPrimary}>
             View Impact Details
           </AppText>
@@ -519,13 +565,21 @@ export function CharityHistoryScreen() {
   );
 
   return (
-    <Screen backgroundColor={palette.creme} scrollable={false}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <FlatList
-        data={filteredData}
+        data={loading ? [] : filteredData}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         onScrollBeginDrag={closeDropdowns}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadHistory(true)}
+            colors={[palette.primary]}
+            tintColor={palette.primary}
+          />
+        }
         ListHeaderComponent={
           <>
             {renderScreenHeader()}
@@ -535,9 +589,18 @@ export function CharityHistoryScreen() {
         renderItem={({ item }) => renderCollectionCard(item)}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
-            <AppText variant="body1" style={styles.emptyText}>
-              No collections found
-            </AppText>
+            {loading ? (
+              <View style={{ gap: hp(1.2), paddingHorizontal: wp(4) }}>
+                {[1, 2].map((i) => (
+                  <Skeleton key={i} width="100%" height={hp(16)} borderRadius={normalize(14)} />
+                ))}
+                <ActivityIndicator color={palette.kale} style={{ marginTop: hp(1) }} />
+              </View>
+            ) : (
+              <AppText variant="body1" style={styles.emptyText}>
+                No collections found
+              </AppText>
+            )}
           </View>
         }
       />
@@ -585,28 +648,6 @@ export function CharityHistoryScreen() {
           </View>
         </View>
       </Modal>
-
-      <Modal visible={impactModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalTopBar}>
-              <AppText variant="h6">Impact Details</AppText>
-              <Pressable style={styles.closeIconBtn} onPress={() => setImpactModalVisible(false)}>
-                <Ionicons name="close" size={normalize(20)} color={palette.black} />
-              </Pressable>
-            </View>
-            <AppText variant="body1" style={styles.modalBodyText}>
-              {totals.foodRecoveredKg.toLocaleString()} kg food recovered
-            </AppText>
-            <AppText variant="body1" style={styles.modalBodyText}>
-              {totals.mealsCreated.toLocaleString()} meals created
-            </AppText>
-            <AppText variant="body1" style={styles.modalBodyText}>
-              {totals.collectionsCompleted.toLocaleString()} collections completed
-            </AppText>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }
@@ -617,7 +658,7 @@ const styles = StyleSheet.create({
     gap: hp(1),
   },
   header: {
-    height: hp(13.5),
+    height: hp(15.5),
     justifyContent: 'flex-end',
     paddingBottom: hp(1.9),
     paddingHorizontal: wp(4),
@@ -626,7 +667,7 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: wp(4),
-    top: hp(2.2),
+    top: hp(4.2),
     width: wp(10),
     height: wp(10),
     alignItems: 'center',

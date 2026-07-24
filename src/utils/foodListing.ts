@@ -76,23 +76,43 @@ export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
   CANCELLED: 'Cancelled',
 };
 
+export function isListingTimeWindowClosed(listing: any): boolean {
+  const now = Date.now();
+  const bestBefore = listing?.bestBefore ? new Date(listing.bestBefore).getTime() : NaN;
+  const pickupByTime = listing?.pickupByTime ? new Date(listing.pickupByTime).getTime() : NaN;
+
+  if (Number.isFinite(bestBefore) && bestBefore <= now) return true;
+  if (Number.isFinite(pickupByTime) && pickupByTime <= now) return true;
+  return false;
+}
+
 /** Map API / claim status to a canonical listing status for UI. */
 export function resolveListingStatus(listing: any): ListingStatus {
   const status = String(listing?.status || '').toUpperCase();
   const claimStatus = String(listing?.claimStatus || '').toLowerCase();
 
-  if (status === 'ACTIVE' || status === 'AVAILABLE') return 'ACTIVE';
-  if (status === 'PARTIAL') return 'PARTIAL';
-  if (status === 'EXPIRED') return 'EXPIRED';
-  if (status === 'CANCELLED') return 'CANCELLED';
-  if (status === 'CLAIMED' || status === 'COMPLETED' || status === 'COLLECTED') return 'CLAIMED';
-  if (['collected', 'completed', 'verified'].includes(claimStatus)) return 'CLAIMED';
+  let resolved: ListingStatus = 'ACTIVE';
+  if (status === 'ACTIVE' || status === 'AVAILABLE') resolved = 'ACTIVE';
+  else if (status === 'PARTIAL') resolved = 'PARTIAL';
+  else if (status === 'EXPIRED') resolved = 'EXPIRED';
+  else if (status === 'CANCELLED') resolved = 'CANCELLED';
+  else if (status === 'CLAIMED' || status === 'COMPLETED' || status === 'COLLECTED') resolved = 'CLAIMED';
+  else if (['collected', 'completed', 'verified'].includes(claimStatus)) resolved = 'CLAIMED';
 
-  return 'ACTIVE';
+  // Past pickup / best-before should display and filter as expired even before the worker flips DB status.
+  if ((resolved === 'ACTIVE' || resolved === 'PARTIAL') && isListingTimeWindowClosed(listing)) {
+    return 'EXPIRED';
+  }
+
+  return resolved;
 }
 
 export function getListingStatusLabel(listing: any): string {
   return LISTING_STATUS_LABELS[resolveListingStatus(listing)];
+}
+
+export function isListingExpired(listing: any): boolean {
+  return resolveListingStatus(listing) === 'EXPIRED';
 }
 
 export function isListingActive(listing: any): boolean {
@@ -142,10 +162,6 @@ export function getCollectedClaimKg(listing: any): number {
     (sum: number, item: any) => sum + Number(item.totalQtyKg || 0),
     0,
   );
-}
-
-export function isListingExpired(listing: any): boolean {
-  return resolveListingStatus(listing) === 'EXPIRED';
 }
 
 export function isListingCancelled(listing: any): boolean {

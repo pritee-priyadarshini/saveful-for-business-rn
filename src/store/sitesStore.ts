@@ -4,6 +4,7 @@ import {
   CreateSitePayload,
   AssignManagerPayload,
   AddStaffPayload,
+  UpdateSitePayload,
 } from '../services/sites.service';
 import { useAuthStore } from './authStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
@@ -89,6 +90,8 @@ interface SitesActions {
   createSite: (data: CreateSitePayload) => Promise<any>;
   assignManager: (siteId: number, data: AssignManagerPayload) => Promise<any>;
   addStaff: (siteId: number, data: AddStaffPayload) => Promise<any>;
+  updateSite: (siteId: number, data: UpdateSitePayload) => Promise<any>;
+  deleteSite: (siteId: number) => Promise<void>;
   removeAccess: (siteId: number, userId: number) => Promise<void>;
   invalidate: () => void;
   reset: () => void;
@@ -251,6 +254,17 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
     const res = await sitesService.addStaff(siteId, data);
     get().invalidate();
     return res;
+  },
+
+  updateSite: async (siteId, data) => {
+    const res = await sitesService.updateSite(siteId, data);
+    get().invalidate();
+    return res;
+  },
+
+  deleteSite: async (siteId) => {
+    await sitesService.deleteSite(siteId);
+    get().invalidate();
   },
 
   removeAccess: async (siteId, userId) => {

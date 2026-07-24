@@ -329,6 +329,7 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
     } else {
       get().invalidateLocations();
     }
+    get().invalidateUsers();
     return res;
   },
 

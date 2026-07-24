@@ -404,7 +404,7 @@ export default function CreateCharitySiteScreen() {
             );
 
             try {
-                await fetchLocations(true);
+                await Promise.all([fetchLocations(true), fetchUsers(true)]);
             } catch {
                 // Non-fatal refresh after successful create.
             }

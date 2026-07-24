@@ -176,6 +176,11 @@ export async function fetchAggregatedSiteImpact(
     }),
   );
 
+  // Receiver impact is org-scoped; fetching every site would double-count the same claims.
+  if (responses.some((response) => response?.mode === 'RECEIVER')) {
+    return responses.find((response) => response?.mode === 'RECEIVER') ?? responses[0] ?? null;
+  }
+
   return aggregateSiteImpacts(responses);
 }
 
@@ -191,6 +196,10 @@ export async function fetchAggregatedSiteImpactByRange(
       return res.data;
     }),
   );
+
+  if (responses.some((response) => response?.mode === 'RECEIVER')) {
+    return responses.find((response) => response?.mode === 'RECEIVER') ?? responses[0] ?? null;
+  }
 
   return aggregateSiteImpacts(responses);
 }

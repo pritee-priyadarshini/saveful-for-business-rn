@@ -86,14 +86,17 @@ export function SpecificFoodSavings({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const rangeParams = useMemo(() => {
-    if (filter.mode !== 'custom' || !filter.startDate || !filter.endDate) {
-      return undefined;
+    if (filter.mode === 'custom' && filter.startDate && filter.endDate) {
+      return { startDate: filter.startDate, endDate: filter.endDate };
     }
-    return { startDate: filter.startDate, endDate: filter.endDate };
+    // all_time → omit dates so the API uses lifetime COLLECTED claims
+    return undefined;
   }, [filter.mode, filter.startDate, filter.endDate]);
 
   const load = useCallback(async () => {
     if (!authUser?.accessToken) return;
+    // Prefer org-scoped for receivers when no site is selected; site path also
+    // resolves receiver orgs to claimantOrgId on the backend.
     if (siteId == null && orgId == null) return;
 
     setLoading(true);
