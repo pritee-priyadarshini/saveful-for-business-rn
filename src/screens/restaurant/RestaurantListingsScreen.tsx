@@ -6,7 +6,6 @@ import {
   Pressable,
   Image,
   Modal,
-  Platform,
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,7 +21,9 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 
 import { palette } from '@/theme/colors';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { elevation } from '@/theme/elevation';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { ListingStatus } from '@/types';
 import {
   compareListingsByNewest,
@@ -212,21 +213,11 @@ function getImpactText(listing: any) {
   return `~${estimateMealsSaved(totalKg)} meals created`;
 }
 
-const cardShadow = Platform.select({
-  ios: {
-    shadowColor: palette.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-  },
-  android: {
-    elevation: 3,
-  },
-});
-
 export function RestaurantListingsScreen({ navigation }: any) {
   useTransparentStatusBar('light');
-  const bottomPadding = useBottomTabPadding(hp(2));
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 22 }), [r]);
+  const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(2));
   const { authUser, currentProfile } = useAppContext();
   const {
     siteListings: listings,
@@ -295,6 +286,20 @@ export function RestaurantListingsScreen({ navigation }: any) {
     return [...result].sort(compareListingsByNewest);
   }, [listings, listingFilter, statusFilter]);
 
+  /** Tablet: Active/Partial = full-width row; everything else stays 2-up. */
+  const { fullWidthListings, gridListings } = useMemo(() => {
+    if (!r.isTablet) {
+      return { fullWidthListings: filteredListings, gridListings: [] as typeof filteredListings };
+    }
+    const fullWidth: typeof filteredListings = [];
+    const grid: typeof filteredListings = [];
+    for (const item of filteredListings) {
+      if (isListingActive(item)) fullWidth.push(item);
+      else grid.push(item);
+    }
+    return { fullWidthListings: fullWidth, gridListings: grid };
+  }, [filteredListings, r.isTablet]);
+
   const handleCancelListing = (id: number) => {
     if (cancellingId !== null) return;
     showConfirmAlert({
@@ -349,19 +354,25 @@ export function RestaurantListingsScreen({ navigation }: any) {
         onPress={() => setListingFilter(key)}
         style={[
           styles.audienceChip,
+          adaptive.audienceChip,
           active
             ? [styles.audienceChipActive, accent ? { borderColor: accent } : {}]
             : styles.audienceChipInactive,
         ]}
       >
         {icon && (
-          <Image source={icon} style={styles.audienceChipIcon} resizeMode="contain" />
+          <Image
+            source={icon}
+            style={[styles.audienceChipIcon, adaptive.audienceChipIcon]}
+            resizeMode="contain"
+          />
         )}
         <AppText
           variant="bodyBold"
           numberOfLines={1}
           style={[
             styles.audienceChipText,
+            adaptive.audienceChipText,
             active ? { color: accent || palette.midgray } : { color: palette.stone },
           ]}
         >
@@ -387,6 +398,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
         onPress={() => setStatusFilter(key)}
         style={[
           styles.statusChip,
+          adaptive.statusChip,
           active
             ? { backgroundColor: accent, borderColor: accent }
             : styles.statusChipInactive,
@@ -396,6 +408,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
           variant="bodyBold"
           style={[
             styles.statusChipText,
+            adaptive.statusChipText,
             { color: active ? palette.white : palette.stone },
           ]}
         >
@@ -414,14 +427,14 @@ export function RestaurantListingsScreen({ navigation }: any) {
   ) => {
     const iconBg = isAnimal ? '#FFE8CC' : '#D8EBDF';
     return (
-      <View style={[styles.metaBox, layout === 'centered' ? styles.metaBoxFull : styles.metaBoxHalf]}>
+      <View style={[styles.metaBox, adaptive.metaBox, layout === 'centered' ? styles.metaBoxFull : styles.metaBoxHalf]}>
         <View style={[styles.metaIconWrap, { backgroundColor: iconBg }]}>
           <Image source={icon} style={styles.metaIconImage} resizeMode="contain" />
         </View>
         <View style={styles.metaItemContent}>
           <AppText
             variant="bodyBold"
-            style={styles.metaLabelText}
+            style={[styles.metaLabelText, adaptive.metaLabelText]}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
@@ -453,24 +466,30 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const viewBtnBg = isAnimal ? palette.orange : palette.kale;
 
     return (
-      <View key={item.id} style={[styles.listingCard, { borderColor: theme.border }]}>
+      <View key={item.id} style={[styles.listingCard, adaptive.listingCard, { borderColor: theme.border }]}>
 
         {/* Card header strip */}
-        <View style={[styles.cardHeader, { backgroundColor: theme.bannerBg }]}>
+        <View style={[styles.cardHeader, adaptive.cardHeader, { backgroundColor: theme.bannerBg }]}>
           <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
-            <AppText variant="caption" style={[styles.statusBadgeText, { color: statusConfig.color }]}>
+            <AppText
+              variant="caption"
+              style={[styles.statusBadgeText, adaptive.statusBadgeText, { color: statusConfig.color }]}
+            >
               {statusLabel}
             </AppText>
           </View>
           <View style={styles.categoryBadge}>
             <Image source={theme.categoryIcon} style={styles.categoryIcon} resizeMode="contain" />
-            <AppText variant="caption" style={[styles.categoryLabel, { color: theme.accent }]}>
+            <AppText
+              variant="caption"
+              style={[styles.categoryLabel, adaptive.categoryLabel, { color: theme.accent }]}
+            >
               {theme.categoryLabel}
             </AppText>
           </View>
         </View>
 
-        <View style={styles.cardBody}>
+        <View style={[styles.cardBody, adaptive.cardBody]}>
           {/* Notification / status message */}
           {active && (
             <View style={styles.notificationRow}>
@@ -501,10 +520,13 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 META_ICONS.items,
                 'Items',
                 <Pressable
-                  style={[styles.viewDetailsBtn, { backgroundColor: viewBtnBg }]}
+                  style={[styles.viewDetailsBtn, adaptive.viewDetailsBtn, { backgroundColor: viewBtnBg }]}
                   onPress={() => openItemsModal(item)}
                 >
-                  <AppText variant="caption" style={styles.viewDetailsBtnText}>
+                  <AppText
+                    variant="caption"
+                    style={[styles.viewDetailsBtnText, adaptive.viewDetailsBtnText]}
+                  >
                     {partial ? 'Breakdown' : 'View all'}
                   </AppText>
                 </Pressable>,
@@ -516,7 +538,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 collected ? 'Collected on' : expired ? 'Expired on' : 'Pickup date',
                 <AppText
                   variant="caption"
-                  style={styles.metaValueText}
+                  style={[styles.metaValueText, adaptive.metaValueText]}
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
@@ -535,7 +557,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
               collected ? 'Impact' : 'Pickup time',
               <AppText
                 variant="caption"
-                style={styles.metaValueText}
+                style={[styles.metaValueText, adaptive.metaValueText]}
                 numberOfLines={2}
                 ellipsizeMode="tail"
               >
@@ -640,7 +662,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
     <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
+        contentContainerStyle={[
+          styles.container,
+          adaptive.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -657,27 +683,39 @@ export function RestaurantListingsScreen({ navigation }: any) {
           <>
             <HeroHeader
               source={require('../../../assets/placeholder/kale-header.png')}
-              height={hp(22)}
+              height={adaptive.heroHeight}
+              style={adaptive.heroBleed}
             >
-             
-              <View style={styles.heroContent}>
+              <View style={[styles.heroContent, adaptive.heroContent]}>
                 <View style={styles.heroTopRow}>
                   <View style={styles.heroTextBlock}>
-                    <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                    <AppText
+                      variant="caption"
+                      style={[styles.heroEyebrow, adaptive.heroEyebrow]}
+                      numberOfLines={1}
+                    >
                       {currentProfile.organization || 'Your business'}
                     </AppText>
-                    <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                    <AppText
+                      variant="h6"
+                      style={[styles.heroTitle, adaptive.heroTitle]}
+                      numberOfLines={1}
+                    >
                       Your listings
                     </AppText>
-                    <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
+                    <AppText
+                      variant="bodySmall"
+                      style={[styles.heroSubtitle, adaptive.heroSubtitle]}
+                      numberOfLines={2}
+                    >
                       Track surplus food, pickups, and your impact
                     </AppText>
                   </View>
 
-                  <View style={styles.heroIconCircle}>
+                  <View style={[styles.heroIconCircle, adaptive.heroIconCircle]}>
                     <Image
                       source={META_ICONS.items}
-                      style={styles.heroIconImage}
+                      style={[styles.heroIconImage, adaptive.heroIconImage]}
                       resizeMode="contain"
                     />
                   </View>
@@ -688,7 +726,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                     <Ionicons name="location-outline" size={normalize(14)} color={palette.white} />
                     <AppText
                       variant="caption"
-                      style={styles.heroLocationText}
+                      style={[styles.heroLocationText, adaptive.heroLocationText]}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
@@ -697,46 +735,114 @@ export function RestaurantListingsScreen({ navigation }: any) {
                   </View>
                 )}
 
-                <View style={styles.heroStatsPill}>
+                <View style={[styles.heroStatsPill, adaptive.heroStatsPill]}>
                   <Ionicons name="layers-outline" size={normalize(14)} color={palette.white} />
-                  <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
-                    {activeCount} active · {listings.length} total
-                  </AppText>
+                    <AppText
+                      variant="caption"
+                      style={[styles.heroStatsText, adaptive.heroStatsText]}
+                      numberOfLines={1}
+                    >
+                      {activeCount} active · {listings.length} total
+                    </AppText>
                 </View>
               </View>
             </HeroHeader>
 
-            <View style={styles.mainContent}>
-              {/* CTA cards */}
-              <Pressable
-                style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
-                onPress={() => navigation.navigate('Surplus')}
-              >
-                <View style={styles.createBtnLeft}>
-                  <View style={styles.createBtnIconWrap}>
-                    <Ionicons name="add" size={normalize(20)} color={palette.white} />
+            <View style={[styles.mainContent, adaptive.mainContent]}>
+              {r.isTablet ? (
+                <View style={adaptive.actionsRow}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.createBtn,
+                        adaptive.createBtn,
+                        pressed && styles.pressed,
+                      ]}
+                      onPress={() => navigation.navigate('Surplus')}
+                    >
+                      <View style={styles.createBtnLeft}>
+                        <View style={[styles.createBtnIconWrap, adaptive.createBtnIconWrap]}>
+                          <Ionicons name="add" size={18} color={palette.white} />
+                        </View>
+                        <AppText
+                          variant="bodyBold"
+                          style={[styles.createBtnText, adaptive.createBtnText]}
+                          numberOfLines={1}
+                        >
+                          Create new listing
+                        </AppText>
+                      </View>
+                      <Ionicons name="arrow-forward" size={16} color={palette.white} />
+                    </Pressable>
                   </View>
-                  <AppText variant="bodyBold" style={styles.createBtnText}>
-                    Create new listing
-                  </AppText>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.historyBtn,
+                        adaptive.historyBtn,
+                        pressed && styles.pressed,
+                      ]}
+                      onPress={() => navigation.navigate('CollectionHistory')}
+                    >
+                      <View style={styles.historyBtnLeft}>
+                        <Ionicons name="time-outline" size={16} color={palette.eggplant} />
+                        <AppText
+                          variant="bodyBold"
+                          style={[styles.historyBtnText, adaptive.historyBtnText]}
+                          numberOfLines={1}
+                        >
+                          Collection history
+                        </AppText>
+                      </View>
+                      <Ionicons name="chevron-forward" size={14} color={palette.eggplant} />
+                    </Pressable>
+                  </View>
                 </View>
-                <View style={styles.createBtnArrow}>
-                  <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
-                </View>
-              </Pressable>
+              ) : (
+                <>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.createBtn,
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={() => navigation.navigate('Surplus')}
+                  >
+                    <View style={styles.createBtnLeft}>
+                      <View style={styles.createBtnIconWrap}>
+                        <Ionicons name="add" size={18} color={palette.white} />
+                      </View>
+                      <AppText
+                        variant="bodyBold"
+                        style={styles.createBtnText}
+                        numberOfLines={1}
+                      >
+                        Create new listing
+                      </AppText>
+                    </View>
+                    <Ionicons name="arrow-forward" size={16} color={palette.white} />
+                  </Pressable>
 
-              <Pressable
-                style={({ pressed }) => [styles.historyBtn, pressed && styles.pressed]}
-                onPress={() => navigation.navigate('CollectionHistory')}
-              >
-                <View style={styles.historyBtnLeft}>
-                  <Ionicons name="time-outline" size={normalize(18)} color={palette.eggplant} />
-                  <AppText variant="bodyBold" style={styles.historyBtnText}>
-                    Collection history
-                  </AppText>
-                </View>
-                <Ionicons name="chevron-forward" size={normalize(16)} color={palette.eggplant} />
-              </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.historyBtn,
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={() => navigation.navigate('CollectionHistory')}
+                  >
+                    <View style={styles.historyBtnLeft}>
+                      <Ionicons name="time-outline" size={16} color={palette.eggplant} />
+                      <AppText
+                        variant="bodyBold"
+                        style={styles.historyBtnText}
+                        numberOfLines={1}
+                      >
+                        Collection history
+                      </AppText>
+                    </View>
+                    <Ionicons name="chevron-forward" size={14} color={palette.eggplant} />
+                  </Pressable>
+                </>
+              )}
 
               {/* Listings section */}
               <View style={styles.section}>
@@ -759,15 +865,42 @@ export function RestaurantListingsScreen({ navigation }: any) {
                 {/* Listings */}
                 {filteredListings.length === 0 ? (
                   <View style={styles.emptyWrap}>
-                    <Ionicons name="file-tray-outline" size={normalize(36)} color={palette.strokecream} />
-                    <AppText variant="bodySmall" color={palette.stone} style={styles.emptyText}>
+                    <Ionicons
+                      name="file-tray-outline"
+                      size={r.isTablet ? adaptive.emptyIconSize : normalize(36)}
+                      color={palette.strokecream}
+                    />
+                    <AppText
+                      variant="bodySmall"
+                      color={palette.stone}
+                      style={[styles.emptyText, adaptive.emptyText]}
+                    >
                       No listings match this filter
                     </AppText>
                     <Pressable onPress={() => { setListingFilter('all'); setStatusFilter('all'); }}>
-                      <AppText variant="bodyBold" color={palette.kale} style={styles.emptyReset}>
+                      <AppText
+                        variant="bodyBold"
+                        color={palette.kale}
+                        style={[styles.emptyReset, adaptive.emptyReset]}
+                      >
                         Clear filters
                       </AppText>
                     </Pressable>
+                  </View>
+                ) : r.isTablet ? (
+                  <View style={styles.listingsGap}>
+                    {fullWidthListings.map((item) => (
+                      <View key={item.id}>{renderListingCard(item)}</View>
+                    ))}
+                    {gridListings.length > 0 ? (
+                      <View style={[styles.listingsGap, adaptive.cardGrid]}>
+                        {gridListings.map((item) => (
+                          <View key={item.id} style={adaptive.cardGridItem}>
+                            {renderListingCard(item)}
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
                   </View>
                 ) : (
                   <View style={styles.listingsGap}>
@@ -901,7 +1034,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    marginTop: -hp(1),
+    marginTop: -hp(2),
   },
 
   heroContent: {
@@ -930,21 +1063,21 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     textTransform: 'none',
     letterSpacing: 0.3,
-    fontSize: normalize(13),
+    fontSize: normalize(12),
   },
 
   heroTitle: {
     color: palette.white,
     textTransform: 'none',
-    fontSize: normalize(30),
-    lineHeight: normalize(38),
+    fontSize: normalize(26),
+    lineHeight: normalize(34),
   },
 
   heroSubtitle: {
     color: 'rgba(255,255,255,0.9)',
     textTransform: 'none',
-    fontSize: normalize(15),
-    lineHeight: normalize(22),
+    fontSize: normalize(14),
+    lineHeight: normalize(20),
   },
 
   heroLocationRow: {
@@ -970,22 +1103,12 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: palette.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    ...elevation.soft,
   },
 
   heroIconImage: {
-    width: normalize(30),
-    height: normalize(30),
+    width: normalize(28),
+    height: normalize(28),
   },
 
   heroStatsPill: {
@@ -1004,92 +1127,93 @@ const styles = StyleSheet.create({
     color: palette.white,
     flexShrink: 1,
     textTransform: 'none',
-    fontSize: normalize(13),
+    fontSize: normalize(11),
+    lineHeight: normalize(15),
   },
 
   mainContent: {
     paddingHorizontal: wp(5),
-    paddingTop: hp(2),
-    gap: hp(1.8),
-    paddingBottom: hp(1),
+    paddingTop: hp(1.2),
+    gap: hp(1.2),
+    paddingBottom: hp(0.8),
+    marginTop: -hp(1.5),
   },
 
   createBtn: {
     backgroundColor: palette.eggplant,
-    borderRadius: normalize(16),
-    paddingVertical: hp(1.8),
-    paddingHorizontal: wp(5),
+    borderRadius: normalize(14),
+    height: 46,
+    minHeight: 46,
+    maxHeight: 46,
+    marginTop: hp(1.2),
+    paddingVertical: 0,
+    paddingHorizontal: wp(4),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...Platform.select({
-      ios: {
-        shadowColor: palette.eggplant,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 10,
-      },
-      android: { elevation: 5 },
-    }),
+    gap: 8,
+    ...elevation.flat,
   },
 
   createBtnLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(3),
+    flex: 1,
+    minWidth: 0,
   },
 
   createBtnIconWrap: {
-    width: normalize(32),
-    height: normalize(32),
-    borderRadius: normalize(16),
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
 
   createBtnText: {
     color: palette.white,
     textTransform: 'none',
-    fontSize: normalize(17),
-  },
-
-  createBtnArrow: {
-    width: normalize(28),
-    height: normalize(28),
-    borderRadius: normalize(14),
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
+    includeFontPadding: false,
   },
 
   historyBtn: {
     backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: palette.strokecream,
-    borderRadius: normalize(16),
-    paddingVertical: hp(1.5),
-    paddingHorizontal: wp(5),
+    borderRadius: normalize(14),
+    height: 46,
+    minHeight: 46,
+    maxHeight: 46,
+    paddingVertical: 0,
+    paddingHorizontal: wp(4),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...cardShadow,
+    ...elevation.flat,
   },
 
   historyBtnLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(3),
+    flex: 1,
+    minWidth: 0,
   },
 
   historyBtnText: {
     color: palette.eggplant,
     textTransform: 'none',
-    fontSize: normalize(17),
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
   },
 
   section: {
-    gap: hp(1.4),
+    gap: hp(1.1),
   },
 
   filterRow: {
@@ -1103,16 +1227,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp(1.5),
-    paddingVertical: hp(1.15),
+    paddingVertical: 8,
     paddingHorizontal: wp(2),
-    borderRadius: normalize(10),
+    borderRadius: 10,
     borderWidth: 1,
-    minHeight: normalize(40),
+    minHeight: 38,
   },
 
   audienceChipActive: {
     backgroundColor: palette.white,
-    ...cardShadow,
+    ...elevation.flat,
   },
 
   audienceChipInactive: {
@@ -1139,11 +1263,11 @@ const styles = StyleSheet.create({
   },
 
   statusChip: {
-    paddingVertical: hp(0.95),
+    paddingVertical: 7,
     paddingHorizontal: wp(4),
-    borderRadius: normalize(20),
+    borderRadius: 16,
     borderWidth: 1,
-    minHeight: normalize(36),
+    minHeight: 34,
     justifyContent: 'center',
   },
 
@@ -1153,31 +1277,31 @@ const styles = StyleSheet.create({
   },
 
   statusChipText: {
-    fontSize: normalize(14),
-    lineHeight: normalize(19),
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
     textTransform: 'none',
   },
 
   listingsGap: {
-    gap: hp(1.8),
+    gap: hp(1.2),
   },
 
   listingCard: {
-    borderRadius: normalize(20),
+    borderRadius: normalize(16),
     borderWidth: 1,
     backgroundColor: palette.white,
     overflow: 'hidden',
-    ...cardShadow,
+    ...elevation.flat,
   },
 
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.9),
     gap: wp(2),
-    minHeight: normalize(40),
+    minHeight: normalize(36),
   },
 
   statusBadge: {
@@ -1216,10 +1340,10 @@ const styles = StyleSheet.create({
   },
 
   cardBody: {
-    paddingHorizontal: wp(4),
-    paddingTop: hp(1.2),
-    paddingBottom: hp(1.6),
-    gap: hp(1.2),
+    paddingHorizontal: wp(3.5),
+    paddingTop: hp(1),
+    paddingBottom: hp(1.2),
+    gap: hp(0.9),
   },
 
   notificationRow: {
@@ -1268,10 +1392,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8F8F8',
     borderRadius: normalize(10),
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(1.1),
+    paddingHorizontal: wp(2.2),
+    paddingVertical: hp(0.9),
     gap: wp(2),
-    minHeight: normalize(56),
+    minHeight: normalize(48),
   },
 
   metaBoxHalf: {
@@ -1395,13 +1519,13 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     textTransform: 'none',
-    fontSize: normalize(15),
-    lineHeight: normalize(22),
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
   },
 
   emptyReset: {
     textTransform: 'none',
-    fontSize: normalize(15),
+    fontSize: normalize(13),
     marginTop: hp(0.4),
   },
 

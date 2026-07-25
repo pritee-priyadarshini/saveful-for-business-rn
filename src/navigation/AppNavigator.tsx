@@ -193,7 +193,10 @@ export function AppNavigator() {
       onReady={flushPendingNotification}
     >
       {isAuthenticated ? (
-        <RootStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
+        <RootStack.Navigator
+          screenOptions={{ headerShown: false, orientation: 'portrait' }}
+          initialRouteName={initialRouteName}
+        >
           <RootStack.Screen name="Tabs" component={RoleTabs} />
 
           {effectiveRole === 'restaurant_multi' ? (

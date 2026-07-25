@@ -31,7 +31,8 @@ import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { organizationService } from '@/services/organization.service';
 import { useAuthStore } from '@/store/authStore';
 
@@ -54,7 +55,9 @@ type Site = {
 
 export default function ManageSitesScreen() {
   useTransparentStatusBar('light');
-  const safeBottomPadding = useSafeBottomPadding(hp(1.5));
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
+  const safeBottomPadding = useSafeBottomPadding(r.isTablet ? 24 : hp(1.5));
   const navigation = useNavigation<NavigationProp>();
   const { logout, currentProfile, authUser } = useAppContext();
   const {
@@ -74,6 +77,18 @@ export default function ManageSitesScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [expandedSite, setExpandedSite] = useState<number | null>(null);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
+
+  const contentColumn = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    return {
+      width: adaptive.columnWidth,
+      maxWidth: r.contentMaxWidth,
+      alignSelf: 'center' as const,
+      paddingHorizontal: r.pagePadH,
+    };
+  }, [r.isTablet, r.contentMaxWidth, r.pagePadH, adaptive.columnWidth]);
+
+  const tabletInsetReset = r.isTablet ? { marginHorizontal: 0, paddingHorizontal: 0 } : null;
 
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const brandName =
@@ -260,7 +275,7 @@ export default function ManageSitesScreen() {
   };
 
   const renderSkeleton = () => (
-    <View style={styles.skeletonWrap}>
+    <View style={[styles.skeletonWrap, contentColumn]}>
       <View style={styles.skeletonHero}>
         <Skeleton width="100%" height="100%" borderRadius={0} />
       </View>
@@ -269,7 +284,7 @@ export default function ManageSitesScreen() {
         <Skeleton width={wp(50)} height={normalize(24)} />
       </View>
 
-      <View style={styles.actionGrid}>
+      <View style={[styles.actionGrid, tabletInsetReset]}>
         {[1, 2, 3, 4].map((i) => (
           <View key={i} style={[styles.actionCard, styles.skeletonActionCard]}>
             <Skeleton width="60%" height={normalize(14)} />
@@ -282,7 +297,10 @@ export default function ManageSitesScreen() {
       </View>
 
       {[1, 2].map((i) => (
-        <View key={i} style={[styles.siteCard, styles.skeletonSiteCard]}>
+        <View
+          key={i}
+          style={[styles.siteCard, styles.skeletonSiteCard, r.isTablet && { marginHorizontal: 0 }]}
+        >
           <View style={styles.siteHeader}>
             <View style={styles.siteLeft}>
               <Skeleton
@@ -345,69 +363,92 @@ export default function ManageSitesScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          adaptive.scrollContent,
+          { paddingBottom: safeBottomPadding },
+        ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <HeroHeader
-          source={require('../../../assets/placeholder/kale-header.png')}
-          height={hp(14)}
-          style={{ marginBottom: hp(1.2) }}
-        >
-          <View style={styles.heroContent}>
-            <View style={styles.heroTopRow}>
-              <View style={styles.heroTextBlock}>
-                <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
-                  {brandName}
-                </AppText>
-                <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
-                  Your sites
-                </AppText>
-                <HeaderAddressRow
-                  address={brandAddress}
-                  iconSize={normalize(15)}
-                  style={styles.heroAddressRow}
-                  textStyle={styles.heroAddress}
-                />
+        <View style={r.isTablet ? { width: r.width, alignSelf: 'center' as const } : undefined}>
+          <HeroHeader
+            source={require('../../../assets/placeholder/kale-header.png')}
+            height={r.isTablet ? adaptive.heroHeight : hp(14)}
+            style={[{ marginBottom: hp(1.2) }, adaptive.heroBleed]}
+          >
+            <View style={[styles.heroContent, adaptive.heroContent]}>
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroTextBlock}>
+                  <AppText
+                    variant="caption"
+                    style={[styles.heroEyebrow, adaptive.heroEyebrow]}
+                    numberOfLines={1}
+                  >
+                    {brandName}
+                  </AppText>
+                  <AppText
+                    variant="h6"
+                    style={[styles.heroTitle, adaptive.heroTitle]}
+                    numberOfLines={1}
+                  >
+                    Your sites
+                  </AppText>
+                  <HeaderAddressRow
+                    address={brandAddress}
+                    iconSize={normalize(15)}
+                    style={styles.heroAddressRow}
+                    textStyle={[styles.heroAddress, adaptive.heroLocationText]}
+                  />
+                </View>
+
+                <Pressable
+                  style={[styles.heroIconCircle, adaptive.heroIconCircle]}
+                  onPress={() => navigation.navigate('Account')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open account profile"
+                >
+                  {businessLogo ? (
+                    <Image
+                      source={{ uri: businessLogo }}
+                      style={styles.logoImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <AppText style={styles.logoFallback}>{brandName[0] || 'B'}</AppText>
+                  )}
+                </Pressable>
               </View>
 
-              <Pressable
-                style={styles.heroIconCircle}
-                onPress={() => navigation.navigate('Account')}
-                accessibilityRole="button"
-                accessibilityLabel="Open account profile"
-              >
-                {businessLogo ? (
-                  <Image
-                    source={{ uri: businessLogo }}
-                    style={styles.logoImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <AppText style={styles.logoFallback}>{brandName[0] || 'B'}</AppText>
-                )}
-              </Pressable>
+              <View style={[styles.heroStatsPill, adaptive.heroStatsPill]}>
+                <Ionicons name="business-outline" size={normalize(14)} color={palette.white} />
+                <AppText
+                  variant="caption"
+                  style={[styles.heroStatsText, adaptive.heroStatsText]}
+                  numberOfLines={1}
+                >
+                  {sites.length === 0
+                    ? 'No locations yet'
+                    : `${managedCount} of ${sites.length} sites managed`}
+                </AppText>
+              </View>
             </View>
+          </HeroHeader>
+        </View>
 
-            <View style={styles.heroStatsPill}>
-              <Ionicons name="business-outline" size={normalize(14)} color={palette.white} />
-              <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
-                {sites.length === 0
-                  ? 'No locations yet'
-                  : `${managedCount} of ${sites.length} sites managed`}
-              </AppText>
-            </View>
-          </View>
-        </HeroHeader>
-
-        <AppText variant="subheading" style={styles.sectionTitle}>
+        <View style={contentColumn}>
+        <AppText variant="subheading" style={[styles.sectionTitle, tabletInsetReset, adaptive.sectionTitle]}>
           What to do today !
         </AppText>
 
-        <View style={styles.actionGrid}>
+        <View style={[styles.actionGrid, tabletInsetReset, r.isTablet && styles.actionGridTablet]}>
           {actions.map((item) => (
             <Pressable
               key={item.label}
-              style={[styles.actionCard, item.primary && styles.actionCardPrimary]}
+              style={[
+                styles.actionCard,
+                r.isTablet && styles.actionCardTablet,
+                item.primary && styles.actionCardPrimary,
+              ]}
               onPress={() => {
                 if (item.route) {
                   navigation.navigate(item.route as any);
@@ -419,6 +460,9 @@ export default function ManageSitesScreen() {
               <AppText
                 variant="bodyBold"
                 style={[styles.actionText, item.primary && styles.actionTextPrimary]}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
               >
                 {item.label}
               </AppText>
@@ -426,7 +470,7 @@ export default function ManageSitesScreen() {
           ))}
         </View>
 
-        <View style={styles.sitesHeader}>
+        <View style={[styles.sitesHeader, tabletInsetReset]}>
           <View style={styles.sitesHeaderLeft}>
             <AppText variant="subheading" style={styles.sitesTitle}>
               Your Sites
@@ -450,7 +494,7 @@ export default function ManageSitesScreen() {
         </View>
 
         {sites.length === 0 ? (
-          <View style={styles.emptyCard}>
+          <View style={[styles.emptyCard, tabletInsetReset]}>
             <View style={styles.emptyIcon}>
               <Ionicons name="business-outline" size={normalize(26)} color={palette.kale} />
             </View>
@@ -476,7 +520,14 @@ export default function ManageSitesScreen() {
           const isEditing = editingSiteId === site.id;
 
           return (
-            <View key={site.id} style={[styles.siteCard, isExpanded && styles.siteCardExpanded]}>
+            <View
+              key={site.id}
+              style={[
+                styles.siteCard,
+                isExpanded && styles.siteCardExpanded,
+                r.isTablet && { marginHorizontal: 0 },
+              ]}
+            >
               <Pressable style={styles.siteHeader} onPress={() => toggleExpanded(site.id)}>
                 <View style={styles.siteLeft}>
                   <View style={styles.siteLogoWrap}>
@@ -705,9 +756,21 @@ export default function ManageSitesScreen() {
             </View>
           );
         })}
+        </View>
       </ScrollView>
 
-      <View style={[styles.stickyFooter, { paddingBottom: safeBottomPadding }]}>
+      <View
+        style={[
+          styles.stickyFooter,
+          { paddingBottom: safeBottomPadding },
+          r.isTablet && {
+            width: adaptive.columnWidth,
+            maxWidth: r.contentMaxWidth,
+            alignSelf: 'center' as const,
+            paddingHorizontal: r.pagePadH,
+          },
+        ]}
+      >
         <Pressable style={styles.logoutBtn} onPress={logout}>
           <AppText variant="bodyBold" style={styles.logoutText}>
             Logout
@@ -816,20 +879,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     marginBottom: hp(2.5),
   },
+  actionGridTablet: {
+    width: '100%',
+    gap: 12,
+  },
   actionCard: {
     backgroundColor: 'white',
     width: '48%',
     paddingVertical: hp(2.3),
+    paddingHorizontal: wp(2),
     borderRadius: normalize(14),
     marginBottom: hp(1.4),
     alignItems: 'center',
+    justifyContent: 'center',
     elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.strokecream,
+  },
+  actionCardTablet: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    maxWidth: '48%',
+    minHeight: 56,
   },
   actionCardPrimary: {
     backgroundColor: palette.kale,
+    borderColor: palette.kale,
   },
   actionText: {
     textAlign: 'center',
+    width: '100%',
+    flexShrink: 1,
   },
   actionTextPrimary: {
     color: palette.white,

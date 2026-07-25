@@ -16,7 +16,6 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
-import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 import {
   ClaimConfirmModal,
   type ClaimLineItem,
@@ -36,7 +35,8 @@ import {
   parseDistanceKm,
   resolveProfileCoordinates,
 } from '@/utils/coordinates';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 type ClaimState = Record<string, number>;
@@ -108,6 +108,18 @@ async function loadListingFoodItems(
 
 export function FarmerMapScreen({ navigation }: any) {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 14 }), [r]);
+  const tabletGutterReset = r.isTablet ? { marginHorizontal: 0 } : null;
+  const contentColumn = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    return {
+      width: adaptive.columnWidth,
+      maxWidth: r.contentMaxWidth,
+      alignSelf: 'center' as const,
+      paddingHorizontal: r.pagePadH,
+    };
+  }, [r.isTablet, r.contentMaxWidth, r.pagePadH, adaptive.columnWidth]);
   const { authUser } = useAppContext();
   const {
     modalVisible,
@@ -123,7 +135,6 @@ export function FarmerMapScreen({ navigation }: any) {
   const [sortByQuantity, setSortByQuantity] = useState(true);
   const [quantityOrder, setQuantityOrder] = useState<QuantityOrder>('desc');
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
   const [expandedClaimSections, setExpandedClaimSections] = useState<Record<string, boolean>>({});
   const [activeClaimItemByListing, setActiveClaimItemByListing] = useState<
     Record<string, number | null>
@@ -621,7 +632,7 @@ export function FarmerMapScreen({ navigation }: any) {
     const availableKg = getAvailableKg(item, claimItems);
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, contentColumn, tabletGutterReset]}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleWrap}>
             <AppText variant="bodyBold" numberOfLines={2}>
@@ -677,7 +688,12 @@ export function FarmerMapScreen({ navigation }: any) {
           <AppText variant="caption" style={styles.storageText}>
             {item.storage}
           </AppText>
-          <Pressable onPress={() => setSelectedListing(item)} hitSlop={8}>
+          <Pressable
+            onPress={() =>
+              navigation.navigate('LivestockListingDetails', { listing: item })
+            }
+            hitSlop={8}
+          >
             <AppText variant="caption" style={styles.detailsLink}>
               View details
             </AppText>
@@ -716,7 +732,8 @@ export function FarmerMapScreen({ navigation }: any) {
     <View>
       <HeroHeader
         source={require('../../../assets/placeholder/kale-header.png')}
-        height={hp(14)}
+        height={r.isTablet ? adaptive.heroHeight : hp(14)}
+        style={r.isTablet ? adaptive.heroBleed : undefined}
       >
         <View style={styles.heroContent}>
           <AppText variant="h5" style={styles.whiteText}>
@@ -728,58 +745,63 @@ export function FarmerMapScreen({ navigation }: any) {
         </View>
       </HeroHeader>
 
-      <Pressable style={styles.pickupBtn} onPress={() => navigation.navigate('FarmerPickup')}>
-        <Ionicons name="car-outline" size={normalize(18)} color={palette.white} />
-        <AppText variant="label" style={styles.pickupBtnText}>
-          View Your Pickups
-        </AppText>
-      </Pressable>
-
-      {!notificationsOn ? (
-        <View style={styles.fallbackHint}>
-          <Ionicons name="notifications-off-outline" size={normalize(16)} color={palette.kale} />
-          <AppText variant="caption" style={styles.fallbackHintText}>
-            Notifications are off — showing nearby food instead. Turn on notifications to get
-            alerts.
-          </AppText>
-        </View>
-      ) : null}
-
-      <View style={styles.activeRow}>
-        <AppText variant="h7">Active Listings</AppText>
-        <View style={styles.activeBadge}>
-          <AppText variant="h7" style={{ color: palette.white }}>
-            {listings.length}
-          </AppText>
-        </View>
-      </View>
-
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[styles.filterPill, sortByDistance && styles.filterPillActive]}
-          onPress={handleDistanceSortPress}
+      <View style={contentColumn}>
+        <Pressable
+          style={[styles.pickupBtn, tabletGutterReset]}
+          onPress={() => navigation.navigate('FarmerPickup')}
         >
-          <AppText
-            variant="caption"
-            style={sortByDistance ? styles.filterTextActive : styles.filterText}
-          >
-            Sort by Distance
+          <Ionicons name="car-outline" size={normalize(18)} color={palette.white} />
+          <AppText variant="label" style={styles.pickupBtnText}>
+            View Your Pickups
           </AppText>
-        </TouchableOpacity>
+        </Pressable>
 
-        <TouchableOpacity
-          style={[styles.filterPill, sortByQuantity && styles.filterPillActive]}
-          onPress={handleQuantitySortPress}
-        >
-          <AppText
-            variant="caption"
-            style={sortByQuantity ? styles.filterTextActive : styles.filterText}
+        {!notificationsOn ? (
+          <View style={[styles.fallbackHint, tabletGutterReset]}>
+            <Ionicons name="notifications-off-outline" size={normalize(16)} color={palette.kale} />
+            <AppText variant="caption" style={styles.fallbackHintText}>
+              Notifications are off — showing nearby food instead. Turn on notifications to get
+              alerts.
+            </AppText>
+          </View>
+        ) : null}
+
+        <View style={[styles.activeRow, tabletGutterReset]}>
+          <AppText variant="h7">Active Listings</AppText>
+          <View style={styles.activeBadge}>
+            <AppText variant="h7" style={{ color: palette.white }}>
+              {listings.length}
+            </AppText>
+          </View>
+        </View>
+
+        <View style={[styles.filterRow, tabletGutterReset]}>
+          <TouchableOpacity
+            style={[styles.filterPill, sortByDistance && styles.filterPillActive]}
+            onPress={handleDistanceSortPress}
           >
-            {sortByQuantity
-              ? `By Quantity ${quantityOrder === 'desc' ? '↓' : '↑'}`
-              : 'By Quantity'}
-          </AppText>
-        </TouchableOpacity>
+            <AppText
+              variant="bodyBold"
+              style={sortByDistance ? styles.filterTextActive : styles.filterText}
+            >
+              Sort by Distance
+            </AppText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterPill, sortByQuantity && styles.filterPillActive]}
+            onPress={handleQuantitySortPress}
+          >
+            <AppText
+              variant="bodyBold"
+              style={sortByQuantity ? styles.filterTextActive : styles.filterText}
+            >
+              {sortByQuantity
+                ? `By Quantity ${quantityOrder === 'desc' ? '↓' : '↑'}`
+                : 'By Quantity'}
+            </AppText>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -798,12 +820,6 @@ export function FarmerMapScreen({ navigation }: any) {
         }}
         confirming={saving}
         searchPlaceholder="Search farm address..."
-      />
-
-      <DiscoverListingDetailModal
-        visible={!!selectedListing}
-        listing={selectedListing}
-        onClose={() => setSelectedListing(null)}
       />
 
       <ClaimConfirmModal
@@ -826,10 +842,11 @@ export function FarmerMapScreen({ navigation }: any) {
         ListHeaderComponent={ListHeader}
         contentContainerStyle={[
           styles.container,
+          adaptive.scrollContent,
           sortedListings.length === 0 && styles.emptyList,
         ]}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <View style={[styles.emptyContainer, contentColumn]}>
             {loading && !refreshing ? (
               <ActivityIndicator color={palette.primary} />
             ) : locationRequired ? (
@@ -1000,16 +1017,22 @@ const styles = StyleSheet.create({
 
   filterPill: {
     flex: 1,
+    minHeight: 44,
     backgroundColor: palette.white,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#D9D9D9',
-    paddingVertical: hp(1),
-    borderRadius: normalize(20),
+    paddingVertical: hp(1.35),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(14),
     alignItems: 'center',
+    justifyContent: 'center',
   },
 
   filterText: {
     color: palette.black,
+    fontSize: normalize(14),
+    lineHeight: normalize(18),
+    textTransform: 'none',
   },
 
   filterPillActive: {
@@ -1019,6 +1042,9 @@ const styles = StyleSheet.create({
 
   filterTextActive: {
     color: palette.white,
+    fontSize: normalize(14),
+    lineHeight: normalize(18),
+    textTransform: 'none',
   },
 
   card: {

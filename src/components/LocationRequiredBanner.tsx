@@ -1,14 +1,10 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, Dimensions } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
 import { palette } from '../theme/colors';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => Math.round(size * (width / 375));
+import { hp, normalize, wp } from '@/utils/responsive';
 
 type Props = {
   title?: string;

@@ -7,7 +7,6 @@ import { useCharityStore } from '../store/charityStore';
 import { organizationService } from '../services/organization.service';
 import { sitesService } from '../services/sites.service';
 import {
-  getLocationDebugInfo,
   normalizeAuthProfile,
   profileHasCoordinates,
 } from '../utils/coordinates';
@@ -50,26 +49,6 @@ export function useOrganizationLocation() {
   );
 
   const showBanner = Boolean(authUser) && !hasLocation && !bannerClosed;
-
-  useEffect(() => {
-    const debug = {
-      ...getLocationDebugInfo(profile),
-      bannerClosed,
-      showBanner,
-      hasAuthUser: Boolean(authUser),
-    };
-
-    console.log('[Location] siteLatitude =', debug.siteLatitude);
-    console.log('[Location] siteLongitude =', debug.siteLongitude);
-    console.log('[Location] orgLatitude =', debug.orgLatitude);
-    console.log('[Location] orgLongitude =', debug.orgLongitude);
-    console.log('[Location] resolvedLatitude =', debug.resolvedLatitude);
-    console.log('[Location] resolvedLongitude =', debug.resolvedLongitude);
-    console.log('[Location] hasLocation =', debug.hasLocation);
-    console.log('[Location] bannerClosed =', debug.bannerClosed);
-    console.log('[Location] showBanner =', debug.showBanner);
-    console.log('[Location] sitesCount =', debug.sitesCount);
-  }, [authUser, bannerClosed, profile, showBanner]);
 
   useFocusEffect(
     useCallback(() => {

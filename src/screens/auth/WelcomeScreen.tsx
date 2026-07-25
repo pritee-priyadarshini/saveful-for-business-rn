@@ -1,5 +1,12 @@
 import React from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,8 +16,9 @@ import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
@@ -29,89 +37,162 @@ const valueProps = [
   },
 ];
 
+/**
+ * Phone: original layout (unchanged).
+ * Tablet: ProfileScreen-style — pad + fill usable width (contentMaxWidth).
+ */
 export function WelcomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const r = useResponsiveLayout();
   useTransparentStatusBar('dark');
+
+  const { isTablet, isLargeTablet, contentMaxWidth, pagePadH, height } = r;
+  const heroH = Math.min(height * (r.isLandscape ? 0.36 : 0.32), isLargeTablet ? 360 : 320);
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <StatusBar style="dark" translucent backgroundColor="transparent" />
-      <View style={[styles.topAccent, { backgroundColor: palette.middlegreen }]} />
+      <View
+        style={[
+          styles.topAccent,
+          { backgroundColor: palette.middlegreen },
+          isTablet && { height: 3 },
+        ]}
+      />
 
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + hp(1.5),
-            paddingBottom: insets.bottom + hp(2),
+            paddingTop: insets.top + (isTablet ? spacing.md : hp(1.5)),
+            paddingBottom: insets.bottom + (isTablet ? spacing.lg : hp(2)),
+          },
+          isTablet && {
+            paddingHorizontal: pagePadH,
+            gap: spacing.md,
+            justifyContent: 'flex-start',
           },
         ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.header}>
-          <Image
-            source={require('../../../assets/intro/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+        <View
+          style={
+            isTablet
+              ? { width: '100%', maxWidth: contentMaxWidth, alignSelf: 'center', gap: spacing.md }
+              : undefined
+          }
+        >
+          <View style={[styles.header, isTablet && styles.headerTablet]}>
+            <Image
+              source={require('../../../assets/intro/logo.png')}
+              style={[styles.logo, isTablet && { width: 176, height: 54 }]}
+              resizeMode="contain"
+            />
 
-          <AppText variant="h5" color={palette.primary} style={styles.heading}>
-            HELP GOOD FOOD GO FURTHER
-          </AppText>
+            <AppText
+              variant="h5"
+              color={palette.primary}
+              style={[
+                styles.heading,
+                isTablet && {
+                  fontSize: r.font(24, 28, 30),
+                  lineHeight: r.font(30, 34, 38),
+                },
+              ]}
+            >
+              HELP GOOD FOOD GO FURTHER
+            </AppText>
 
-          <AppText variant="body1" color={palette.textMuted} style={styles.subtitle}>
-            List surplus or find food ready for collection.{'\n'}
-            Saveful connects businesses, charities and farmers to help good food go further.
-          </AppText>
-        </View>
-
-        <View style={styles.illustrationFrame}>
-          <Image
-            source={require('../../../assets/intro/welcome_hero.png')}
-            style={styles.heroIllustration}
-            resizeMode="cover"
-          />
-        </View>
-
-        <View style={styles.actionPanel}>
-          <View style={styles.valuePropRow}>
-            {valueProps.map((item) => (
-              <View key={item.label} style={styles.valuePropItem}>
-                <Image source={item.image} style={styles.valuePropImage} resizeMode="contain" />
-                <AppText variant="caption" color={palette.textMuted} style={styles.valuePropLabel}>
-                  {item.label}
-                </AppText>
-              </View>
-            ))}
+            <AppText
+              variant="body1"
+              color={palette.textMuted}
+              style={[
+                styles.subtitle,
+                isTablet && {
+                  fontSize: r.font(15, 16, 16),
+                  lineHeight: r.font(22, 24, 24),
+                  maxWidth: '100%',
+                },
+              ]}
+            >
+              List surplus or find food ready for collection.{'\n'}
+              Saveful connects businesses, charities and farmers to help good food go further.
+            </AppText>
           </View>
 
-          <Pressable
-            onPress={() => navigation.navigate('RoleSelectionMain')}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.buttonPressed,
+          <View
+            style={[
+              styles.illustrationFrame,
+              isTablet && {
+                height: heroH,
+                borderRadius: 20,
+                borderWidth: 6,
+                marginVertical: 0,
+              },
             ]}
           >
-            <AppText variant="bodyBold" style={styles.primaryButtonText}>
-              Get Started
-            </AppText>
-            <Ionicons name="arrow-forward" size={normalize(20)} color={palette.white} />
-          </Pressable>
+            <Image
+              source={require('../../../assets/intro/welcome_hero.png')}
+              style={styles.heroIllustration}
+              resizeMode="cover"
+            />
+          </View>
 
-          <View style={styles.loginRow}>
-            <AppText variant="bodySmall" color={palette.textMuted} style={styles.loginPrompt}>
-              Already have an account?
-            </AppText>
+          <View style={[styles.actionPanel, isTablet && styles.actionPanelTablet]}>
+            <View style={[styles.valuePropRow, isTablet && { gap: spacing.md }]}>
+              {valueProps.map((item) => (
+                <View key={item.label} style={[styles.valuePropItem, { minWidth: 0 }]}>
+                  <Image
+                    source={item.image}
+                    style={[styles.valuePropImage, isTablet && { width: 68, height: 68 }]}
+                    resizeMode="contain"
+                  />
+                  <AppText
+                    variant="caption"
+                    color={palette.textMuted}
+                    style={[
+                      styles.valuePropLabel,
+                      isTablet && { fontSize: 13, lineHeight: 17, letterSpacing: 0.4 },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {item.label}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+
             <Pressable
-              onPress={() => navigation.navigate('SignIn')}
-              hitSlop={8}
-              style={({ pressed }) => pressed && styles.buttonPressed}
+              onPress={() => navigation.navigate('RoleSelectionMain')}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                isTablet && styles.primaryButtonTablet,
+                pressed && styles.buttonPressed,
+              ]}
             >
-              <AppText variant="bodyBold" color={palette.primary} style={styles.loginLink}>
-                Log in
+              <AppText variant="bodyBold" style={styles.primaryButtonText}>
+                Get Started
               </AppText>
+              <View style={styles.primaryButtonArrow}>
+                <Ionicons name="arrow-forward" size={16} color={palette.white} />
+              </View>
             </Pressable>
+
+            <View style={styles.loginRow}>
+              <AppText variant="bodySmall" color={palette.textMuted} style={styles.loginPrompt}>
+                Already have an account?
+              </AppText>
+              <Pressable
+                onPress={() => navigation.navigate('SignIn')}
+                hitSlop={8}
+                style={({ pressed }) => pressed && styles.buttonPressed}
+              >
+                <AppText variant="bodyBold" color={palette.primary} style={styles.loginLink}>
+                  Log in
+                </AppText>
+              </Pressable>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -135,6 +216,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: hp(1.2),
     paddingHorizontal: wp(2),
+  },
+
+  headerTablet: {
+    gap: spacing.sm,
+    paddingHorizontal: 0,
   },
 
   logo: {
@@ -208,6 +294,15 @@ const styles = StyleSheet.create({
     }),
   },
 
+  actionPanelTablet: {
+    borderRadius: 24,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: spacing.lg,
+    marginTop: 0,
+  },
+
   valuePropRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -218,6 +313,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: hp(0.6),
+    minWidth: 0,
   },
 
   valuePropImage: {
@@ -235,14 +331,14 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: palette.eggplant,
     width: '100%',
-    minHeight: normalize(52),
-    paddingVertical: hp(1.6),
-    paddingHorizontal: wp(5),
+    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
     borderRadius: normalize(14),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: wp(2),
+    gap: spacing.sm,
     ...Platform.select({
       ios: {
         shadowColor: palette.eggplant,
@@ -254,6 +350,23 @@ const styles = StyleSheet.create({
         elevation: 3,
       },
     }),
+  },
+
+  primaryButtonTablet: {
+    minHeight: 48,
+    paddingVertical: 12,
+    borderRadius: 14,
+    maxWidth: 420,
+    alignSelf: 'center',
+  },
+
+  primaryButtonArrow: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   primaryButtonText: {

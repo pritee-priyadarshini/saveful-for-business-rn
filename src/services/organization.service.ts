@@ -16,8 +16,6 @@ export async function patchFormData(path: string, body: FormData) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  console.log(`[ORG] → PATCH ${url}`);
-
   const response = await fetch(url, {
     method: 'PATCH',
     body,
@@ -25,7 +23,6 @@ export async function patchFormData(path: string, body: FormData) {
   });
 
   const json = await response.json().catch(() => null);
-  console.log(`[ORG] ← ${response.status} PATCH ${url}`, json);
 
   if (!response.ok) {
     const error: any = new Error(json?.message || `Request failed with status ${response.status}`);

@@ -161,7 +161,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       setRoleFlow,
       selectPlan,
       upgradePlan: () => {
-        console.log('Upgrade handled via backend later / API to be integrated');
+        // Upgrade handled via backend / API when available.
       },
       updateRestaurantField,
       updateCharityField,

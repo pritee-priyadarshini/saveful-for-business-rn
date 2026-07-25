@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/AppText';
 import { palette } from '@/theme/colors';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import type { ImpactFilter } from '@/store/impactStore';
 
 type Props = {
@@ -59,6 +59,8 @@ function parseApiDate(isoDate?: string): Date {
 }
 
 export function ImpactDateFilter({ filter, onChange }: Props) {
+  const r = useResponsiveLayout();
+  const compact = r.isTablet;
   const [pickerTarget, setPickerTarget] = useState<'from' | 'to' | null>(null);
   const [draftDate, setDraftDate] = useState(new Date());
 
@@ -115,12 +117,20 @@ export function ImpactDateFilter({ filter, onChange }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
-        <AppText variant="bodyBold" style={styles.title} numberOfLines={1}>
+        <AppText
+          variant="bodyBold"
+          style={[styles.title, compact && styles.titleCompact]}
+          numberOfLines={1}
+        >
           Select time period
         </AppText>
 
         <Pressable
-          style={[styles.allTimeChip, filter.mode === 'all_time' && styles.allTimeChipActive]}
+          style={[
+            styles.allTimeChip,
+            compact && styles.allTimeChipCompact,
+            filter.mode === 'all_time' && styles.allTimeChipActive,
+          ]}
           onPress={() => onChange({ mode: 'all_time' })}
           accessibilityRole="button"
           accessibilityState={{ selected: filter.mode === 'all_time' }}
@@ -128,12 +138,13 @@ export function ImpactDateFilter({ filter, onChange }: Props) {
         >
           <Ionicons
             name="infinite-outline"
-            size={normalize(15)}
+            size={compact ? 13 : normalize(15)}
             color={filter.mode === 'all_time' ? palette.white : palette.kale}
           />
           <AppText
             style={[
               styles.allTimeText,
+              compact && styles.allTimeTextCompact,
               filter.mode === 'all_time' && styles.allTimeTextActive,
             ]}
             numberOfLines={1}
@@ -145,26 +156,40 @@ export function ImpactDateFilter({ filter, onChange }: Props) {
 
       <View style={styles.dateRow}>
         <Pressable
-          style={[styles.dateField, filter.mode === 'custom' && styles.dateFieldActive]}
+          style={[
+            styles.dateField,
+            compact && styles.dateFieldCompact,
+            filter.mode === 'custom' && styles.dateFieldActive,
+          ]}
           onPress={() => openPicker('from')}
         >
-          <AppText style={styles.dateLabel}>From</AppText>
+          <AppText style={[styles.dateLabel, compact && styles.dateLabelCompact]}>From</AppText>
           <View style={styles.dateValueRow}>
-            <Ionicons name="calendar-outline" size={normalize(15)} color={palette.kale} />
-            <AppText style={styles.dateValue} numberOfLines={1}>
+            <Ionicons name="calendar-outline" size={compact ? 13 : normalize(15)} color={palette.kale} />
+            <AppText
+              style={[styles.dateValue, compact && styles.dateValueCompact]}
+              numberOfLines={1}
+            >
               {formatDisplayDate(filter.mode === 'custom' ? filter.startDate : undefined)}
             </AppText>
           </View>
         </Pressable>
 
         <Pressable
-          style={[styles.dateField, filter.mode === 'custom' && styles.dateFieldActive]}
+          style={[
+            styles.dateField,
+            compact && styles.dateFieldCompact,
+            filter.mode === 'custom' && styles.dateFieldActive,
+          ]}
           onPress={() => openPicker('to')}
         >
-          <AppText style={styles.dateLabel}>To</AppText>
+          <AppText style={[styles.dateLabel, compact && styles.dateLabelCompact]}>To</AppText>
           <View style={styles.dateValueRow}>
-            <Ionicons name="calendar-outline" size={normalize(15)} color={palette.kale} />
-            <AppText style={styles.dateValue} numberOfLines={1}>
+            <Ionicons name="calendar-outline" size={compact ? 13 : normalize(15)} color={palette.kale} />
+            <AppText
+              style={[styles.dateValue, compact && styles.dateValueCompact]}
+              numberOfLines={1}
+            >
               {formatDisplayDate(filter.mode === 'custom' ? filter.endDate : undefined)}
             </AppText>
           </View>
@@ -235,6 +260,10 @@ const styles = StyleSheet.create({
     fontSize: normalize(14),
     textTransform: 'none',
   },
+  titleCompact: {
+    fontSize: 13,
+    lineHeight: 17,
+  },
   allTimeChip: {
     flexShrink: 0,
     flexDirection: 'row',
@@ -247,6 +276,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.7),
   },
+  allTimeChipCompact: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
   allTimeChipActive: {
     backgroundColor: palette.kale,
   },
@@ -255,6 +289,9 @@ const styles = StyleSheet.create({
     fontSize: normalize(13),
     color: palette.kale,
     textTransform: 'none',
+  },
+  allTimeTextCompact: {
+    fontSize: 12,
   },
   allTimeTextActive: {
     color: palette.white,
@@ -274,6 +311,13 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1),
     gap: hp(0.35),
   },
+  dateFieldCompact: {
+    minHeight: 52,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    gap: 4,
+  },
   dateFieldActive: {
     borderColor: palette.kale,
     backgroundColor: '#F7FAF7',
@@ -283,6 +327,9 @@ const styles = StyleSheet.create({
     fontSize: normalize(11),
     color: palette.midgray,
     textTransform: 'uppercase',
+  },
+  dateLabelCompact: {
+    fontSize: 10,
   },
   dateValueRow: {
     flexDirection: 'row',
@@ -297,6 +344,10 @@ const styles = StyleSheet.create({
     fontSize: normalize(13),
     color: palette.black,
     textTransform: 'none',
+  },
+  dateValueCompact: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   modalBackdrop: {
     flex: 1,

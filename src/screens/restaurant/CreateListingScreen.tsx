@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Dimensions,
   Image,
   Linking,
   Modal,
@@ -33,14 +32,8 @@ import {
   hasListingDateErrors,
   type ListingDateFieldErrors,
 } from '../../utils/listingDateValidation';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildFormShellStyles } from '@/utils/dashboardAdaptive';
 
 type Step = 1 | 2 | 3;
 type PickerTarget = 'bestBefore' | 'from' | 'to' | null;
@@ -111,6 +104,8 @@ const formatTime = (date: Date | null) => {
 };
 
 export function CreateListingScreen({ navigation }: any) {
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
   const { currentProfile, authUser } = useAppContext();
   const { submitting, withLock } = useSubmitLock();
   const { hasPreviousListing, previousListing } = usePreviousListingRelist('people');
@@ -423,15 +418,18 @@ export function CreateListingScreen({ navigation }: any) {
         useListingsStore.getState().invalidateSite();
         navigation.replace('RestaurantListings');
       } catch (error: any) {
-        console.log('[FoodListing] create failed', error?.response?.status, error?.response?.data);
         showErrorAlert(error, 'Could not create listing', 'Please try again.');
       }
     });
   };
 
   return (
-    <Screen backgroundColor="#F2F5E9" scrollable contentStyle={styles.screenContent}>
-      <View style={styles.pageWrap}>
+    <Screen
+      backgroundColor="#F2F5E9"
+      scrollable
+      contentStyle={[styles.screenContent, adaptive.screenContent]}
+    >
+      <View style={[styles.pageWrap, adaptive.pageWrap]}>
         <View style={styles.topPanel}>
           <View style={styles.headerRow}>
             <Pressable onPress={handleBack} style={styles.backBtn}>
@@ -451,7 +449,7 @@ export function CreateListingScreen({ navigation }: any) {
 
           <Image
             source={require('../../../assets/placeholder/people_icon.png')}
-            style={styles.peopleIcon}
+            style={[styles.peopleIcon, adaptive.peopleIcon]}
             resizeMode="contain"
           />
 
@@ -471,7 +469,7 @@ export function CreateListingScreen({ navigation }: any) {
                 <React.Fragment key={entry.id}>
                   <Pressable
                     onPress={() => (entry.id <= step ? setStep(entry.id) : undefined)}
-                    style={[styles.stepDot, (isActive || isDone) && styles.stepDotActive]}
+                    style={[styles.stepDot, adaptive.stepDot, (isActive || isDone) && styles.stepDotActive]}
                   >
                     <AppText
                       variant="bodyBold"
@@ -483,7 +481,7 @@ export function CreateListingScreen({ navigation }: any) {
                   </Pressable>
 
                   {index < stepMeta.length - 1 ? (
-                    <View style={[styles.stepLine, step > entry.id && styles.stepLineActive]} />
+                    <View style={[styles.stepLine, adaptive.stepLine, step > entry.id && styles.stepLineActive]} />
                   ) : null}
                 </React.Fragment>
               );
@@ -536,7 +534,7 @@ export function CreateListingScreen({ navigation }: any) {
                   </View>
 
                   <View style={styles.qtyWrap}>
-                    <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, -0.5)}>
+                    <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, -0.5)}>
                       <AppText variant="h6" color={palette.stone}>
                         -
                       </AppText>
@@ -546,7 +544,7 @@ export function CreateListingScreen({ navigation }: any) {
                       {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
                     </AppText>
 
-                    <Pressable style={styles.qtyBtn} onPress={() => updateQty(index, 0.5)}>
+                    <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, 0.5)}>
                       <AppText variant="h6" color={palette.stone}>
                         +
                       </AppText>
@@ -595,7 +593,7 @@ export function CreateListingScreen({ navigation }: any) {
             </AppText>
             <View style={styles.card}>
               {images.length === 0 ? (
-                <Pressable style={styles.photoPlaceholder} onPress={pickFromGallery}>
+                <Pressable style={[styles.photoPlaceholder, adaptive.photoPlaceholder]} onPress={pickFromGallery}>
                   <AppText variant="h7" color={palette.stone}>
                     +
                   </AppText>
@@ -603,7 +601,7 @@ export function CreateListingScreen({ navigation }: any) {
               ) : (
                 <View style={styles.photoGrid}>
                   {images.map((uri, index) => (
-                    <View key={`${uri}-${index}`} style={styles.previewItem}>
+                    <View key={`${uri}-${index}`} style={[styles.previewItem, adaptive.previewItem]}>
                       <Image source={{ uri }} style={styles.previewImage} />
                       <Pressable style={styles.removePhotoBtn} onPress={() => removePhoto(index)}>
                         <Ionicons name="close" size={normalize(14)} color={palette.white} />
@@ -620,13 +618,13 @@ export function CreateListingScreen({ navigation }: any) {
               </View>
 
               <View style={styles.photoButtonRow}>
-                <Pressable style={styles.secondaryBtn} onPress={pickFromGallery}>
+                <Pressable style={[styles.secondaryBtn, adaptive.secondaryBtn]} onPress={pickFromGallery}>
                   <AppText variant="bodyBold" color={palette.stone}>
                     Gallery
                   </AppText>
                 </Pressable>
 
-                <Pressable style={styles.primaryBtn} onPress={pickFromCamera}>
+                <Pressable style={[styles.primaryBtn, adaptive.primaryBtn]} onPress={pickFromCamera}>
                   <AppText variant="bodyBold" color={palette.white}>
                     Camera
                   </AppText>
@@ -723,7 +721,7 @@ export function CreateListingScreen({ navigation }: any) {
                   <Pressable
                     key={option.label}
                     onPress={() => setStorage(option.label)}
-                    style={[styles.choiceChip, active && styles.choiceChipActive]}
+                    style={[styles.choiceChip, adaptive.choiceChip, active && styles.choiceChipActive]}
                   >
                     <Image
                       source={option.icon}
@@ -748,7 +746,7 @@ export function CreateListingScreen({ navigation }: any) {
                   <Pressable
                     key={option.label}
                     onPress={() => setReheating(option.label)}
-                    style={[styles.choiceChip, active && styles.choiceChipActive]}
+                    style={[styles.choiceChip, adaptive.choiceChip, active && styles.choiceChipActive]}
                   >
                     {option.icon ? (
                       <Image
@@ -955,7 +953,7 @@ export function CreateListingScreen({ navigation }: any) {
         ) : null}
 
         <Pressable
-          style={[styles.bottomButton, submitting && styles.bottomButtonDisabled]}
+          style={[styles.bottomButton, adaptive.bottomButton, submitting && styles.bottomButtonDisabled]}
           onPress={step === 3 ? handleCreateListing : handleContinue}
           disabled={submitting}
         >

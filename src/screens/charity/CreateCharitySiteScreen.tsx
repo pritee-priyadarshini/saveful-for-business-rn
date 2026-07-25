@@ -8,7 +8,6 @@ import {
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
-    Dimensions,
     Modal,
     Animated,
     PanResponder,
@@ -38,6 +37,7 @@ import { Skeleton } from '@/components/Skeleton';
 import { getUserFriendlyErrorMessage, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { DEFAULT_PICKUP_RADIUS_KM } from '@/utils/authSession';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -67,14 +67,6 @@ function findLocationAdmin(users: CharityMember[], locationId: number) {
     );
 }
 
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
-
 const inputPropsBase = { compact: true as const, labelVariant: 'label' as const };
 const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
 
@@ -98,10 +90,26 @@ function validateManagerPassword(
 
 export default function CreateCharitySiteScreen() {
     useTransparentStatusBar('light');
+    const r = useResponsiveLayout();
     const navigation = useNavigation();
     const route = useRoute<any>();
     const isAssignMode = route.params?.mode === 'assign-manager';
     const assignSiteId = route.params?.siteId ?? route.params?.locationId ?? null;
+
+    const contentColumn = useMemo(() => {
+        if (!r.isTablet) return null;
+        return {
+            width: '100%' as const,
+            maxWidth: r.contentMaxWidth,
+            alignSelf: 'center' as const,
+            paddingHorizontal: r.pagePadH,
+        };
+    }, [r.isTablet, r.contentMaxWidth, r.pagePadH]);
+
+    const tabletCardInset = r.isTablet ? { marginHorizontal: 0 } : null;
+    const modalHeight = Math.round(r.height * 0.72);
+    const modalHeightRef = useRef(modalHeight);
+    modalHeightRef.current = modalHeight;
 
     const {
         locations: storeLocations,
@@ -133,7 +141,7 @@ export default function CreateCharitySiteScreen() {
             field.measureInWindow((_x, fieldY, _w, fieldH) => {
                 const gap = hp(2);
                 const activeKeyboardHeight = keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
-                const visibleBottom = height - activeKeyboardHeight - gap;
+                const visibleBottom = r.height - activeKeyboardHeight - gap;
                 const fieldBottom = fieldY + fieldH;
 
                 if (fieldBottom > visibleBottom) {
@@ -144,7 +152,7 @@ export default function CreateCharitySiteScreen() {
                 }
             });
         });
-    }, []);
+    }, [r.height]);
 
     const handleFieldFocus = useCallback(
         (field: View) => {
@@ -219,18 +227,17 @@ export default function CreateCharitySiteScreen() {
     const [showPlacesSearch, setShowPlacesSearch] = useState(false);
     const [gpsLoading, setGpsLoading] = useState(false);
 
-    const MODAL_HEIGHT = height * 0.72;
-    const slideAnim = useRef(new Animated.Value(height * 0.72)).current;
+    const slideAnim = useRef(new Animated.Value(modalHeight)).current;
 
     const openModal = () => {
-        slideAnim.setValue(MODAL_HEIGHT);
+        slideAnim.setValue(modalHeight);
         setShowPlacesSearch(true);
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
     };
 
     const closeModal = () => {
         Keyboard.dismiss();
-        Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
+        Animated.timing(slideAnim, { toValue: modalHeight, duration: 250, useNativeDriver: true })
             .start(() => setShowPlacesSearch(false));
     };
 
@@ -243,7 +250,7 @@ export default function CreateCharitySiteScreen() {
             onPanResponderRelease: (_, gs) => {
                 if (gs.dy > 80 || gs.vy > 0.5) {
                     Keyboard.dismiss();
-                    Animated.timing(slideAnim, { toValue: MODAL_HEIGHT, duration: 250, useNativeDriver: true })
+                    Animated.timing(slideAnim, { toValue: modalHeightRef.current, duration: 250, useNativeDriver: true })
                         .start(() => setShowPlacesSearch(false));
                 } else {
                     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
@@ -651,7 +658,7 @@ export default function CreateCharitySiteScreen() {
     );
 
     const renderAssignSkeleton = () => (
-        <View style={styles.formCard}>
+        <View style={[styles.formCard, tabletCardInset]}>
             <Skeleton width="100%" height={normalize(72)} borderRadius={normalize(10)} />
             {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Skeleton key={i} width="100%" height={normalize(44)} borderRadius={normalize(10)} />
@@ -678,7 +685,16 @@ export default function CreateCharitySiteScreen() {
                             <View style={styles.modalOverlay}>
                                 <TouchableWithoutFeedback>
                                     <Animated.View
-                                        style={[styles.modalSheet, { transform: [{ translateY: slideAnim }] }]}
+                                        style={[
+                                            styles.modalSheet,
+                                            {
+                                                height: modalHeight,
+                                                maxWidth: r.isTablet ? Math.min(720, r.contentMaxWidth) : undefined,
+                                                width: r.isTablet ? '100%' : undefined,
+                                                alignSelf: r.isTablet ? 'center' : undefined,
+                                                transform: [{ translateY: slideAnim }],
+                                            },
+                                        ]}
                                     >
                                         <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
                                             <View style={styles.dragHandle} />
@@ -747,29 +763,32 @@ export default function CreateCharitySiteScreen() {
                             },
                         ]}
                     >
-                        <StackHeroHeader
-                            title={
-                                isReplaceMode
-                                    ? 'Update Site Manager'
-                                    : isAssignMode
-                                      ? 'Assign Site Manager'
-                                      : 'Add Location'
-                            }
-                            subtitle={
-                                isReplaceMode
-                                    ? 'Replace the current manager for this location'
-                                    : isAssignMode
-                                      ? 'Add a manager to an existing location'
-                                      : 'Set up the location, map pin, and manager in one step'
-                            }
-                            height={hp(16)}
-                        />
+                        <View style={r.isTablet ? { width: r.width, alignSelf: 'center' as const } : undefined}>
+                            <StackHeroHeader
+                                title={
+                                    isReplaceMode
+                                        ? 'Update Site Manager'
+                                        : isAssignMode
+                                          ? 'Assign Site Manager'
+                                          : 'Add Location'
+                                }
+                                subtitle={
+                                    isReplaceMode
+                                        ? 'Replace the current manager for this location'
+                                        : isAssignMode
+                                          ? 'Add a manager to an existing location'
+                                          : 'Set up the location, map pin, and manager in one step'
+                                }
+                                height={r.isTablet ? Math.min(r.height * 0.16, 168) : hp(16)}
+                            />
+                        </View>
 
+                        <View style={contentColumn}>
                         {isAssignMode ? (
                             isFetchingLocations && !assignSite ? (
                                 renderAssignSkeleton()
                             ) : (
-                            <View style={styles.formCard}>
+                            <View style={[styles.formCard, tabletCardInset]}>
                                 <View style={styles.siteBanner}>
                                     <AppText variant="label" style={styles.siteBannerLabel}>
                                         Site
@@ -839,7 +858,7 @@ export default function CreateCharitySiteScreen() {
                             </View>
                             )
                         ) : (
-                            <View style={styles.formCard}>
+                            <View style={[styles.formCard, tabletCardInset]}>
                                 <AppText variant="bodyBold" style={styles.sectionHeading}>
                                     Site details
                                 </AppText>
@@ -922,6 +941,7 @@ export default function CreateCharitySiteScreen() {
                                 </Pressable>
                             </View>
                         )}
+                        </View>
                     </ScrollView>
             </Screen>
         </KeyboardAvoidingView>
@@ -1071,7 +1091,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalSheet: {
-        height: height * 0.72,
         backgroundColor: palette.white,
         borderTopLeftRadius: normalize(20),
         borderTopRightRadius: normalize(20),

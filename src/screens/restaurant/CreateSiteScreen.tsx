@@ -8,7 +8,6 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
-  Dimensions,
   Modal,
   Animated,
   PanResponder,
@@ -31,6 +30,7 @@ import { fetchCurrentLocation } from '@/utils/currentLocation';
 import { resolveLocationDetails } from '@/utils/postcode';
 import { getUserFriendlyErrorMessage, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
 /** Matches AssignSiteManagerDto MinLength(8) in svforb sites.dto.ts */
 const MIN_PASSWORD_LENGTH = 8;
@@ -45,14 +45,6 @@ type FieldKey =
   | 'mobile'
   | 'password'
   | 'confirmPassword';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
 
 const inputPropsBase = { compact: true as const, labelVariant: 'label' as const };
 const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
@@ -94,10 +86,26 @@ function extractCreatedSiteId(res: any): number | null {
 
 export default function CreateSiteScreen() {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
   const navigation = useNavigation();
   const route = useRoute<any>();
   const isAssignMode = route.params?.mode === 'manager';
   const assignSiteId = route.params?.siteId ?? null;
+
+  const contentColumn = useMemo(() => {
+    if (!r.isTablet) return null;
+    return {
+      width: '100%' as const,
+      maxWidth: r.contentMaxWidth,
+      alignSelf: 'center' as const,
+      paddingHorizontal: r.pagePadH,
+    };
+  }, [r.isTablet, r.contentMaxWidth, r.pagePadH]);
+
+  const tabletCardInset = r.isTablet ? { marginHorizontal: 0 } : null;
+  const modalHeight = Math.round(r.height * 0.72);
+  const modalHeightRef = useRef(modalHeight);
+  modalHeightRef.current = modalHeight;
 
   const {
     sites: storeSites,
@@ -136,7 +144,7 @@ export default function CreateSiteScreen() {
       field.measureInWindow((_x, fieldY, _w, fieldH) => {
         const gap = hp(2);
         const activeKeyboardHeight = keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
-        const visibleBottom = height - activeKeyboardHeight - gap;
+        const visibleBottom = r.height - activeKeyboardHeight - gap;
         const fieldBottom = fieldY + fieldH;
 
         if (fieldBottom > visibleBottom) {
@@ -147,7 +155,7 @@ export default function CreateSiteScreen() {
         }
       });
     });
-  }, []);
+  }, [r.height]);
 
   const handleFieldFocus = useCallback(
     (field: View) => {
@@ -233,11 +241,10 @@ export default function CreateSiteScreen() {
   const [showPlacesSearch, setShowPlacesSearch] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
 
-  const MODAL_HEIGHT = height * 0.72;
-  const slideAnim = useRef(new Animated.Value(height * 0.72)).current;
+  const slideAnim = useRef(new Animated.Value(modalHeight)).current;
 
   const openModal = () => {
-    slideAnim.setValue(MODAL_HEIGHT);
+    slideAnim.setValue(modalHeight);
     setShowPlacesSearch(true);
     Animated.spring(slideAnim, {
       toValue: 0,
@@ -250,7 +257,7 @@ export default function CreateSiteScreen() {
   const closeModal = () => {
     Keyboard.dismiss();
     Animated.timing(slideAnim, {
-      toValue: MODAL_HEIGHT,
+      toValue: modalHeight,
       duration: 250,
       useNativeDriver: true,
     }).start(() => setShowPlacesSearch(false));
@@ -266,7 +273,7 @@ export default function CreateSiteScreen() {
         if (gs.dy > 80 || gs.vy > 0.5) {
           Keyboard.dismiss();
           Animated.timing(slideAnim, {
-            toValue: MODAL_HEIGHT,
+            toValue: modalHeightRef.current,
             duration: 250,
             useNativeDriver: true,
           }).start(() => setShowPlacesSearch(false));
@@ -689,7 +696,7 @@ export default function CreateSiteScreen() {
   );
 
   const renderAssignSkeleton = () => (
-    <View style={styles.formCard}>
+    <View style={[styles.formCard, tabletCardInset]}>
       <Skeleton width="100%" height={normalize(72)} borderRadius={normalize(10)} />
       {[1, 2, 3, 4, 5, 6].map((i) => (
         <Skeleton key={i} width="100%" height={normalize(44)} borderRadius={normalize(10)} />
@@ -716,7 +723,16 @@ export default function CreateSiteScreen() {
               <View style={styles.modalOverlay}>
                 <TouchableWithoutFeedback>
                   <Animated.View
-                    style={[styles.modalSheet, { transform: [{ translateY: slideAnim }] }]}
+                    style={[
+                      styles.modalSheet,
+                      {
+                        height: modalHeight,
+                        maxWidth: r.isTablet ? Math.min(720, r.contentMaxWidth) : undefined,
+                        width: r.isTablet ? '100%' : undefined,
+                        alignSelf: r.isTablet ? 'center' : undefined,
+                        transform: [{ translateY: slideAnim }],
+                      },
+                    ]}
                   >
                     <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
                       <View style={styles.dragHandle} />
@@ -783,21 +799,24 @@ export default function CreateSiteScreen() {
               },
             ]}
           >
-            <StackHeroHeader
-              title={isAssignMode ? 'Assign Site Manager' : 'Add Location'}
-              subtitle={
-                isAssignMode
-                  ? 'Add a manager to an existing location'
-                  : 'Set up the location, map pin, and manager in one step'
-              }
-              height={hp(16)}
-            />
+            <View style={r.isTablet ? { width: r.width, alignSelf: 'center' as const } : undefined}>
+              <StackHeroHeader
+                title={isAssignMode ? 'Assign Site Manager' : 'Add Location'}
+                subtitle={
+                  isAssignMode
+                    ? 'Add a manager to an existing location'
+                    : 'Set up the location, map pin, and manager in one step'
+                }
+                height={r.isTablet ? Math.min(r.height * 0.16, 168) : hp(16)}
+              />
+            </View>
 
+            <View style={contentColumn}>
             {isAssignMode ? (
               isFetchingManagers && !assignSite ? (
                 renderAssignSkeleton()
               ) : (
-                <View style={styles.formCard}>
+                <View style={[styles.formCard, tabletCardInset]}>
                   <View style={styles.siteBanner}>
                     <AppText variant="label" style={styles.siteBannerLabel}>
                       Site
@@ -855,7 +874,7 @@ export default function CreateSiteScreen() {
                 </View>
               )
             ) : (
-              <View style={styles.formCard}>
+              <View style={[styles.formCard, tabletCardInset]}>
                 <AppText variant="bodyBold" style={styles.sectionHeading}>
                   Site details
                 </AppText>
@@ -951,6 +970,7 @@ export default function CreateSiteScreen() {
                 </Pressable>
               </View>
             )}
+            </View>
           </ScrollView>
       </Screen>
     </KeyboardAvoidingView>
@@ -1073,7 +1093,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    height: height * 0.72,
     backgroundColor: palette.white,
     borderTopLeftRadius: normalize(20),
     borderTopRightRadius: normalize(20),

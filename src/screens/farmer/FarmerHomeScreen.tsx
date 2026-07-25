@@ -21,7 +21,6 @@ import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
-import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 import { AssignDriverModal } from '@/components/AssignDriverModal';
 
 import { useAppContext } from '../../store/AppContext';
@@ -96,7 +95,6 @@ export function FarmerHomeScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<HomeTab>('list');
-  const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
   const [siteDrivers, setSiteDrivers] = useState<SiteDriverRow[]>([]);
   const [driversLoading, setDriversLoading] = useState(false);
   const [driversError, setDriversError] = useState<string | null>(null);
@@ -268,7 +266,12 @@ export function FarmerHomeScreen() {
           label="View Details"
           size="compact"
           style={styles.detailsBtn}
-          onPress={() => setSelectedListing(item)}
+          onPress={() =>
+            navigation.navigate('Available', {
+              screen: 'LivestockListingDetails',
+              params: { listing: item },
+            })
+          }
         />
       </View>
     </View>
@@ -491,12 +494,6 @@ export function FarmerHomeScreen() {
         searchPlaceholder="Search farm address or place..."
       />
 
-      <DiscoverListingDetailModal
-        visible={!!selectedListing}
-        listing={selectedListing}
-        onClose={() => setSelectedListing(null)}
-      />
-
       {viewMode === 'list' ? (
         <FlatList
           data={listings}
@@ -603,7 +600,7 @@ const styles = StyleSheet.create({
 
   heroContent: {
     flex: 1,
-    paddingHorizontal: wp(5),
+    paddingHorizontal: wp(4),
     justifyContent: 'flex-start',
     paddingTop: hp(1),
     paddingBottom: hp(1.5),

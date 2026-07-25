@@ -6,7 +6,6 @@ import {
   Pressable,
   Image,
   Modal,
-  Dimensions,
   ViewStyle,
   TextStyle,
   ScrollView,
@@ -20,18 +19,13 @@ import { Skeleton } from '../../components/Skeleton';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
+import { elevation } from '@/theme/elevation';
 import { estimateMealsSaved, getCollectedClaimKg, getListingAudience, isAnimalListing, isListingCancelled, isListingExpired, listingHasCollectedClaim, isPeopleListing } from '../../utils/foodListing';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
 import { showErrorAlert } from '@/utils/apiError';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH_INDEX = new Date().getMonth();
@@ -176,6 +170,25 @@ function getCollectorLabel(listing: any): string | null {
 
 export default function CollectionHistoryScreen({ navigation }: any) {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
+  /** Same outer width for header sections + collection card rows on tablet. */
+  const historyColumn = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    return {
+      width: '100%' as const,
+      alignSelf: 'stretch' as const,
+      marginHorizontal: 0,
+    };
+  }, [r.isTablet, adaptive.columnWidth]);
+  const historyListPad = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    const side = Math.max(0, (r.width - adaptive.columnWidth) / 2);
+    return {
+      paddingHorizontal: side,
+      alignItems: 'stretch' as const,
+    };
+  }, [r.isTablet, r.width, adaptive.columnWidth]);
   const { authUser } = useAppContext();
 
   const {
@@ -361,7 +374,22 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   );
 
   const renderScreenHeader = () => (
-    <StackHeroHeader title="Collection History" height={hp(14)} />
+    <View
+      style={
+        r.isTablet && historyListPad
+          ? {
+              marginHorizontal: -historyListPad.paddingHorizontal,
+              width: r.width,
+            }
+          : undefined
+      }
+    >
+      <StackHeroHeader
+        title="Collection History"
+        height={r.isTablet ? adaptive.heroHeight : hp(14)}
+        style={r.isTablet ? adaptive.heroBleed : undefined}
+      />
+    </View>
   );
 
   const renderMetaBox = (
@@ -413,13 +441,24 @@ export default function CollectionHistoryScreen({ navigation }: any) {
       <Pressable
         key={key}
         onPress={() => setAudienceFilter(key)}
-        style={[styles.filterChip, active ? styles.filterChipActive : styles.filterChipInactive]}
+        style={[
+          styles.filterChip,
+          adaptive.filterChip,
+          active ? styles.filterChipActive : styles.filterChipInactive,
+        ]}
       >
-        {icon ? <Image source={icon} style={styles.filterChipIcon} resizeMode="contain" /> : null}
+        {icon ? (
+          <Image
+            source={icon}
+            style={[styles.filterChipIcon, adaptive.filterChipIcon]}
+            resizeMode="contain"
+          />
+        ) : null}
         <AppText
           variant="bodyBold"
           style={[
             styles.filterChipText,
+            adaptive.filterChipText,
             active ? styles.filterChipTextActive : styles.filterChipTextInactive,
           ]}
           numberOfLines={1}
@@ -489,7 +528,14 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     const collectorLabel = getCollectorLabel(item);
 
     return (
-      <View style={[styles.collectionCard, ts.collectionCard]}>
+      <View
+        style={[
+          styles.collectionCard,
+          r.isTablet && elevation.flat,
+          r.isTablet ? styles.collectionCardTablet : null,
+          ts.collectionCard,
+        ]}
+      >
         <View style={styles.cardTopRow}>
           <View style={styles.cardTopLeft}>
             <View style={[styles.statusBadge, ts.statusBadge]}>
@@ -575,11 +621,19 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
   const renderListHeader = () => (
     <>
-      <AppText variant="h8" style={styles.sectionHeading}>
+      <AppText variant="h8" style={[styles.sectionHeading, historyColumn, r.isTablet && styles.sectionHeadingTablet]}>
         TOTAL COLLECTIONS
       </AppText>
 
-      <View style={[styles.sectionCard, themeStyles.people.sectionCard]}>
+      <View
+        style={[
+          styles.sectionCard,
+          r.isTablet && elevation.flat,
+          historyColumn,
+          r.isTablet && styles.sectionCardTablet,
+          themeStyles.people.sectionCard,
+        ]}
+      >
         <View style={styles.statsRow}>
           {renderStatCard(
             STAT_ICONS.redistributed,
@@ -606,11 +660,19 @@ export default function CollectionHistoryScreen({ navigation }: any) {
         </Pressable>
       </View>
 
-      <AppText variant="h8" style={styles.sectionHeading}>
+      <AppText variant="h8" style={[styles.sectionHeading, historyColumn, r.isTablet && styles.sectionHeadingTablet]}>
         Search Collections
       </AppText>
 
-      <View style={[styles.sectionCard, themeStyles.people.sectionCard]}>
+      <View
+        style={[
+          styles.sectionCard,
+          r.isTablet && elevation.flat,
+          historyColumn,
+          r.isTablet && styles.sectionCardTablet,
+          themeStyles.people.sectionCard,
+        ]}
+      >
         <View style={styles.filterRow}>
           {renderFilterChip('all', 'All', history.length)}
           {renderFilterChip('people', 'For People', peopleCount, PEOPLE_FILTER_ICON)}
@@ -653,7 +715,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
         </View>
       </View>
 
-      <AppText variant="h8" style={styles.sectionHeading}>
+      <AppText variant="h8" style={[styles.sectionHeading, historyColumn, r.isTablet && styles.sectionHeadingTablet]}>
         Recent Collections
       </AppText>
     </>
@@ -661,10 +723,10 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
-      <Skeleton width="100%" height={hp(14)} borderRadius={0} />
-      <View style={styles.skeletonSection}>
-        <Skeleton width={wp(40)} height={normalize(18)} style={styles.skeletonHeading} />
-        <View style={styles.skeletonSectionCard}>
+      <Skeleton width="100%" height={r.isTablet ? adaptive.heroHeight : hp(14)} borderRadius={0} />
+      <View style={[styles.skeletonSection, historyColumn]}>
+        <Skeleton width={wp(40)} height={normalize(18)} />
+        <View style={[styles.skeletonSectionCard, r.isTablet && styles.skeletonCardFlush]}>
           <View style={styles.skeletonStatsRow}>
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} width="30%" height={normalize(72)} borderRadius={normalize(8)} />
@@ -673,9 +735,9 @@ export default function CollectionHistoryScreen({ navigation }: any) {
           <Skeleton width="100%" height={normalize(44)} borderRadius={normalize(8)} />
         </View>
       </View>
-      <View style={styles.skeletonSection}>
-        <Skeleton width={wp(45)} height={normalize(18)} style={styles.skeletonHeading} />
-        <View style={styles.skeletonSectionCard}>
+      <View style={[styles.skeletonSection, historyColumn]}>
+        <Skeleton width={wp(45)} height={normalize(18)} />
+        <View style={[styles.skeletonSectionCard, r.isTablet && styles.skeletonCardFlush]}>
           <View style={styles.skeletonFilterRow}>
             <Skeleton width={wp(20)} height={normalize(36)} borderRadius={normalize(8)} />
             <Skeleton width={wp(28)} height={normalize(36)} borderRadius={normalize(8)} />
@@ -691,9 +753,12 @@ export default function CollectionHistoryScreen({ navigation }: any) {
           </View>
         </View>
       </View>
-      <Skeleton width={wp(42)} height={normalize(18)} style={styles.skeletonHeading} />
+      <Skeleton width={wp(42)} height={normalize(18)} style={historyColumn ?? undefined} />
       {[1, 2].map((i) => (
-        <View key={i} style={styles.skeletonCollectionCard}>
+        <View
+          key={i}
+          style={[styles.skeletonCollectionCard, historyColumn, r.isTablet && styles.skeletonCardFlush]}
+        >
           <View style={styles.skeletonTopRow}>
             <Skeleton width={wp(22)} height={normalize(26)} borderRadius={normalize(6)} />
             <Skeleton width={wp(28)} height={normalize(26)} borderRadius={normalize(8)} />
@@ -722,7 +787,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
               {renderSkeleton()}
             </>
           }
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, adaptive.scrollContent, historyListPad]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -739,9 +804,12 @@ export default function CollectionHistoryScreen({ navigation }: any) {
   return (
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <FlatList
+        key={r.isTablet ? 'history-2' : 'history-1'}
         data={filteredData}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
+        numColumns={r.isTablet ? 2 : 1}
+        columnWrapperStyle={r.isTablet ? styles.historyColumnWrapper : undefined}
+        contentContainerStyle={[styles.listContent, adaptive.scrollContent, historyListPad]}
         showsVerticalScrollIndicator={false}
         onScrollBeginDrag={closeDropdowns}
         refreshControl={
@@ -758,10 +826,16 @@ export default function CollectionHistoryScreen({ navigation }: any) {
             {renderListHeader()}
           </>
         }
-        renderItem={({ item }) => renderCollectionCard(item)}
+        renderItem={({ item }) =>
+          r.isTablet ? (
+            <View style={styles.historyGridItem}>{renderCollectionCard(item)}</View>
+          ) : (
+            renderCollectionCard(item)
+          )
+        }
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <AppText variant="body1" style={styles.emptyText}>
+          <View style={[styles.emptyWrap, historyColumn]}>
+            <AppText variant="body1" style={[styles.emptyText, adaptive.emptyText]}>
               No collections found
             </AppText>
           </View>
@@ -781,7 +855,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, r.isTablet && styles.modalCardTablet]}>
             <View style={styles.modalTopBar}>
               <AppText variant="h6">Listed Food</AppText>
               <Pressable style={styles.closeIconBtn} onPress={() => setModalVisible(false)}>
@@ -822,7 +896,7 @@ export default function CollectionHistoryScreen({ navigation }: any) {
 
       <Modal visible={impactModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, r.isTablet && styles.modalCardTablet]}>
             <View style={styles.modalTopBar}>
               <AppText variant="h6">Impact Details</AppText>
               <Pressable style={styles.closeIconBtn} onPress={() => setImpactModalVisible(false)}>
@@ -850,6 +924,33 @@ const styles = StyleSheet.create({
     paddingBottom: hp(3),
     gap: hp(1),
   },
+  columnFlush: {
+    marginHorizontal: 0,
+    marginTop: 8,
+  },
+  sectionHeadingTablet: {
+    paddingHorizontal: 0,
+    marginVertical: 8,
+  },
+  sectionCardTablet: {
+    marginHorizontal: 0,
+    padding: 14,
+    gap: 10,
+    borderRadius: 14,
+  },
+  historyColumnWrapper: {
+    gap: 16,
+    marginTop: 8,
+    width: '100%',
+  },
+  historyGridItem: {
+    flex: 1,
+    minWidth: 0,
+  },
+  skeletonCardFlush: {
+    marginHorizontal: 0,
+    width: '100%',
+  },
   sectionHeading: {
     paddingHorizontal: wp(4),
     textTransform: 'none',
@@ -857,7 +958,7 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     marginHorizontal: wp(4),
-    borderWidth: normalize(1),
+    borderWidth: 1,
     borderRadius: normalize(14),
     backgroundColor: palette.white,
     padding: wp(4),
@@ -870,7 +971,7 @@ const styles = StyleSheet.create({
   statMiniCard: {
     flex: 1,
     alignItems: 'center',
-    borderWidth: normalize(1),
+    borderWidth: 1,
     borderRadius: normalize(8),
     backgroundColor: palette.white,
     paddingVertical: hp(0.5),
@@ -1039,11 +1140,20 @@ const styles = StyleSheet.create({
   },
   collectionCard: {
     marginHorizontal: wp(4),
-    borderWidth: normalize(1),
+    borderWidth: 1,
     borderRadius: normalize(8),
     padding: wp(3.5),
     gap: hp(1.1),
     backgroundColor: palette.white,
+  },
+  collectionCardTablet: {
+    width: '100%',
+    marginHorizontal: 0,
+    flex: 1,
+    padding: 12,
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
   },
 
   cardTopRow: {
@@ -1135,7 +1245,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minWidth: 0,
-    borderWidth: normalize(0.5),
+    borderWidth: 1,
     borderRadius: normalize(8),
     borderColor: '#D9D9D9',
     backgroundColor: palette.white,
@@ -1220,6 +1330,14 @@ const styles = StyleSheet.create({
     borderRadius: normalize(16),
     padding: wp(5),
     gap: hp(1),
+    width: '100%',
+    maxWidth: normalize(420),
+    alignSelf: 'center',
+  },
+  modalCardTablet: {
+    maxWidth: 520,
+    borderRadius: 14,
+    padding: 20,
   },
 
   modalTopBar: {

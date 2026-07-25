@@ -3,12 +3,13 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Dimensions,
   Image,
-  TouchableOpacity,
   ImageSourcePropType,
   Pressable,
   RefreshControl,
+  useWindowDimensions,
+  ActivityIndicator,
+  type ViewStyle,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { useNavigation } from '@react-navigation/native';
@@ -29,12 +30,12 @@ import { toLineChartDatasets } from '@/utils/impactData';
 import { useBottomTabPadding, useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
+import { elevation } from '@/theme/elevation';
 import { StatusBar } from 'expo-status-bar';
 import { HeroHeader } from '@/components/HeroHeader';
 import { Ionicons } from '@expo/vector-icons';
-import { hp, normalize, wp } from '@/utils/responsive';
-
-const { width } = Dimensions.get('window');
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles, dashboardChartWidth } from '@/utils/dashboardAdaptive';
 
 const ANALYTICS_ICONS = {
   foodRecovered: require('../../../assets/placeholder/storage_box_green.png'),
@@ -89,10 +90,17 @@ export function CharityAnalyticsScreen({
   variant?: 'tab' | 'stack';
 } = {}) {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const adaptive = React.useMemo(
+    () => buildDashboardShellStyles(r, { heroPhoneHp: 22, stackHero: variant === 'stack' }),
+    [r, variant],
+  );
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentProfile } = useAppContext();
-  const tabBottomPadding = useBottomTabPadding(hp(2));
-  const stackBottomPadding = useSafeBottomPadding(hp(4));
+  const { width } = useWindowDimensions();
+  const chartWidth = dashboardChartWidth(r, width);
+  const tabBottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(2));
+  const stackBottomPadding = useSafeBottomPadding(r.isTablet ? 32 : hp(4));
   const bottomPadding = variant === 'stack' ? stackBottomPadding : tabBottomPadding;
 
   const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
@@ -131,16 +139,21 @@ export function CharityAnalyticsScreen({
 
   const organization = currentProfile.organization || 'Your charity';
 
-  const renderMetricCard = (icon: ImageSourcePropType, value: string, label: string) => (
-    <View style={styles.metricCard}>
+  const renderMetricCard = (
+    icon: ImageSourcePropType,
+    value: string,
+    label: string,
+    wrapperStyle?: ViewStyle,
+  ) => (
+    <View style={[styles.metricCard, adaptive.metricCard, wrapperStyle]}>
       <View style={styles.metricIconWrap}>
         <Image source={icon} style={styles.metricIcon} resizeMode="contain" />
       </View>
       <View style={styles.metricContent}>
-        <AppText variant="h8" style={styles.metricValue} numberOfLines={1}>
+        <AppText variant="h8" style={[styles.metricValue, adaptive.metricValue]} numberOfLines={1}>
           {value}
         </AppText>
-        <AppText variant="caption" style={styles.metricLabel} numberOfLines={2}>
+        <AppText variant="caption" style={[styles.metricLabel, adaptive.metricLabel]} numberOfLines={2}>
           {label}
         </AppText>
       </View>
@@ -149,62 +162,155 @@ export function CharityAnalyticsScreen({
 
   const renderImpactMetricsSection = (title: string, stats: ReturnType<typeof toCharityStats>) => (
     <>
-      <AppText variant="h8" style={styles.sectionTitle}>
+      <AppText variant="h8" style={[styles.sectionTitle, adaptive.sectionTitle]}>
         {title}
       </AppText>
 
       <View style={styles.metricsGrid}>
-        <View style={styles.metricsRow}>
-          {renderMetricCard(
-            ANALYTICS_ICONS.foodRecovered,
-            `${formatNumber(stats.foodRecoveredKg)} kg`,
-            'Food Recovered',
-          )}
-          {renderMetricCard(
-            ANALYTICS_ICONS.meals,
-            formatNumber(stats.mealsCreated),
-            'Meals created',
-          )}
-        </View>
-
-        <View style={styles.metricsRow}>
-          {renderMetricCard(
-            ANALYTICS_ICONS.co2,
-            `${formatNumber(stats.co2AvoidedKg)} kg`,
-            'Total CO2 avoided',
-          )}
-          {renderMetricCard(
-            ANALYTICS_ICONS.collections,
-            formatNumber(stats.collectionsCompleted),
-            'Collections completed',
-          )}
-        </View>
-
-        <View style={styles.ratingRow}>
-          <View style={styles.ratingCard}>
-            <View style={styles.metricIconWrap}>
-              <Image source={ANALYTICS_ICONS.rating} style={styles.ratingIcon} resizeMode="contain" />
-            </View>
-            <View style={styles.metricContent}>
-              <AppText variant="h8" style={styles.metricValue}>
-                {formatRating(stats.rating)}
-              </AppText>
-              <AppText variant="caption" style={styles.metricLabel}>
-                Rating
-              </AppText>
-            </View>
+        {r.isTablet ? (
+          <View style={adaptive.metricsWrap}>
+            {renderMetricCard(
+              ANALYTICS_ICONS.foodRecovered,
+              `${formatNumber(stats.foodRecoveredKg)} kg`,
+              'Food Recovered',
+              adaptive.metricGridItem,
+            )}
+            {renderMetricCard(
+              ANALYTICS_ICONS.meals,
+              formatNumber(stats.mealsCreated),
+              'Meals created',
+              adaptive.metricGridItem,
+            )}
+            {renderMetricCard(
+              ANALYTICS_ICONS.co2,
+              `${formatNumber(stats.co2AvoidedKg)} kg`,
+              'Total CO2 avoided',
+              adaptive.metricGridItem,
+            )}
+            {renderMetricCard(
+              ANALYTICS_ICONS.collections,
+              formatNumber(stats.collectionsCompleted),
+              'Collections completed',
+              adaptive.metricGridItem,
+            )}
+            {renderMetricCard(
+              ANALYTICS_ICONS.rating,
+              formatRating(stats.rating),
+              'Rating',
+              adaptive.metricGridItem,
+            )}
           </View>
-        </View>
+        ) : (
+          <>
+            <View style={styles.metricsRow}>
+              {renderMetricCard(
+                ANALYTICS_ICONS.foodRecovered,
+                `${formatNumber(stats.foodRecoveredKg)} kg`,
+                'Food Recovered',
+              )}
+              {renderMetricCard(
+                ANALYTICS_ICONS.meals,
+                formatNumber(stats.mealsCreated),
+                'Meals created',
+              )}
+            </View>
+
+            <View style={styles.metricsRow}>
+              {renderMetricCard(
+                ANALYTICS_ICONS.co2,
+                `${formatNumber(stats.co2AvoidedKg)} kg`,
+                'Total CO2 avoided',
+              )}
+              {renderMetricCard(
+                ANALYTICS_ICONS.collections,
+                formatNumber(stats.collectionsCompleted),
+                'Collections completed',
+              )}
+            </View>
+
+            <View style={styles.ratingRow}>
+              <View style={[styles.ratingCard, adaptive.metricCard]}>
+                <View style={styles.metricIconWrap}>
+                  <Image source={ANALYTICS_ICONS.rating} style={styles.ratingIcon} resizeMode="contain" />
+                </View>
+                <View style={styles.metricContent}>
+                  <AppText variant="h8" style={[styles.metricValue, adaptive.metricValue]}>
+                    {formatRating(stats.rating)}
+                  </AppText>
+                  <AppText variant="caption" style={[styles.metricLabel, adaptive.metricLabel]}>
+                    Rating
+                  </AppText>
+                </View>
+              </View>
+            </View>
+          </>
+        )}
       </View>
     </>
   );
+
+  const renderTimeChip = (key: TimeRange, label: string) => {
+    const active = range === key;
+    return (
+      <Pressable
+        key={key}
+        onPress={() => setRange(key)}
+        style={[
+          styles.filterChip,
+          adaptive.filterChip,
+          active ? styles.filterChipActive : styles.filterChipInactive,
+        ]}
+      >
+        <AppText
+          variant="bodyBold"
+          style={[
+            styles.filterChipText,
+            adaptive.filterChipText,
+            { color: active ? palette.white : palette.stone },
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </AppText>
+      </Pressable>
+    );
+  };
+
+  const renderMetricChip = (key: ImpactMetric, label: string) => {
+    const active = selectedMetric === key;
+    return (
+      <Pressable
+        key={key}
+        onPress={() => setSelectedMetric(key)}
+        style={[
+          styles.metricChip,
+          adaptive.filterChip,
+          active ? styles.filterChipActive : styles.filterChipInactive,
+        ]}
+      >
+        <AppText
+          variant="bodyBold"
+          style={[
+            styles.filterChipText,
+            adaptive.filterChipText,
+            { color: active ? palette.white : palette.stone },
+          ]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          {label}
+        </AppText>
+      </Pressable>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
       <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
         <ScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -215,11 +321,11 @@ export function CharityAnalyticsScreen({
             />
           }
         >
-          <Skeleton width="100%" height={hp(22)} borderRadius={0} />
+          <Skeleton width="100%" height={adaptive.heroHeight} borderRadius={0} />
           <View style={{ padding: wp(5), gap: hp(1.5) }}>
-            <Skeleton width="100%" height={normalize(48)} borderRadius={normalize(12)} />
-            <Skeleton width="100%" height={hp(24)} borderRadius={normalize(12)} />
-            <Skeleton width="100%" height={hp(30)} borderRadius={normalize(12)} />
+            <Skeleton width="100%" height={normalize(52)} borderRadius={normalize(14)} />
+            <Skeleton width="100%" height={hp(28)} borderRadius={normalize(14)} />
+            <Skeleton width="100%" height={hp(32)} borderRadius={normalize(14)} />
           </View>
         </ScrollView>
       </Screen>
@@ -230,7 +336,11 @@ export function CharityAnalyticsScreen({
     <Screen backgroundColor={palette.creme} transparentTop scrollable={false}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
+        contentContainerStyle={[
+          styles.container,
+          adaptive.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
         showsVerticalScrollIndicator={false}
         bounces
         alwaysBounceVertical
@@ -245,41 +355,58 @@ export function CharityAnalyticsScreen({
       >
         <HeroHeader
           source={require('../../../assets/placeholder/kale-header.png')}
-          height={variant === 'stack' ? hp(24) : hp(22)}
+          height={adaptive.heroHeight}
+          style={adaptive.heroBleed}
         >
           <View
             style={[
               styles.heroContent,
               variant === 'stack' && styles.heroContentWithBack,
+              adaptive.heroContent,
             ]}
           >
             {variant === 'stack' ? (
               <Pressable
                 onPress={() => navigation.goBack()}
-                style={styles.heroBackBtnAbsolute}
+                style={[
+                  styles.heroBackBtnAbsolute,
+                  r.isTablet && { left: r.pagePadH, top: 20 },
+                ]}
                 hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel="Go back"
               >
-                <Ionicons name="arrow-back" size={normalize(22)} color={palette.white} />
+                <Ionicons name="arrow-back" size={22} color={palette.white} />
               </Pressable>
             ) : null}
 
             <View style={styles.heroTopRow}>
               <View style={styles.heroTextBlock}>
-                <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                <AppText
+                  variant="caption"
+                  style={[styles.heroEyebrow, adaptive.heroEyebrow]}
+                  numberOfLines={1}
+                >
                   {organization}
                 </AppText>
-                <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                <AppText
+                  variant="h6"
+                  style={[styles.heroTitle, adaptive.heroTitle]}
+                  numberOfLines={1}
+                >
                   Your insights
                 </AppText>
-                <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
+                <AppText
+                  variant="bodySmall"
+                  style={[styles.heroSubtitle, adaptive.heroSubtitle]}
+                  numberOfLines={2}
+                >
                   See the difference your surplus makes
                 </AppText>
               </View>
 
               <Pressable
-                style={styles.heroIconCircle}
+                style={[styles.heroIconCircle, adaptive.heroIconCircle]}
                 onPress={() => navigation.navigate('Account')}
                 accessibilityRole="button"
                 accessibilityLabel="Open account profile"
@@ -291,14 +418,18 @@ export function CharityAnalyticsScreen({
                     resizeMode="cover"
                   />
                 ) : (
-                  <Ionicons name="bar-chart" size={normalize(26)} color={palette.eggplant} />
+                  <Ionicons name="bar-chart" size={26} color={palette.eggplant} />
                 )}
               </Pressable>
             </View>
 
-            <View style={styles.heroStatsPill}>
-              <Ionicons name="leaf-outline" size={normalize(14)} color={palette.white} />
-              <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
+            <View style={[styles.heroStatsPill, adaptive.heroStatsPill]}>
+              <Ionicons name="leaf-outline" size={14} color={palette.white} />
+              <AppText
+                variant="caption"
+                style={[styles.heroStatsText, adaptive.heroStatsText]}
+                numberOfLines={1}
+              >
                 {selectedSiteId == null && isMultiSite ? 'All sites · ' : ''}
                 {formatNumber(displayStats.mealsCreated)} meals ·{' '}
                 {formatNumber(displayStats.foodRecoveredKg)} kg · {filterLabel}
@@ -307,14 +438,28 @@ export function CharityAnalyticsScreen({
           </View>
         </HeroHeader>
 
-        <View style={styles.mainContent}>
+        <View style={[styles.mainContent, adaptive.mainContent]}>
           <Pressable
-            style={styles.ctaButton}
+            style={({ pressed }) => [
+              styles.createBtn,
+              adaptive.createBtn,
+              pressed && styles.pressed,
+            ]}
             onPress={() => navigation.navigate('CharityHistory')}
           >
-            <AppText variant="bodyLarge" style={styles.ctaText}>
-              View Collections History
-            </AppText>
+            <View style={styles.createBtnLeft}>
+              <View style={[styles.createBtnIconWrap, adaptive.createBtnIconWrap]}>
+                <Ionicons name="time-outline" size={16} color={palette.white} />
+              </View>
+              <AppText
+                variant="bodyBold"
+                style={[styles.createBtnText, adaptive.createBtnText]}
+                numberOfLines={1}
+              >
+                View Collections History
+              </AppText>
+            </View>
+            <Ionicons name="arrow-forward" size={16} color={palette.white} />
           </Pressable>
 
           <View style={styles.siteSelectorSlot}>
@@ -334,55 +479,20 @@ export function CharityAnalyticsScreen({
           )}
 
           <View style={styles.chartCard}>
-            <AppText variant="bodyBold" style={styles.chartSectionTitle}>
+            <AppText variant="bodyBold" style={[styles.sectionTitle, adaptive.sectionTitle]}>
               Impact over time
             </AppText>
 
-            <View style={styles.timeFilterRow}>
-              {TIME_RANGES.map(({ key, label }) => {
-                const isActive = range === key;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    onPress={() => setRange(key)}
-                    activeOpacity={0.8}
-                    style={[styles.timeFilterPill, isActive && styles.filterPillActive]}
-                  >
-                    <AppText
-                      style={[styles.filterPillText, isActive && styles.filterPillTextActive]}
-                    >
-                      {label}
-                    </AppText>
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={styles.filterRow}>
+              {TIME_RANGES.map(({ key, label }) => renderTimeChip(key, label))}
             </View>
 
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.metricFilterScroll}
+              contentContainerStyle={styles.metricFilterRow}
             >
-              {IMPACT_METRICS.map(({ key, label }) => {
-                const isActive = selectedMetric === key;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    onPress={() => setSelectedMetric(key)}
-                    activeOpacity={0.8}
-                    style={[styles.metricFilterPill, isActive && styles.filterPillActive]}
-                  >
-                    <AppText
-                      style={[styles.metricFilterPillText, isActive && styles.filterPillTextActive]}
-                      numberOfLines={2}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.8}
-                    >
-                      {label}
-                    </AppText>
-                  </TouchableOpacity>
-                );
-              })}
+              {IMPACT_METRICS.map(({ key, label }) => renderMetricChip(key, label))}
             </ScrollView>
 
             <View style={styles.chartContainer}>
@@ -392,7 +502,7 @@ export function CharityAnalyticsScreen({
                   labels: chartSeries.labels,
                   datasets: toLineChartDatasets(chartSeries.values),
                 }}
-                width={width - wp(10) - wp(8)}
+                width={chartWidth}
                 height={hp(24)}
                 yAxisSuffix={activeMetric.suffix ? ` ${activeMetric.suffix}` : ''}
                 yLabelsOffset={4}
@@ -411,13 +521,14 @@ export function CharityAnalyticsScreen({
                 withOuterLines={false}
                 withVerticalLines
                 withHorizontalLines
-                style={[styles.chart, chartLoading && styles.chartDimmed]}
+                style={StyleSheet.flatten([
+                  styles.chart,
+                  chartLoading && styles.chartDimmed,
+                ])}
               />
               {chartLoading ? (
                 <View style={styles.chartLoadingOverlay}>
-                  <AppText variant="caption" style={styles.chartEmptyText}>
-                    Updating…
-                  </AppText>
+                  <ActivityIndicator size="small" color={palette.kale} />
                 </View>
               ) : null}
             </View>
@@ -502,19 +613,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     textTransform: 'none',
     letterSpacing: 0.3,
-    fontSize: normalize(13),
+    fontSize: normalize(12),
   },
   heroTitle: {
     color: palette.white,
     textTransform: 'none',
-    fontSize: normalize(30),
-    lineHeight: normalize(38),
+    fontSize: normalize(26),
+    lineHeight: normalize(34),
   },
   heroSubtitle: {
     color: 'rgba(255,255,255,0.9)',
     textTransform: 'none',
-    fontSize: normalize(15),
-    lineHeight: normalize(22),
+    fontSize: normalize(14),
+    lineHeight: normalize(20),
   },
   heroIconCircle: {
     width: normalize(52),
@@ -524,6 +635,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    ...elevation.soft,
   },
   logoImage: {
     width: '100%',
@@ -544,24 +656,60 @@ const styles = StyleSheet.create({
     color: palette.white,
     flexShrink: 1,
     textTransform: 'none',
-    fontSize: normalize(13),
+    fontSize: normalize(11),
+    lineHeight: normalize(15),
   },
   mainContent: {
     paddingHorizontal: wp(5),
-    paddingTop: hp(2),
-    gap: hp(2),
-    paddingBottom: hp(1),
+    paddingTop: hp(1.2),
+    gap: hp(1.2),
+    paddingBottom: hp(0.8),
+    marginTop: -hp(1.5),
   },
   siteSelectorSlot: {
     marginBottom: hp(0.5),
   },
-  sectionTitle: {
-    color: palette.black,
-    textTransform: 'none',
-    marginTop: hp(0.5),
+  createBtn: {
+    backgroundColor: palette.eggplant,
+    borderRadius: normalize(14),
+    height: 46,
+    minHeight: 46,
+    maxHeight: 46,
+    marginTop: hp(1.2),
+    paddingVertical: 0,
+    paddingHorizontal: wp(4),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    ...elevation.flat,
   },
-  chartSectionTitle: {
-    fontSize: normalize(18),
+  createBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+    flex: 1,
+    minWidth: 0,
+  },
+  createBtnIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  createBtnText: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
+    includeFontPadding: false,
+  },
+  sectionTitle: {
+    fontSize: normalize(16),
+    lineHeight: normalize(22),
     textTransform: 'none',
     color: palette.black,
     letterSpacing: 0.2,
@@ -571,20 +719,21 @@ const styles = StyleSheet.create({
   },
   metricsRow: {
     flexDirection: 'row',
-    gap: wp(2.5),
+    gap: wp(2),
   },
   metricCard: {
     flex: 1,
     minWidth: 0,
     backgroundColor: palette.white,
-    borderRadius: normalize(16),
+    borderRadius: normalize(14),
     borderWidth: 1,
     borderColor: palette.strokecream,
-    paddingVertical: hp(1.4),
-    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2.2),
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2),
+    ...elevation.flat,
   },
   metricIconWrap: {
     width: normalize(36),
@@ -635,71 +784,56 @@ const styles = StyleSheet.create({
   },
   chartCard: {
     backgroundColor: palette.white,
-    borderRadius: normalize(20),
+    borderRadius: normalize(14),
     borderWidth: 1,
     borderColor: palette.strokecream,
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1.8),
-    gap: hp(1.2),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.3),
+    gap: hp(1),
+    ...elevation.flat,
   },
-  timeFilterRow: {
+  filterRow: {
     flexDirection: 'row',
-    width: '100%',
     gap: wp(2),
   },
-  metricFilterScroll: {
+  metricFilterRow: {
     flexDirection: 'row',
     gap: wp(2),
     paddingVertical: hp(0.2),
   },
-  timeFilterPill: {
+  filterChip: {
     flex: 1,
-    paddingVertical: hp(1),
-    paddingHorizontal: wp(2),
-    borderRadius: normalize(20),
-    backgroundColor: palette.white,
-    borderWidth: 1,
-    borderColor: palette.strokecream,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: normalize(38),
-  },
-  metricFilterPill: {
     minWidth: 0,
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(0.9),
-    borderRadius: normalize(20),
-    backgroundColor: palette.white,
+    paddingVertical: 7,
+    paddingHorizontal: wp(2),
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: palette.strokecream,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: normalize(36),
+    minHeight: 34,
   },
-  filterPillActive: {
+  metricChip: {
+    minWidth: 0,
+    paddingVertical: 7,
+    paddingHorizontal: wp(3),
+    borderRadius: 16,
+    borderWidth: 1,
+    minHeight: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterChipActive: {
     backgroundColor: palette.eggplant,
     borderColor: palette.eggplant,
   },
-  filterPillText: {
-    color: palette.stone,
-    textTransform: 'none',
-    letterSpacing: 0,
-    fontSize: normalize(13),
-    lineHeight: normalize(18),
-    fontFamily: 'Saveful-Bold',
-    textAlign: 'center',
+  filterChipInactive: {
+    backgroundColor: palette.white,
+    borderColor: palette.strokecream,
   },
-  metricFilterPillText: {
-    color: palette.stone,
+  filterChipText: {
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
     textTransform: 'none',
-    letterSpacing: 0,
-    fontSize: normalize(13),
-    lineHeight: normalize(18),
-    fontFamily: 'Saveful-Bold',
-    textAlign: 'center',
-  },
-  filterPillTextActive: {
-    color: palette.white,
   },
   chartContainer: {
     width: '100%',
@@ -726,15 +860,7 @@ const styles = StyleSheet.create({
     borderRadius: normalize(12),
     marginLeft: -wp(2),
   },
-  ctaButton: {
-    backgroundColor: palette.eggplant,
-    borderRadius: normalize(16),
-    paddingVertical: hp(1.8),
-    paddingHorizontal: wp(5),
-    alignItems: 'center',
-  },
-  ctaText: {
-    color: palette.white,
-    textTransform: 'none',
+  pressed: {
+    opacity: 0.82,
   },
 });

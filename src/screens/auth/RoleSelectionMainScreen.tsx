@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
 	Image,
 	Pressable,
@@ -9,14 +9,16 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelectionMain'>;
 
@@ -30,7 +32,6 @@ const roleCards = [
 			'List surplus edible food for charities to help communities in need. Or list non-edible for farmers to feed livestock.',
 		borderColor: palette.kale,
 		titleColor: palette.kale,
-		accentColor: palette.kale,
 		buttonColor: palette.kale,
 		iconBgColor: palette.kale,
 		role: 'restaurant_single' as const,
@@ -45,7 +46,6 @@ const roleCards = [
 			'Collect surplus edible food to help communities in need. Or collect non-edible to be used for farm livestock feed.',
 		borderColor: palette.eggplant,
 		titleColor: palette.kale,
-		accentColor: palette.validation,
 		buttonColor: palette.eggplant,
 		iconBgColor: palette.eggplant,
 		role: 'charity_single' as const,
@@ -55,6 +55,8 @@ const roleCards = [
 
 export function RoleSelectionMainScreen({ navigation }: Props) {
 	const { setRole, setRoleFlow } = useAppContext();
+	const insets = useSafeAreaInsets();
+	const r = useResponsiveLayout();
 	useTransparentStatusBar('light');
 
 	const onContinue = (role: (typeof roleCards)[number]['role']) => {
@@ -63,70 +65,153 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 		navigation.navigate('RoleSelection');
 	};
 
+	const tablet = useMemo(() => {
+		if (!r.isTablet) return null;
+		return {
+			screenContent: {
+				paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm,
+				justifyContent: 'flex-start' as const,
+			},
+			heroHeight: Math.min(r.height * (r.isLandscape ? 0.16 : 0.14), r.isLandscape ? 120 : 150),
+			headerText: {
+				maxWidth: r.contentMaxWidth,
+				fontSize: r.font(20, 24, 26),
+				lineHeight: r.font(26, 30, 32),
+			},
+			content: {
+				paddingHorizontal: r.pagePadH,
+				paddingTop: r.space(12, 16, 18),
+				gap: r.space(14, 16, 18),
+				width: '100%' as const,
+				maxWidth: r.contentMaxWidth,
+				alignSelf: 'center' as const,
+			},
+			subtitle: {
+				fontSize: r.font(14, 15, 16),
+				lineHeight: r.font(20, 22, 24),
+				paddingHorizontal: 0,
+			},
+			card: {
+				paddingVertical: r.space(14, 16, 18),
+				paddingHorizontal: r.space(16, 18, 20),
+				borderRadius: 18,
+			},
+			roundIconWrap: {
+				width: 56,
+				height: 56,
+				borderRadius: 28,
+			},
+			roundIcon: {
+				width: 56,
+				height: 56,
+			},
+			illustration: {
+				width: 130,
+				height: 88,
+			},
+			cardTitle: {
+				fontSize: r.font(16, 18, 19),
+				lineHeight: r.font(22, 24, 26),
+			},
+			cardDescription: {
+				fontSize: r.font(14, 15, 15),
+				lineHeight: r.font(20, 22, 22),
+			},
+			continueButton: {
+				minHeight: 48,
+				paddingVertical: 12,
+				borderRadius: 12,
+				marginTop: spacing.md,
+			},
+		};
+	}, [r, insets.bottom]);
+
 	return (
 		<Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
 			<StatusBar style="light" translucent backgroundColor="transparent" />
-			<ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
-			<HeroHeader
-				source={require('../../../assets/placeholder/kale-headera.png')}
-				height={hp(16)}
-				padContentRight={false}
-				contentStyle={styles.headerContent}
+			<ScrollView
+				contentContainerStyle={[styles.screenContent, tablet?.screenContent]}
+				showsVerticalScrollIndicator={false}
+				bounces={false}
 			>
-				<AppText variant="h5" color={palette.white} style={styles.headerText}>
-					{`HOW WILL YOU USE\nSAVEFUL FOR BUSINESS?`}
-				</AppText>
-			</HeroHeader>
+				<HeroHeader
+					source={require('../../../assets/placeholder/kale-headera.png')}
+					height={tablet?.heroHeight ?? hp(16)}
+					padContentRight={false}
+					contentStyle={styles.headerContent}
+				>
+					<AppText variant="h5" color={palette.white} style={[styles.headerText, tablet?.headerText]}>
+						{`HOW WILL YOU USE\nSAVEFUL FOR BUSINESS?`}
+					</AppText>
+				</HeroHeader>
 
-			<View style={styles.content}>
-				<AppText variant="bodyBold" color={palette.primary} style={styles.subtitle}>
-					This helps us personalise your experience and connect you with the right community
-				</AppText>
+				<View style={[styles.content, tablet?.content]}>
+					<AppText variant="bodyBold" color={palette.primary} style={[styles.subtitle, tablet?.subtitle]}>
+						This helps us personalise your experience and connect you with the right community
+					</AppText>
 
-				{roleCards.map((card) => (
-					<View key={card.id} style={[styles.card, { borderColor: card.borderColor }]}>
-						<View style={styles.cardTopRow}>
-							<View style={[styles.roundIconWrap, { backgroundColor: card.iconBgColor }]}>
+					{roleCards.map((card) => (
+						<View key={card.id} style={[styles.card, { borderColor: card.borderColor }, tablet?.card]}>
+							<View style={styles.cardTopRow}>
+								<View
+									style={[
+										styles.roundIconWrap,
+										{ backgroundColor: card.iconBgColor },
+										tablet?.roundIconWrap,
+									]}
+								>
+									<Image
+										source={card.roundIcon}
+										style={[styles.roundIcon, tablet?.roundIcon]}
+										resizeMode="contain"
+									/>
+								</View>
+
 								<Image
-									source={card.roundIcon}
-									style={styles.roundIcon}
+									source={card.illustration}
+									style={[styles.illustration, tablet?.illustration]}
 									resizeMode="contain"
 								/>
 							</View>
 
-							<Image
-								source={card.illustration}
-								style={styles.illustration}
-								resizeMode="contain"
-							/>
+							<AppText variant="bodyBold1" color={palette.primary} style={styles.cardSubTitle}>
+								{card.subTitle}
+							</AppText>
+
+							<AppText
+								variant="h8"
+								color={card.titleColor}
+								style={[styles.cardTitle, tablet?.cardTitle]}
+							>
+								{card.title}
+							</AppText>
+
+							<AppText
+								variant="body1"
+								color={palette.primary}
+								style={[styles.cardDescription, tablet?.cardDescription]}
+							>
+								{card.description}
+							</AppText>
+
+							<Pressable
+								onPress={() => onContinue(card.role)}
+								style={[
+									styles.continueButton,
+									{ backgroundColor: card.buttonColor },
+									tablet?.continueButton,
+								]}
+							>
+								<AppText variant="bodyBold" color={palette.white} style={styles.continueLabel}>
+									CONTINUE
+								</AppText>
+								<View style={styles.continueArrow}>
+									<Ionicons name="arrow-forward" size={16} color={palette.white} />
+								</View>
+							</Pressable>
 						</View>
-
-						<AppText variant="bodyBold1" color={palette.primary} style={styles.cardSubTitle}>
-							{card.subTitle}
-						</AppText>
-
-						<AppText variant="h8" color={card.titleColor} style={styles.cardTitle}>
-							{card.title}
-						</AppText>
-
-						<AppText variant="body1" color={palette.primary} style={styles.cardDescription}>
-							{card.description}
-						</AppText>
-
-						<Pressable
-							onPress={() => onContinue(card.role)}
-							style={[styles.continueButton, { backgroundColor: card.buttonColor }]}
-						>
-							<AppText variant="bodyBold" color={palette.white}>
-								CONTINUE
-							</AppText>
-							<AppText variant="bodyBold" color={palette.white} style={styles.arrowText}>
-								<Ionicons name="arrow-forward" size={normalize(20)} color={palette.white} />
-							</AppText>
-						</Pressable>
-					</View>
-				))}
-			</View>
+					))}
+				</View>
 			</ScrollView>
 		</Screen>
 	);
@@ -164,30 +249,27 @@ const styles = StyleSheet.create({
 		backgroundColor: '#F3F3EC',
 		paddingVertical: hp(1.5),
 		paddingHorizontal: wp(3.4),
+		width: '100%',
 	},
 	cardTopRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 	},
 	roundIconWrap: {
-		width: wp(16),
-		height: wp(16),
-		borderRadius: wp(8),
+		width: 56,
+		height: 56,
+		borderRadius: 28,
 		alignItems: 'center',
 		justifyContent: 'center',
+		overflow: 'hidden',
 	},
 	roundIcon: {
-		width: wp(16),
-		height: wp(16),
-	},
-	cardNumber: {
-		marginLeft: wp(15),
-		fontSize: normalize(34),
-		lineHeight: normalize(36),
+		width: 56,
+		height: 56,
 	},
 	illustration: {
-		width: wp(34),
-		height: hp(10),
+		width: 120,
+		height: 88,
 		marginLeft: 'auto',
 	},
 	cardSubTitle: {
@@ -203,21 +285,24 @@ const styles = StyleSheet.create({
 	continueButton: {
 		marginTop: hp(1.3),
 		borderRadius: normalize(10),
-		minHeight: hp(5),
-		paddingHorizontal: wp(4),
+		minHeight: 48,
+		paddingVertical: 12,
+		paddingHorizontal: spacing.lg,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
+		gap: spacing.sm,
 	},
-	continueText: {
-		fontSize: normalize(13),
-		lineHeight: normalize(16),
+	continueLabel: {
+		textTransform: 'uppercase',
+		letterSpacing: 0.4,
 	},
-	arrowText: {
-		position: 'absolute',
-		right: wp(4),
-		fontSize: normalize(15),
-		lineHeight: normalize(18),
-		top: hp(1.5),
+	continueArrow: {
+		width: 26,
+		height: 26,
+		borderRadius: 13,
+		backgroundColor: 'rgba(255,255,255,0.22)',
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 });

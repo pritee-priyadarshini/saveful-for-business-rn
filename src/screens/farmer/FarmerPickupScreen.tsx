@@ -1,32 +1,27 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   Pressable,
-  ImageBackground,
   Image,
   Modal,
   Linking,
-  Dimensions,
   ViewStyle,
   TextStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
-import { Skeleton } from '../../components/Skeleton';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '../../theme/colors';
 import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 
 type StatusFilter = 'all' | 'completed' | 'cancelled';
 
@@ -229,7 +224,12 @@ function getDriverLabel(pickup: Pickup) {
 }
 
 export default function FarmerPickupScreen({ navigation }: any) {
-  const [loading, setLoading] = useState(true);
+  useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
+  const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(3));
+  const tabletInsetReset = r.isTablet ? { paddingHorizontal: 0 } : null;
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPickup, setSelectedPickup] = useState<Pickup | null>(null);
@@ -296,6 +296,16 @@ export default function FarmerPickupScreen({ navigation }: any) {
     openDetails(pickup);
   };
 
+  const contentColumn = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    return {
+      width: adaptive.columnWidth,
+      maxWidth: r.contentMaxWidth,
+      alignSelf: 'center' as const,
+      paddingHorizontal: r.pagePadH,
+    };
+  }, [r.isTablet, r.contentMaxWidth, r.pagePadH, adaptive.columnWidth]);
+
   const renderContactButton = (
     label: 'Call' | 'Message',
     onPress: () => void,
@@ -338,60 +348,59 @@ export default function FarmerPickupScreen({ navigation }: any) {
         <View style={styles.cardBodyRow}>
           <View style={[styles.weightBox, theme.weightBox]}>
             <Image source={theme.weightIcon} style={styles.weightIcon} resizeMode="contain" />
-            <AppText
-              variant="bodyBold"
-              style={[styles.weightText, theme.weightText]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-            >
-              {pickup.weightKg} kg
+            <AppText variant="bodyBold" style={[styles.weightValue, theme.weightText]} numberOfLines={1}>
+              {pickup.weightKg}
+            </AppText>
+            <AppText variant="caption" style={styles.weightUnit} numberOfLines={1}>
+              kg
             </AppText>
           </View>
 
-          <View style={styles.cardMainArea}>
-            <View style={styles.cardContent}>
-              <View style={styles.detailLine}>
-                <Ionicons name="location-sharp" size={normalize(13)} color={palette.chilli} />
-                <AppText variant="bodySmall" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
-                  {pickup.restaurantAddress}
-                </AppText>
-              </View>
-
-              <AppText variant="bodySmall" style={styles.distanceText}>
-                {pickup.distance}
+          <View style={styles.detailsColumn}>
+            <View style={styles.detailLine}>
+              <Ionicons name="location-sharp" size={normalize(14)} color={palette.chilli} />
+              <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                {pickup.restaurantAddress}
               </AppText>
+            </View>
 
+            <AppText variant="bodySmall" style={styles.distanceText}>
+              {pickup.distance}
+            </AppText>
+
+            <View style={styles.detailLine}>
+              <Image
+                source={require('../../../assets/placeholder/clock_icon_2.png')}
+                style={styles.inlineIcon}
+                resizeMode="contain"
+              />
+              <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                {formatTimeLine(pickup)}
+              </AppText>
+            </View>
+
+            {driverLabel ? (
               <View style={styles.detailLine}>
                 <Image
-                  source={require('../../../assets/placeholder/clock_icon_2.png')}
+                  source={require('../../../assets/placeholder/driver_icon.png')}
                   style={styles.inlineIcon}
                   resizeMode="contain"
                 />
-                <AppText variant="bodySmall" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
-                  {formatTimeLine(pickup)}
+                <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                  {driverLabel}
                 </AppText>
               </View>
-
-              {driverLabel ? (
-                <View style={styles.detailLine}>
-                  <Image
-                    source={require('../../../assets/placeholder/driver_icon.png')}
-                    style={styles.inlineIcon}
-                    resizeMode="contain"
-                  />
-                  <AppText variant="bodySmall" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
-                    {driverLabel}
-                  </AppText>
-                </View>
-              ) : null}
-            </View>
+            ) : null}
 
             <Pressable
               style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
               onPress={() => handleViewDetails(pickup)}
             >
-              <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]} numberOfLines={2}>
+              <AppText
+                variant="bodyBold"
+                style={[styles.viewDetailsText, theme.viewDetailsText]}
+                numberOfLines={1}
+              >
                 View Details
               </AppText>
             </Pressable>
@@ -455,71 +464,52 @@ export default function FarmerPickupScreen({ navigation }: any) {
     );
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 900);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const renderSkeleton = () => (
-    <View style={styles.skeletonWrap}>
-      <Skeleton width="100%" height={hp(14)} borderRadius={0} />
-      <View style={styles.skeletonFilterRow}>
-        <Skeleton width="31%" height={normalize(34)} borderRadius={normalize(8)} />
-        <Skeleton width="31%" height={normalize(34)} borderRadius={normalize(8)} />
-        <Skeleton width="31%" height={normalize(34)} borderRadius={normalize(8)} />
-      </View>
-      {[1, 2, 3].map((i) => (
-        <Skeleton key={i} width={wp(92)} height={normalize(180)} borderRadius={normalize(16)} style={styles.skeletonCard} />
-      ))}
-    </View>
-  );
-
-  if (loading) {
-    return (
-      <Screen backgroundColor={palette.white}>
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-          {renderSkeleton()}
-        </ScrollView>
-      </Screen>
-    );
-  }
-
   return (
-    <Screen backgroundColor={palette.white}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <ImageBackground
-          source={require('../../../assets/placeholder/feed-bg.png')}
-          resizeMode="cover"
-          style={styles.headerBg}
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          adaptive.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={
+            r.isTablet
+              ? { width: r.width, alignSelf: 'center' as const }
+              : undefined
+          }
         >
-          <AppText variant="h4" style={styles.headerTitle}>
-            YOUR PICKUPS
-          </AppText>
-        </ImageBackground>
+          <StackHeroHeader
+            title="Your Pickups"
+            height={r.isTablet ? adaptive.heroHeight : hp(14)}
+            style={r.isTablet ? adaptive.heroBleed : undefined}
+          />
+        </View>
 
         {nextPickup ? (
-          <View style={styles.sectionBlock}>
-            <AppText variant="h8" style={styles.sectionHeading}>
+          <View style={[styles.sectionBlock, contentColumn, tabletInsetReset]}>
+            <AppText variant="h8" style={[styles.sectionHeading, adaptive.sectionTitle]}>
               Next Pickup
             </AppText>
             {renderPickupCard(nextPickup)}
           </View>
         ) : null}
 
-        <View style={styles.sectionBlock}>
-          <View style={styles.filterWrap}>
-            <View style={styles.filterRow}>
-              {renderStatusChip('all', 'All')}
-              {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
-              {renderStatusChip('cancelled', 'Cancelled', 'close-circle-outline')}
-            </View>
+        <View style={[styles.sectionBlock, contentColumn, tabletInsetReset]}>
+          <View style={styles.filterRow}>
+            {renderStatusChip('all', 'All')}
+            {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
+            {renderStatusChip('cancelled', 'Cancelled', 'close-circle-outline')}
           </View>
 
           {filteredPickups.length > 0 ? (
             filteredPickups.map((pickup) => renderPickupCard(pickup))
           ) : (
             <View style={styles.emptyWrap}>
-              <AppText variant="bodySmall" style={styles.emptyText}>
+              <AppText variant="bodySmall" style={[styles.emptyText, adaptive.emptyText]}>
                 No pickups match this filter.
               </AppText>
             </View>
@@ -528,8 +518,17 @@ export default function FarmerPickupScreen({ navigation }: any) {
       </ScrollView>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalWrap}>
-          <View style={styles.modalCard}>
+        <View style={[styles.modalWrap, r.isTablet && { paddingHorizontal: r.pagePadH }]}>
+          <View
+            style={[
+              styles.modalCard,
+              r.isTablet && {
+                width: '100%',
+                maxWidth: Math.min(520, r.contentMaxWidth),
+                alignSelf: 'center',
+              },
+            ]}
+          >
             <View style={styles.modalTopBar}>
               <AppText variant="h6">Items</AppText>
               <Pressable style={styles.closeIconBtn} onPress={() => setModalVisible(false)}>
@@ -611,26 +610,14 @@ export default function FarmerPickupScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: hp(4),
     gap: hp(1.5),
-  },
-
-  /* Header */
-  headerBg: {
-    width: '100%',
-    height: hp(16),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: palette.white,
-    textTransform: 'none',
   },
 
   /* Sections */
   sectionBlock: {
     paddingHorizontal: wp(4),
     gap: hp(1.2),
+    width: '100%',
   },
   sectionHeading: {
     color: palette.black,
@@ -638,28 +625,25 @@ const styles = StyleSheet.create({
   },
 
   /* Filter chips */
-  filterWrap: {
-    gap: hp(0.8),
-  },
   filterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: wp(2),
-    width: '100%',
+    alignItems: 'center',
   },
   filterChip: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: wp(1.5),
-    paddingVertical: hp(0.75),
-    paddingHorizontal: wp(2),
-    borderRadius: normalize(8),
-    borderWidth: normalize(1),
+    gap: wp(1),
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(999),
+    borderWidth: 1,
+    flexShrink: 0,
   },
   filterChipInactive: {
     backgroundColor: palette.white,
-    borderColor: '#D9D9D9',
+    borderColor: palette.primary,
   },
   filterChipActive: {
     backgroundColor: palette.primary,
@@ -668,13 +652,13 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontSize: normalize(13),
     textTransform: 'none',
-    textAlign: 'center',
+    flexShrink: 0,
   },
   filterChipTextActive: {
     color: palette.white,
   },
   filterChipTextInactive: {
-    color: palette.black,
+    color: palette.primary,
   },
 
   /* Pickup card */
@@ -710,44 +694,43 @@ const styles = StyleSheet.create({
   },
   cardBodyRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
     gap: wp(2.5),
   },
   weightBox: {
-    width: wp(17),
-    height: wp(17),
-    borderWidth: normalize(1),
+    width: normalize(64),
+    minHeight: normalize(72),
+    borderWidth: 1,
     borderRadius: normalize(10),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: hp(0.35),
-    paddingHorizontal: wp(0.8),
-    gap: hp(0.2),
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(1),
+    gap: hp(0.15),
     flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   weightIcon: {
-    width: normalize(24),
-    height: normalize(24),
+    width: normalize(22),
+    height: normalize(22),
   },
-  weightText: {
-    fontSize: normalize(11),
-    lineHeight: normalize(13),
+  weightValue: {
+    fontSize: normalize(13),
+    lineHeight: normalize(16),
     textTransform: 'none',
     textAlign: 'center',
-    width: '100%',
   },
-  cardMainArea: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.5),
-    minWidth: 0,
+  weightUnit: {
+    fontSize: normalize(11),
+    lineHeight: normalize(13),
+    color: palette.stone,
+    textTransform: 'none',
+    textAlign: 'center',
   },
-  cardContent: {
+  detailsColumn: {
     flex: 1,
-    gap: hp(0.15),
     minWidth: 0,
-    justifyContent: 'flex-start',
+    gap: hp(0.4),
   },
   detailLine: {
     flexDirection: 'row',
@@ -757,39 +740,36 @@ const styles = StyleSheet.create({
   },
   detailText: {
     flex: 1,
-    flexShrink: 1,
-    fontSize: normalize(11),
-    lineHeight: normalize(15),
-    color: palette.stone,
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
+    color: palette.black,
     textTransform: 'none',
   },
   distanceText: {
-    marginLeft: wp(4),
+    marginLeft: wp(4.5),
     color: palette.midgray,
     textTransform: 'none',
     fontSize: normalize(11),
-    lineHeight: normalize(15),
   },
   inlineIcon: {
-    width: normalize(13),
-    height: normalize(13),
+    width: normalize(14),
+    height: normalize(14),
     marginTop: normalize(1),
     flexShrink: 0,
   },
   viewDetailsBtn: {
-    flexShrink: 0,
-    minWidth: wp(18),
-    paddingHorizontal: wp(2.5),
-    paddingVertical: hp(0.75),
+    alignSelf: 'flex-end',
+    minWidth: normalize(108),
+    paddingVertical: hp(0.85),
+    paddingHorizontal: wp(3.5),
     borderRadius: normalize(8),
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
+    marginTop: hp(0.3),
   },
   viewDetailsText: {
-    fontSize: normalize(11),
-    lineHeight: normalize(14),
-    textAlign: 'center',
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
     textTransform: 'none',
   },
 
@@ -907,18 +887,6 @@ const styles = StyleSheet.create({
   modalInstructions: {
     color: palette.midgray,
     textTransform: 'none',
-  },
-  skeletonWrap: {
-    gap: hp(1.2),
-  },
-  skeletonFilterRow: {
-    flexDirection: 'row',
-    gap: wp(2),
-    paddingHorizontal: wp(4),
-    width: '100%',
-  },
-  skeletonCard: {
-    alignSelf: 'center',
   },
 });
 

@@ -6,7 +6,6 @@ import {
   Pressable,
   Image,
   Linking,
-  Dimensions,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -53,14 +52,14 @@ import {
   resolveProfileCoordinates,
 } from '@/utils/coordinates';
 import { fetchCurrentLocation } from '@/utils/currentLocation';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+/** Phone-capped vertical sizes — tablet must match mobile header/support overlap. */
+const PHONE_HP_CAP = 812;
+const phoneHp = (p: number) => (PHONE_HP_CAP * p) / 100;
+const TABLET_HEADER_H = phoneHp(25);
+const TABLET_SCROLL_PAD_TOP = phoneHp(10);
+const TABLET_HEADER_CONTENT_MT = -(TABLET_HEADER_H - spacing.xl);
 
 /** Local gallery/crop URIs (not remote https). */
 function isLocalImageUri(uri: string | null | undefined): boolean {
@@ -97,6 +96,8 @@ function buildProfileForm(
 
 export function ProfileScreen() {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const isTablet = r.isTablet;
   const { currentProfile, authUser } = useAppContext();
   const { updateLocation } = useCharityStore();
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
@@ -104,6 +105,15 @@ export function ProfileScreen() {
 
   const navigation = useNavigation<NavigationProp>();
   const canGoBack = navigation.canGoBack();
+
+  const contentColumn = isTablet
+    ? {
+        width: '100%' as const,
+        maxWidth: r.contentMaxWidth,
+        alignSelf: 'center' as const,
+        paddingHorizontal: r.pagePadH,
+      }
+    : null;
 
   const [openSection, setOpenSection] = useState<string | null>(null);
   const { submitting, withLock } = useSubmitLock();
@@ -516,7 +526,7 @@ export function ProfileScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, isTablet && { alignItems: 'stretch' }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -527,14 +537,24 @@ export function ProfileScreen() {
           />
         }
       >
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            isTablet && { height: TABLET_HEADER_H, width: r.width, alignSelf: 'center' },
+          ]}
+        >
           <Image
             source={require('../../../assets/placeholder/modal-head-backgrounda.png')}
             style={styles.headerBg}
             resizeMode="cover"
           />
 
-          <View style={styles.headerContent}>
+          <View
+            style={[
+              styles.headerContent,
+              isTablet && { marginTop: TABLET_HEADER_CONTENT_MT },
+            ]}
+          >
             {canGoBack ? (
               <Pressable
                 onPress={() => navigation.goBack()}
@@ -569,7 +589,7 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.scroll}>
+        <View style={[styles.scroll, isTablet && { paddingTop: TABLET_SCROLL_PAD_TOP }, contentColumn]}>
 
           <Card style={styles.card}>
             <AppText variant="body" style={{ textAlign: 'center' }}>Need a hand?</AppText>
@@ -830,7 +850,7 @@ export function ProfileScreen() {
               style={styles.linkRow}
               onPress={() => {
                 const route = getSubscriptionRoute(selectedRole);
-                if (route) navigation.navigate(route);
+                if (route) navigation.navigate(route as any);
               }}
             >
               <AppText variant='body'>Plans</AppText>
@@ -1037,19 +1057,21 @@ const styles = StyleSheet.create({
   },
 
   profileCircleWrap: {
-    width: normalize(44),
-    height: normalize(44),
+    width: 48,
+    height: 48,
     flexShrink: 0,
   },
 
   profileCircle: {
-    width: normalize(44),
-    height: normalize(44),
-    borderRadius: normalize(22),
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#A8E6CF',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.85)',
   },
 
   profileImage: {
@@ -1079,9 +1101,9 @@ const styles = StyleSheet.create({
 
   logoPreviewWrap: {
     alignSelf: 'flex-start',
-    width: normalize(120),
-    height: normalize(120),
-    borderRadius: normalize(60),
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: palette.border,

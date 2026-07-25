@@ -4,13 +4,14 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Dimensions,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
@@ -28,17 +29,11 @@ import {
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
 const MIN_PASSWORD_LENGTH = 8;
 const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
 
 const inputPropsBase = { compact: true as const, labelVariant: 'bodyBold' as const };
 
@@ -63,6 +58,10 @@ function validatePassword(password: string, confirmPassword: string): string | n
 
 export default function FarmerManageAccessScreen() {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const safeBottomPadding = useSafeBottomPadding(hp(4));
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -94,7 +93,7 @@ export default function FarmerManageAccessScreen() {
       field.measureInWindow((_x, fieldY, _w, fieldH) => {
         const gap = hp(2);
         const activeKeyboardHeight = keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
-        const visibleBottom = height - activeKeyboardHeight - gap;
+        const visibleBottom = windowHeight - activeKeyboardHeight - gap;
         const fieldBottom = fieldY + fieldH;
 
         if (fieldBottom > visibleBottom) {
@@ -105,7 +104,7 @@ export default function FarmerManageAccessScreen() {
         }
       });
     });
-  }, []);
+  }, [windowHeight]);
 
   const handleFieldFocus = useCallback(
     (field: View) => {
@@ -362,13 +361,14 @@ export default function FarmerManageAccessScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? normalize(8) : 0}
+      keyboardVerticalOffset={insets.top + normalize(20)}
     >
       <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
         <ScrollView
           ref={scrollRef}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="none"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
           onScroll={(event) => {
             scrollYRef.current = event.nativeEvent.contentOffset.y;
           }}
@@ -379,7 +379,9 @@ export default function FarmerManageAccessScreen() {
           contentContainerStyle={[
             styles.container,
             {
-              paddingBottom: keyboardVisible ? keyboardHeight + hp(4) : hp(8),
+              paddingBottom:
+                safeBottomPadding +
+                (keyboardVisible ? Math.max(keyboardHeight, FALLBACK_KEYBOARD_HEIGHT) * 0.35 + hp(3) : hp(2)),
             },
           ]}
         >
@@ -387,8 +389,21 @@ export default function FarmerManageAccessScreen() {
               title="Manage Access"
               subtitle="Add and manage users & drivers"
               height={hp(14)}
+              style={r.isTablet ? { width: r.width, alignSelf: 'center' } : undefined}
             />
 
+            <View
+              style={
+                r.isTablet
+                  ? {
+                      width: '100%',
+                      maxWidth: r.contentMaxWidth,
+                      alignSelf: 'center',
+                      paddingHorizontal: r.pagePadH,
+                    }
+                  : undefined
+              }
+            >
             <View style={styles.tabRow}>
               <Pressable
                 style={[styles.tabPill, activeTab === 'user' && styles.activeTab]}
@@ -631,6 +646,7 @@ export default function FarmerManageAccessScreen() {
                 </View>
               ))
             )}
+            </View>
           </ScrollView>
       </Screen>
     </KeyboardAvoidingView>
@@ -639,14 +655,14 @@ export default function FarmerManageAccessScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    gap: hp(2),
-    flexGrow: 1,
+    gap: hp(1.5),
   },
   tabRow: {
     flexDirection: 'row',
     gap: wp(2.5),
     marginHorizontal: wp(4),
-    marginBottom: hp(2),
+    marginTop: hp(1.2),
+    marginBottom: hp(1.2),
     paddingBottom: hp(0.5),
   },
   tabPill: {

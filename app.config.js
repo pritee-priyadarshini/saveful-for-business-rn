@@ -48,24 +48,9 @@ if (
   );
 }
 
-if (includeFirebase) {
-  console.log('[app.config] Firebase enabled', {
-    android: Boolean(androidGoogleServicesFile),
-    ios: Boolean(iosGoogleServicesFile),
-    platform: process.env.EAS_BUILD_PLATFORM ?? 'local',
-  });
-}
-
 const firebasePlugins = includeFirebase
   ? ['@react-native-firebase/app', '@react-native-firebase/messaging']
   : [];
-
-if (!includeFirebase && process.env.EAS_BUILD) {
-  console.warn(
-    '[app.config] Firebase config plugins skipped — add google-services.json to enable FCM push. ' +
-      'Manifest merge fix still applied for autolinked firebase modules.',
-  );
-}
 
 // When Firebase is enabled, omit defaultChannel here — the channel is created at
 // runtime in pushNotifications.ts. Including defaultChannel makes expo-notifications
@@ -98,6 +83,7 @@ export default {
 
     ios: {
       supportsTablet: true,
+      requireFullScreen: true,
       icon: './assets/intro/Saveful-for-Business-logo.png',
       bundleIdentifier: 'com.priteepriyadarshini.savefulbusiness',
       ...(iosGoogleServicesFile && { googleServicesFile: iosGoogleServicesFile }),
@@ -105,6 +91,8 @@ export default {
         ITSAppUsesNonExemptEncryption: false,
         NSPhotoLibraryUsageDescription:
           'Allow Saveful for Business to access your photo library to upload a logo.',
+        UISupportedInterfaceOrientations: ['UIInterfaceOrientationPortrait'],
+        'UISupportedInterfaceOrientations~ipad': ['UIInterfaceOrientationPortrait'],
       },
     },
 
@@ -135,6 +123,12 @@ export default {
       '@react-native-community/datetimepicker',
       'expo-secure-store',
       'expo-font',
+      [
+        'expo-screen-orientation',
+        {
+          initialOrientation: 'PORTRAIT',
+        },
+      ],
       expoNotificationsPlugin,
       ...firebasePlugins,
       [

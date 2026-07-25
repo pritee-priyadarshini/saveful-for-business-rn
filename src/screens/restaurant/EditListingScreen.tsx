@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   Linking,
   Modal,
@@ -9,7 +8,6 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -50,15 +48,9 @@ import {
   hasListingDateErrors,
   type ListingDateFieldErrors,
 } from '../../utils/listingDateValidation';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildFormShellStyles, formColumnWidth } from '@/utils/dashboardAdaptive';
 
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
 
 type Step = 1 | 2 | 3;
 type PickerTarget = 'bestBefore' | 'from' | 'to' | null;
@@ -133,14 +125,11 @@ const formatTime = (date: Date | null) => {
 
 const STORAGE_COLS = 4;
 const CONTAMINANT_COLS = 3;
-const PAGE_H_PAD_PERCENT = 4.2;
-const GRID_GAP_PERCENT = 1.2;
 
-const getGridLayout = (winWidth: number) => {
-  const pagePad = (winWidth * PAGE_H_PAD_PERCENT) / 100 * 2;
-  const gap = Math.round((winWidth * GRID_GAP_PERCENT) / 100);
-  const border = Math.round((winWidth / 375) * 2);
-  const contentW = winWidth - pagePad;
+const getGridLayout = (contentWidth: number, pagePadH: number) => {
+  const gap = 10;
+  const border = 2;
+  const contentW = Math.max(240, contentWidth - pagePadH * 2);
   const colWidth = (cols: number) =>
     Math.floor((contentW - gap * (cols - 1)) / cols) - border;
   return {
@@ -201,6 +190,8 @@ function EditPeopleListingForm({
   listingId: number;
   initialListing: ListingDetail;
 }) {
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
   const { submitting, withLock } = useSubmitLock();
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FoodItem[]>(seedItems);
@@ -475,8 +466,12 @@ function EditPeopleListingForm({
   };
 
   return (
-    <Screen backgroundColor="#F2F5E9" scrollable contentStyle={peopleStyles.screenContent}>
-      <View style={peopleStyles.pageWrap}>
+    <Screen
+      backgroundColor="#F2F5E9"
+      scrollable
+      contentStyle={[peopleStyles.screenContent, adaptive.screenContent]}
+    >
+      <View style={[peopleStyles.pageWrap, adaptive.pageWrap]}>
         <View style={peopleStyles.topPanel}>
           <Pressable onPress={handleBack} style={peopleStyles.backBtn}>
             <Ionicons name="arrow-back" size={normalize(20)} color={palette.kale} />
@@ -1000,8 +995,13 @@ function EditFarmListingForm({
   listingId: number;
   initialListing: ListingDetail;
 }) {
-  const { width: winWidth } = useWindowDimensions();
-  const gridLayout = useMemo(() => getGridLayout(winWidth), [winWidth]);
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
+  const columnWidth = r.isTablet ? formColumnWidth(r) : r.width;
+  const gridLayout = useMemo(
+    () => getGridLayout(columnWidth, r.isTablet ? r.pagePadH : wp(4.2)),
+    [columnWidth, r.isTablet, r.pagePadH],
+  );
   const { submitting, withLock } = useSubmitLock();
 
   const [step, setStep] = useState<Step>(1);
@@ -1262,8 +1262,12 @@ function EditFarmListingForm({
   };
 
   return (
-    <Screen backgroundColor={FARM_BG} scrollable contentStyle={farmStyles.screenContent}>
-      <View style={farmStyles.pageWrap}>
+    <Screen
+      backgroundColor={FARM_BG}
+      scrollable
+      contentStyle={[farmStyles.screenContent, adaptive.screenContent]}
+    >
+      <View style={[farmStyles.pageWrap, adaptive.pageWrap]}>
 
         <View style={farmStyles.topPanel}>
           <Pressable onPress={handleBack} style={farmStyles.backBtn}>

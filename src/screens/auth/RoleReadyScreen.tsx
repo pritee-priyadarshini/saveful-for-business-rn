@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import {
+  Image,
+  ImageSourcePropType,
   Pressable,
   StyleSheet,
   View,
@@ -8,6 +10,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
@@ -15,14 +18,13 @@ import { HeroHeader } from '../../components/HeroHeader';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleReady'>;
-type StepIcon = keyof typeof Ionicons.glyphMap;
 
 type NextStep = {
-  icon: StepIcon;
+  image: ImageSourcePropType;
   title: string;
   description: string;
 };
@@ -38,12 +40,12 @@ function resolveAudience(role: string | null | undefined): Audience {
 
 const sharedSteps: NextStep[] = [
   {
-    icon: 'person-outline',
+    image: require('../../../assets/intro/welcome_feed_communities.png'),
     title: 'Complete your profile',
     description: 'Add a few details to get started',
   },
   {
-    icon: 'shield-checkmark-outline',
+    image: require('../../../assets/placeholder/charity_green.png'),
     title: 'Verify who you are',
     description: 'Quick verification builds trust in the community',
   },
@@ -51,25 +53,25 @@ const sharedSteps: NextStep[] = [
 
 const thirdStepByAudience: Record<Audience, NextStep> = {
   restaurant: {
-    icon: 'restaurant-outline',
+    image: require('../../../assets/intro/welcome_reduce_waste.png'),
     title: 'Start listing surplus food',
     description:
       'List surplus food for redistribution to communities, and reduce waste from your business',
   },
   charity: {
-    icon: 'search-outline',
+    image: require('../../../assets/intro/welcome_connect_locally.png'),
     title: 'Start browsing and collecting',
     description:
       'Find nearby surplus food listings and arrange collections to support your community',
   },
   farm_producer: {
-    icon: 'leaf-outline',
+    image: require('../../../assets/intro/welcome_reduce_waste.png'),
     title: 'Start listing farm surplus',
     description:
       'List produce and food not fit for human consumption for redistribution or farm livestock feed',
   },
   farmer: {
-    icon: 'nutrition-outline',
+    image: require('../../../assets/placeholder/farmhouse.png'),
     title: 'Start collecting livestock feed',
     description:
       'Find food not suitable for human consumption to feed farm livestock near you',
@@ -78,37 +80,77 @@ const thirdStepByAudience: Record<Audience, NextStep> = {
 
 export function RoleReadyScreen({ navigation }: Props) {
   useTransparentStatusBar('light');
+  const insets = useSafeAreaInsets();
   const { selectedRole } = useAppContext();
+  const r = useResponsiveLayout();
 
   const nextSteps = useMemo(() => {
     const audience = resolveAudience(selectedRole);
     return [...sharedSteps, thirdStepByAudience[audience]];
   }, [selectedRole]);
 
+  const iconSize = r.isTablet ? 56 : normalize(52);
+
   return (
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop contentStyle={styles.screenContent}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
-      <ScrollView contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollInner,
+          r.isTablet && { paddingBottom: insets.bottom + 24 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
       <HeroHeader
         source={require('../../../assets/placeholder/kale-headera.png')}
-        height={hp(16)}
+        height={r.isTablet ? Math.min(r.height * 0.14, 140) : hp(16)}
         padContentRight={false}
         contentStyle={styles.heroContent}
       />
 
-      <View style={styles.mainCard}>
+      <View
+        style={[
+          styles.mainCard,
+          r.isTablet && {
+            maxWidth: r.contentMaxWidth,
+            width: '100%',
+            alignSelf: 'center',
+            marginHorizontal: r.pagePadH,
+            marginTop: r.isLandscape ? 24 : 40,
+            paddingHorizontal: 28,
+            paddingTop: 36,
+            paddingBottom: 28,
+          },
+        ]}
+      >
         <View style={styles.titleBlock}>
-          <AppText variant="h4" color={palette.black} style={styles.title}>
+          <AppText
+            variant="h4"
+            color={palette.black}
+            style={[styles.title, r.isTablet && { fontSize: r.font(28, 30, 32) }]}
+          >
             What happens next?
           </AppText>
         </View>
 
         <View style={styles.stepsSection}>
-
           {nextSteps.map((step) => (
             <View key={step.title} style={styles.stepRow}>
-              <View style={styles.stepIconWrap}>
-                <Ionicons name={step.icon} size={normalize(32)} color={palette.kale} />
+              <View
+                style={[
+                  styles.stepIconWrap,
+                  {
+                    width: iconSize,
+                    height: iconSize,
+                    borderRadius: iconSize / 2,
+                  },
+                ]}
+              >
+                <Image
+                  source={step.image}
+                  style={{ width: iconSize * 0.88, height: iconSize * 0.88 }}
+                  resizeMode="contain"
+                />
               </View>
               <View style={styles.stepTextWrap}>
                 <AppText variant="label" color={palette.black} style={styles.stepTitle}>
@@ -123,13 +165,23 @@ export function RoleReadyScreen({ navigation }: Props) {
         </View>
 
         <Pressable
-          style={styles.continueButton}
+          style={[
+            styles.continueButton,
+            r.isTablet && {
+              minHeight: 48,
+              paddingVertical: 12,
+              width: '100%',
+              alignSelf: 'stretch',
+            },
+          ]}
           onPress={() => navigation.navigate('Auth')}
         >
           <AppText variant="bodyBold" color={palette.white} style={styles.continueText}>
             CONTINUE
           </AppText>
-          <Ionicons name="arrow-forward" size={normalize(20)} color={palette.white} />
+          <View style={styles.continueArrow}>
+            <Ionicons name="arrow-forward" size={16} color={palette.white} />
+          </View>
         </Pressable>
       </View>
       </ScrollView>
@@ -173,13 +225,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  subtitle: {
-    textTransform: 'none',
-    textAlign: 'center',
-    lineHeight: normalize(22),
-    paddingVertical: hp(1),
-  },
-
   stepsSection: {
     gap: hp(1.8),
     paddingTop: hp(0.5),
@@ -187,28 +232,25 @@ const styles = StyleSheet.create({
     borderTopColor: '#EFEFEF',
   },
 
-  cardTitle: {
-    textAlign: 'center',
-    textTransform: 'none',
-    marginVertical: hp(2),
-  },
-
   stepRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: wp(3),
+    alignItems: 'center',
+    gap: wp(3.5),
   },
 
   stepIconWrap: {
-    width: wp(11),
-    height: wp(11),
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    backgroundColor: palette.white,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: palette.strokecream,
   },
 
   stepTextWrap: {
     flex: 1,
+    minWidth: 0,
     gap: hp(0.3),
   },
 
@@ -222,7 +264,6 @@ const styles = StyleSheet.create({
     lineHeight: normalize(18),
     marginBottom: hp(1.5),
     color: palette.stone,
-
   },
 
   continueButton: {
@@ -232,9 +273,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: wp(2),
+    gap: 10,
+    minHeight: 48,
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.5),
+    paddingVertical: 12,
+  },
+
+  continueArrow: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   continueText: {

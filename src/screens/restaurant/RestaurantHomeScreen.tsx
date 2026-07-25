@@ -8,6 +8,9 @@ import {
   ImageBackground,
   Platform,
   RefreshControl,
+  type ViewStyle,
+  type TextStyle,
+  type ImageStyle,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -27,7 +30,7 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 
 import { palette } from '@/theme/colors';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp, type ResponsiveLayout } from '@/utils/responsive';
 
 const IMPACT_ICONS = {
   food: require('../../../assets/placeholder/storage_box_green.png'),
@@ -35,9 +38,267 @@ const IMPACT_ICONS = {
   co2: require('../../../assets/placeholder/co2_green_icon.png'),
 };
 
+type AdaptiveStyles = {
+  mainContent: ViewStyle;
+  heroContent: ViewStyle;
+  heroName: TextStyle;
+  heroOrg: TextStyle;
+  logoCircle: ViewStyle;
+  logoImage: ImageStyle;
+  surplusBanner: ViewStyle;
+  surplusBannerContent: ViewStyle;
+  surplusBannerTitle: TextStyle;
+  surplusBannerIcon: ViewStyle;
+  surplusBannerIconImage: ImageStyle;
+  surplusBody: ViewStyle;
+  surplusDescription: TextStyle;
+  surplusCta: ViewStyle;
+  surplusCtaText: TextStyle;
+  sectionHeading: ViewStyle;
+  sectionHeadingBg: ImageStyle;
+  sectionHeadingText: TextStyle;
+  impactGrid: ViewStyle;
+  impactStatCard: ViewStyle;
+  impactIconWrap: ViewStyle;
+  impactIcon: ImageStyle;
+  impactValue: TextStyle;
+  impactLabel: TextStyle;
+  locationCapturedPill: ViewStyle;
+  contentColumn: ViewStyle;
+  insightsLinkLeft: ViewStyle;
+  calculationText: TextStyle;
+  skeletonCard: ViewStyle;
+  skeletonHeadingWrap: ViewStyle;
+  skeletonImpactRow: ViewStyle;
+  skeletonImpactCard: { width: number; height: number };
+  heroHeight: number;
+  skeletonBannerHeight: number;
+};
+
+/** Phone returns empty overrides so StyleSheet stays pixel-identical. */
+function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
+  const { isTablet, isLargeTablet, contentMaxWidth, pagePadH, font, space } = r;
+
+  const empty: AdaptiveStyles = {
+    mainContent: {},
+    heroContent: {},
+    heroName: {},
+    heroOrg: {},
+    logoCircle: {},
+    logoImage: {},
+    surplusBanner: {},
+    surplusBannerContent: {},
+    surplusBannerTitle: {},
+    surplusBannerIcon: {},
+    surplusBannerIconImage: {},
+    surplusBody: {},
+    surplusDescription: {},
+    surplusCta: {},
+    surplusCtaText: {},
+    sectionHeading: {},
+    sectionHeadingBg: {},
+    sectionHeadingText: {},
+    impactGrid: {},
+    impactStatCard: {},
+    impactIconWrap: {},
+    impactIcon: {},
+    impactValue: {},
+    impactLabel: {},
+    locationCapturedPill: {},
+    contentColumn: {},
+    insightsLinkLeft: {},
+    calculationText: {},
+    skeletonCard: {},
+    skeletonHeadingWrap: {},
+    skeletonImpactRow: {},
+    skeletonImpactCard: { width: wp(28), height: hp(14) },
+    heroHeight: hp(22),
+    skeletonBannerHeight: hp(26),
+  };
+
+  if (!isTablet) return empty;
+
+  const column: ViewStyle = {
+    width: '100%',
+    maxWidth: contentMaxWidth,
+    alignSelf: 'center',
+  };
+
+  const logoSize = isLargeTablet ? 64 : 56;
+  const bannerIcon = isLargeTablet ? 72 : 64;
+  const ctaMax = isLargeTablet ? 400 : 360;
+
+  return {
+    contentColumn: column,
+    mainContent: {
+      ...column,
+      paddingHorizontal: pagePadH,
+      gap: space(18, 20, 22),
+      marginTop: space(-12, -10, -8),
+    },
+    heroContent: {
+      ...column,
+      paddingHorizontal: pagePadH,
+      paddingBottom: space(24, 28, 32),
+      gap: space(10, 12, 14),
+    },
+    heroName: {
+      fontSize: font(26, 30, 32),
+      lineHeight: font(34, 38, 40),
+    },
+    heroOrg: {
+      fontSize: font(14, 15, 16),
+    },
+    logoCircle: {
+      width: logoSize,
+      height: logoSize,
+      borderRadius: logoSize / 2,
+    },
+    logoImage: {
+      borderRadius: logoSize / 2,
+    },
+    // Flex row instead of absolute icon overlay (Profile-style layout).
+    surplusBanner: {
+      height: Math.min(r.height * 0.16, isLargeTablet ? 180 : 156),
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      paddingHorizontal: space(18, 22, 26),
+      paddingBottom: space(14, 16, 18),
+      gap: space(12, 14, 16),
+    },
+    surplusBannerContent: {
+      flex: 1,
+      minWidth: 0,
+      maxWidth: '100%',
+      paddingHorizontal: 0,
+      paddingBottom: 0,
+    },
+    surplusBannerTitle: {
+      fontSize: font(22, 26, 28),
+      lineHeight: font(28, 32, 34),
+    },
+    surplusBannerIcon: {
+      position: 'relative',
+      right: 0,
+      bottom: 0,
+      width: bannerIcon,
+      height: bannerIcon,
+      borderRadius: 20,
+      flexShrink: 0,
+    },
+    surplusBannerIconImage: {
+      width: bannerIcon * 0.62,
+      height: bannerIcon * 0.62,
+    },
+    surplusBody: {
+      paddingHorizontal: space(18, 22, 26),
+      paddingTop: space(16, 18, 20),
+      paddingBottom: space(18, 20, 22),
+      gap: space(14, 16, 18),
+    },
+    surplusDescription: {
+      fontSize: font(14, 15, 16),
+      lineHeight: font(21, 22, 24),
+    },
+    // Fixed tap height — avoid hp() blow-up on tall tablets.
+    surplusCta: {
+      alignSelf: 'stretch',
+      width: '100%',
+      maxWidth: ctaMax,
+      height: 48,
+      minHeight: 48,
+      paddingVertical: 0,
+      paddingHorizontal: 20,
+      borderRadius: 14,
+      gap: 8,
+    },
+    surplusCtaText: {
+      fontSize: font(16, 17, 18),
+      lineHeight: 20,
+    },
+    sectionHeading: {
+      minHeight: space(88, 96, 104),
+      paddingVertical: space(16, 18, 20),
+    },
+    sectionHeadingBg: {
+      width: '100%',
+      maxWidth: Math.min(720, contentMaxWidth),
+      height: space(80, 88, 96),
+    },
+    sectionHeadingText: {
+      fontSize: font(20, 24, 26),
+      lineHeight: font(26, 30, 32),
+    },
+    impactGrid: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: space(10, 12, 14),
+    },
+    impactStatCard: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: space(14, 16, 18),
+      paddingHorizontal: space(10, 12, 14),
+      borderRadius: 18,
+      gap: space(6, 8, 10),
+    },
+    impactIconWrap: {
+      width: space(40, 44, 48),
+      height: space(40, 44, 48),
+      borderRadius: space(20, 22, 24),
+    },
+    impactIcon: {
+      width: space(28, 30, 32),
+      height: space(28, 30, 32),
+    },
+    impactValue: {
+      fontSize: font(20, 22, 24),
+      lineHeight: font(26, 28, 30),
+    },
+    impactLabel: {
+      fontSize: font(11, 12, 13),
+      lineHeight: font(15, 16, 18),
+    },
+    locationCapturedPill: {
+      ...column,
+      marginHorizontal: pagePadH,
+    },
+    insightsLinkLeft: {
+      flex: 1,
+      minWidth: 0,
+    },
+    calculationText: {
+      fontSize: font(15, 16, 17),
+      lineHeight: font(20, 22, 24),
+    },
+    skeletonCard: {
+      ...column,
+      marginHorizontal: pagePadH,
+    },
+    skeletonHeadingWrap: {
+      ...column,
+      paddingHorizontal: pagePadH,
+    },
+    skeletonImpactRow: {
+      ...column,
+      paddingHorizontal: pagePadH,
+      gap: space(10, 12, 14),
+    },
+    skeletonImpactCard: {
+      width: Math.round((contentMaxWidth - pagePadH * 2 - 28) / 3),
+      height: isLargeTablet ? 120 : 110,
+    },
+    heroHeight: Math.min(r.height * 0.18, isLargeTablet ? 200 : 180),
+    skeletonBannerHeight: isLargeTablet ? 220 : 200,
+  };
+}
+
 export function RestaurantHomeScreen({ navigation }: any) {
   useTransparentStatusBar('light');
-  const bottomPadding = useBottomTabPadding(hp(2));
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildAdaptiveStyles(r), [r]);
+  const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(2));
   const { currentProfile } = useAppContext();
   const {
     showBanner,
@@ -142,16 +403,25 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
-      <Skeleton width="100%" height={hp(18)} borderRadius={0} />
-      <View style={styles.skeletonCard}>
-        <Skeleton width="100%" height={hp(26)} borderRadius={normalize(24)} />
+      <Skeleton width="100%" height={adaptive.heroHeight} borderRadius={0} />
+      <View style={[styles.skeletonCard, adaptive.skeletonCard]}>
+        <Skeleton
+          width="100%"
+          height={adaptive.skeletonBannerHeight}
+          borderRadius={normalize(24)}
+        />
       </View>
-      <View style={styles.skeletonHeadingWrap}>
-        <Skeleton width={wp(70)} height={normalize(20)} />
+      <View style={[styles.skeletonHeadingWrap, adaptive.skeletonHeadingWrap]}>
+        <Skeleton width={r.isTablet ? '50%' : wp(70)} height={normalize(20)} />
       </View>
-      <View style={styles.skeletonImpactRow}>
+      <View style={[styles.skeletonImpactRow, adaptive.skeletonImpactRow]}>
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} width={wp(28)} height={hp(14)} borderRadius={normalize(18)} />
+          <Skeleton
+            key={i}
+            width={adaptive.skeletonImpactCard.width}
+            height={adaptive.skeletonImpactCard.height}
+            borderRadius={normalize(18)}
+          />
         ))}
       </View>
     </View>
@@ -183,17 +453,19 @@ export function RestaurantHomeScreen({ navigation }: any) {
         }
       >
         {showBanner && (
-          <LocationRequiredBanner
-            description="Set your business location so charities can find your surplus listings and pickups work correctly."
-            onUseGps={useGpsLocation}
-            onSearchAddress={() => setModalVisible(true)}
-            onDismiss={() => setBannerClosed(true)}
-            gpsLoading={gpsLoading}
-          />
+          <View style={r.isTablet ? adaptive.contentColumn : undefined}>
+            <LocationRequiredBanner
+              description="Set your business location so charities can find your surplus listings and pickups work correctly."
+              onUseGps={useGpsLocation}
+              onSearchAddress={() => setModalVisible(true)}
+              onDismiss={() => setBannerClosed(true)}
+              gpsLoading={gpsLoading}
+            />
+          </View>
         )}
 
         {!!capturedAddress && !showBanner && (
-          <View style={styles.locationCapturedPill}>
+          <View style={[styles.locationCapturedPill, adaptive.locationCapturedPill]}>
             <Ionicons name="checkmark-circle" size={normalize(16)} color={palette.middlegreen} />
             <AppText variant="caption" style={styles.locationCapturedText} numberOfLines={2} ellipsizeMode="tail">
               {capturedAddress}
@@ -207,30 +479,41 @@ export function RestaurantHomeScreen({ navigation }: any) {
           <>
             <HeroHeader
               source={require('../../../assets/placeholder/kale-header.png')}
-              height={hp(22)}
+              height={adaptive.heroHeight}
             >
-              <View style={styles.heroContent}>
+              <View style={[styles.heroContent, adaptive.heroContent]}>
                 <View style={styles.heroTopRow}>
                   <View style={styles.heroTextBlock}>
                     <AppText variant="caption" style={styles.heroGreeting}>
                       {greeting}
                     </AppText>
-                    <AppText variant="h6" style={styles.heroName} numberOfLines={1}>
+                    <AppText
+                      variant="h6"
+                      style={[styles.heroName, adaptive.heroName]}
+                      numberOfLines={1}
+                    >
                       {isFirstTimeUser ? `Welcome, ${firstName}` : `${firstName}`}
                     </AppText>
-                    <AppText variant="bodySmall" style={styles.heroOrg} numberOfLines={1}>
+                    <AppText
+                      variant="bodySmall"
+                      style={[styles.heroOrg, adaptive.heroOrg]}
+                      numberOfLines={1}
+                    >
                       {currentProfile.organization}
                     </AppText>
                   </View>
 
                   <Pressable
-                    style={styles.logoCircle}
+                    style={[styles.logoCircle, adaptive.logoCircle]}
                     onPress={() => navigation.navigate('Account')}
                     accessibilityRole="button"
                     accessibilityLabel="Open account profile"
                   >
                     {currentProfile.logo ? (
-                      <Image source={{ uri: currentProfile.logo }} style={styles.logoImage} />
+                      <Image
+                        source={{ uri: currentProfile.logo }}
+                        style={[styles.logoImage, adaptive.logoImage]}
+                      />
                     ) : (
                       <AppText style={styles.logoFallback}>
                         {currentProfile.organization?.[0] || 'S'}
@@ -255,7 +538,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
               </View>
             </HeroHeader>
 
-            <View style={styles.mainContent}>
+            <View style={[styles.mainContent, adaptive.mainContent]}>
               <Pressable
                 style={({ pressed }) => [styles.surplusCard, pressed && styles.pressed]}
                 onPress={() =>
@@ -266,7 +549,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
               >
                 <ImageBackground
                   source={require('../../../assets/home/restaurant_home_banner.png')}
-                  style={styles.surplusBanner}
+                  style={[styles.surplusBanner, adaptive.surplusBanner]}
                   imageStyle={styles.surplusBannerImage}
                   resizeMode="cover"
                 >
@@ -276,24 +559,36 @@ export function RestaurantHomeScreen({ navigation }: any) {
                     end={{ x: 0, y: 1 }}
                     style={StyleSheet.absoluteFillObject}
                   />
-                  <View style={styles.surplusBannerContent}>
+                  <View style={[styles.surplusBannerContent, adaptive.surplusBannerContent]}>
                     <View style={styles.surplusBadge}>
                       <MaterialIcons name="lunch-dining" size={normalize(14)} color={palette.middlegreen} />
                       <AppText variant="caption" color={palette.middlegreen} style={styles.surplusBadgeText}>
                         Today's surplus
                       </AppText>
                     </View>
-                    <AppText variant="h6" style={styles.surplusBannerTitle}>
+                    <AppText
+                      variant="h6"
+                      style={[styles.surplusBannerTitle, adaptive.surplusBannerTitle]}
+                      numberOfLines={2}
+                    >
                       Got surplus food?
                     </AppText>
                   </View>
-                  <View style={styles.surplusBannerIcon}>
-                    <Image source={IMPACT_ICONS.food} style={styles.surplusBannerIconImage} resizeMode="contain" />
+                  <View style={[styles.surplusBannerIcon, adaptive.surplusBannerIcon]}>
+                    <Image
+                      source={IMPACT_ICONS.food}
+                      style={[styles.surplusBannerIconImage, adaptive.surplusBannerIconImage]}
+                      resizeMode="contain"
+                    />
                   </View>
                 </ImageBackground>
 
-                <View style={styles.surplusBody}>
-                  <AppText variant="bodySmall" color={palette.textMuted} style={styles.surplusDescription}>
+                <View style={[styles.surplusBody, adaptive.surplusBody]}>
+                  <AppText
+                    variant="bodySmall"
+                    color={palette.textMuted}
+                    style={[styles.surplusDescription, adaptive.surplusDescription]}
+                  >
                     List what you have - local charities get notified to arrange pickup.
                   </AppText>
 
@@ -320,37 +615,63 @@ export function RestaurantHomeScreen({ navigation }: any) {
                     </View>
                   </View>
 
-                  <View style={styles.surplusCta}>
-                    <AppText variant="bodyBold" style={styles.surplusCtaText}>
+                  <View style={[styles.surplusCta, adaptive.surplusCta]}>
+                    <AppText
+                      variant="bodyBold"
+                      style={[styles.surplusCtaText, adaptive.surplusCtaText]}
+                    >
                       List Surplus
                     </AppText>
-                    <View style={styles.surplusCtaIcon}>
-                      <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
-                    </View>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={18}
+                      color={palette.white}
+                      style={styles.surplusCtaArrow}
+                    />
                   </View>
                 </View>
               </Pressable>
 
               <View style={styles.impactSection}>
-                <View style={styles.sectionHeading}>
+                <View style={[styles.sectionHeading, adaptive.sectionHeading]}>
                   <Image
                     source={require('../../../assets/placeholder/Illustration.png')}
-                    style={styles.sectionHeadingBg}
+                    style={[styles.sectionHeadingBg, adaptive.sectionHeadingBg]}
                     resizeMode="contain"
                   />
-                  <AppText variant="heading" style={styles.sectionHeadingText} numberOfLines={2}>
+                  <AppText
+                    variant="heading"
+                    style={[styles.sectionHeadingText, adaptive.sectionHeadingText]}
+                    numberOfLines={2}
+                  >
                     Your impact so far
                   </AppText>
                 </View>
 
-                <View style={styles.impactGrid}>
+                <View style={[styles.impactGrid, adaptive.impactGrid]}>
                   {impactStats.map((stat) => (
-                    <View key={stat.key} style={[styles.impactStatCard, { backgroundColor: stat.tint }]}>
-                      <View style={styles.impactIconWrap}>
-                        <Image source={stat.icon} style={styles.impactIcon} resizeMode="contain" />
+                    <View
+                      key={stat.key}
+                      style={[
+                        styles.impactStatCard,
+                        { backgroundColor: stat.tint },
+                        adaptive.impactStatCard,
+                      ]}
+                    >
+                      <View style={[styles.impactIconWrap, adaptive.impactIconWrap]}>
+                        <Image
+                          source={stat.icon}
+                          style={[styles.impactIcon, adaptive.impactIcon]}
+                          resizeMode="contain"
+                        />
                       </View>
                       <View style={styles.impactValueRow}>
-                        <AppText variant="h7" style={styles.impactValue} numberOfLines={1} adjustsFontSizeToFit>
+                        <AppText
+                          variant="h7"
+                          style={[styles.impactValue, adaptive.impactValue]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                        >
                           {stat.value}
                         </AppText>
                         {!!stat.unit && (
@@ -359,7 +680,12 @@ export function RestaurantHomeScreen({ navigation }: any) {
                           </AppText>
                         )}
                       </View>
-                      <AppText variant="caption" color={palette.textMuted} style={styles.impactLabel} numberOfLines={2}>
+                      <AppText
+                        variant="caption"
+                        color={palette.textMuted}
+                        style={[styles.impactLabel, adaptive.impactLabel]}
+                        numberOfLines={2}
+                      >
                         {stat.label}
                       </AppText>
                     </View>
@@ -377,9 +703,9 @@ export function RestaurantHomeScreen({ navigation }: any) {
                     style={({ pressed }) => [styles.insightsLink, pressed && styles.pressed]}
                     onPress={() => navigation.navigate('Insights')}
                   >
-                    <View style={styles.insightsLinkLeft}>
+                    <View style={[styles.insightsLinkLeft, adaptive.insightsLinkLeft]}>
                       <Ionicons name="bar-chart-outline" size={normalize(20)} color={palette.primary} />
-                      <AppText variant="bodyBold" color={palette.primary}>
+                      <AppText variant="bodyBold" color={palette.primary} numberOfLines={1} style={styles.insightsLinkText}>
                         View detailed insights
                       </AppText>
                     </View>
@@ -392,7 +718,11 @@ export function RestaurantHomeScreen({ navigation }: any) {
                 style={({ pressed }) => [styles.calculationRow, pressed && styles.pressed]}
                 onPress={() => navigation.navigate('Calculation')}
               >
-                <AppText variant="bodySmall" color={palette.textMuted}>
+                <AppText
+                  variant="body"
+                  color={palette.textMuted}
+                  style={[styles.calculationText, adaptive.calculationText]}
+                >
                   About our calculations
                 </AppText>
                 <Ionicons name="chevron-forward" size={normalize(18)} color={palette.textMuted} />
@@ -417,6 +747,7 @@ const cardShadow = Platform.select({
   },
 });
 
+/** Mobile baseline styles — unchanged look on phones. */
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
@@ -528,6 +859,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: palette.strokecream,
+    width: '100%',
     ...cardShadow,
   },
 
@@ -671,10 +1003,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: palette.eggplant,
-    borderRadius: normalize(16),
-    paddingVertical: hp(1.7),
-    paddingHorizontal: wp(5),
-    gap: wp(2),
+    borderRadius: 14,
+    height: 48,
+    paddingVertical: 0,
+    paddingHorizontal: 20,
+    gap: 8,
     ...Platform.select({
       ios: {
         shadowColor: palette.eggplant,
@@ -691,17 +1024,14 @@ const styles = StyleSheet.create({
   surplusCtaText: {
     color: palette.white,
     textTransform: 'none',
-    fontSize: normalize(16),
+    fontSize: 16,
+    lineHeight: 20,
     letterSpacing: 0.2,
+    includeFontPadding: false,
   },
 
-  surplusCtaIcon: {
-    width: normalize(28),
-    height: normalize(28),
-    borderRadius: normalize(14),
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  surplusCtaArrow: {
+    marginTop: 1,
   },
 
   impactSection: {
@@ -737,6 +1067,7 @@ const styles = StyleSheet.create({
   impactGrid: {
     flexDirection: 'row',
     gap: wp(2),
+    width: '100%',
   },
 
   impactStatCard: {
@@ -816,6 +1147,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(2.5),
+    flex: 1,
+    minWidth: 0,
+  },
+
+  insightsLinkText: {
+    flex: 1,
+    minWidth: 0,
+    textTransform: 'none',
   },
 
   calculationRow: {
@@ -824,6 +1163,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: wp(1),
     paddingVertical: hp(1),
+  },
+
+  calculationText: {
+    textTransform: 'none',
+    fontSize: normalize(14),
+    lineHeight: normalize(20),
   },
 
   locationCapturedPill: {

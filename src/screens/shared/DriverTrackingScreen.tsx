@@ -7,8 +7,8 @@ import {
     Modal,
     Linking,
     Animated,
-    Dimensions,
     ScrollView,
+    useWindowDimensions,
 } from 'react-native';
 import { OsmMapView } from '../../components/OsmMapView';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -146,6 +146,7 @@ function getStepIndex(status: OrderStatus) {
 }
 
 export default function DriverTrackingScreen() {
+    const { width: windowWidth } = useWindowDimensions();
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<Params, 'DriverTracking'>>();
     const { trackingId, source } = route.params;
@@ -188,12 +189,12 @@ export default function DriverTrackingScreen() {
     const trackerAnim = useRef(new Animated.Value(0)).current;
     useEffect(() => {
         const step = getStepIndex(data.orderStatus);
-        const segment = (Dimensions.get('window').width - 120) / (STEPS.length - 1);
+        const segment = (windowWidth - 120) / (STEPS.length - 1);
         Animated.spring(trackerAnim, {
             toValue: segment * step,
             useNativeDriver: true,
         }).start();
-    }, [data.orderStatus]);
+    }, [data.orderStatus, windowWidth, trackerAnim]);
 
     const makeCall = async (phone?: string | null) => {
         if (!phone) {

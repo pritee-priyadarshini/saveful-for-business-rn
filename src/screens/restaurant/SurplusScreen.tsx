@@ -1,25 +1,25 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-	Dimensions,
 	Image,
 	Pressable,
 	StyleSheet,
 	View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
-import { Ionicons } from '@expo/vector-icons';
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-	const scale = width / 375;
-	return Math.round(size * scale);
-};
+import { elevation } from '@/theme/elevation';
+import {
+	hp,
+	normalize,
+	useResponsiveLayout,
+	wp,
+} from '@/utils/responsive';
+import { dashboardColumnWidth, buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 
 const surplusCards = [
 	{
@@ -50,6 +50,10 @@ const surplusCards = [
 
 export function SurplusScreen({ navigation }: any) {
 	useTransparentStatusBar('light');
+	const r = useResponsiveLayout();
+	const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
+	const columnWidth = r.isTablet ? dashboardColumnWidth(r) : undefined;
+
 	const handleListSurplus = (type: (typeof surplusCards)[number]['id']) => {
 		if (type === 'livestock') {
 			navigation.navigate('CreateFarmListing');
@@ -61,58 +65,126 @@ export function SurplusScreen({ navigation }: any) {
 
 	return (
 		<Screen scrollable backgroundColor={palette.creme} contentStyle={styles.screenContent} transparentTop>
-			<StackHeroHeader title="Today's Surplus" height={hp(14)} />
+			<StackHeroHeader
+				title="Today's Surplus"
+				height={adaptive.heroHeight}
+				style={adaptive.heroBleed}
+			/>
 
-			<View style={styles.contentWrap}>
-				<AppText variant="label" color={palette.primary} style={styles.subtitle}>
+			<View
+				style={[
+					styles.contentWrap,
+					r.isTablet && {
+						width: columnWidth,
+						maxWidth: r.contentMaxWidth,
+						paddingHorizontal: r.pagePadH,
+						gap: r.space(12, 14, 16),
+					},
+				]}
+			>
+				<AppText
+					variant="label"
+					color={palette.primary}
+					style={[styles.subtitle, r.isTablet && { fontSize: r.font(13, 14, 14), lineHeight: 20 }]}
+				>
 					Firstly tell us what type of surplus food you have, so we can notify the right recipients
 				</AppText>
 
-				{surplusCards.map((card) => (
-					<View
-						key={card.id}
-						style={[styles.card, { borderColor: card.borderColor, backgroundColor: card.backgroundColor }]}
-					>
-						<View style={styles.cardTopRow}>
-							<Image source={card.icon} style={styles.cardIcon} resizeMode="contain" />
-
-							<AppText variant="h6" color={card.titleColor} style={styles.cardTitle}>
-								{card.title}
-							</AppText>
-						</View>
-
-						<AppText variant="label" color={palette.black} style={styles.cardSummary}>
-							{card.summary}
-						</AppText>
-
-						<AppText variant="body1" color={palette.midgray} style={styles.cardDescription}>
-							{card.description}
-						</AppText>
-
-						<Pressable
-							onPress={() => handleListSurplus(card.id)}
-							style={[styles.actionButton, { backgroundColor: card.buttonColor }]}
+				<View style={styles.cardsWrap}>
+					{surplusCards.map((card) => (
+						<View
+							key={card.id}
+							style={[
+								styles.card,
+								elevation.flat,
+								r.isTablet && styles.cardTablet,
+								{ borderColor: card.borderColor, backgroundColor: card.backgroundColor },
+							]}
 						>
-							<AppText variant="bodyBold" color={palette.white} style={styles.buttonText}>
-								LIST SURPLUS
-							</AppText>
+							{r.isTablet ? (
+								<View style={styles.cardTabletRow}>
+									<Image
+										source={card.icon}
+										style={styles.cardIconTablet}
+										resizeMode="contain"
+									/>
+									<View style={styles.cardTabletMain}>
+										<AppText
+											variant="h6"
+											color={card.titleColor}
+											style={[styles.cardTitle, styles.cardTitleTablet, { fontSize: r.font(17, 18, 19) }]}
+										>
+											{card.title.replace('\n', ' ')}
+										</AppText>
+										<AppText variant="label" color={palette.black} style={styles.cardSummary}>
+											{card.summary.replace('\n', ' ')}
+										</AppText>
+										<AppText variant="body1" color={palette.midgray} style={styles.cardDescription}>
+											{card.description}
+										</AppText>
+										<Pressable
+											onPress={() => handleListSurplus(card.id)}
+											style={[
+												styles.actionButton,
+												styles.actionButtonTablet,
+												{ backgroundColor: card.buttonColor },
+											]}
+										>
+											<AppText variant="bodyBold" color={palette.white} style={styles.buttonText}>
+												LIST SURPLUS
+											</AppText>
+											<Ionicons
+												name="arrow-forward"
+												size={normalize(18)}
+												color={palette.white}
+												style={styles.actionArrow}
+											/>
+										</Pressable>
+									</View>
+								</View>
+							) : (
+								<>
+									<View style={styles.cardTopRow}>
+										<Image source={card.icon} style={styles.cardIcon} resizeMode="contain" />
+										<AppText variant="h6" color={card.titleColor} style={styles.cardTitle}>
+											{card.title}
+										</AppText>
+									</View>
 
-							<Ionicons
-								name="arrow-forward"
-								size={normalize(18)}
-								color={palette.white}
-								style={styles.actionArrow}
-							/>
-						</Pressable>
-					</View>
-				))}
+									<AppText variant="label" color={palette.black} style={styles.cardSummary}>
+										{card.summary}
+									</AppText>
 
-				<View style={styles.missionCard}>
+									<AppText variant="body1" color={palette.midgray} style={styles.cardDescription}>
+										{card.description}
+									</AppText>
+
+									<Pressable
+										onPress={() => handleListSurplus(card.id)}
+										style={[styles.actionButton, { backgroundColor: card.buttonColor }]}
+									>
+										<AppText variant="bodyBold" color={palette.white} style={styles.buttonText}>
+											LIST SURPLUS
+										</AppText>
+										<Ionicons
+											name="arrow-forward"
+											size={normalize(18)}
+											color={palette.white}
+											style={styles.actionArrow}
+										/>
+									</Pressable>
+								</>
+							)}
+						</View>
+					))}
+				</View>
+
+				<View style={[styles.missionCard, elevation.flat]}>
 					<Image
-            source={require('../../../assets/placeholder/leaf_icon.png')}
-            style={styles.leafIcon}
-            resizeMode="contain"
-          />
+						source={require('../../../assets/placeholder/leaf_icon.png')}
+						style={[styles.leafIcon, r.isTablet && styles.leafIconTablet]}
+						resizeMode="contain"
+					/>
 
 					<View style={styles.missionTextWrap}>
 						<AppText variant="label" color={palette.black}>
@@ -144,13 +216,34 @@ const styles = StyleSheet.create({
 	subtitle: {
 		textAlign: 'center',
 		paddingHorizontal: wp(2),
-    lineHeight: normalize(22),
+		lineHeight: normalize(22),
+	},
+	cardsWrap: {
+		width: '100%',
+		gap: hp(1.8),
 	},
 	card: {
 		borderWidth: normalize(2),
 		borderRadius: normalize(18),
 		paddingVertical: hp(1.6),
 		paddingHorizontal: wp(3),
+		width: '100%',
+	},
+	cardTablet: {
+		borderRadius: 14,
+		paddingVertical: 16,
+		paddingHorizontal: 18,
+	},
+	cardTabletRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 18,
+		width: '100%',
+	},
+	cardTabletMain: {
+		flex: 1,
+		minWidth: 0,
+		gap: 6,
 	},
 	cardTopRow: {
 		flexDirection: 'row',
@@ -161,13 +254,27 @@ const styles = StyleSheet.create({
 		width: wp(23),
 		height: hp(10),
 	},
-  leafIcon: {
-    width: wp(8),
-    height: hp(5),
-  },
+	cardIconTablet: {
+		width: 108,
+		height: 88,
+		flexShrink: 0,
+	},
+	leafIcon: {
+		width: wp(8),
+		height: hp(5),
+	},
+	leafIconTablet: {
+		width: 36,
+		height: 36,
+	},
 	cardTitle: {
 		flex: 1,
-    paddingHorizontal: wp(2),
+		paddingHorizontal: wp(2),
+	},
+	cardTitleTablet: {
+		flex: 0,
+		paddingHorizontal: 0,
+		textTransform: 'none',
 	},
 	cardSummary: {
 		marginTop: hp(0.6),
@@ -184,6 +291,15 @@ const styles = StyleSheet.create({
 		paddingHorizontal: wp(4),
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+	actionButtonTablet: {
+		alignSelf: 'flex-start',
+		minWidth: 200,
+		minHeight: 44,
+		height: 44,
+		marginTop: 10,
+		borderRadius: 10,
+		paddingHorizontal: 20,
 	},
 	buttonText: {
 		letterSpacing: 0.2,
@@ -205,6 +321,7 @@ const styles = StyleSheet.create({
 	},
 	missionTextWrap: {
 		marginLeft: wp(2.8),
+		flex: 1,
+		minWidth: 0,
 	},
 });
-  

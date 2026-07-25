@@ -20,7 +20,7 @@ import { useAppContext } from '@/store/AppContext';
 import { authService } from '@/services/auth.service';
 import { showErrorAlert, showSuccessAlert, getOtpVerificationErrorMessage } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import {
   buildAuthUserFromProfile,
   resolveUserRole,
@@ -30,6 +30,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
 export function EmailVerificationScreen({ navigation, route }: Props) {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
 
   const {
     selectedRole,
@@ -169,18 +170,28 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       <Screen scrollable={false} backgroundColor={palette.creme} transparentTop contentStyle={styles.container}>
         <StatusBar style="light" translucent backgroundColor="transparent" />
 
-        <View style={styles.content}>
-          <HeroHeader
-            source={require('../../../assets/placeholder/feed-bg.png')}
-            height={hp(20)}
-            padContentRight={false}
-            contentStyle={styles.headerContent}
-          >
-            <AppText variant="h5" color={palette.white} style={styles.heading}>
-              Verify your email Id
-            </AppText>
-          </HeroHeader>
+        <HeroHeader
+          source={require('../../../assets/placeholder/feed-bg.png')}
+          height={r.isTablet ? Math.min(r.height * 0.16, 140) : hp(20)}
+          padContentRight={false}
+          contentStyle={styles.headerContent}
+        >
+          <AppText variant="h5" color={palette.white} style={styles.heading}>
+            Verify your email Id
+          </AppText>
+        </HeroHeader>
 
+        <View
+          style={[
+            styles.content,
+            r.isTablet && {
+              maxWidth: r.contentMaxWidth,
+              width: '100%',
+              alignSelf: 'center',
+              paddingHorizontal: r.pagePadH,
+            },
+          ]}
+        >
           {/* HEADING */}
           <View style={styles.textBlock}>
             <AppText variant='bodyLarge' style={styles.subText}>
@@ -194,14 +205,23 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
           </View>
 
           {/* OTP */}
-          <View style={styles.otpContainer}>
+          <View
+            style={[
+              styles.otpContainer,
+              r.isTablet && { marginHorizontal: 0, gap: 12, justifyContent: 'center' },
+            ]}
+          >
             {otp.map((digit, index) => (
               <TextInput
                 key={index}
                 ref={(ref) => {
                   inputs.current[index] = ref;
                 }}
-                style={[styles.otpInput, otp[index] ? styles.otpFilled : null]}
+                style={[
+                  styles.otpInput,
+                  otp[index] ? styles.otpFilled : null,
+                  r.isTablet && { width: 56, height: 64 },
+                ]}
                 keyboardType="number-pad"
                 maxLength={1}
                 value={digit}
@@ -233,7 +253,12 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
         </View>
 
         {/* RESEND */}
-        <View style={styles.bottom}>
+        <View
+          style={[
+            styles.bottom,
+            r.isTablet && { maxWidth: r.contentMaxWidth, width: '100%', alignSelf: 'center', paddingHorizontal: r.pagePadH },
+          ]}
+        >
           <Pressable style={styles.resendButton} onPress={handleResend} disabled={resending}>
             <AppText variant='label' style={styles.resendText}>
               {resending ? 'Resending...' : 'Resend Email'}
@@ -244,8 +269,13 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
       </Screen>
 
       <Modal visible={showSuccess} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+        <View style={[styles.modalOverlay, r.isTablet && { paddingHorizontal: r.pagePadH }]}>
+          <View
+            style={[
+              styles.modalCard,
+              r.isTablet && { maxWidth: r.contentMaxWidth, width: '100%', alignSelf: 'center', paddingHorizontal: r.pagePadH },
+            ]}
+          >
 
             {/* TEXT */}
             <View style={styles.textBlock}>
@@ -318,8 +348,8 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    width: normalize(140),
-    height: normalize(60),
+    width: 140,
+    height: 48,
   },
 
   textBlock: {

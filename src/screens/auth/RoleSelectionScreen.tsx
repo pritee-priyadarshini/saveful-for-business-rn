@@ -10,11 +10,10 @@ import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAppContext } from '../../store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelection'>;
-type IconName = keyof typeof Ionicons.glyphMap;
 
 const businessOptions = [
   {
@@ -61,6 +60,7 @@ const charityOptions = [
 export function RoleSelectionScreen({ navigation }: Props) {
   const { selectedRole, setRole, roleFlow } = useAppContext();
   const insets = useSafeAreaInsets();
+  const r = useResponsiveLayout();
   useTransparentStatusBar('dark');
 
   useEffect(() => {
@@ -105,14 +105,40 @@ export function RoleSelectionScreen({ navigation }: Props) {
     navigation.navigate('RoleReady');
   };
 
+  const tabletColumn = r.isTablet
+    ? {
+        width: '100%' as const,
+        maxWidth: r.contentMaxWidth,
+        alignSelf: 'center' as const,
+        paddingHorizontal: r.pagePadH,
+      }
+    : null;
+
   return (
     <Screen backgroundColor={viewModel.bg} scrollable={false} transparentTop contentStyle={styles.screenContent}>
       <StatusBar style="dark" translucent backgroundColor="transparent" />
-      <ScrollView contentContainerStyle={styles.scrollInner} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollInner,
+          r.isTablet && { paddingBottom: insets.bottom + 24 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={[styles.topAccent, { backgroundColor: viewModel.accent }]} />
 
-      <View style={[styles.headerWrap, { paddingTop: insets.top + hp(2) }]}>
-        <AppText variant="h3" color={palette.black} style={styles.title}>
+      <View style={tabletColumn}>
+      <View
+        style={[
+          styles.headerWrap,
+          { paddingTop: insets.top + (r.isTablet ? 24 : hp(2)) },
+          r.isTablet && { paddingHorizontal: 0 },
+        ]}
+      >
+        <AppText
+          variant="h3"
+          color={palette.black}
+          style={[styles.title, r.isTablet && { fontSize: r.font(26, 28, 30), lineHeight: r.font(32, 34, 36) }]}
+        >
           Tell us about your organisation
         </AppText>
         <AppText variant="bodyBold" color={palette.black} style={styles.subtitle}>
@@ -120,23 +146,30 @@ export function RoleSelectionScreen({ navigation }: Props) {
         </AppText>
       </View>
 
-      <View style={styles.listWrap}>
+      <View style={[styles.listWrap, r.isTablet && { gap: 16, paddingHorizontal: 0, marginTop: 28 }]}>
         {viewModel.options.map((item) => (
-          <Pressable key={item.id} onPress={() => onSelect(item.id)} style={styles.optionCard}>
+          <Pressable
+            key={item.id}
+            onPress={() => onSelect(item.id)}
+            style={[
+              styles.optionCard,
+              r.isTablet && { minHeight: 96, paddingVertical: 16, paddingHorizontal: 18 },
+            ]}
+          >
             <View style={styles.optionLeft}>
-              <View style={styles.iconBox}>
+              <View style={[styles.iconBox, r.isTablet && { width: 48, height: 48 }]}>
                 <Image
                   source={item.iconName}
-                  style={styles.roundIcon}
+                  style={[styles.roundIcon, r.isTablet && { width: 48, height: 48 }]}
                   resizeMode="contain"
                 />
               </View>
 
               <View style={styles.textWrap}>
-                <AppText variant="h8" color={palette.black} style={styles.optionTitle}>
+                <AppText variant="h8" color={palette.black} style={styles.optionTitle} numberOfLines={2}>
                   {item.title}
                 </AppText>
-                <AppText variant="body" color={palette.black} style={styles.optionDescription}>
+                <AppText variant="body" color={palette.black} style={styles.optionDescription} numberOfLines={3}>
                   {item.description}
                 </AppText>
               </View>
@@ -145,6 +178,7 @@ export function RoleSelectionScreen({ navigation }: Props) {
             <Ionicons name="chevron-forward" size={normalize(22)} color="#6A6A6A" />
           </Pressable>
         ))}
+      </View>
       </View>
       </ScrollView>
     </Screen>
@@ -187,18 +221,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     gap: hp(2),
   },
-  roundIcon: { 
-    width: wp(12), 
-    height: wp(12),
+  roundIcon: {
+    width: 48,
+    height: 48,
   },
   optionCard: {
-    minHeight: hp(12),
+    minHeight: 96,
     borderRadius: normalize(8),
     backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: '#D9D9D9',
     paddingHorizontal: wp(3.2),
-    paddingVertical: hp(1.3),
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -209,17 +243,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: wp(3.2),
     flex: 1,
+    minWidth: 0,
   },
 
   iconBox: {
-    width: wp(12),
-    height: wp(12),
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
 
   textWrap: {
     flex: 1,
+    minWidth: 0,
     paddingRight: wp(2),
   },
 

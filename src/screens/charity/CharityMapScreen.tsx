@@ -759,7 +759,7 @@ export function CharityMapScreen({ navigation }: any) {
           onPress={handleDistanceSortPress}
         >
           <AppText
-            variant="caption"
+            variant="bodyBold"
             style={sortByDistance ? styles.filterTextActive : styles.filterText}
           >
             Sort by Distance
@@ -771,7 +771,7 @@ export function CharityMapScreen({ navigation }: any) {
           onPress={handleQuantitySortPress}
         >
           <AppText
-            variant="caption"
+            variant="bodyBold"
             style={sortByQuantity ? styles.filterTextActive : styles.filterText}
           >
             {sortByQuantity
@@ -999,16 +999,22 @@ const styles = StyleSheet.create({
 
   filterPill: {
     flex: 1,
+    minHeight: 44,
     backgroundColor: palette.white,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#D9D9D9',
-    paddingVertical: hp(1),
-    borderRadius: normalize(20),
+    paddingVertical: hp(1.35),
+    paddingHorizontal: wp(2),
+    borderRadius: normalize(14),
     alignItems: 'center',
+    justifyContent: 'center',
   },
 
   filterText: {
     color: palette.black,
+    fontSize: normalize(14),
+    lineHeight: normalize(18),
+    textTransform: 'none',
   },
 
   filterPillActive: {
@@ -1018,6 +1024,9 @@ const styles = StyleSheet.create({
 
   filterTextActive: {
     color: palette.white,
+    fontSize: normalize(14),
+    lineHeight: normalize(18),
+    textTransform: 'none',
   },
 
   card: {

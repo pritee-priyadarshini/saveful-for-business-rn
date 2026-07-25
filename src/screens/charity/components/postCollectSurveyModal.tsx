@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Modal,
     View,
@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { AppText } from '@/components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
+import { normalize, useResponsiveLayout } from '@/utils/responsive';
 
 type Item = {
     id: string;
@@ -29,6 +30,7 @@ type Props = {
 
 export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Props) {
     const navigation = useNavigation<any>();
+    const r = useResponsiveLayout();
     const [step, setStep] = useState(1);
     const [isPartial, setIsPartial] = useState(false);
 
@@ -50,6 +52,17 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
 
     const totalKg = items.reduce((sum, i) => sum + i.quantity, 0);
 
+    const cardStyle = useMemo(() => {
+        if (!r.isTablet) return null;
+        return {
+            width: '100%' as const,
+            maxWidth: Math.min(520, r.contentMaxWidth),
+            alignSelf: 'center' as const,
+        };
+    }, [r.isTablet, r.contentMaxWidth]);
+
+    const iconSize = r.isTablet ? 120 : 150;
+
     const updateQty = (id: string, delta: number) => {
         setItems((prev) =>
             prev.map((i) =>
@@ -69,14 +82,15 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
         setIsPartial(false);
     };
 
+    const handleClose = () => {
+        reset();
+        onClose();
+    };
+
     const handleGoHome = () => {
         handleClose();
         navigation.navigate('Home');
     };
-    const handleClose = () => {
-        reset();
-        onClose();
-    }
 
     const reasons = [
         'Pickup expired',
@@ -88,47 +102,54 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
 
     const canSubmitRating = rating > 0;
 
+    const questionIcon = (
+        <Image
+            source={require('../../../../assets/placeholder/bowl.png')}
+            style={[styles.questionIcon, { width: iconSize, height: iconSize }]}
+        />
+    );
+
     return (
         <Modal visible={visible} transparent animationType="fade">
-            <View style={styles.overlay}>
-                <View style={styles.card}>
+            <View style={[styles.overlay, r.isTablet && { paddingHorizontal: r.pagePadH }]}>
+                <View style={[styles.card, cardStyle]}>
                     <Pressable style={styles.closeIcon} onPress={handleClose}>
-                        <Ionicons name="close" size={22} color={palette.black} />
+                        <Ionicons name="close" size={normalize(22)} color={palette.black} />
                     </Pressable>
                     <ScrollView contentContainerStyle={styles.content}>
-                        {/* STEP 1 - Collection Confirmation */}
                         {step === 1 && (
                             <>
-                                <Image
-                                    source={require('../../../../assets/placeholder/bowl.png')}
-                                    style={styles.questionIcon}
-                                />
-                                <AppText variant='label' style={styles.title}>Did you collect the food?</AppText>
+                                {questionIcon}
+                                <AppText variant="label" style={styles.title}>
+                                    Did you collect the food?
+                                </AppText>
 
                                 <View style={styles.row}>
                                     <Pressable style={styles.primaryBtn} onPress={() => setStep(2)}>
-                                        <AppText variant='label' style={styles.primaryText}>Yes</AppText>
+                                        <AppText variant="label" style={styles.primaryText}>
+                                            Yes
+                                        </AppText>
                                     </Pressable>
 
                                     <Pressable style={styles.secondaryBtn} onPress={() => setStep(6)}>
-                                        <AppText variant='label'>No</AppText>
+                                        <AppText variant="label">No</AppText>
                                     </Pressable>
                                 </View>
                             </>
                         )}
 
-                        {/* STEP 2 - Full or Partial Claim */}
                         {step === 2 && (
                             <>
-                                <Image
-                                    source={require('../../../../assets/placeholder/bowl.png')}
-                                    style={styles.questionIcon}
-                                />
-                                <AppText variant='subheading' style={styles.title}>Was it full or partial?</AppText>
+                                {questionIcon}
+                                <AppText variant="subheading" style={styles.title}>
+                                    Was it full or partial?
+                                </AppText>
 
                                 <View style={styles.row}>
                                     <Pressable style={styles.primaryBtn} onPress={() => setStep(4)}>
-                                        <AppText variant='label' style={styles.primaryText}>Full</AppText>
+                                        <AppText variant="label" style={styles.primaryText}>
+                                            Full
+                                        </AppText>
                                     </Pressable>
 
                                     <Pressable
@@ -138,55 +159,55 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                                             setStep(3);
                                         }}
                                     >
-                                        <AppText variant='label'>Partial</AppText>
+                                        <AppText variant="label">Partial</AppText>
                                     </Pressable>
                                 </View>
                             </>
                         )}
 
-                        {/* STEP 3 - If Partial */}
                         {step === 3 && (
                             <>
-                                <Image
-                                    source={require('../../../../assets/placeholder/bowl.png')}
-                                    style={styles.questionIcon}
-                                />
-                                <AppText variant='subheading' style={styles.title}>Adjust collected items</AppText>
+                                {questionIcon}
+                                <AppText variant="subheading" style={styles.title}>
+                                    Adjust collected items
+                                </AppText>
 
                                 {items.map((item) => (
                                     <View key={item.id} style={styles.itemRow}>
-                                        <AppText variant='bodySmall'>{item.name}</AppText>
+                                        <AppText variant="bodySmall">{item.name}</AppText>
 
                                         <View style={styles.counter}>
                                             <Pressable onPress={() => updateQty(item.id, -1)}>
-                                                <Ionicons name="remove" size={18} />
+                                                <Ionicons name="remove" size={normalize(18)} />
                                             </Pressable>
 
-                                            <AppText variant='label'>{item.quantity} kg</AppText>
+                                            <AppText variant="label">{item.quantity} kg</AppText>
 
                                             <Pressable onPress={() => updateQty(item.id, 1)}>
-                                                <Ionicons name="add" size={18} />
+                                                <Ionicons name="add" size={normalize(18)} />
                                             </Pressable>
                                         </View>
                                     </View>
                                 ))}
 
-                                <AppText variant='label' style={styles.total}>Total: {totalKg} kg</AppText>
+                                <AppText variant="label" style={styles.total}>
+                                    Total: {totalKg} kg
+                                </AppText>
 
                                 <Pressable style={styles.primaryBtn} onPress={() => setStep(4)}>
-                                    <AppText variant='label' style={styles.primaryText}>Continue</AppText>
+                                    <AppText variant="label" style={styles.primaryText}>
+                                        Continue
+                                    </AppText>
                                 </Pressable>
                             </>
                         )}
 
-                        {/* STEP 4 - Rating */}
                         {step === 4 && (
                             <>
-                                <Image
-                                    source={require('../../../../assets/placeholder/bowl.png')}
-                                    style={styles.questionIcon}
-                                />
-                                <AppText variant='subheading' style={styles.title}>How much will you rate the surplus?</AppText>
+                                {questionIcon}
+                                <AppText variant="subheading" style={styles.title}>
+                                    How much will you rate the surplus?
+                                </AppText>
 
                                 <View style={styles.ratingRow}>
                                     {[1, 2, 3, 4, 5].map((num) => {
@@ -224,52 +245,52 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                                     disabled={!canSubmitRating}
                                     onPress={() => setStep(5)}
                                 >
-                                    <AppText variant='label' style={styles.primaryText}>Submit</AppText>
+                                    <AppText variant="label" style={styles.primaryText}>
+                                        Submit
+                                    </AppText>
                                 </Pressable>
                             </>
                         )}
 
-                        {/* STEP 5 - Success */}
                         {step === 5 && (
                             <>
-                                <Image
-                                    source={require('../../../../assets/placeholder/bowl.png')}
-                                    style={styles.questionIcon}
-                                />
-                                <AppText variant='subheading' style={styles.title}>🌍 You made a difference</AppText>
+                                {questionIcon}
+                                <AppText variant="subheading" style={styles.title}>
+                                    🌍 You made a difference
+                                </AppText>
 
-                                <AppText variant='bodyLarge' style={styles.success}>
+                                <AppText variant="bodyLarge" style={styles.success}>
                                     You helped reduce food waste and supported your community today.
                                 </AppText>
 
                                 <Pressable style={styles.primaryBtn} onPress={handleGoHome}>
-                                    <AppText variant='label' style={styles.primaryText}>Go To Home Screen</AppText>
+                                    <AppText variant="label" style={styles.primaryText}>
+                                        Go To Home Screen
+                                    </AppText>
                                 </Pressable>
                             </>
                         )}
 
-                        {/* STEP 6 - If not collected */}
                         {step === 6 && (
                             <>
-                                <Image
-                                    source={require('../../../../assets/placeholder/bowl.png')}
-                                    style={styles.questionIcon}
-                                />
-                                <AppText variant='subheading' style={styles.title}>Reason for Not Collecting</AppText>
+                                {questionIcon}
+                                <AppText variant="subheading" style={styles.title}>
+                                    Reason for Not Collecting
+                                </AppText>
 
-                                {reasons.map((r) => {
-                                    const selected = reason === r;
+                                {reasons.map((reasonLabel) => {
+                                    const selected = reason === reasonLabel;
 
                                     return (
                                         <Pressable
-                                            key={r}
+                                            key={reasonLabel}
                                             style={styles.radioRow}
-                                            onPress={() => setReason(r)}
+                                            onPress={() => setReason(reasonLabel)}
                                         >
                                             <View style={styles.radioOuter}>
                                                 {selected && <View style={styles.radioInner} />}
                                             </View>
-                                            <AppText variant='bodyLarge'>{r}</AppText>
+                                            <AppText variant="bodyLarge">{reasonLabel}</AppText>
                                         </Pressable>
                                     );
                                 })}
@@ -284,30 +305,31 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                                 )}
 
                                 <Pressable style={styles.primaryBtn} onPress={() => setStep(7)}>
-                                    <AppText variant='label' style={styles.primaryText}>Submit</AppText>
+                                    <AppText variant="label" style={styles.primaryText}>
+                                        Submit
+                                    </AppText>
                                 </Pressable>
                             </>
                         )}
 
-                        {/* STEP 7 */}
                         {step === 7 && (
                             <>
-                                <Image
-                                    source={require('../../../../assets/placeholder/bowl.png')}
-                                    style={styles.questionIcon}
-                                />
-                                <AppText variant='subheading' style={styles.title}>🙏 You tried to help</AppText>
+                                {questionIcon}
+                                <AppText variant="subheading" style={styles.title}>
+                                    🙏 You tried to help
+                                </AppText>
 
-                                <AppText variant='bodyLarge' style={styles.success}>
+                                <AppText variant="bodyLarge" style={styles.success}>
                                     Keep looking for new listings and continue making an impact.
                                 </AppText>
 
                                 <Pressable style={styles.primaryBtn} onPress={handleGoHome}>
-                                    <AppText variant='label' style={styles.primaryText}>Go To Home Screen</AppText>
+                                    <AppText variant="label" style={styles.primaryText}>
+                                        Go To Home Screen
+                                    </AppText>
                                 </Pressable>
                             </>
                         )}
-
                     </ScrollView>
                 </View>
             </View>
@@ -327,7 +349,7 @@ const styles = StyleSheet.create({
         width: '92%',
         maxHeight: '90%',
         backgroundColor: palette.white,
-        borderRadius: 20,
+        borderRadius: normalize(20),
         padding: spacing.lg,
     },
 
@@ -362,7 +384,7 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: palette.primary,
         padding: spacing.sm,
-        borderRadius: 10,
+        borderRadius: normalize(10),
         alignItems: 'center',
         marginRight: spacing.sm,
         marginTop: spacing.md,
@@ -373,7 +395,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: palette.strokecream,
         padding: spacing.sm,
-        borderRadius: 10,
+        borderRadius: normalize(10),
         alignItems: 'center',
         marginTop: spacing.md,
     },
@@ -392,7 +414,7 @@ const styles = StyleSheet.create({
     input: {
         borderWidth: 1,
         borderColor: palette.strokecream,
-        borderRadius: 10,
+        borderRadius: normalize(10),
         padding: spacing.sm,
         marginTop: spacing.sm,
     },
@@ -406,10 +428,12 @@ const styles = StyleSheet.create({
         marginTop: spacing.sm,
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
     },
 
     counter: {
         flexDirection: 'row',
+        alignItems: 'center',
         gap: spacing.sm,
     },
 
@@ -426,9 +450,9 @@ const styles = StyleSheet.create({
     },
 
     radioOuter: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: normalize(18),
+        height: normalize(18),
+        borderRadius: normalize(9),
         borderWidth: 2,
         borderColor: palette.primary,
         justifyContent: 'center',
@@ -436,26 +460,25 @@ const styles = StyleSheet.create({
     },
 
     radioInner: {
-        width: 8,
-        height: 8,
+        width: normalize(8),
+        height: normalize(8),
         backgroundColor: palette.primary,
-        borderRadius: 4,
+        borderRadius: normalize(4),
     },
 
     appleWrapper: {
         padding: 6,
-        borderRadius: 8,
+        borderRadius: normalize(8),
     },
 
     apple: {
-        fontSize: 32,
-        lineHeight: 36,
+        fontSize: normalize(32),
+        lineHeight: normalize(36),
         opacity: 0.3,
     },
 
     appleSelected: {
         opacity: 1,
         transform: [{ scale: 1.2 }],
-
     },
 });

@@ -7,12 +7,12 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/AppText';
 import { palette } from '@/theme/colors';
+import { elevation } from '@/theme/elevation';
 import { hp, normalize, wp } from '@/utils/responsive';
 import {
   TopFoodItem,
@@ -209,16 +209,6 @@ export function SpecificFoodSavings({
   const showAnimalSplit = split.animalPercent > 0;
   const showBothSplits = showPeopleSplit && showAnimalSplit;
 
-  const cardShadow = Platform.select({
-    ios: {
-      shadowColor: palette.black,
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-    },
-    android: { elevation: 2 },
-  });
-
   return (
     <View style={styles.wrap}>
       <AppText variant="bodyBold" style={styles.title}>
@@ -265,7 +255,7 @@ export function SpecificFoodSavings({
               {selected ? ` (${foodLabel(selected)})` : ''}.
             </AppText>
             <View style={styles.row}>
-              <View style={[styles.statCard, cardShadow]}>
+              <View style={[styles.statCard, elevation.flat]}>
                 <View style={styles.statIconWrap}>
                   <Image source={ICONS.redistributed} style={styles.statIcon} resizeMode="contain" />
                 </View>
@@ -277,7 +267,7 @@ export function SpecificFoodSavings({
                 </View>
               </View>
 
-              <View style={[styles.statCard, cardShadow]}>
+              <View style={[styles.statCard, elevation.flat]}>
                 <View style={styles.statIconWrap}>
                   <Image source={ICONS.co2} style={styles.statIcon} resizeMode="contain" />
                 </View>
@@ -293,7 +283,7 @@ export function SpecificFoodSavings({
             {showBothSplits || showPeopleSplit || showAnimalSplit ? (
               <View style={styles.row}>
                 {showPeopleSplit ? (
-                  <View style={[styles.splitCard, cardShadow, !showBothSplits && styles.splitCardFull]}>
+                  <View style={[styles.splitCard, elevation.flat, !showBothSplits && styles.splitCardFull]}>
                     <View style={[styles.splitHeader, styles.peopleHeader]}>
                       <Image source={ICONS.people} style={styles.splitBadgeIcon} resizeMode="contain" />
                       <AppText style={styles.peopleHeaderText}>For people</AppText>
@@ -330,7 +320,7 @@ export function SpecificFoodSavings({
                 ) : null}
 
                 {showAnimalSplit ? (
-                  <View style={[styles.splitCard, cardShadow, !showBothSplits && styles.splitCardFull]}>
+                  <View style={[styles.splitCard, elevation.flat, !showBothSplits && styles.splitCardFull]}>
                     <View style={[styles.splitHeader, styles.animalsHeader]}>
                       <Image source={ICONS.animals} style={styles.splitBadgeIcon} resizeMode="contain" />
                       <AppText style={styles.animalsHeaderText}>For animals</AppText>

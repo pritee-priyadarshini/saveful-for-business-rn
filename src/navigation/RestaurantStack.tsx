@@ -29,6 +29,7 @@ export function RestaurantStack() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: palette.creme },
+        orientation: 'portrait',
       }}
     >
       <Stack.Screen name="RestaurantListings" component={RestaurantListingsScreen} />

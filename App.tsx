@@ -1,8 +1,10 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { AppProvider } from './src/store/AppContext';
 import { useAuthStore } from './src/store/authStore';
@@ -16,6 +18,23 @@ import { AppAlertHost } from './src/components/AppAlertModal';
 export default function App() {
   const [splashTimerDone, setSplashTimerDone] = useState(false);
   const isInitialLoading = useAuthStore((state) => state.isInitialLoading);
+
+  useEffect(() => {
+    const lockPortrait = async () => {
+      try {
+        if (Platform.OS === 'android') {
+          await ScreenOrientation.lockPlatformAsync({
+            screenOrientationConstantAndroid: 1, // SCREEN_ORIENTATION_PORTRAIT
+          });
+        } else {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        }
+      } catch {
+        // Ignore — requires native rebuild after adding expo-screen-orientation
+      }
+    };
+    void lockPortrait();
+  }, []);
 
   useEffect(() => {
     void useAuthStore.getState().restoreSession();

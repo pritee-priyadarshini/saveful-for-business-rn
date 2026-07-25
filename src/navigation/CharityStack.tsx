@@ -12,7 +12,7 @@ const Stack = createNativeStackNavigator<CharityStackParamList>();
 
 export function CharityStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, orientation: 'portrait' }}>
         <Stack.Screen name="CharityMap" component={CharityMapScreen} />
         <Stack.Screen name="CharityPickup" component={CharityPickupScreen} />
     </Stack.Navigator>

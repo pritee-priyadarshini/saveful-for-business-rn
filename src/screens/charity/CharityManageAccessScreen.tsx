@@ -8,7 +8,6 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
-  Dimensions,
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,16 +29,9 @@ import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
 const MIN_PASSWORD_LENGTH = 6;
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
 
 const inputProps = { compact: true as const, labelVariant: 'bodyBold' as const };
 
@@ -64,6 +56,7 @@ function validatePassword(password: string, confirmPassword: string): string | n
 
 export default function CharityManageAccessScreen() {
   useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -353,6 +346,7 @@ export default function CharityManageAccessScreen() {
           title="Manage Access"
           subtitle="Add and manage users & drivers"
           height={hp(14)}
+          style={r.isTablet ? { width: r.width, alignSelf: 'center' } : undefined}
         />
         {renderSkeleton()}
       </Screen>
@@ -389,8 +383,21 @@ export default function CharityManageAccessScreen() {
               title="Manage Access"
               subtitle="Add and manage users & drivers"
               height={hp(14)}
+              style={r.isTablet ? { width: r.width, alignSelf: 'center' } : undefined}
             />
 
+            <View
+              style={
+                r.isTablet
+                  ? {
+                      width: '100%',
+                      maxWidth: r.contentMaxWidth,
+                      alignSelf: 'center',
+                      paddingHorizontal: r.pagePadH,
+                    }
+                  : undefined
+              }
+            >
             <View style={styles.tabRow}>
               <Pressable
                 style={[styles.tabPill, activeTab === 'user' && styles.activeTab]}
@@ -671,6 +678,7 @@ export default function CharityManageAccessScreen() {
                   </View>
                 ))
               )}
+            </View>
             </View>
           </ScrollView>
         </Screen>

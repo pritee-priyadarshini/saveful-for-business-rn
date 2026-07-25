@@ -11,7 +11,6 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
  */
 async function postFormData(path: string, body: FormData) {
   const url = `${BASE_URL}${path}`;
-  console.log(`[AUTH] → POST ${url}`);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -19,7 +18,6 @@ async function postFormData(path: string, body: FormData) {
   });
 
   const json = await response.json().catch(() => null);
-  console.log(`[AUTH] ← ${response.status} POST ${url}`, json);
 
   if (!response.ok) {
     const error: any = new Error(json?.message || `Request failed with status ${response.status}`);

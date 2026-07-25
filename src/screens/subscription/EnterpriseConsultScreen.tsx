@@ -189,13 +189,6 @@ export function EnterpriseConsultScreen() {
   };
 
   const onSubmit = () => {
-    console.log('Enterprise consult request', {
-      details,
-      locationRange,
-      contactPref,
-      notes: notes.trim(),
-      businessTypeLabel: getBusinessVenueLabel(details.businessType),
-    });
     navigation.navigate('EnterpriseThanks');
   };
 

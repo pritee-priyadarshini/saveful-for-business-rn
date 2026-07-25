@@ -9,125 +9,134 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { AuthStackParamList } from '../../navigation/types';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { useResponsiveLayout } from '@/utils/responsive';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+
 type Props = NativeStackScreenProps<AuthStackParamList, 'TeamInvite'>;
 
 export function TeamInviteScreen({ navigation }: Props) {
-    const insets = useSafeAreaInsets();
-    useTransparentStatusBar('dark');
-    const inviteCode = '123456';
+  const insets = useSafeAreaInsets();
+  const r = useResponsiveLayout();
+  useTransparentStatusBar('dark');
+  const inviteCode = '123456';
 
-    return (
-        <Screen
-            backgroundColor={palette.restaurantBackground}
-            transparentTop
-            contentStyle={{
-                ...styles.container,
-                paddingTop: insets.top + spacing.lg,
-            }}
-        >
-            <StatusBar style="dark" translucent backgroundColor="transparent" />
+  return (
+    <Screen
+      backgroundColor={palette.restaurantBackground}
+      transparentTop
+      contentStyle={{
+        ...styles.container,
+        paddingTop: insets.top + spacing.lg,
+        paddingBottom: Math.max(insets.bottom, spacing.lg),
+        ...(r.isTablet
+          ? {
+              paddingHorizontal: r.pagePadH,
+              alignItems: 'center' as const,
+            }
+          : null),
+      }}
+    >
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
 
-            <View style={styles.content}>
+      <View
+        style={[
+          styles.column,
+          r.isTablet && { maxWidth: r.contentMaxWidth, width: '100%' },
+        ]}
+      >
+        <View style={styles.content}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../../../assets/intro/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
 
-                {/* LOGO */}
-                <View style={styles.logoContainer}>
-                    <Image
-                        source={require('../../../assets/intro/logo.png')}
-                        style={styles.logo}
-                        resizeMode="contain"
-                    />
-                </View>
+          <View style={styles.textBlock}>
+            <AppText variant="heading">ADD YOUR TEAM (OPTIONAL)</AppText>
 
-                {/* TEXT */}
-                <View style={styles.textBlock}>
-                    <AppText variant="heading">ADD YOUR TEAM (OPTIONAL)</AppText>
+            <AppText style={styles.text}>
+              Invite your team to help list and manage surplus.
+            </AppText>
 
-                    <AppText style={styles.text}>
-                        Invite your team to help list and manage surplus.
-                    </AppText>
+            <AppText style={styles.text}>Share this code to get them started:</AppText>
+          </View>
 
-                    <AppText style={styles.text}>
-                        Share this code to get them started:
-                    </AppText>
-                </View>
+          <View style={styles.codeBox}>
+            <AppText variant="bodyBold">{inviteCode}</AppText>
+          </View>
 
-                {/* CODE BOX */}
-                <View style={styles.codeBox}>
-                    <AppText variant="bodyBold">{inviteCode}</AppText>
-                </View>
+          <AppText style={styles.info}>You can add up to 6 users on your current plan.</AppText>
+        </View>
 
-                {/* INFO */}
-                <AppText style={styles.info}>
-                    You can add up to 6 users on your current plan.
-                </AppText>
+        <View style={styles.bottom}>
+          <Button label="Continue" onPress={() => {}} />
 
-            </View>
-
-            {/* ACTIONS */}
-            <View style={styles.bottom}>
-                <Button label="Continue" onPress={() => { }} />
-
-                <Pressable onPress={() => { }}>
-                    <AppText style={styles.skip}>Skip for now</AppText>
-                </Pressable>
-            </View>
-
-        </Screen>
-    );
+          <Pressable onPress={() => {}}>
+            <AppText style={styles.skip}>Skip for now</AppText>
+          </Pressable>
+        </View>
+      </View>
+    </Screen>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flexGrow: 1,
-        justifyContent: 'space-between',
-        padding: spacing.lg,
-    },
+  container: {
+    flexGrow: 1,
+    padding: spacing.lg,
+  },
 
-    content: {
-        gap: spacing.lg,
-    },
+  column: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'space-between',
+  },
 
-    logoContainer: {
-        alignItems: 'center',
-        gap: spacing.xs,
-    },
+  content: {
+    gap: spacing.lg,
+  },
 
-    logo: {
-        width: wp(50),
-        height: hp(10),
-    },
+  logoContainer: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
 
-    textBlock: {
-        gap: spacing.sm,
-    },
+  logo: {
+    width: 168,
+    height: 52,
+  },
 
-    text: {
-        opacity: 0.85,
-    },
+  textBlock: {
+    gap: spacing.sm,
+  },
 
-    codeBox: {
-        padding: spacing.lg,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: palette.border,
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-    },
+  text: {
+    opacity: 0.85,
+  },
 
-    info: {
-        opacity: 0.6,
-    },
+  codeBox: {
+    padding: spacing.lg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
 
-    bottom: {
-        gap: spacing.md,
-        marginTop: spacing.lg,
-    },
+  info: {
+    opacity: 0.6,
+  },
 
-    skip: {
-        textAlign: 'center',
-        opacity: 0.7,
-    },
+  bottom: {
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
+
+  skip: {
+    textAlign: 'center',
+    opacity: 0.7,
+  },
 });

@@ -30,7 +30,6 @@ export async function pickSquareImage(): Promise<string | null> {
 
     return openCircularImageCrop(result.assets[0].uri);
   } catch (error) {
-    console.warn('[Logo] Image pick/crop failed:', error);
     showErrorAlert('Please try again.', 'Could not open gallery');
     return null;
   }

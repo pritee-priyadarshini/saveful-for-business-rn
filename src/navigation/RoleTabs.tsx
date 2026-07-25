@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
-import { Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CharityAnalyticsScreen } from '../screens/charity/CharityAnalyticsScreen';
@@ -21,14 +21,14 @@ import { FarmerStack } from './FarmerStack';
 import { FarmerAnalyticsScreen } from '@/screens/farmer/FarmerAnalyticsScreen';
 import { FarmerUpdatesScreen } from '@/screens/farmer/FarmerUpdatesScreen';
 import { FarmerHomeScreen } from '@/screens/farmer/FarmerHomeScreen';
-import { normalize } from '@/utils/responsive';
 
 const RestaurantTab = createBottomTabNavigator<RestaurantTabsParamList>();
 const CharityTab = createBottomTabNavigator<CharityTabsParamList>();
 const FarmerTab = createBottomTabNavigator<FarmerTabsParamList>();
 
-const TAB_ICON_SIZE = normalize(26);
-const TAB_BAR_CONTENT_HEIGHT = normalize(58);
+/** Fixed sizes — avoid normalize() so icons don't clip on tablets. */
+const TAB_ICON_SIZE = 24;
+const TAB_BAR_CONTENT_HEIGHT = 56;
 
 const iconMap: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled: keyof typeof Ionicons.glyphMap }> = {
   Home: { outline: 'home-outline', filled: 'home' },
@@ -41,9 +41,23 @@ const iconMap: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled:
   Updates: { outline: 'notifications-outline', filled: 'notifications' },
 };
 
+function TabBarIcon({
+  name,
+  color,
+}: {
+  name: keyof typeof Ionicons.glyphMap;
+  color: string;
+}) {
+  return (
+    <View style={styles.iconWrap}>
+      <Ionicons name={name} size={TAB_ICON_SIZE} color={color} />
+    </View>
+  );
+}
+
 function useTabScreenOptions(): ({ route }: { route: { name: string } }) => BottomTabNavigationOptions {
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? normalize(6) : 0);
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 6 : 0);
 
   return ({ route }) => {
     const icons = iconMap[route.name];
@@ -52,9 +66,11 @@ function useTabScreenOptions(): ({ route }: { route: { name: string } }) => Bott
       headerShown: false,
       tabBarActiveTintColor: palette.primary,
       tabBarInactiveTintColor: palette.textMuted,
+      // Keep icon above label on all widths — beside-icon clips icons with 5 tabs.
+      tabBarLabelPosition: 'below-icon',
       tabBarStyle: {
         height: TAB_BAR_CONTENT_HEIGHT + bottomInset,
-        paddingTop: normalize(6),
+        paddingTop: 6,
         paddingBottom: bottomInset,
         backgroundColor: palette.creme,
         borderTopColor: palette.strokecream,
@@ -75,19 +91,22 @@ function useTabScreenOptions(): ({ route }: { route: { name: string } }) => Bott
         paddingVertical: 0,
         marginTop: 0,
       },
+      tabBarIconStyle: {
+        marginTop: 0,
+        marginBottom: 0,
+      },
       tabBarLabelStyle: {
         fontFamily: 'Saveful-SemiBold',
-        fontSize: normalize(11),
-        lineHeight: normalize(15),
-        marginTop: normalize(3),
+        fontSize: 11,
+        lineHeight: 14,
+        marginTop: 2,
         marginBottom: 0,
         letterSpacing: 0.2,
       },
       tabBarIcon: ({ color, focused }) => (
-        <Ionicons
+        <TabBarIcon
           color={color}
           name={focused && icons ? icons.filled : icons?.outline ?? 'ellipse-outline'}
-          size={TAB_ICON_SIZE}
         />
       ),
       sceneContainerStyle: {
@@ -150,3 +169,13 @@ export function RoleTabs() {
     </RestaurantTab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrap: {
+    width: TAB_ICON_SIZE + 4,
+    height: TAB_ICON_SIZE + 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+});

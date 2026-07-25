@@ -4,28 +4,24 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  ImageBackground,
   Image,
   Modal,
   Linking,
-  Dimensions,
   ViewStyle,
   TextStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '../../theme/colors';
 import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 
 type StatusFilter = 'all' | 'completed' | 'cancelled';
 
@@ -228,6 +224,12 @@ function getDriverLabel(pickup: Pickup) {
 }
 
 export default function CharityPickupScreen({ navigation }: any) {
+  useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
+  const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(3));
+  const tabletInsetReset = r.isTablet ? { paddingHorizontal: 0 } : null;
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPickup, setSelectedPickup] = useState<Pickup | null>(null);
@@ -294,6 +296,16 @@ export default function CharityPickupScreen({ navigation }: any) {
     openDetails(pickup);
   };
 
+  const contentColumn = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    return {
+      width: adaptive.columnWidth,
+      maxWidth: r.contentMaxWidth,
+      alignSelf: 'center' as const,
+      paddingHorizontal: r.pagePadH,
+    };
+  }, [r.isTablet, r.contentMaxWidth, r.pagePadH, adaptive.columnWidth]);
+
   const renderContactButton = (
     label: 'Call' | 'Message',
     onPress: () => void,
@@ -336,8 +348,11 @@ export default function CharityPickupScreen({ navigation }: any) {
         <View style={styles.cardBodyRow}>
           <View style={[styles.weightBox, theme.weightBox]}>
             <Image source={theme.weightIcon} style={styles.weightIcon} resizeMode="contain" />
-            <AppText variant="bodyBold" style={[styles.weightText, theme.weightText]}>
-              {pickup.weightKg} kg
+            <AppText variant="bodyBold" style={[styles.weightValue, theme.weightText]} numberOfLines={1}>
+              {pickup.weightKg}
+            </AppText>
+            <AppText variant="caption" style={styles.weightUnit} numberOfLines={1}>
+              kg
             </AppText>
           </View>
 
@@ -365,40 +380,30 @@ export default function CharityPickupScreen({ navigation }: any) {
             </View>
 
             {driverLabel ? (
-              <View style={styles.driverDetailsRow}>
-                <View style={styles.detailLine}>
-                  <Image
-                    source={require('../../../assets/placeholder/driver_icon.png')}
-                    style={styles.inlineIcon}
-                    resizeMode="contain"
-                  />
-                  <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
-                    {driverLabel}
-                  </AppText>
-                </View>
+              <View style={styles.detailLine}>
+                <Image
+                  source={require('../../../assets/placeholder/driver_icon.png')}
+                  style={styles.inlineIcon}
+                  resizeMode="contain"
+                />
+                <AppText variant="bodyBold" style={styles.detailText} numberOfLines={2} ellipsizeMode="tail">
+                  {driverLabel}
+                </AppText>
+              </View>
+            ) : null}
 
-                <Pressable
-                  style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
-                  onPress={() => handleViewDetails(pickup)}
-                >
-                  <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]}>
-                    View Details
-                  </AppText>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.driverDetailsRow}>
-                <View style={styles.detailLine} />
-                <Pressable
-                  style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
-                  onPress={() => handleViewDetails(pickup)}
-                >
-                  <AppText variant="bodyBold" style={[styles.viewDetailsText, theme.viewDetailsText]}>
-                    View Details
-                  </AppText>
-                </Pressable>
-              </View>
-            )}
+            <Pressable
+              style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
+              onPress={() => handleViewDetails(pickup)}
+            >
+              <AppText
+                variant="bodyBold"
+                style={[styles.viewDetailsText, theme.viewDetailsText]}
+                numberOfLines={1}
+              >
+                View Details
+              </AppText>
+            </Pressable>
           </View>
         </View>
 
@@ -460,28 +465,40 @@ export default function CharityPickupScreen({ navigation }: any) {
   };
 
   return (
-    <Screen backgroundColor={palette.white}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <ImageBackground
-          source={require('../../../assets/placeholder/feed-bg.png')}
-          resizeMode="cover"
-          style={styles.headerBg}
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          adaptive.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={
+            r.isTablet
+              ? { width: r.width, alignSelf: 'center' as const }
+              : undefined
+          }
         >
-          <AppText variant="h4" style={styles.headerTitle}>
-            YOUR PICKUPS
-          </AppText>
-        </ImageBackground>
+          <StackHeroHeader
+            title="Your Pickups"
+            height={r.isTablet ? adaptive.heroHeight : hp(14)}
+            style={r.isTablet ? adaptive.heroBleed : undefined}
+          />
+        </View>
 
         {nextPickup ? (
-          <View style={styles.sectionBlock}>
-            <AppText variant="h8" style={styles.sectionHeading}>
+          <View style={[styles.sectionBlock, contentColumn, tabletInsetReset]}>
+            <AppText variant="h8" style={[styles.sectionHeading, adaptive.sectionTitle]}>
               Next Pickup
             </AppText>
             {renderPickupCard(nextPickup)}
           </View>
         ) : null}
 
-        <View style={styles.sectionBlock}>
+        <View style={[styles.sectionBlock, contentColumn, tabletInsetReset]}>
           <View style={styles.filterRow}>
             {renderStatusChip('all', 'All')}
             {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
@@ -492,7 +509,7 @@ export default function CharityPickupScreen({ navigation }: any) {
             filteredPickups.map((pickup) => renderPickupCard(pickup))
           ) : (
             <View style={styles.emptyWrap}>
-              <AppText variant="bodySmall" style={styles.emptyText}>
+              <AppText variant="bodySmall" style={[styles.emptyText, adaptive.emptyText]}>
                 No pickups match this filter.
               </AppText>
             </View>
@@ -501,8 +518,17 @@ export default function CharityPickupScreen({ navigation }: any) {
       </ScrollView>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalWrap}>
-          <View style={styles.modalCard}>
+        <View style={[styles.modalWrap, r.isTablet && { paddingHorizontal: r.pagePadH }]}>
+          <View
+            style={[
+              styles.modalCard,
+              r.isTablet && {
+                width: '100%',
+                maxWidth: Math.min(520, r.contentMaxWidth),
+                alignSelf: 'center',
+              },
+            ]}
+          >
             <View style={styles.modalTopBar}>
               <AppText variant="h6">Items</AppText>
               <Pressable style={styles.closeIconBtn} onPress={() => setModalVisible(false)}>
@@ -561,26 +587,14 @@ export default function CharityPickupScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: hp(4),
     gap: hp(1.5),
-  },
-
-  /* Header */
-  headerBg: {
-    width: '100%',
-    height: hp(16),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: palette.white,
-    textTransform: 'none',
   },
 
   /* Sections */
   sectionBlock: {
     paddingHorizontal: wp(4),
     gap: hp(1.2),
+    width: '100%',
   },
   sectionHeading: {
     color: palette.black,
@@ -657,38 +671,48 @@ const styles = StyleSheet.create({
   },
   cardBodyRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
     gap: wp(2.5),
   },
   weightBox: {
-    width: wp(18),
-    minHeight: wp(18),
-    borderWidth: normalize(1),
+    width: normalize(64),
+    minHeight: normalize(72),
+    borderWidth: 1,
     borderRadius: normalize(10),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: hp(0.8),
-    gap: hp(0.4),
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(1),
+    gap: hp(0.15),
     flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   weightIcon: {
-    width: normalize(28),
-    height: normalize(28),
+    width: normalize(22),
+    height: normalize(22),
   },
-  weightText: {
-    fontSize: normalize(12),
+  weightValue: {
+    fontSize: normalize(13),
+    lineHeight: normalize(16),
     textTransform: 'none',
+    textAlign: 'center',
+  },
+  weightUnit: {
+    fontSize: normalize(11),
+    lineHeight: normalize(13),
+    color: palette.stone,
+    textTransform: 'none',
+    textAlign: 'center',
   },
   detailsColumn: {
     flex: 1,
     minWidth: 0,
-    gap: hp(0.35),
+    gap: hp(0.4),
   },
   detailLine: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: wp(1),
-    flex: 1,
     minWidth: 0,
   },
   detailText: {
@@ -710,22 +734,19 @@ const styles = StyleSheet.create({
     marginTop: normalize(1),
     flexShrink: 0,
   },
-  driverDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: wp(1.5),
-    flexWrap: 'wrap',
-    marginTop: hp(0.2),
-  },
   viewDetailsBtn: {
-    paddingVertical: hp(0.7),
-    paddingHorizontal: wp(2.5),
-    borderRadius: normalize(8),
-    flexShrink: 0,
     alignSelf: 'flex-end',
+    minWidth: normalize(108),
+    paddingVertical: hp(0.85),
+    paddingHorizontal: wp(3.5),
+    borderRadius: normalize(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp(0.3),
   },
   viewDetailsText: {
-    fontSize: normalize(11),
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
     textTransform: 'none',
   },
 

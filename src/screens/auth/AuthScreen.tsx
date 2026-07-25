@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   Image,
-  Dimensions,
   Platform,
   Linking,
   Keyboard,
@@ -39,10 +38,8 @@ import { getUserFriendlyErrorMessage, showErrorAlert } from '@/utils/apiError';
 import { REGION_OPTIONS, getRegionLabel, appendSignupRegionAndCoordinates, isSelectableRegion } from '@/data/regions';
 import type { Region } from '@/types';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { DEFAULT_PICKUP_RADIUS_KM } from '@/utils/authSession';
-
-const { height } = Dimensions.get('window');
 
 type NavProp = NativeStackNavigationProp<AuthStackParamList>;
 
@@ -63,7 +60,7 @@ function AuthContinueButton({
       <AppText variant="bodyBold" style={styles.authContinueText}>
         {label}
       </AppText>
-      <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+      <Ionicons name="arrow-forward" size={18} color={palette.white} style={styles.authContinueArrowIcon} />
     </Pressable>
   );
 }
@@ -281,6 +278,7 @@ function FormErrorBanner({ message }: { message: string | null }) {
 
 export function AuthScreen() {
   const insets = useSafeAreaInsets();
+  const r = useResponsiveLayout();
   useTransparentStatusBar('dark');
 
   const {
@@ -324,7 +322,7 @@ export function AuthScreen() {
         const gap = hp(1.5);
         const activeKeyboardHeight =
           keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
-        const visibleBottom = height - activeKeyboardHeight - gap;
+        const visibleBottom = r.height - activeKeyboardHeight - gap;
         const fieldBottom = fieldY + fieldH;
 
         if (fieldBottom > visibleBottom) {
@@ -335,7 +333,7 @@ export function AuthScreen() {
         }
       });
     });
-  }, []);
+  }, [r.height]);
 
   const handleFieldFocus = useCallback(
     (field: View) => {
@@ -944,10 +942,15 @@ export function AuthScreen() {
           contentContainerStyle={[
             styles.newContent,
             {
-              paddingTop: insets.top + hp(1),
+              paddingTop: insets.top + (r.isTablet ? spacing.sm : hp(1)),
               paddingBottom: keyboardVisible
-                ? keyboardHeight + hp(3)
-                : hp(6),
+                ? keyboardHeight + (r.isTablet ? spacing.xl : hp(3))
+                : r.isTablet
+                  ? spacing.xxl
+                  : hp(6),
+              ...(r.isTablet
+                ? { paddingHorizontal: r.pagePadH }
+                : { paddingHorizontal: wp(4.5) }),
             },
           ]}
           onScroll={(event) => {
@@ -958,7 +961,17 @@ export function AuthScreen() {
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
         >
-          <View style={styles.authContainer}>
+          <View
+            style={[
+              styles.authContainer,
+              r.isTablet && {
+                maxWidth: r.contentMaxWidth,
+                width: '100%',
+                alignSelf: 'center',
+                gap: spacing.md,
+              },
+            ]}
+          >
             <Pressable style={styles.backRow} onPress={handleBack} hitSlop={8}>
               <Ionicons name="chevron-back" size={normalize(20)} color={palette.kale} />
               <AppText variant="bodyBold" style={styles.backRowText}>
@@ -1104,7 +1117,7 @@ export function AuthScreen() {
               />
 
               <View ref={mobileFieldRef} style={styles.mobileFieldWrap}>
-                <AppText variant="label" style={styles.mobileLabel}>
+                <AppText variant="label" color={palette.black} style={styles.mobileLabel}>
                   Mobile
                 </AppText>
 
@@ -1114,7 +1127,7 @@ export function AuthScreen() {
                     onPress={() => setCountryPickerOpen((open) => !open)}
                   >
                     <AppText style={styles.countryFlag}>{selectedMobileCountry.flag}</AppText>
-                    <AppText variant="bodyBold" style={styles.countryDialCode}>
+                    <AppText variant="bodySmall" style={styles.countryDialCode}>
                       {selectedMobileCountry.dialCode}
                     </AppText>
                     <Ionicons
@@ -1496,6 +1509,10 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 
+  authContinueArrowIcon: {
+    marginTop: 1,
+  },
+
   authContinueText: {
     color: palette.white,
     textTransform: 'uppercase',
@@ -1504,7 +1521,7 @@ const styles = StyleSheet.create({
   },
 
   mobileFieldWrap: {
-    gap: spacing.xs,
+    gap: hp(0.6),
   },
 
   mobileLabel: {
@@ -1971,8 +1988,6 @@ const styles = StyleSheet.create({
 
 
   newContent: {
-    paddingHorizontal: wp(4.5),
-    paddingBottom: hp(4),
     flexGrow: 1,
   },
 
@@ -2106,9 +2121,9 @@ const styles = StyleSheet.create({
   },
 
   logoPreviewImage: {
-    width: normalize(120),
-    height: normalize(120),
-    borderRadius: normalize(60),
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
 
   buttonRow: {

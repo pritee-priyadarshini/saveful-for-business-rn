@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   Modal,
   Pressable,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
@@ -48,7 +48,7 @@ export function CircularImageCropHost() {
   const [saving, setSaving] = useState(false);
   const [rotating, setRotating] = useState(false);
 
-  const { width: screenW, height: screenH } = Dimensions.get('window');
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const minCrop = Math.min(screenW, screenH) * 0.28;
   const maxCrop = Math.min(screenW, screenH) - 32;
   const initialCrop = Math.min(screenW, screenH) * 0.72;

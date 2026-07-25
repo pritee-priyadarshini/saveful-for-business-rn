@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Keyboard,
   Modal,
   PanResponder,
@@ -16,15 +15,9 @@ import { AppText } from './AppText';
 import { OsmMapView } from './OsmMapView';
 import { PlacesSearchInput } from './PlacesSearchInput';
 import { palette } from '../theme/colors';
-import { fetchCurrentLocation, reverseGeocodeAddress } from '@/utils/currentLocation';
+import { fetchCurrentLocation } from '@/utils/currentLocation';
 import { resolveLocationDetails } from '@/utils/postcode';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => Math.round(size * (width / 375));
-
-const MODAL_HEIGHT = height * 0.9;
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
 export type SelectedLocation = {
   latitude: number;
@@ -50,11 +43,16 @@ export function LocationSetupModal({
   confirming = false,
   initialLocation = null,
 }: Props) {
+  const r = useResponsiveLayout();
+  const modalHeight = Math.round(r.height * 0.9);
+  const modalHeightRef = useRef(modalHeight);
+  modalHeightRef.current = modalHeight;
+
   const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [selectedPostcode, setSelectedPostcode] = useState('');
 
-  const slideAnim = useRef(new Animated.Value(MODAL_HEIGHT)).current;
+  const slideAnim = useRef(new Animated.Value(modalHeight)).current;
 
   useEffect(() => {
     if (!visible) return;
@@ -68,7 +66,7 @@ export function LocationSetupModal({
       setSelectedPostcode(initialLocation.postcode || '');
     }
 
-    slideAnim.setValue(MODAL_HEIGHT);
+    slideAnim.setValue(modalHeightRef.current);
     Animated.spring(slideAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -76,6 +74,15 @@ export function LocationSetupModal({
       friction: 11,
     }).start();
   }, [visible, initialLocation, slideAnim]);
+
+  const handleClose = () => {
+    Keyboard.dismiss();
+    Animated.timing(slideAnim, {
+      toValue: modalHeightRef.current,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => onClose());
+  };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -85,22 +92,18 @@ export function LocationSetupModal({
       },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dy > 100 || gesture.vy > 0.5) {
-          handleClose();
+          Keyboard.dismiss();
+          Animated.timing(slideAnim, {
+            toValue: modalHeightRef.current,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => onClose());
         } else {
           Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
         }
       },
     }),
   ).current;
-
-  const handleClose = () => {
-    Keyboard.dismiss();
-    Animated.timing(slideAnim, {
-      toValue: MODAL_HEIGHT,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => onClose());
-  };
 
   const applyCoords = async (
     latitude: number,
@@ -154,7 +157,15 @@ export function LocationSetupModal({
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={handleClose} />
 
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              height: modalHeight,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
           <View style={styles.dragArea} {...panResponder.panHandlers}>
             <View style={styles.dragHandle} />
           </View>
@@ -235,7 +246,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   sheet: {
-    height: MODAL_HEIGHT,
     backgroundColor: palette.white,
     borderTopLeftRadius: normalize(20),
     borderTopRightRadius: normalize(20),

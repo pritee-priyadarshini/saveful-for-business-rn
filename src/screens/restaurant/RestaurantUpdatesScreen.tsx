@@ -8,7 +8,7 @@ import {
   View,
   Image,
   Linking,
-  Platform,
+  type TextStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -18,10 +18,12 @@ import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
+import { elevation } from '@/theme/elevation';
 import { PostPickupSurveyModal } from './components/postPickupSurveyModal';
 import { estimateMealsSaved } from '../../utils/foodListing';
 import { showErrorAlert } from '@/utils/apiError';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAppContext } from '../../store/AppContext';
@@ -148,23 +150,25 @@ function formatCollectedDate(value: string) {
   return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
-const cardElevation = Platform.select({
-  ios: {
-    shadowColor: palette.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-  },
-  android: { elevation: 3 },
-});
-
-function renderCardHeadline(primary: string, secondary: string) {
+function renderCardHeadline(
+  primary: string,
+  secondary: string,
+  textStyles?: { primary?: TextStyle; secondary?: TextStyle },
+) {
   return (
     <View style={styles.cardHeadline}>
-      <AppText variant="h8" style={styles.cardHeadlinePrimary} numberOfLines={2}>
+      <AppText
+        variant="h8"
+        style={[styles.cardHeadlinePrimary, textStyles?.primary]}
+        numberOfLines={2}
+      >
         {primary}
       </AppText>
-      <AppText variant="bodySmall" color={palette.stone} style={styles.cardHeadlineSecondary}>
+      <AppText
+        variant="bodySmall"
+        color={palette.stone}
+        style={[styles.cardHeadlineSecondary, textStyles?.secondary]}
+      >
         {secondary}
       </AppText>
     </View>
@@ -173,7 +177,9 @@ function renderCardHeadline(primary: string, secondary: string) {
 
 export function RestaurantUpdatesScreen() {
   useTransparentStatusBar('light');
-  const bottomPadding = useBottomTabPadding(hp(3));
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 20 }), [r]);
+  const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(3));
   const { currentProfile } = useAppContext();
 
   const [loading, setLoading] = useState(true);
@@ -250,12 +256,26 @@ export function RestaurantUpdatesScreen() {
       <Pressable
         key={key}
         onPress={() => setUpdateFilter(key)}
-        style={[styles.filterChip, active ? styles.filterChipActive : styles.filterChipInactive]}
+        style={[
+          styles.filterChip,
+          adaptive.filterChip,
+          active ? styles.filterChipActive : styles.filterChipInactive,
+        ]}
       >
-        {icon ? <Image source={icon} style={styles.filterChipIcon} resizeMode="contain" /> : null}
+        {icon ? (
+          <Image
+            source={icon}
+            style={[styles.filterChipIcon, adaptive.filterChipIcon]}
+            resizeMode="contain"
+          />
+        ) : null}
         <AppText
           variant="bodyBold"
-          style={[styles.filterChipText, active ? styles.filterChipTextActive : styles.filterChipTextInactive]}
+          style={[
+            styles.filterChipText,
+            adaptive.filterChipText,
+            active ? styles.filterChipTextActive : styles.filterChipTextInactive,
+          ]}
         >
           {label}
         </AppText>
@@ -278,36 +298,39 @@ export function RestaurantUpdatesScreen() {
       <View
         style={[
           styles.card,
-          cardElevation,
+          adaptive.updateCard,
+          elevation.flat,
           {
             borderColor: theme.accent,
             backgroundColor: item.audience === 'animals' ? theme.lightBg : palette.white,
           },
         ]}
       >
-        <View style={styles.cardBody}>
+        <View style={[styles.cardBody, adaptive.updateCardBody]}>
           <View style={styles.badgeRow}>
             <View style={[styles.tag, { backgroundColor: theme.statusBg }]}>
-              <AppText style={[styles.tagText, { color: theme.accent }]}>CLAIMED</AppText>
+              <AppText style={[styles.tagText, adaptive.tagText, { color: theme.accent }]}>CLAIMED</AppText>
             </View>
             <View style={[styles.tagRow, { backgroundColor: theme.statusBg }]}>
               <Image source={theme.categoryIcon} style={styles.tagIcon} resizeMode="contain" />
-              <AppText style={[styles.tagText, { color: theme.accent }]}>
+              <AppText style={[styles.tagText, adaptive.tagText, { color: theme.accent }]}>
                 {theme.categoryLabel.toUpperCase()}
               </AppText>
             </View>
             <View style={[styles.tagOutline, { borderColor: theme.accent + '80' }]}>
               <View style={[styles.statusDot, { backgroundColor: theme.accent }]} />
-              <AppText style={[styles.tagText, { color: theme.accent }]} numberOfLines={1}>
+              <AppText style={[styles.tagText, adaptive.tagText, { color: theme.accent }]} numberOfLines={1}>
                 {statusLabel.toUpperCase()}
               </AppText>
             </View>
           </View>
 
-          {renderCardHeadline(item.claimerName ?? 'Someone', 'claimed your listing')}
+          {renderCardHeadline(item.claimerName ?? 'Someone', 'claimed your listing', {
+            primary: adaptive.cardHeadlinePrimary,
+            secondary: adaptive.cardHeadlineSecondary,
+          })}
 
-          {/* Location & assignee */}
-          <View style={styles.metaStack}>
+          <View style={[styles.metaStack, adaptive.updateMetaStack]}>
             <View style={styles.metaRow}>
               <Ionicons name="location-outline" size={normalize(13)} color={theme.accent} />
               <AppText variant="bodySmall" color={palette.stone} style={styles.metaText} numberOfLines={1}>
@@ -328,15 +351,14 @@ export function RestaurantUpdatesScreen() {
 
           <View style={styles.hr} />
 
-          {/* Collection details */}
-          <View style={styles.detailRow}>
-            <View style={[styles.detailBox, { flex: 1.6 }]}>
+          <View style={[styles.detailRow, r.isTablet && styles.detailActionRow]}>
+            <View style={[styles.detailBox, adaptive.detailBox, r.isTablet ? styles.detailActionGrow : { flex: 1.6 }]}>
               <View style={[styles.detailIconWrap, { backgroundColor: theme.statusBg }]}>
                 <Image source={DETAIL_ICONS.calendar} style={styles.detailIconImg} resizeMode="contain" />
               </View>
               <View style={styles.detailTextWrap}>
-                <AppText style={styles.detailLabel}>COLLECTION</AppText>
-                <AppText variant="bodyBold" style={styles.detailValue} numberOfLines={1}>
+                <AppText style={[styles.detailLabel, adaptive.detailLabel]}>COLLECTION</AppText>
+                <AppText variant="bodyBold" style={[styles.detailValue, adaptive.detailValue]} numberOfLines={1}>
                   {formatCollectionDate(item.pickupFrom!)}
                 </AppText>
                 <AppText variant="bodySmall" color={palette.stone} style={styles.detailSub} numberOfLines={1}>
@@ -344,53 +366,63 @@ export function RestaurantUpdatesScreen() {
                 </AppText>
               </View>
             </View>
-            <View style={[styles.detailBox, { flex: 1 }]}>
+            <View style={[styles.detailBox, adaptive.detailBox, r.isTablet ? styles.detailActionGrow : { flex: 1 }]}>
               <View style={[styles.detailIconWrap, { backgroundColor: theme.statusBg }]}>
                 <Image source={DETAIL_ICONS.basket} style={styles.detailIconImg} resizeMode="contain" />
               </View>
               <View style={styles.detailTextWrap}>
-                <AppText style={styles.detailLabel}>QUANTITY</AppText>
-                <AppText variant="bodyBold" style={styles.detailValue}>
+                <AppText style={[styles.detailLabel, adaptive.detailLabel]}>QUANTITY</AppText>
+                <AppText variant="bodyBold" style={[styles.detailValue, adaptive.detailValue]} numberOfLines={1}>
                   {item.quantityKg} kg
                 </AppText>
               </View>
             </View>
+            <Pressable
+              style={[
+                styles.outlineBtn,
+                styles.outlineBtnInline,
+                r.isTablet ? styles.detailActionBtn : styles.outlineBtnFull,
+                { borderColor: theme.accent + '80' },
+              ]}
+              onPress={() => {
+                setSelectedItems(item.items || []);
+                setDetailsModalVisible(true);
+              }}
+            >
+              <AppText
+                variant="bodyBold"
+                style={[styles.outlineBtnText, styles.outlineBtnTextInline, { color: theme.accent }]}
+                numberOfLines={1}
+              >
+                View Items
+              </AppText>
+              <Ionicons name="chevron-down" size={normalize(15)} color={theme.accent} />
+            </Pressable>
           </View>
-
-          {/* View items button */}
-          <Pressable
-            style={[styles.outlineBtn, { borderColor: theme.accent + '80' }]}
-            onPress={() => {
-              setSelectedItems(item.items || []);
-              setDetailsModalVisible(true);
-            }}
-          >
-            <AppText variant="bodyBold" style={[styles.outlineBtnText, { color: theme.accent }]}>
-              View Food Items
-            </AppText>
-            <Ionicons name="chevron-down" size={normalize(15)} color={theme.accent} />
-          </Pressable>
 
           <View style={styles.hr} />
 
-          {/* Contact grid */}
           <View style={styles.contactGrid}>
             <View style={styles.contactColumn}>
               <AppText style={styles.contactLabel}>{claimerLabel.toUpperCase()}</AppText>
               <View style={styles.contactActions}>
                 <Pressable
-                  style={[styles.contactActionBtn, { borderColor: theme.accent + '70' }]}
+                  style={[styles.contactActionBtn, adaptive.actionBtn, { borderColor: theme.accent + '70' }]}
                   onPress={() => makeCall(item.claimerPhone)}
                 >
                   <Ionicons name="call-outline" size={normalize(13)} color={theme.accent} />
-                  <AppText style={[styles.contactActionText, { color: theme.accent }]}>CALL</AppText>
+                  <AppText style={[styles.contactActionText, adaptive.actionBtnText, { color: theme.accent }]}>
+                    CALL
+                  </AppText>
                 </Pressable>
                 <Pressable
-                  style={[styles.contactActionBtn, { borderColor: theme.accent + '70' }]}
+                  style={[styles.contactActionBtn, adaptive.actionBtn, { borderColor: theme.accent + '70' }]}
                   onPress={() => sendMessage(item.claimerPhone)}
                 >
                   <Ionicons name="chatbubble-outline" size={normalize(13)} color={theme.accent} />
-                  <AppText style={[styles.contactActionText, { color: theme.accent }]}>MSG</AppText>
+                  <AppText style={[styles.contactActionText, adaptive.actionBtnText, { color: theme.accent }]}>
+                    MSG
+                  </AppText>
                 </Pressable>
               </View>
             </View>
@@ -399,47 +431,56 @@ export function RestaurantUpdatesScreen() {
               <AppText style={styles.contactLabel}>{assigneeLabel.toUpperCase()}</AppText>
               <View style={styles.contactActions}>
                 <Pressable
-                  style={[styles.contactActionBtn, { borderColor: theme.accent + '70' }]}
+                  style={[styles.contactActionBtn, adaptive.actionBtn, { borderColor: theme.accent + '70' }]}
                   onPress={() => makeCall(item.assigneePhone)}
                 >
                   <Ionicons name="call-outline" size={normalize(13)} color={theme.accent} />
-                  <AppText style={[styles.contactActionText, { color: theme.accent }]}>CALL</AppText>
+                  <AppText style={[styles.contactActionText, adaptive.actionBtnText, { color: theme.accent }]}>
+                    CALL
+                  </AppText>
                 </Pressable>
                 <Pressable
-                  style={[styles.contactActionBtn, { borderColor: theme.accent + '70' }]}
+                  style={[styles.contactActionBtn, adaptive.actionBtn, { borderColor: theme.accent + '70' }]}
                   onPress={() => sendMessage(item.assigneePhone)}
                 >
                   <Ionicons name="chatbubble-outline" size={normalize(13)} color={theme.accent} />
-                  <AppText style={[styles.contactActionText, { color: theme.accent }]}>MSG</AppText>
+                  <AppText style={[styles.contactActionText, adaptive.actionBtnText, { color: theme.accent }]}>
+                    MSG
+                  </AppText>
                 </Pressable>
               </View>
             </View>
           </View>
 
-          {/* Pickup CTA */}
           {pickupStatus[item.id] === 'completed' ? (
             <View style={[styles.statusBanner, { backgroundColor: theme.statusBg }]}>
               <Ionicons name="checkmark-circle" size={normalize(18)} color={theme.accent} />
-              <AppText variant="bodyBold" style={{ color: theme.accent, textTransform: 'none', fontSize: normalize(14) }}>
+              <AppText
+                variant="bodyBold"
+                style={{ color: theme.accent, textTransform: 'none', fontSize: normalize(14) }}
+              >
                 Pickup & survey completed
               </AppText>
             </View>
           ) : pickupStatus[item.id] === 'cancelled' ? (
             <View style={[styles.statusBanner, { backgroundColor: '#FFF0EB' }]}>
               <Ionicons name="close-circle" size={normalize(18)} color={palette.chilli} />
-              <AppText variant="bodyBold" style={{ color: palette.chilli, textTransform: 'none', fontSize: normalize(14) }}>
+              <AppText
+                variant="bodyBold"
+                style={{ color: palette.chilli, textTransform: 'none', fontSize: normalize(14) }}
+              >
                 Pickup cancelled
               </AppText>
             </View>
           ) : (
             <Pressable
-              style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+              style={[styles.primaryBtn, adaptive.primaryActionBtn, { backgroundColor: theme.accent }]}
               onPress={() => {
                 setSelectedId(item.id);
                 setModalVisible(true);
               }}
             >
-              <AppText variant="bodyBold" style={styles.primaryBtnText}>
+              <AppText variant="bodyBold" style={[styles.primaryBtnText, adaptive.primaryActionBtnText]}>
                 Complete Pickup
               </AppText>
               <View style={styles.primaryBtnArrow}>
@@ -464,80 +505,117 @@ export function RestaurantUpdatesScreen() {
       <View
         style={[
           styles.card,
-          cardElevation,
+          adaptive.updateCard,
+          elevation.flat,
           {
             borderColor: theme.accent,
             backgroundColor: item.audience === 'animals' ? theme.lightBg : palette.white,
           },
         ]}
       >
-        <View style={styles.cardBody}>
+        <View style={[styles.cardBody, adaptive.updateCardBody]}>
           <View style={styles.badgeRow}>
             <View style={[styles.tagRow, { backgroundColor: theme.statusBg }]}>
               <Ionicons name="checkmark-circle" size={normalize(12)} color={theme.accent} />
-              <AppText style={[styles.tagText, { color: theme.accent }]}>COLLECTED</AppText>
+              <AppText style={[styles.tagText, adaptive.tagText, { color: theme.accent }]}>COLLECTED</AppText>
             </View>
             <View style={[styles.tagRow, { backgroundColor: theme.statusBg }]}>
               <Image source={theme.categoryIcon} style={styles.tagIcon} resizeMode="contain" />
-              <AppText style={[styles.tagText, { color: theme.accent }]}>
+              <AppText style={[styles.tagText, adaptive.tagText, { color: theme.accent }]}>
                 {theme.categoryLabel.toUpperCase()}
               </AppText>
             </View>
           </View>
 
-          {renderCardHeadline('Listing collected', 'Your surplus was picked up successfully')}
+          {renderCardHeadline('Listing collected', 'Your surplus was picked up successfully', {
+            primary: adaptive.cardHeadlinePrimary,
+            secondary: adaptive.cardHeadlineSecondary,
+          })}
 
           <View style={styles.hr} />
 
-          {/* Date & quantity */}
-          <View style={styles.detailRow}>
-            <View style={[styles.detailBox, { flex: 1.4 }]}>
+          <View style={[styles.detailRow, r.isTablet && styles.detailActionRow]}>
+            <View style={[styles.detailBox, adaptive.detailBox, r.isTablet ? styles.detailActionGrow : { flex: 1.4 }]}>
               <View style={[styles.detailIconWrap, { backgroundColor: theme.statusBg }]}>
                 <Image source={DETAIL_ICONS.calendar} style={styles.detailIconImg} resizeMode="contain" />
               </View>
               <View style={styles.detailTextWrap}>
-                <AppText style={styles.detailLabel}>COLLECTED ON</AppText>
-                <AppText variant="bodyBold" style={styles.detailValue}>
+                <AppText style={[styles.detailLabel, adaptive.detailLabel]}>COLLECTED ON</AppText>
+                <AppText variant="bodyBold" style={[styles.detailValue, adaptive.detailValue]} numberOfLines={1}>
                   {formatCollectedDate(item.collectedDate!)}
                 </AppText>
               </View>
             </View>
-            <View style={[styles.detailBox, { flex: 1 }]}>
+            <View style={[styles.detailBox, adaptive.detailBox, r.isTablet ? styles.detailActionGrow : { flex: 1 }]}>
               <View style={[styles.detailIconWrap, { backgroundColor: theme.statusBg }]}>
                 <Image source={DETAIL_ICONS.basket} style={styles.detailIconImg} resizeMode="contain" />
               </View>
               <View style={styles.detailTextWrap}>
-                <AppText style={styles.detailLabel}>
+                <AppText style={[styles.detailLabel, adaptive.detailLabel]}>
                   {item.audience === 'animals' ? 'FEED' : 'FOOD'}
                 </AppText>
-                <AppText variant="bodyBold" style={styles.detailValue}>
+                <AppText variant="bodyBold" style={[styles.detailValue, adaptive.detailValue]} numberOfLines={1}>
                   {item.quantityKg} kg
                 </AppText>
               </View>
             </View>
+            {r.isTablet ? (
+              <View
+                style={[
+                  styles.impactCard,
+                  styles.detailActionGrow,
+                  styles.impactCardCompact,
+                  { backgroundColor: theme.lightBg, borderColor: theme.accent + '35' },
+                ]}
+              >
+                <View style={[styles.impactIconWrap, styles.impactIconWrapCompact, { backgroundColor: theme.statusBg }]}>
+                  <Image source={impactIcon} style={styles.impactIconImgCompact} resizeMode="contain" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <AppText
+                    style={[styles.impactValue, styles.impactValueCompact, adaptive.impactValue, { color: theme.accent }]}
+                    numberOfLines={1}
+                  >
+                    {impactValue}
+                  </AppText>
+                  <AppText
+                    style={[styles.impactLabel, styles.impactLabelCompact, { color: theme.accent }]}
+                    numberOfLines={1}
+                  >
+                    {impactLabel}
+                  </AppText>
+                </View>
+              </View>
+            ) : null}
           </View>
 
-          {/* Impact highlight */}
-          <View style={[styles.impactCard, { backgroundColor: theme.lightBg, borderColor: theme.accent + '35' }]}>
-            <View style={[styles.impactIconWrap, { backgroundColor: theme.statusBg }]}>
-              <Image source={impactIcon} style={styles.impactIconImg} resizeMode="contain" />
+          {!r.isTablet ? (
+            <View style={[styles.impactCard, { backgroundColor: theme.lightBg, borderColor: theme.accent + '35' }]}>
+              <View style={[styles.impactIconWrap, { backgroundColor: theme.statusBg }]}>
+                <Image source={impactIcon} style={styles.impactIconImg} resizeMode="contain" />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <AppText style={[styles.impactValue, adaptive.impactValue, { color: theme.accent }]}>
+                  {impactValue}
+                </AppText>
+                <AppText style={[styles.impactLabel, { color: theme.accent }]}>{impactLabel}</AppText>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <AppText style={[styles.impactValue, { color: theme.accent }]}>{impactValue}</AppText>
-              <AppText style={[styles.impactLabel, { color: theme.accent }]}>{impactLabel}</AppText>
-            </View>
-          </View>
+          ) : null}
 
-          {/* View impact */}
           <Pressable
-            style={[styles.outlineBtn, { borderColor: theme.accent + '80' }]}
+            style={[styles.outlineBtn, styles.outlineBtnInline, { borderColor: theme.accent + '80' }]}
             onPress={() => {
               setSelectedImpact(item);
               setImpactModalVisible(true);
             }}
           >
-            <AppText variant="bodyBold" style={[styles.outlineBtnText, { color: theme.accent }]}>
-              View Impact Details
+            <AppText
+              variant="bodyBold"
+              style={[styles.outlineBtnText, styles.outlineBtnTextInline, { color: theme.accent }]}
+              numberOfLines={1}
+            >
+              Impact Details
             </AppText>
             <Ionicons name="chevron-forward" size={normalize(15)} color={theme.accent} />
           </Pressable>
@@ -583,91 +661,121 @@ export function RestaurantUpdatesScreen() {
 
   if (loading) {
     return (
-      <Screen backgroundColor={palette.background} scrollable={false} transparentTop>
+      <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
         <FlatList
           data={[]}
           renderItem={null}
           ListHeaderComponent={renderSkeleton}
-          contentContainerStyle={[styles.container, { paddingBottom: hp(3) }]}
+          contentContainerStyle={[styles.container, styles.containerGrow, { paddingBottom: hp(3) }]}
         />
       </Screen>
     );
   }
 
   return (
-    <Screen backgroundColor={palette.background} scrollable={false} transparentTop>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
 
       <FlatList
         data={sections}
         keyExtractor={(item) => item.title}
-        contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
+        contentContainerStyle={[
+          styles.container,
+          adaptive.scrollContent,
+          { paddingBottom: bottomPadding },
+          // Only fill the viewport when there is nothing to list — otherwise
+          // flexGrow stretches ListHeader and hides section cards below.
+          sections.length === 0 && styles.containerGrow,
+        ]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <>
+          <View style={styles.listHeader}>
             <HeroHeader
-               
               source={require('../../../assets/placeholder/modal-head-backgrounda.png')}
-              height={hp(20)}
+              height={adaptive.heroHeight}
+              style={adaptive.heroBleed}
             >
-              
-              <View style={styles.heroContent}>
+              <View style={[styles.heroContent, adaptive.heroContent]}>
                 <View style={styles.heroTopRow}>
                   <View style={styles.heroTextBlock}>
-                    <AppText variant="caption" style={styles.heroEyebrow} numberOfLines={1}>
+                    <AppText
+                      variant="caption"
+                      style={[styles.heroEyebrow, adaptive.heroEyebrow]}
+                      numberOfLines={1}
+                    >
                       {currentProfile.organization || 'Your business'}
                     </AppText>
-                    <AppText variant="h6" style={styles.heroTitle} numberOfLines={1}>
+                    <AppText
+                      variant="h6"
+                      style={[styles.heroTitle, adaptive.heroTitle]}
+                      numberOfLines={1}
+                    >
                       Your updates
                     </AppText>
-                    <AppText variant="bodySmall" style={styles.heroSubtitle} numberOfLines={2}>
+                    <AppText
+                      variant="bodySmall"
+                      style={[styles.heroSubtitle, adaptive.heroSubtitle]}
+                      numberOfLines={2}
+                    >
                       Track claims, pickups, and collections in one place
                     </AppText>
                   </View>
-                  <View style={styles.heroIconCircle}>
-                    <Ionicons name="notifications" size={normalize(26)} color={palette.eggplant} />
+                  <View style={[styles.heroIconCircle, adaptive.heroIconCircle]}>
+                    <Ionicons name="notifications" size={26} color={palette.eggplant} />
                   </View>
                 </View>
-                <View style={styles.heroStatsPill}>
-                  <Ionicons name="pulse-outline" size={normalize(14)} color={palette.white} />
-                  <AppText variant="caption" style={styles.heroStatsText} numberOfLines={1}>
+                <View style={[styles.heroStatsPill, adaptive.heroStatsPill]}>
+                  <Ionicons name="pulse-outline" size={14} color={palette.white} />
+                  <AppText
+                    variant="caption"
+                    style={[styles.heroStatsText, adaptive.heroStatsText]}
+                    numberOfLines={1}
+                  >
                     {updates.length} active update{updates.length !== 1 ? 's' : ''} · {peopleCount} people · {animalCount} animals
                   </AppText>
                 </View>
               </View>
             </HeroHeader>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.filterScrollWrap}
-              contentContainerStyle={styles.filterScroll}
-            >
-              {renderFilterChip('all', 'All', updates.length)}
-              {renderFilterChip('people', 'For People', peopleCount, PEOPLE_THEME.categoryIcon)}
-              {renderFilterChip('animals', 'For Animals', animalCount, ANIMAL_THEME.categoryIcon)}
-            </ScrollView>
-          </>
+            <View style={[styles.filterScrollWrap, adaptive.filterScroll]}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.filterScrollView}
+                contentContainerStyle={styles.filterScroll}
+              >
+                {renderFilterChip('all', 'All', updates.length)}
+                {renderFilterChip('people', 'For People', peopleCount, PEOPLE_THEME.categoryIcon)}
+                {renderFilterChip('animals', 'For Animals', animalCount, ANIMAL_THEME.categoryIcon)}
+              </ScrollView>
+            </View>
+          </View>
         }
         renderItem={({ item: section }) => (
-          <View style={styles.section}>
+          <View style={[styles.section, adaptive.section]}>
             <View style={styles.sectionHeader}>
-              <AppText variant="h8" style={styles.sectionTitle}>
+              <AppText variant="h8" style={[styles.sectionTitle, adaptive.sectionTitle]}>
                 {section.title}
               </AppText>
             </View>
             <View style={styles.sectionCards}>
               {section.data.map((update) => (
-                <View key={update.id}>{renderCard(update)}</View>
+                <View key={update.id} style={styles.sectionCardItem}>
+                  {renderCard(update)}
+                </View>
               ))}
             </View>
           </View>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
+          <View style={[styles.emptyState, adaptive.section]}>
             <Ionicons name="notifications-outline" size={normalize(52)} color={palette.strokecream} />
-            <AppText variant="bodyBold" color={palette.stone} style={styles.emptyTitle}>
+            <AppText
+              variant="bodyBold"
+              color={palette.stone}
+              style={[styles.emptyTitle, adaptive.emptyText]}
+            >
               No updates yet
             </AppText>
             <AppText variant="bodySmall" color={palette.stone} style={styles.emptyBody}>
@@ -778,12 +886,18 @@ export function RestaurantUpdatesScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    marginTop: -hp(2),
+  },
+
+  containerGrow: {
     flexGrow: 1,
-    marginTop: -hp(1),
+  },
+
+  listHeader: {
+    width: '100%',
   },
 
   heroContent: {
-    
     flex: 1,
     paddingHorizontal: wp(5),
     justifyContent: 'flex-end',
@@ -806,19 +920,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     textTransform: 'none',
     letterSpacing: 0.3,
-    fontSize: normalize(13),
+    fontSize: normalize(12),
   },
   heroTitle: {
     color: palette.white,
     textTransform: 'none',
-    fontSize: normalize(30),
-    lineHeight: normalize(38),
+    fontSize: normalize(26),
+    lineHeight: normalize(34),
   },
   heroSubtitle: {
     color: 'rgba(255,255,255,0.9)',
     textTransform: 'none',
-    fontSize: normalize(15),
-    lineHeight: normalize(22),
+    fontSize: normalize(14),
+    lineHeight: normalize(20),
   },
   heroIconCircle: {
     width: normalize(52),
@@ -827,15 +941,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.white,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: palette.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-      },
-      android: { elevation: 3 },
-    }),
+    ...elevation.soft,
   },
   heroStatsPill: {
     flexDirection: 'row',
@@ -853,15 +959,20 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textTransform: 'none',
     fontSize: normalize(11),
+    lineHeight: normalize(15),
   },
 
   // ── Filter chips ──────────────────────────────────────────────────
   filterScrollWrap: {
-    marginTop: hp(1.6),
-    marginBottom: hp(0.2),
+    marginTop: hp(1.2),
+    marginBottom: hp(0.8),
+    width: '100%',
+  },
+  filterScrollView: {
+    flexGrow: 0,
   },
   filterScroll: {
-    paddingHorizontal: wp(4),
+    paddingHorizontal: wp(5),
     paddingRight: wp(6),
     gap: wp(2),
     flexDirection: 'row',
@@ -871,8 +982,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: wp(1.5),
-    paddingHorizontal: wp(3.5),
-    paddingVertical: hp(0.85),
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(0.75),
     borderRadius: normalize(24),
     borderWidth: normalize(1.5),
   },
@@ -885,20 +996,20 @@ const styles = StyleSheet.create({
     borderColor: palette.strokecream,
   },
   filterChipIcon: {
-    width: normalize(15),
-    height: normalize(15),
+    width: normalize(14),
+    height: normalize(14),
   },
   filterChipText: {
-    fontSize: normalize(13),
+    fontSize: normalize(12),
     textTransform: 'none',
     letterSpacing: 0,
   },
   filterChipTextActive: { color: palette.white },
   filterChipTextInactive: { color: palette.stone },
   countPill: {
-    minWidth: normalize(20),
-    height: normalize(20),
-    borderRadius: normalize(10),
+    minWidth: normalize(18),
+    height: normalize(18),
+    borderRadius: normalize(9),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: normalize(5),
@@ -914,9 +1025,9 @@ const styles = StyleSheet.create({
 
   // ── Sections ──────────────────────────────────────────────────────
   section: {
-    paddingHorizontal: wp(4),
-    gap: hp(1.2),
-    marginTop: hp(1.2),
+    paddingHorizontal: wp(5),
+    gap: hp(1),
+    marginTop: hp(0.8),
   },
   sectionHeader: {
     paddingLeft: wp(0.5),
@@ -924,11 +1035,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     textTransform: 'none',
     color: palette.black,
-    fontSize: normalize(18),
-    lineHeight: normalize(24),
+    fontSize: normalize(16),
+    lineHeight: normalize(22),
   },
   sectionCards: {
-    gap: hp(1.4),
+    gap: hp(1),
+    width: '100%',
+  },
+  sectionCardItem: {
+    width: '100%',
   },
 
   // ── Base card ─────────────────────────────────────────────────────
@@ -936,24 +1051,25 @@ const styles = StyleSheet.create({
     borderRadius: normalize(14),
     borderWidth: normalize(1),
     backgroundColor: palette.white,
+    width: '100%',
   },
   cardBody: {
-    padding: wp(4),
-    gap: hp(1.2),
+    padding: wp(3.5),
+    gap: hp(0.9),
   },
   cardHeadline: {
-    gap: hp(0.35),
+    gap: hp(0.3),
   },
   cardHeadlinePrimary: {
     textTransform: 'none',
-    fontSize: normalize(18),
-    lineHeight: normalize(24),
+    fontSize: normalize(16),
+    lineHeight: normalize(22),
     color: palette.black,
   },
   cardHeadlineSecondary: {
     textTransform: 'none',
-    fontSize: normalize(14),
-    lineHeight: normalize(19),
+    fontSize: normalize(13),
+    lineHeight: normalize(18),
   },
 
   // ── Tags / badges ─────────────────────────────────────────────────
@@ -1024,8 +1140,30 @@ const styles = StyleSheet.create({
   // ── Detail boxes ──────────────────────────────────────────────────
   detailRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: wp(2),
     alignItems: 'stretch',
+    width: '100%',
+  },
+  // Tablet: keep collection / quantity / action on one line (no nested rows).
+  detailActionRow: {
+    flexWrap: 'nowrap',
+  },
+  detailActionGrow: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+  },
+  detailActionBtn: {
+    flexGrow: 0,
+    flexShrink: 0,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    minWidth: 128,
+    maxWidth: 160,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
   },
   detailBox: {
     flexDirection: 'row',
@@ -1085,10 +1223,29 @@ const styles = StyleSheet.create({
     borderRadius: normalize(10),
     borderWidth: normalize(1.5),
   },
+  outlineBtnFull: {
+    width: '100%',
+    flexBasis: '100%',
+  },
+  outlineBtnInline: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+  },
+  outlineBtnCompact: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 44,
+  },
   outlineBtnText: {
     textTransform: 'none',
     fontSize: normalize(14),
     fontFamily: 'Saveful-SemiBold',
+  },
+  outlineBtnTextInline: {
+    flexShrink: 0,
+  },
+  outlineBtnTextCompact: {
+    fontSize: normalize(13),
   },
 
   // ── Contact grid ──────────────────────────────────────────────────
@@ -1169,11 +1326,18 @@ const styles = StyleSheet.create({
   impactCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(3.5),
-    paddingVertical: hp(1.7),
-    paddingHorizontal: wp(3.5),
+    gap: wp(3),
+    paddingVertical: hp(1.3),
+    paddingHorizontal: wp(3),
     borderRadius: normalize(12),
     borderWidth: normalize(1),
+  },
+  impactCardCompact: {
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 0,
+    alignSelf: 'stretch',
   },
   impactIconWrap: {
     width: normalize(44),
@@ -1183,21 +1347,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
+  impactIconWrapCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+  },
   impactIconImg: {
     width: normalize(26),
     height: normalize(26),
   },
+  impactIconImgCompact: {
+    width: 18,
+    height: 18,
+  },
   impactValue: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(22),
-    lineHeight: normalize(26),
+    fontSize: normalize(18),
+    lineHeight: normalize(22),
     textTransform: 'none',
+  },
+  impactValueCompact: {
+    fontSize: normalize(15),
+    lineHeight: normalize(18),
   },
   impactLabel: {
     fontFamily: 'Saveful-SemiBold',
     fontSize: normalize(10),
     letterSpacing: 0.5,
     marginTop: hp(0.2),
+  },
+  impactLabelCompact: {
+    marginTop: 0,
+    fontSize: normalize(9),
   },
 
   // ── Empty state ───────────────────────────────────────────────────
@@ -1210,13 +1391,14 @@ const styles = StyleSheet.create({
   emptyTitle: {
     textTransform: 'none',
     textAlign: 'center',
-    fontSize: normalize(16),
+    fontSize: normalize(15),
     marginTop: hp(0.5),
   },
   emptyBody: {
     textTransform: 'none',
     textAlign: 'center',
-    lineHeight: normalize(20),
+    lineHeight: normalize(18),
+    fontSize: normalize(13),
   },
 
   // ── Modals ────────────────────────────────────────────────────────

@@ -10,7 +10,6 @@ import {
   ScrollView,
   TextInput,
   Pressable,
-  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -47,11 +46,10 @@ import {
   resolveUserRole,
 } from '@/utils/authSession';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { hp, normalize, wp } from '@/utils/responsive';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
 type Mode = 'login' | 'forgot';
 
-const { height: WINDOW_HEIGHT } = Dimensions.get('window');
 const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
 const HAS_SIGNED_IN_BEFORE_KEY = 'hasSignedInBefore';
 
@@ -99,11 +97,13 @@ function PrimaryButton({
   onPress,
   disabled = false,
   showArrow = false,
+  style,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   showArrow?: boolean;
+  style?: object;
 }) {
   return (
     <Pressable
@@ -112,13 +112,16 @@ function PrimaryButton({
         styles.primaryButton,
         disabled && styles.primaryButtonDisabled,
         pressed && !disabled && styles.buttonPressed,
+        style,
       ]}
     >
       <AppText variant="bodyBold" style={styles.primaryButtonText}>
         {label}
       </AppText>
       {showArrow ? (
-        <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+        <View style={styles.primaryButtonArrow}>
+          <Ionicons name="arrow-forward" size={16} color={palette.white} />
+        </View>
       ) : null}
     </Pressable>
   );
@@ -313,6 +316,7 @@ function ResetPasswordModalFields({
 export function SignInScreen() {
   const { setAuthUser, setRole } = useAppContext();
   const insets = useSafeAreaInsets();
+  const r = useResponsiveLayout();
   useTransparentStatusBar('dark');
 
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
@@ -381,7 +385,7 @@ export function SignInScreen() {
         const gap = hp(2);
         const activeKeyboardHeight =
           keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
-        const visibleBottom = WINDOW_HEIGHT - activeKeyboardHeight - gap;
+        const visibleBottom = r.height - activeKeyboardHeight - gap;
         const fieldBottom = fieldY + fieldH;
 
         if (fieldBottom > visibleBottom) {
@@ -392,7 +396,7 @@ export function SignInScreen() {
         }
       });
     });
-  }, []);
+  }, [r.height]);
 
   const handleFieldFocus = useCallback(
     (field: View) => {
@@ -718,6 +722,9 @@ export function SignInScreen() {
               paddingBottom: keyboardVisible
                 ? keyboardHeight + hp(3)
                 : insets.bottom + hp(2.5),
+              ...(r.isTablet
+                ? { paddingHorizontal: r.pagePadH }
+                : null),
             },
           ]}
           onScroll={(event) => {
@@ -728,6 +735,13 @@ export function SignInScreen() {
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="none"
         >
+          <View
+            style={
+              r.isTablet
+                ? { width: '100%', maxWidth: r.contentMaxWidth, alignSelf: 'center' as const }
+                : undefined
+            }
+          >
           <Pressable
             style={styles.backRow}
             onPress={() => {
@@ -865,6 +879,7 @@ export function SignInScreen() {
               ) : null}
             </View>
           </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -967,11 +982,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: hp(0.5),
+    minWidth: 0,
   },
 
   valuePropImage: {
-    width: normalize(72),
-    height: normalize(72),
+    width: 64,
+    height: 64,
   },
 
   iconLabel: {
@@ -1012,8 +1028,8 @@ const styles = StyleSheet.create({
   },
 
   formLogo: {
-    width: wp(36),
-    height: hp(5),
+    width: 140,
+    height: 44,
   },
 
   formTitle: {
@@ -1028,7 +1044,8 @@ const styles = StyleSheet.create({
     fontSize: normalize(14),
     lineHeight: normalize(20),
     textTransform: 'none',
-    maxWidth: wp(72),
+    maxWidth: '100%',
+    paddingHorizontal: wp(2),
   },
 
   fieldsPanel: {
@@ -1167,6 +1184,7 @@ const styles = StyleSheet.create({
 
   errorBannerText: {
     flex: 1,
+    minWidth: 0,
     color: palette.validation,
     textTransform: 'none',
     lineHeight: normalize(18),
@@ -1174,14 +1192,14 @@ const styles = StyleSheet.create({
 
   primaryButton: {
     backgroundColor: palette.eggplant,
-    minHeight: normalize(52),
-    paddingVertical: hp(1.6),
+    minHeight: 48,
+    paddingVertical: 12,
     paddingHorizontal: wp(5),
     borderRadius: normalize(14),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: wp(2),
+    gap: 10,
     marginTop: hp(0.4),
     ...Platform.select({
       ios: {
@@ -1196,6 +1214,15 @@ const styles = StyleSheet.create({
     }),
   },
 
+  primaryButtonArrow: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   primaryButtonDisabled: {
     opacity: 0.65,
   },
@@ -1207,8 +1234,8 @@ const styles = StyleSheet.create({
   },
 
   secondaryButton: {
-    minHeight: normalize(48),
-    paddingVertical: hp(1.4),
+    minHeight: 48,
+    paddingVertical: 12,
     borderRadius: normalize(14),
     borderWidth: 1,
     borderColor: palette.strokecream,

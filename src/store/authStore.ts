@@ -69,7 +69,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         });
       }
     } catch (error) {
-      console.log('SESSION RESTORE ERROR', error);
       await SecureStore.deleteItemAsync('accessToken');
     } finally {
       set({ isInitialLoading: false });

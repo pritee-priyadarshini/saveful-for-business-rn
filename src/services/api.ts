@@ -39,19 +39,6 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     config.headers.set('Content-Type', 'application/json');
   }
 
-  const method = (config.method ?? 'get').toUpperCase();
-  const base = config.baseURL ?? '';
-  const path = config.url ?? '';
-  const query = config.params
-    ? `?${new URLSearchParams(
-        Object.entries(config.params).reduce<Record<string, string>>((acc, [key, value]) => {
-          if (value != null) acc[key] = String(value);
-          return acc;
-        }, {}),
-      ).toString()}`
-    : '';
-  console.log(`[API] → ${method} ${base}${path}${query}`);
-
   return config;
 });
 
@@ -68,24 +55,10 @@ function isPublicAuthPath(path: string): boolean {
 
 api.interceptors.response.use(
   response => {
-    const method = (response.config.method ?? 'get').toUpperCase();
-    const base = response.config.baseURL ?? '';
-    const path = response.config.url ?? '';
-    console.log(`[API] ← ${response.status} ${method} ${base}${path}`);
     return response;
   },
   async error => {
     const config = error.config;
-    const method = (config?.method ?? 'get').toUpperCase();
-    const base = config?.baseURL ?? '';
-    const path = config?.url ?? '';
-    console.log(
-      `[API] ← ERROR ${error.response?.status ?? 'NETWORK'} ${method} ${base}${path}`,
-      error.response?.data ?? error.message,
-    );
-    if (!error.response) {
-      console.log('[API] Network failure details:', error.code, error.message);
-    }
 
     if (error.response?.status === 401) {
       const path = config?.url ?? '';

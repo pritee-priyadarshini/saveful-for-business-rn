@@ -15,7 +15,7 @@ const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export function AuthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, orientation: 'portrait' }}>
       <Stack.Screen component={WelcomeScreen} name="Welcome" />
       <Stack.Screen component={RoleSelectionMainScreen} name="RoleSelectionMain" />
       <Stack.Screen component={RoleSelectionScreen} name="RoleSelection" />

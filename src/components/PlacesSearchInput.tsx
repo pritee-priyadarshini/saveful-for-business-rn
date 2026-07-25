@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Pressable,
   StyleSheet,
@@ -11,9 +10,7 @@ import {
 
 import { AppText } from './AppText';
 import { palette } from '../theme/colors';
-
-const { width } = Dimensions.get('window');
-const normalize = (size: number) => Math.round(size * (width / 375));
+import { normalize } from '@/utils/responsive';
 
 export type PlaceSelection = {
   latitude: number;

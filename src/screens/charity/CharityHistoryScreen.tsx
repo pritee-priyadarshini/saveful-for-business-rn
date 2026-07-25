@@ -6,9 +6,7 @@ import {
   ScrollView,
   Pressable,
   Image,
-  ImageBackground,
   Modal,
-  Dimensions,
   ViewStyle,
   TextStyle,
   RefreshControl,
@@ -20,18 +18,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
 import { Skeleton } from '../../components/Skeleton';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { palette } from '../../theme/colors';
+import { elevation } from '@/theme/elevation';
 import { estimateMealsSaved } from '../../utils/foodListing';
 import { claimsService } from '../../services/claims.service';
 import { showErrorAlert } from '@/utils/apiError';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => {
-  const scale = width / 375;
-  return Math.round(size * scale);
-};
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH_INDEX = new Date().getMonth();
@@ -151,7 +146,27 @@ function unwrapClaimsPayload(payload: any): any[] {
 }
 
 export function CharityHistoryScreen() {
+  useTransparentStatusBar('light');
   const navigation = useNavigation<any>();
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
+  /** Same outer width for header sections + collection card rows on tablet. */
+  const historyColumn = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    return {
+      width: '100%' as const,
+      alignSelf: 'stretch' as const,
+      marginHorizontal: 0,
+    };
+  }, [r.isTablet, adaptive.columnWidth]);
+  const historyListPad = useMemo(() => {
+    if (!r.isTablet || !adaptive.columnWidth) return null;
+    const side = Math.max(0, (r.width - adaptive.columnWidth) / 2);
+    return {
+      paddingHorizontal: side,
+      alignItems: 'stretch' as const,
+    };
+  }, [r.isTablet, r.width, adaptive.columnWidth]);
 
   const [historyData, setHistoryData] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -318,18 +333,22 @@ export function CharityHistoryScreen() {
   );
 
   const renderScreenHeader = () => (
-    <ImageBackground
-      source={require('../../../assets/placeholder/feed-bg.png')}
-      resizeMode="cover"
-      style={styles.header}
+    <View
+      style={
+        r.isTablet && historyListPad
+          ? {
+              marginHorizontal: -historyListPad.paddingHorizontal,
+              width: r.width,
+            }
+          : undefined
+      }
     >
-      <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="arrow-back" size={normalize(22)} color={palette.white} />
-      </Pressable>
-      <AppText variant="h4" style={styles.headerTitle}>
-        COLLECTION HISTORY
-      </AppText>
-    </ImageBackground>
+      <StackHeroHeader
+        title="Collection History"
+        height={r.isTablet ? adaptive.heroHeight : hp(14)}
+        style={r.isTablet ? adaptive.heroBleed : undefined}
+      />
+    </View>
   );
 
   const renderMetaBox = (
@@ -424,7 +443,14 @@ export function CharityHistoryScreen() {
           : 'In progress';
 
     return (
-      <View style={[styles.collectionCard, ts.collectionCard]}>
+      <View
+        style={[
+          styles.collectionCard,
+          r.isTablet && elevation.flat,
+          r.isTablet ? styles.collectionCardTablet : null,
+          ts.collectionCard,
+        ]}
+      >
         <View style={styles.cardTopRow}>
           <View style={styles.cardTopLeft}>
             <View style={[styles.statusBadge, ts.statusBadge]}>
@@ -482,11 +508,22 @@ export function CharityHistoryScreen() {
 
   const renderListHeader = () => (
     <>
-      <AppText variant="h8" style={styles.sectionHeading}>
+      <AppText
+        variant="h8"
+        style={[styles.sectionHeading, historyColumn, r.isTablet && styles.sectionHeadingTablet]}
+      >
         Total Collections
       </AppText>
 
-      <View style={[styles.sectionCard, themeStyles.completed.sectionCard]}>
+      <View
+        style={[
+          styles.sectionCard,
+          r.isTablet && elevation.flat,
+          historyColumn,
+          r.isTablet && styles.sectionCardTablet,
+          themeStyles.completed.sectionCard,
+        ]}
+      >
         <View style={styles.statsRow}>
           {renderStatCard(
             STAT_ICONS.foodRecovered,
@@ -516,11 +553,22 @@ export function CharityHistoryScreen() {
         </Pressable>
       </View>
 
-      <AppText variant="h8" style={styles.sectionHeading}>
+      <AppText
+        variant="h8"
+        style={[styles.sectionHeading, historyColumn, r.isTablet && styles.sectionHeadingTablet]}
+      >
         Search Collections
       </AppText>
 
-      <View style={[styles.sectionCard, themeStyles.completed.sectionCard]}>
+      <View
+        style={[
+          styles.sectionCard,
+          r.isTablet && elevation.flat,
+          historyColumn,
+          r.isTablet && styles.sectionCardTablet,
+          themeStyles.completed.sectionCard,
+        ]}
+      >
         <View style={styles.filterRow}>
           {renderStatusChip('all', 'All')}
           {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
@@ -558,7 +606,10 @@ export function CharityHistoryScreen() {
         </View>
       </View>
 
-      <AppText variant="h8" style={styles.sectionHeading}>
+      <AppText
+        variant="h8"
+        style={[styles.sectionHeading, historyColumn, r.isTablet && styles.sectionHeadingTablet]}
+      >
         Recent Collections
       </AppText>
     </>
@@ -567,9 +618,12 @@ export function CharityHistoryScreen() {
   return (
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
       <FlatList
+        key={r.isTablet ? 'history-2' : 'history-1'}
         data={loading ? [] : filteredData}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        numColumns={r.isTablet ? 2 : 1}
+        columnWrapperStyle={r.isTablet ? styles.historyColumnWrapper : undefined}
+        contentContainerStyle={[styles.listContent, adaptive.scrollContent, historyListPad]}
         showsVerticalScrollIndicator={false}
         onScrollBeginDrag={closeDropdowns}
         refreshControl={
@@ -586,18 +640,30 @@ export function CharityHistoryScreen() {
             {renderListHeader()}
           </>
         }
-        renderItem={({ item }) => renderCollectionCard(item)}
+        renderItem={({ item }) =>
+          r.isTablet ? (
+            <View style={styles.historyGridItem}>{renderCollectionCard(item)}</View>
+          ) : (
+            renderCollectionCard(item)
+          )
+        }
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
+          <View style={[styles.emptyWrap, historyColumn]}>
             {loading ? (
-              <View style={{ gap: hp(1.2), paddingHorizontal: wp(4) }}>
+              <View
+                style={[
+                  { gap: hp(1.2) },
+                  !r.isTablet && { paddingHorizontal: wp(4) },
+                  r.isTablet && styles.skeletonCardFlush,
+                ]}
+              >
                 {[1, 2].map((i) => (
                   <Skeleton key={i} width="100%" height={hp(16)} borderRadius={normalize(14)} />
                 ))}
                 <ActivityIndicator color={palette.kale} style={{ marginTop: hp(1) }} />
               </View>
             ) : (
-              <AppText variant="body1" style={styles.emptyText}>
+              <AppText variant="body1" style={[styles.emptyText, adaptive.emptyText]}>
                 No collections found
               </AppText>
             )}
@@ -657,29 +723,28 @@ const styles = StyleSheet.create({
     paddingBottom: hp(3),
     gap: hp(1),
   },
-  header: {
-    height: hp(15.5),
-    justifyContent: 'flex-end',
-    paddingBottom: hp(1.9),
-    paddingHorizontal: wp(4),
-    backgroundColor: palette.primary,
+  sectionHeadingTablet: {
+    paddingHorizontal: 0,
+    marginVertical: 8,
   },
-  backButton: {
-    position: 'absolute',
-    left: wp(4),
-    top: hp(4.2),
-    width: wp(10),
-    height: wp(10),
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
+  sectionCardTablet: {
+    marginHorizontal: 0,
+    padding: 14,
+    gap: 10,
+    borderRadius: 14,
   },
-  headerTitle: {
-    textAlign: 'center',
-    color: palette.white,
-    fontSize: normalize(22),
-    letterSpacing: 0.5,
-    textTransform: 'none',
+  historyColumnWrapper: {
+    gap: 16,
+    marginTop: 8,
+    width: '100%',
+  },
+  historyGridItem: {
+    flex: 1,
+    minWidth: 0,
+  },
+  skeletonCardFlush: {
+    marginHorizontal: 0,
+    width: '100%',
   },
   sectionHeading: {
     paddingHorizontal: wp(4),
@@ -856,6 +921,15 @@ const styles = StyleSheet.create({
     gap: hp(1.1),
     backgroundColor: palette.white,
   },
+  collectionCardTablet: {
+    width: '100%',
+    marginHorizontal: 0,
+    flex: 1,
+    padding: 12,
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   cardTopRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -922,7 +996,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minWidth: 0,
-    borderWidth: normalize(0.5),
+    borderWidth: 1,
     borderRadius: normalize(8),
     borderColor: '#D9D9D9',
     backgroundColor: palette.white,

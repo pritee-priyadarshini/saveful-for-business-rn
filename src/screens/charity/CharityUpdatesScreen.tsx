@@ -2,25 +2,25 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Image,
-  ImageBackground,
   Pressable,
   StyleSheet,
   View,
-  Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
+import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { palette } from '../../theme/colors';
 import { PostCollectSurveyModal } from './components/postCollectSurveyModal';
-
-const { width, height } = Dimensions.get('window');
-const wp = (p: number) => (width * p) / 100;
-const hp = (p: number) => (height * p) / 100;
-const normalize = (size: number) => Math.round(size * (width / 375));
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
+import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
+import { useAppContext } from '../../store/AppContext';
 
 type UpdateType = 'new_surplus' | 'pickup' | 'collected' | 'feedback';
 type UpdateFilter = 'all' | UpdateType;
@@ -146,6 +146,12 @@ const CARD_THEMES: Record<
 };
 
 export function CharityUpdatesScreen() {
+  useTransparentStatusBar('light');
+  const r = useResponsiveLayout();
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 20 }), [r]);
+  const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(3));
+  const { currentProfile } = useAppContext();
+
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<UpdateFilter>('all');
@@ -258,8 +264,11 @@ export function CharityUpdatesScreen() {
     return (
       <View style={[styles.qtyBox, { borderColor: theme.qtyBorder, backgroundColor: theme.qtyBg }]}>
         <Image source={CRATE_ICON} style={styles.qtyIcon} resizeMode="contain" />
-        <AppText variant="bodyBold" style={styles.qtyText}>
-          {item.quantityKg} kg
+        <AppText variant="bodyBold" style={styles.qtyValue} numberOfLines={1}>
+          {item.quantityKg}
+        </AppText>
+        <AppText variant="caption" style={styles.qtyUnit} numberOfLines={1}>
+          kg
         </AppText>
       </View>
     );
@@ -267,15 +276,15 @@ export function CharityUpdatesScreen() {
 
   const handleViewDetails = (item: UpdateItem) => {
     if (item.type === 'new_surplus') {
-      navigation.navigate('Available', { screen: 'FarmerMap' });
+      navigation.navigate('Available', { screen: 'CharityMap' });
       return;
     }
     if (item.type === 'pickup') {
-      navigation.navigate('Available', { screen: 'FarmerPickup' });
+      navigation.navigate('Available', { screen: 'CharityPickup' });
       return;
     }
     if (item.type === 'collected') {
-      navigation.navigate('FarmerHistory');
+      navigation.navigate('CharityHistory');
     }
   };
 
@@ -283,7 +292,7 @@ export function CharityUpdatesScreen() {
     const theme = CARD_THEMES[item.type];
 
     return (
-      <View style={styles.updateCard}>
+      <View style={[styles.updateCard, adaptive.updateCard]}>
         <View style={styles.cardTopRow}>
           <View style={[styles.statusBadge, { backgroundColor: theme.badgeBg }]}>
             <AppText variant="bodyBold" style={[styles.statusBadgeText, { color: theme.badgeText }]}>
@@ -336,7 +345,7 @@ export function CharityUpdatesScreen() {
               style={[styles.viewDetailsBtn, { backgroundColor: theme.btn }]}
               onPress={() => handleViewDetails(item)}
             >
-              <AppText variant="bodyBold" style={styles.viewDetailsText}>
+              <AppText variant="bodyBold" style={styles.viewDetailsText} numberOfLines={1}>
                 View Details
               </AppText>
             </Pressable>
@@ -351,7 +360,7 @@ export function CharityUpdatesScreen() {
     const completed = surveyCompletedIds.includes(item.id);
 
     return (
-      <View style={styles.updateCard}>
+      <View style={[styles.updateCard, adaptive.updateCard]}>
         <View style={styles.cardTopRow}>
           <View style={[styles.statusBadge, { backgroundColor: theme.badgeBg }]}>
             <AppText variant="bodyBold" style={[styles.statusBadgeText, { color: theme.badgeText }]}>
@@ -410,37 +419,81 @@ export function CharityUpdatesScreen() {
 
   if (loading) {
     return (
-      <Screen backgroundColor={palette.creme} scrollable={false}>
+      <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+        <StatusBar style="light" translucent backgroundColor="transparent" />
         <FlatList
           data={[]}
           renderItem={null}
           ListHeaderComponent={renderSkeleton}
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[styles.container, { paddingBottom: bottomPadding }]}
         />
       </Screen>
     );
   }
 
   return (
-    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop={true}>
+    <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+
       <FlatList
         data={sections}
         keyExtractor={(item) => item.title}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          adaptive.scrollContent,
+          { paddingBottom: bottomPadding },
+        ]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <>
-            <ImageBackground
+          <View style={styles.listHeader}>
+            <HeroHeader
               source={require('../../../assets/placeholder/kale-header.png')}
-              style={styles.headerBg}
-              resizeMode="cover"
+              height={adaptive.heroHeight}
+              style={adaptive.heroBleed}
             >
-              <AppText variant="h4" style={styles.headerTitle}>
-                UPDATES
-              </AppText>
-            </ImageBackground>
+              <View style={[styles.heroContent, adaptive.heroContent]}>
+                <View style={styles.heroTopRow}>
+                  <View style={styles.heroTextBlock}>
+                    <AppText
+                      variant="caption"
+                      style={[styles.heroEyebrow, adaptive.heroEyebrow]}
+                      numberOfLines={1}
+                    >
+                      {currentProfile.organization || 'Your charity'}
+                    </AppText>
+                    <AppText
+                      variant="h6"
+                      style={[styles.heroTitle, adaptive.heroTitle]}
+                      numberOfLines={1}
+                    >
+                      Updates
+                    </AppText>
+                    <AppText
+                      variant="bodySmall"
+                      style={[styles.heroSubtitle, adaptive.heroSubtitle]}
+                      numberOfLines={2}
+                    >
+                      Track surplus, pickups, and collections in one place
+                    </AppText>
+                  </View>
+                  <View style={[styles.heroIconCircle, adaptive.heroIconCircle]}>
+                    <Ionicons name="notifications" size={26} color={palette.eggplant} />
+                  </View>
+                </View>
+                <View style={[styles.heroStatsPill, adaptive.heroStatsPill]}>
+                  <Ionicons name="pulse-outline" size={14} color={palette.white} />
+                  <AppText
+                    variant="caption"
+                    style={[styles.heroStatsText, adaptive.heroStatsText]}
+                    numberOfLines={1}
+                  >
+                    {updates.length} update{updates.length !== 1 ? 's' : ''} · {counts.new_surplus} surplus · {counts.pickup} pickups
+                  </AppText>
+                </View>
+              </View>
+            </HeroHeader>
 
-            <View style={styles.filterWrap}>
+            <View style={[styles.filterWrap, adaptive.filterScroll]}>
               <View style={styles.filterRow}>
                 {FILTER_ROW_1.map(({ key, label, type }) =>
                   renderFilterChip(key, label, type),
@@ -452,11 +505,11 @@ export function CharityUpdatesScreen() {
                 )}
               </View>
             </View>
-          </>
+          </View>
         }
         renderItem={({ item: section }) => (
-          <View style={styles.section}>
-            <AppText variant="h8" style={styles.sectionTitle}>
+          <View style={[styles.section, adaptive.section]}>
+            <AppText variant="h8" style={[styles.sectionTitle, adaptive.sectionTitle]}>
               {section.title}
             </AppText>
             <View style={styles.sectionCards}>
@@ -467,7 +520,7 @@ export function CharityUpdatesScreen() {
           </View>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
+          <View style={[styles.emptyWrap, adaptive.section]}>
             <AppText variant="body1" color={palette.stone}>
               No updates to show
             </AppText>
@@ -493,21 +546,75 @@ export function CharityUpdatesScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: hp(3),
+    marginTop: -hp(2),
   },
 
-  headerBg: {
+  listHeader: {
     width: '100%',
-    height: hp(18),
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
-  headerTitle: {
+  heroContent: {
+    flex: 1,
+    paddingHorizontal: wp(5),
+    justifyContent: 'flex-end',
+    paddingBottom: hp(3),
+    gap: hp(1.2),
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: wp(3),
+  },
+  heroTextBlock: {
+    flex: 1,
+    gap: hp(0.3),
+    minWidth: 0,
+    paddingBottom: hp(0.2),
+  },
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'none',
+    letterSpacing: 0.3,
+    fontSize: normalize(12),
+  },
+  heroTitle: {
     color: palette.white,
-    fontSize: normalize(24),
-    letterSpacing: 0.5,
-    paddingTop: hp(4),
+    textTransform: 'none',
+    fontSize: normalize(26),
+    lineHeight: normalize(34),
+  },
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    textTransform: 'none',
+    fontSize: normalize(14),
+    lineHeight: normalize(20),
+  },
+  heroIconCircle: {
+    width: normalize(52),
+    height: normalize(52),
+    borderRadius: normalize(26),
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroStatsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: wp(1.5),
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(3),
+    borderRadius: normalize(20),
+    maxWidth: '100%',
+  },
+  heroStatsText: {
+    color: palette.white,
+    flexShrink: 1,
+    textTransform: 'none',
+    fontSize: normalize(11),
+    lineHeight: normalize(15),
   },
 
   filterWrap: {
@@ -612,44 +719,55 @@ const styles = StyleSheet.create({
   cardBodyRow: {
     flexDirection: 'row',
     gap: wp(2.5),
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
   },
 
   cardMainArea: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.5),
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: hp(0.7),
     minWidth: 0,
   },
 
   qtyBox: {
-    width: wp(17),
-    height: wp(17),
-    borderWidth: normalize(1),
+    width: normalize(64),
+    minHeight: normalize(72),
+    borderWidth: 1,
     borderRadius: normalize(10),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: hp(0.35),
-    paddingHorizontal: wp(0.8),
-    gap: hp(0.2),
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(1),
+    gap: hp(0.15),
     flexShrink: 0,
+    alignSelf: 'flex-start',
   },
 
   qtyIcon: {
-    width: normalize(24),
-    height: normalize(24),
+    width: normalize(22),
+    height: normalize(22),
   },
 
-  qtyText: {
-    fontSize: normalize(11),
+  qtyValue: {
+    fontSize: normalize(13),
+    lineHeight: normalize(16),
     color: palette.black,
     textTransform: 'none',
+    textAlign: 'center',
+  },
+
+  qtyUnit: {
+    fontSize: normalize(11),
+    lineHeight: normalize(13),
+    color: palette.stone,
+    textTransform: 'none',
+    textAlign: 'center',
   },
 
   cardContent: {
-    flex: 1,
-    gap: hp(0.15),
+    flexGrow: 1,
+    gap: hp(0.2),
     minWidth: 0,
     justifyContent: 'flex-start',
   },
@@ -684,18 +802,19 @@ const styles = StyleSheet.create({
   },
 
   viewDetailsBtn: {
-    flexShrink: 0,
-    paddingHorizontal: wp(2.8),
-    paddingVertical: hp(0.75),
+    alignSelf: 'flex-end',
+    minWidth: normalize(108),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.85),
     borderRadius: normalize(8),
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
   },
 
   viewDetailsText: {
     color: palette.white,
     fontSize: normalize(12),
+    lineHeight: normalize(16),
     textTransform: 'none',
   },
 
