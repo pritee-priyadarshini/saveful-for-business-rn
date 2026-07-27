@@ -89,7 +89,7 @@ export function extractListingImages(data: ListingDetail): string[] {
   return [];
 }
 
-const PEOPLE_STORAGE = ['Fridge', 'Freezer', 'Ambient'] as const;
+const PEOPLE_STORAGE = ['Fridge', 'Freezer', 'Ambient', 'Hot'] as const;
 type PeopleStorage = (typeof PEOPLE_STORAGE)[number];
 
 export function inferPeopleStorage(data: ListingDetail): PeopleStorage {
@@ -101,6 +101,9 @@ export function inferPeopleStorage(data: ListingDetail): PeopleStorage {
     const match = raw.find((s) => PEOPLE_STORAGE.includes(s as PeopleStorage));
     if (match) return match as PeopleStorage;
   }
+  if (data.needsHot) return 'Hot';
+  if (data.needsAmbient) return 'Ambient';
+  if (data.needsFreezer) return 'Freezer';
   if (data.needsRefrigeration) return 'Fridge';
   return 'Freezer';
 }

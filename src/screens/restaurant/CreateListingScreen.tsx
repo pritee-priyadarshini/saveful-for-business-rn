@@ -36,7 +36,7 @@ import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildFormShellStyles } from '@/utils/dashboardAdaptive';
 
 type Step = 1 | 2 | 3;
-type PickerTarget = 'bestBefore' | 'from' | 'to' | null;
+type PickerTarget = 'bestBefore' | 'bestBeforeTime' | 'from' | 'to' | null;
 
 type FoodItem = {
   name: string;
@@ -76,10 +76,14 @@ const ALLERGEN_OPTIONS = [
   'Sulphites',
 ];
 
-const storageOptions: ReadonlyArray<{ label: 'Fridge' | 'Freezer' | 'Ambient'; icon: any }> = [
+const storageOptions: ReadonlyArray<{
+  label: 'Fridge' | 'Freezer' | 'Ambient' | 'Hot';
+  icon: any;
+}> = [
   { label: 'Fridge', icon: require('../../../assets/placeholder/fridge_icon.png') },
   { label: 'Freezer', icon: require('../../../assets/placeholder/freezer_icon.png') },
   { label: 'Ambient', icon: require('../../../assets/placeholder/ambient_temp_icon.png') },
+  { label: 'Hot', icon: require('../../../assets/placeholder/heating_icon.png') },
 ];
 
 const reheatingOptions: ReadonlyArray<{ label: 'Yes' | 'No' | 'Not sure'; icon?: any }> = [
@@ -103,6 +107,19 @@ const formatTime = (date: Date | null) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
+const formatBestBeforeSummary = (date: Date | null, hasTime: boolean) => {
+  if (!date) return 'Select best before date';
+  const dateLabel = formatDate(date);
+  if (!hasTime) return dateLabel;
+  return `${dateLabel} · ${formatTime(date)}`;
+};
+
+/** Treat end-of-day (23:59) as date-only so optional time stays optional. */
+const hasExplicitBestBeforeTime = (date: Date | null) => {
+  if (!date) return false;
+  return !(date.getHours() === 23 && date.getMinutes() === 59);
+};
+
 export function CreateListingScreen({ navigation }: any) {
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
@@ -123,10 +140,11 @@ export function CreateListingScreen({ navigation }: any) {
 
   const [location, setLocation] = useState(currentProfile?.address || '');
   const [bestBeforeDate, setBestBeforeDate] = useState<Date | null>(null);
+  const [bestBeforeTimeSet, setBestBeforeTimeSet] = useState(false);
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
   const [pickupToDate, setPickupToDate] = useState<Date | null>(null);
 
-  const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient'>('Freezer');
+  const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient' | 'Hot'>('Freezer');
   const [reheating, setReheating] = useState<'Yes' | 'No' | 'Not sure'>('No');
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
   const [confirmedSafe, setConfirmedSafe] = useState(false);
@@ -152,6 +170,7 @@ export function CreateListingScreen({ navigation }: any) {
     setItems(values.items);
     setLocation(values.location);
     setBestBeforeDate(values.bestBeforeDate);
+    setBestBeforeTimeSet(hasExplicitBestBeforeTime(values.bestBeforeDate));
     setPickupFromDate(values.pickupFromDate);
     setPickupToDate(values.pickupToDate);
     setStorage(values.storage);
@@ -216,7 +235,7 @@ export function CreateListingScreen({ navigation }: any) {
 
   const openDatePicker = (target: Exclude<PickerTarget, null>) => {
     const initial =
-      target === 'bestBefore'
+      target === 'bestBefore' || target === 'bestBeforeTime'
         ? bestBeforeDate || new Date()
         : target === 'from'
           ? pickupFromDate || new Date()
@@ -226,7 +245,15 @@ export function CreateListingScreen({ navigation }: any) {
     setPickerValue(initial);
 
     if (Platform.OS === 'ios') {
-      setPickerMode(target === 'bestBefore' ? 'date' : 'datetime');
+      if (target === 'bestBefore') setPickerMode('date');
+      else if (target === 'bestBeforeTime') setPickerMode('time');
+      else setPickerMode('datetime');
+      setPickerVisible(true);
+      return;
+    }
+
+    if (target === 'bestBeforeTime') {
+      setPickerMode('time');
       setPickerVisible(true);
       return;
     }
@@ -237,7 +264,21 @@ export function CreateListingScreen({ navigation }: any) {
 
   const applySelectedDate = (target: Exclude<PickerTarget, null>, value: Date) => {
     if (target === 'bestBefore') {
-      setBestBeforeDate(value);
+      const next = new Date(value);
+      if (bestBeforeTimeSet && bestBeforeDate) {
+        next.setHours(bestBeforeDate.getHours(), bestBeforeDate.getMinutes(), 0, 0);
+      } else {
+        // Date-only: keep end-of-day so pickup windows on that day remain valid.
+        next.setHours(23, 59, 0, 0);
+      }
+      setBestBeforeDate(next);
+      setStepErrors((prev) => ({ ...prev, bestBefore: undefined }));
+    }
+    if (target === 'bestBeforeTime') {
+      const base = bestBeforeDate ? new Date(bestBeforeDate) : new Date();
+      base.setHours(value.getHours(), value.getMinutes(), 0, 0);
+      setBestBeforeDate(base);
+      setBestBeforeTimeSet(true);
       setStepErrors((prev) => ({ ...prev, bestBefore: undefined }));
     }
     if (target === 'from') {
@@ -265,8 +306,8 @@ export function CreateListingScreen({ navigation }: any) {
       return;
     }
 
-    if (pickerTarget === 'bestBefore') {
-      applySelectedDate('bestBefore', selectedDate);
+    if (pickerTarget === 'bestBefore' || pickerTarget === 'bestBeforeTime') {
+      applySelectedDate(pickerTarget, selectedDate);
       setPickerTarget(null);
       return;
     }
@@ -404,10 +445,14 @@ export function CreateListingScreen({ navigation }: any) {
           bestBefore: bestBefore.toISOString(),
           pickupFromTime: pickupFrom.toISOString(),
           pickupByTime: pickupTo.toISOString(),
+          // Storage flags — mutually exclusive, match existing create DTO shape.
           needsRefrigeration: storage === 'Fridge',
           needsFreezer: storage === 'Freezer',
           needsAmbient: storage === 'Ambient',
+          needsHot: storage === 'Hot',
+          storage,
           needsReheating: reheating === 'Yes',
+          reheating,
           isSafeForDonation: true,
           allergens: selectedAllergens,
           photoUrls: images.filter((uri) => uri.startsWith('http')),
@@ -427,7 +472,7 @@ export function CreateListingScreen({ navigation }: any) {
     <Screen
       backgroundColor="#F2F5E9"
       scrollable
-      contentStyle={[styles.screenContent, adaptive.screenContent]}
+      contentStyle={{ ...styles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[styles.pageWrap, adaptive.pageWrap]}>
         <View style={styles.topPanel}>
@@ -502,7 +547,7 @@ export function CreateListingScreen({ navigation }: any) {
             {hasPreviousListing ? (
               <View style={styles.relistCard}>
                 <AppText variant="bodyBold" color={palette.midgray}>
-                  Same as yesterday?
+                  Same as last time?
                 </AppText>
                 <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
                   <AppText variant="bodyBold" color={palette.white}>
@@ -666,12 +711,61 @@ export function CreateListingScreen({ navigation }: any) {
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               FOOD BEST BEFORE
             </AppText>
-            <Pressable style={styles.selectorRow} onPress={() => openDatePicker('bestBefore')}>
-              <Ionicons name="calendar-outline" size={normalize(20)} color={palette.kale} />
-              <AppText variant="bodyBold" color={palette.midgray}>
-                {formatDate(bestBeforeDate)}
-              </AppText>
-            </Pressable>
+            <View style={styles.windowRow}>
+              <Pressable style={styles.windowBox} onPress={() => openDatePicker('bestBefore')}>
+                <AppText variant="caption" color={palette.stone}>
+                  DATE
+                </AppText>
+                <View style={styles.bestBeforeValueRow}>
+                  <Ionicons name="calendar-outline" size={normalize(16)} color={palette.kale} />
+                  <AppText
+                    variant="bodyBold"
+                    color={palette.midgray}
+                    style={styles.windowValue}
+                    numberOfLines={1}
+                  >
+                    {bestBeforeDate ? formatDate(bestBeforeDate) : 'Select date'}
+                  </AppText>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={styles.windowBox}
+                onPress={() => openDatePicker('bestBeforeTime')}
+              >
+                <AppText variant="caption" color={palette.stone}>
+                  TIME (OPTIONAL)
+                </AppText>
+                <View style={styles.bestBeforeValueRow}>
+                  <Ionicons name="time-outline" size={normalize(16)} color={palette.kale} />
+                  <AppText
+                    variant="bodyBold"
+                    color={palette.midgray}
+                    style={[styles.windowValue, { flex: 1 }]}
+                    numberOfLines={1}
+                  >
+                    {bestBeforeTimeSet && bestBeforeDate ? formatTime(bestBeforeDate) : 'Add time'}
+                  </AppText>
+                  {bestBeforeTimeSet ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => {
+                        setBestBeforeTimeSet(false);
+                        if (bestBeforeDate) {
+                          const cleared = new Date(bestBeforeDate);
+                          cleared.setHours(23, 59, 0, 0);
+                          setBestBeforeDate(cleared);
+                        }
+                      }}
+                    >
+                      <AppText variant="caption" color={palette.kale} style={styles.bestBeforeClear}>
+                        Clear
+                      </AppText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </Pressable>
+            </View>
             {stepErrors.bestBefore ? (
               <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
                 {stepErrors.bestBefore}
@@ -721,16 +815,28 @@ export function CreateListingScreen({ navigation }: any) {
                   <Pressable
                     key={option.label}
                     onPress={() => setStorage(option.label)}
-                    style={[styles.choiceChip, adaptive.choiceChip, active && styles.choiceChipActive]}
+                    style={[
+                      styles.choiceChip,
+                      adaptive.choiceChip,
+                      styles.storageChoiceChip,
+                      active && styles.choiceChipActive,
+                    ]}
                   >
                     <Image
                       source={option.icon}
-                      style={{ width: normalize(18), height: normalize(18) }}
+                      style={{ width: normalize(16), height: normalize(16) }}
                     />
-                    <AppText variant="bodyBold" color={active ? palette.kale : palette.stone}>
+                    <AppText
+                      variant="bodyBold"
+                      color={active ? palette.kale : palette.stone}
+                      numberOfLines={1}
+                      style={styles.storageChoiceText}
+                    >
                       {option.label}
                     </AppText>
-                    {active ? <Ionicons name="checkmark-circle" size={normalize(15)} color={palette.kale} /> : null}
+                    {active ? (
+                      <Ionicons name="checkmark-circle" size={normalize(14)} color={palette.kale} />
+                    ) : null}
                   </Pressable>
                 );
               })}
@@ -863,7 +969,7 @@ export function CreateListingScreen({ navigation }: any) {
               <View style={styles.summaryInfoRow}>
                 <Ionicons name="calendar-outline" size={normalize(18)} color={palette.kale} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  Best Before - {formatDate(bestBeforeDate)}
+                  Best Before - {formatBestBeforeSummary(bestBeforeDate, bestBeforeTimeSet)}
                 </AppText>
               </View>
 
@@ -980,10 +1086,16 @@ export function CreateListingScreen({ navigation }: any) {
               </View>
               <DateTimePicker
                 value={pickerValue}
-                mode={pickerMode === 'datetime' ? 'datetime' : 'date'}
+                mode={
+                  pickerMode === 'datetime'
+                    ? 'datetime'
+                    : pickerMode === 'time'
+                      ? 'time'
+                      : 'date'
+                }
                 display="spinner"
                 onChange={onNativePickerChange}
-                minimumDate={new Date()}
+                minimumDate={pickerTarget === 'bestBeforeTime' ? undefined : new Date()}
               />
             </View>
           </View>
@@ -993,10 +1105,16 @@ export function CreateListingScreen({ navigation }: any) {
       {Platform.OS === 'android' && pickerVisible ? (
         <DateTimePicker
           value={pickerValue}
-          mode={pickerMode === 'datetime' ? 'date' : pickerMode}
+          mode={
+            pickerMode === 'datetime'
+              ? 'date'
+              : pickerMode === 'time'
+                ? 'time'
+                : pickerMode
+          }
           display="default"
           onChange={onNativePickerChange}
-          minimumDate={new Date()}
+          minimumDate={pickerTarget === 'bestBeforeTime' ? undefined : new Date()}
         />
       ) : null}
     </Screen>
@@ -1339,7 +1457,27 @@ const styles = StyleSheet.create({
   },
   chipRow: {
     flexDirection: 'row',
-    gap: wp(2.2),
+    gap: wp(1.6),
+  },
+  storageChoiceChip: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: wp(0.6),
+    paddingVertical: hp(0.6),
+    gap: hp(0.15),
+  },
+  storageChoiceText: {
+    fontSize: normalize(11),
+    textAlign: 'center',
+  },
+  bestBeforeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.2),
+    marginTop: hp(0.25),
+  },
+  bestBeforeClear: {
+    textTransform: 'none',
   },
   allergenCard: {
     borderWidth: normalize(1),

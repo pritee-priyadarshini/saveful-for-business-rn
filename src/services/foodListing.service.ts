@@ -33,6 +33,7 @@ export type FoodListing = {
   needsRefrigeration?: boolean;
   needsAmbient?: boolean;
   needsFreezer?: boolean;
+  needsHot?: boolean;
   needsReheating?: boolean;
   isSafeForDonation?: boolean;
   allergens?: string[];
@@ -64,10 +65,13 @@ export type CreateListingPayload = {
   needsRefrigeration?: boolean;
   needsAmbient?: boolean;
   needsFreezer?: boolean;
+  needsHot?: boolean;
   needsReheating?: boolean;
   isSafeForDonation?: boolean;
   allergens?: string[];
   photoUrls?: string[];
+  storage?: string;
+  reheating?: string;
 };
 
 export type UpdateListingPayload = {
@@ -77,6 +81,9 @@ export type UpdateListingPayload = {
   pickupFromTime?: string;
   pickupByTime?: string;
   needsRefrigeration?: boolean;
+  needsAmbient?: boolean;
+  needsFreezer?: boolean;
+  needsHot?: boolean;
   needsReheating?: boolean;
   containsAllergens?: boolean;
   isGlutenFree?: boolean;
@@ -242,10 +249,13 @@ function normalizeCreateListingPayload(payload: CreateListingPayload): CreateLis
     needsRefrigeration: Boolean(payload.needsRefrigeration),
     needsAmbient: Boolean(payload.needsAmbient),
     needsFreezer: Boolean(payload.needsFreezer),
+    needsHot: Boolean(payload.needsHot),
     needsReheating: Boolean(payload.needsReheating),
     isSafeForDonation: payload.isSafeForDonation ?? true,
     allergens: Array.isArray(payload.allergens) ? payload.allergens : [],
     photoUrls: Array.isArray(payload.photoUrls) ? payload.photoUrls : [],
+    storage: payload.storage?.trim() || undefined,
+    reheating: payload.reheating?.trim() || undefined,
     foodItems,
   };
 }

@@ -53,7 +53,7 @@ import { buildFormShellStyles, formColumnWidth } from '@/utils/dashboardAdaptive
 
 
 type Step = 1 | 2 | 3;
-type PickerTarget = 'bestBefore' | 'from' | 'to' | null;
+type PickerTarget = 'bestBefore' | 'bestBeforeTime' | 'from' | 'to' | null;
 
 type FoodItem = {
   name: string;
@@ -93,10 +93,14 @@ const ALLERGEN_OPTIONS = [
   'Sulphites',
 ];
 
-const storageOptions: ReadonlyArray<{ label: 'Fridge' | 'Freezer' | 'Ambient'; icon: any }> = [
+const storageOptions: ReadonlyArray<{
+  label: 'Fridge' | 'Freezer' | 'Ambient' | 'Hot';
+  icon: any;
+}> = [
   { label: 'Fridge', icon: require('../../../assets/placeholder/fridge_icon.png') },
   { label: 'Freezer', icon: require('../../../assets/placeholder/freezer_icon.png') },
   { label: 'Ambient', icon: require('../../../assets/placeholder/ambient_temp_icon.png') },
+  { label: 'Hot', icon: require('../../../assets/placeholder/heating_icon.png') },
 ];
 
 const reheatingOptions: ReadonlyArray<{ label: 'Yes' | 'No' | 'Not sure'; icon?: any }> = [
@@ -118,6 +122,19 @@ const formatDateShort = (date: Date | null) => {
 const formatTime = (date: Date | null) => {
   if (!date) return '--:--';
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+};
+
+const formatBestBeforeSummary = (date: Date | null, hasTime: boolean) => {
+  if (!date) return 'Select best before date';
+  const dateLabel = formatDate(date);
+  if (!hasTime) return dateLabel;
+  return `${dateLabel} · ${formatTime(date)}`;
+};
+
+/** Treat end-of-day (23:59) as date-only so optional time stays optional on edit. */
+const hasExplicitBestBeforeTime = (date: Date | null) => {
+  if (!date) return false;
+  return !(date.getHours() === 23 && date.getMinutes() === 59);
 };
 
 
@@ -151,7 +168,7 @@ type FarmItem = {
 
 const farmSeedItems: FarmItem[] = [
   { name: 'Baked goods', qty: 0, icon: require('../../../assets/placeholder/bread_icon.png') },
-  { name: 'Fruit & veg', qty: 0, icon: require('../../../assets/placeholder/fruit&veg_icon.png') },
+  { name: 'Fruit & veg', qty: 0, icon: require('../../../assets/placeholder/fruit_veg_icon.png') },
   { name: 'Grain / cereal', qty: 0, icon: require('../../../assets/placeholder/grain_icon.png') },
   { name: 'Dairy', qty: 0, icon: require('../../../assets/placeholder/milk_icon.png') },
   { name: 'Food scraps – no meat', qty: 0, icon: require('../../../assets/placeholder/food_scraps_icon.png') },
@@ -200,10 +217,11 @@ function EditPeopleListingForm({
 
   const [location, setLocation] = useState('');
   const [bestBeforeDate, setBestBeforeDate] = useState<Date | null>(null);
+  const [bestBeforeTimeSet, setBestBeforeTimeSet] = useState(false);
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
   const [pickupToDate, setPickupToDate] = useState<Date | null>(null);
 
-  const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient'>('Freezer');
+  const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient' | 'Hot'>('Freezer');
   const [reheating, setReheating] = useState<'Yes' | 'No' | 'Not sure'>('No');
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
   const [confirmedSafe, setConfirmedSafe] = useState(false);
@@ -223,7 +241,9 @@ function EditPeopleListingForm({
     const data = initialListing;
     setItems(mergePeopleFoodItems(data.foodItems ?? [], seedItems));
     setLocation(getListingPickupAddress(data));
-    setBestBeforeDate(parseListingDate(data.bestBefore));
+    const parsedBestBefore = parseListingDate(data.bestBefore);
+    setBestBeforeDate(parsedBestBefore);
+    setBestBeforeTimeSet(hasExplicitBestBeforeTime(parsedBestBefore));
     setPickupFromDate(parseListingDate(getListingPickupFrom(data)));
     setPickupToDate(parseListingDate(getListingPickupTo(data)));
     setStorage(inferPeopleStorage(data));
@@ -286,7 +306,7 @@ function EditPeopleListingForm({
 
   const openDatePicker = (target: Exclude<PickerTarget, null>) => {
     const initial =
-      target === 'bestBefore'
+      target === 'bestBefore' || target === 'bestBeforeTime'
         ? bestBeforeDate || new Date()
         : target === 'from'
           ? pickupFromDate || new Date()
@@ -296,7 +316,15 @@ function EditPeopleListingForm({
     setPickerValue(initial);
 
     if (Platform.OS === 'ios') {
-      setPickerMode(target === 'bestBefore' ? 'date' : 'datetime');
+      if (target === 'bestBefore') setPickerMode('date');
+      else if (target === 'bestBeforeTime') setPickerMode('time');
+      else setPickerMode('datetime');
+      setPickerVisible(true);
+      return;
+    }
+
+    if (target === 'bestBeforeTime') {
+      setPickerMode('time');
       setPickerVisible(true);
       return;
     }
@@ -306,7 +334,21 @@ function EditPeopleListingForm({
   };
 
   const applySelectedDate = (target: Exclude<PickerTarget, null>, value: Date) => {
-    if (target === 'bestBefore') setBestBeforeDate(value);
+    if (target === 'bestBefore') {
+      const next = new Date(value);
+      if (bestBeforeTimeSet && bestBeforeDate) {
+        next.setHours(bestBeforeDate.getHours(), bestBeforeDate.getMinutes(), 0, 0);
+      } else {
+        next.setHours(23, 59, 0, 0);
+      }
+      setBestBeforeDate(next);
+    }
+    if (target === 'bestBeforeTime') {
+      const base = bestBeforeDate ? new Date(bestBeforeDate) : new Date();
+      base.setHours(value.getHours(), value.getMinutes(), 0, 0);
+      setBestBeforeDate(base);
+      setBestBeforeTimeSet(true);
+    }
     if (target === 'from') setPickupFromDate(value);
     if (target === 'to') setPickupToDate(value);
   };
@@ -326,8 +368,8 @@ function EditPeopleListingForm({
       return;
     }
 
-    if (pickerTarget === 'bestBefore') {
-      applySelectedDate('bestBefore', selectedDate);
+    if (pickerTarget === 'bestBefore' || pickerTarget === 'bestBeforeTime') {
+      applySelectedDate(pickerTarget, selectedDate);
       setPickerTarget(null);
       return;
     }
@@ -447,6 +489,9 @@ function EditPeopleListingForm({
           pickupFromTime: pickupFrom.toISOString(),
           pickupByTime: pickupTo.toISOString(),
           needsRefrigeration: storage === 'Fridge',
+          needsFreezer: storage === 'Freezer',
+          needsAmbient: storage === 'Ambient',
+          needsHot: storage === 'Hot',
           needsReheating: reheating === 'Yes',
           containsAllergens: hasSelectedAllergens,
           allergens: selectedAllergens,
@@ -469,7 +514,7 @@ function EditPeopleListingForm({
     <Screen
       backgroundColor="#F2F5E9"
       scrollable
-      contentStyle={[peopleStyles.screenContent, adaptive.screenContent]}
+      contentStyle={{ ...peopleStyles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[peopleStyles.pageWrap, adaptive.pageWrap]}>
         <View style={peopleStyles.topPanel}>
@@ -669,12 +714,61 @@ function EditPeopleListingForm({
             <AppText variant="h8" color={palette.black} style={peopleStyles.fieldLabel}>
               FOOD BEST BEFORE
             </AppText>
-            <Pressable style={peopleStyles.selectorRow} onPress={() => openDatePicker('bestBefore')}>
-              <Ionicons name="calendar-outline" size={normalize(20)} color={palette.kale} />
-              <AppText variant="bodyBold" color={palette.midgray}>
-                {formatDate(bestBeforeDate)}
-              </AppText>
-            </Pressable>
+            <View style={peopleStyles.windowRow}>
+              <Pressable style={peopleStyles.windowBox} onPress={() => openDatePicker('bestBefore')}>
+                <AppText variant="caption" color={palette.stone}>
+                  DATE
+                </AppText>
+                <View style={peopleStyles.bestBeforeValueRow}>
+                  <Ionicons name="calendar-outline" size={normalize(16)} color={palette.kale} />
+                  <AppText
+                    variant="bodyBold"
+                    color={palette.midgray}
+                    style={peopleStyles.windowValue}
+                    numberOfLines={1}
+                  >
+                    {bestBeforeDate ? formatDate(bestBeforeDate) : 'Select date'}
+                  </AppText>
+                </View>
+              </Pressable>
+
+              <Pressable
+                style={peopleStyles.windowBox}
+                onPress={() => openDatePicker('bestBeforeTime')}
+              >
+                <AppText variant="caption" color={palette.stone}>
+                  TIME (OPTIONAL)
+                </AppText>
+                <View style={peopleStyles.bestBeforeValueRow}>
+                  <Ionicons name="time-outline" size={normalize(16)} color={palette.kale} />
+                  <AppText
+                    variant="bodyBold"
+                    color={palette.midgray}
+                    style={[peopleStyles.windowValue, { flex: 1 }]}
+                    numberOfLines={1}
+                  >
+                    {bestBeforeTimeSet && bestBeforeDate ? formatTime(bestBeforeDate) : 'Add time'}
+                  </AppText>
+                  {bestBeforeTimeSet ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => {
+                        setBestBeforeTimeSet(false);
+                        if (bestBeforeDate) {
+                          const cleared = new Date(bestBeforeDate);
+                          cleared.setHours(23, 59, 0, 0);
+                          setBestBeforeDate(cleared);
+                        }
+                      }}
+                    >
+                      <AppText variant="caption" color={palette.kale} style={peopleStyles.bestBeforeClear}>
+                        Clear
+                      </AppText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </Pressable>
+            </View>
 
             <AppText variant="h8" color={palette.black} style={peopleStyles.fieldLabel}>
               PICKUP WINDOW
@@ -709,16 +803,24 @@ function EditPeopleListingForm({
                   <Pressable
                     key={option.label}
                     onPress={() => setStorage(option.label)}
-                    style={[peopleStyles.choiceChip, active && peopleStyles.choiceChipActive]}
+                    style={[
+                      peopleStyles.choiceChip,
+                      peopleStyles.storageChoiceChip,
+                      active && peopleStyles.choiceChipActive,
+                    ]}
                   >
                     <Image
                       source={option.icon}
-                      style={{ width: normalize(18), height: normalize(18) }}
+                      style={{ width: normalize(16), height: normalize(16) }}
                     />
-                    <AppText variant="bodyBold" color={active ? palette.kale : palette.stone}>
+                    <AppText
+                      variant="bodyBold"
+                      color={active ? palette.kale : palette.stone}
+                      numberOfLines={1}
+                      style={peopleStyles.storageChoiceText}
+                    >
                       {option.label}
                     </AppText>
-                    {active ? <Ionicons name="checkmark-circle" size={normalize(15)} color={palette.kale} /> : null}
                   </Pressable>
                 );
               })}
@@ -851,7 +953,7 @@ function EditPeopleListingForm({
               <View style={peopleStyles.summaryInfoRow}>
                 <Ionicons name="calendar-outline" size={normalize(18)} color={palette.kale} />
                 <AppText variant="bodyBold" color={palette.midgray} style={peopleStyles.summaryInfoText}>
-                  Best Before - {formatDate(bestBeforeDate)}
+                  Best Before - {formatBestBeforeSummary(bestBeforeDate, bestBeforeTimeSet)}
                 </AppText>
               </View>
 
@@ -960,10 +1062,16 @@ function EditPeopleListingForm({
               </View>
               <DateTimePicker
                 value={pickerValue}
-                mode={pickerMode === 'datetime' ? 'datetime' : 'date'}
+                mode={
+                  pickerMode === 'datetime'
+                    ? 'datetime'
+                    : pickerMode === 'time'
+                      ? 'time'
+                      : 'date'
+                }
                 display="spinner"
                 onChange={onNativePickerChange}
-                minimumDate={new Date()}
+                minimumDate={pickerTarget === 'bestBeforeTime' ? undefined : new Date()}
               />
             </View>
           </View>
@@ -976,7 +1084,7 @@ function EditPeopleListingForm({
           mode={pickerMode === 'datetime' ? 'date' : pickerMode}
           display="default"
           onChange={onNativePickerChange}
-          minimumDate={new Date()}
+          minimumDate={pickerTarget === 'bestBeforeTime' ? undefined : new Date()}
         />
       ) : null}
     </Screen>
@@ -1265,7 +1373,7 @@ function EditFarmListingForm({
     <Screen
       backgroundColor={FARM_BG}
       scrollable
-      contentStyle={[farmStyles.screenContent, adaptive.screenContent]}
+      contentStyle={{ ...farmStyles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[farmStyles.pageWrap, adaptive.pageWrap]}>
 
@@ -2179,7 +2287,27 @@ const peopleStyles = StyleSheet.create({
   },
   chipRow: {
     flexDirection: 'row',
-    gap: wp(2.2),
+    gap: wp(1.6),
+  },
+  storageChoiceChip: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: wp(0.6),
+    paddingVertical: hp(0.6),
+    gap: hp(0.15),
+  },
+  storageChoiceText: {
+    fontSize: normalize(11),
+    textAlign: 'center',
+  },
+  bestBeforeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.2),
+    marginTop: hp(0.25),
+  },
+  bestBeforeClear: {
+    textTransform: 'none',
   },
   allergenCard: {
     borderWidth: normalize(1),

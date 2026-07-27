@@ -693,9 +693,11 @@ export function CharityMapScreen({ navigation }: any) {
         <View style={styles.ctaRow}>
           <Button
             label={`Claim ${formatKg(totalSelected)} kg`}
+            variant="secondary"
             size="compact"
             disabled={!hasSelection || isLoadingItems}
-            style={styles.flexBtn}
+            textColor={palette.middlegreen}
+            style={styles.partialClaimBtn}
             onPress={() => openPartialClaim(item, claimItems)}
           />
 
@@ -703,7 +705,7 @@ export function CharityMapScreen({ navigation }: any) {
             label="Claim All"
             size="compact"
             disabled={isLoadingItems || claimItems.length === 0}
-            style={styles.flexBtn}
+            style={styles.claimAllBtn}
             onPress={() => openFullClaim(item, claimItems)}
           />
         </View>
@@ -1291,9 +1293,18 @@ const styles = StyleSheet.create({
     marginTop: hp(1.2),
   },
 
-  flexBtn: {
+  partialClaimBtn: {
+    flex: 1,
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: palette.middlegreen,
+  },
+
+  claimAllBtn: {
     flex: 1,
     backgroundColor: palette.middlegreen,
+    borderWidth: 1,
+    borderColor: palette.middlegreen,
   },
 
   emptyContainer: {

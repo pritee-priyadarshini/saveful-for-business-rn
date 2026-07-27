@@ -72,7 +72,7 @@ const stepMeta = [
 
 const seedItems: FarmItem[] = [
   { name: 'Baked goods', qty: 0, icon: require('../../../assets/placeholder/bread_icon.png') },
-  { name: 'Fruit & veg', qty: 0, icon: require('../../../assets/placeholder/fruit&veg_icon.png') },
+  { name: 'Fruit & veg', qty: 0, icon: require('../../../assets/placeholder/fruit_veg_icon.png') },
   { name: 'Grain / cereal', qty: 0, icon: require('../../../assets/placeholder/grain_icon.png') },
   { name: 'Dairy', qty: 0, icon: require('../../../assets/placeholder/milk_icon.png') },
   { name: 'Food scraps – no meat', qty: 0, icon: require('../../../assets/placeholder/food_scraps_icon.png') },
@@ -427,7 +427,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
     <Screen
       backgroundColor={FARM_BG}
       scrollable
-      contentStyle={[styles.screenContent, adaptive.screenContent]}
+      contentStyle={{ ...styles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[styles.pageWrap, adaptive.pageWrap]}>
 
@@ -508,7 +508,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
             {hasPreviousListing ? (
               <View style={styles.relistCard}>
                 <AppText variant="bodyBold" color={palette.midgray}>
-                  Same as yesterday?
+                  Same as last time?
                 </AppText>
                 <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
                   <AppText variant="bodyBold" color={palette.white}>

@@ -13,6 +13,8 @@ type ButtonProps = {
   size?: 'default' | 'compact';
   icon?: keyof typeof Ionicons.glyphMap;
   style?: ViewStyle;
+  /** Overrides label/icon color when enabled. */
+  textColor?: string;
   disabled?: boolean;
   loading?: boolean;
 };
@@ -24,13 +26,15 @@ export function Button({
   size = 'default',
   icon,
   style,
+  textColor,
   disabled = false,
   loading = false,
 }: ButtonProps) {
   const isPrimary = variant === 'primary';
-  const isSecondary = variant === 'secondary';
   const isDisabled = disabled || loading;
   const isCompact = size === 'compact';
+  const enabledColor = textColor ?? (isPrimary ? palette.surface : palette.primary);
+  const contentColor = isDisabled ? '#9E9E9E' : enabledColor;
 
   return (
     <Pressable
@@ -39,7 +43,7 @@ export function Button({
         styles.button,
         isCompact && styles.compact,
         isPrimary && styles.primary,
-        isSecondary && styles.secondary,
+        variant === 'secondary' && styles.secondary,
         variant === 'ghost' && styles.ghost,
         pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
@@ -47,33 +51,14 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator
-          color={isPrimary ? palette.surface : palette.primary}
-          size="small"
-        />
+        <ActivityIndicator color={contentColor} size="small" />
       ) : icon ? (
-        <Ionicons
-          color={
-            isDisabled
-              ? '#9E9E9E'
-              : isPrimary
-              ? palette.surface
-              : palette.primary
-          }
-          name={icon}
-          size={18}
-        />
+        <Ionicons color={contentColor} name={icon} size={18} />
       ) : null}
 
       <AppText
         variant={isCompact ? 'label' : 'bodyBold'}
-        color={
-          isDisabled
-            ? '#9E9E9E'
-            : isPrimary
-            ? palette.surface
-            : palette.primary
-        }
+        color={contentColor}
         style={styles.label}
       >
         {label}

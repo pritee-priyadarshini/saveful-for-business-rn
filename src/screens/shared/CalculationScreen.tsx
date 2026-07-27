@@ -247,21 +247,25 @@ const styles = StyleSheet.create({
   formulaLabel: {
     color: palette.eggplant,
     lineHeight: normalize(22),
+    textTransform: 'uppercase',
   },
 
   formulaBody: {
     color: palette.midgray,
     lineHeight: normalize(22),
+    textTransform: 'none',
   },
 
   link: {
     color: palette.blueberry,
     textDecorationLine: 'underline',
+    textTransform: 'none',
   },
 
   disclaimer: {
     color: palette.stone,
     lineHeight: normalize(18),
     opacity: 0.7,
+    textTransform: 'none',
   },
 });

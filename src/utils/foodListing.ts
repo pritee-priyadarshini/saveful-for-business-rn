@@ -13,7 +13,7 @@ const FOOD_ICON_SOURCES: Record<FoodIconKey, any> = {
   preparedMeals: require('../../assets/placeholder/meal_icon.png'),
   bread: require('../../assets/placeholder/bread_icon.png'),
   bakedGoods: require('../../assets/placeholder/baked_goods_icon.png'),
-  fruitVeg: require('../../assets/placeholder/fruit&veg_icon.png'),
+  fruitVeg: require('../../assets/placeholder/fruit_veg_icon.png'),
   meat: require('../../assets/placeholder/meat_icon.png'),
   dairy: require('../../assets/placeholder/milk_icon.png'),
   defaultMeal: require('../../assets/placeholder/meal_icon.png'),
