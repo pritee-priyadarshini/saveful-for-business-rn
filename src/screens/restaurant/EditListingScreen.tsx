@@ -495,8 +495,6 @@ function EditPeopleListingForm({
           needsReheating: reheating === 'Yes',
           containsAllergens: hasSelectedAllergens,
           allergens: selectedAllergens,
-          storage,
-          reheating,
           isSafeForDonation: true,
         });
         invalidateListingDetail(listingId);
@@ -1353,9 +1351,12 @@ function EditFarmListingForm({
           pickupByTime: pickupTo.toISOString(),
           needsRefrigeration:
             selectedStorage.includes('Fridge') || selectedStorage.includes('Freezer'),
+          needsFreezer: selectedStorage.includes('Freezer'),
+          needsAmbient:
+            selectedStorage.includes('Ambient') ||
+            selectedStorage.includes('Dry storage'),
           containsAllergens: selectedContaminants.length > 0,
-          storage: selectedStorage,
-          contaminants: selectedContaminants,
+          allergens: selectedContaminants,
           isSafeForDonation: false,
         });
         invalidateListingDetail(listingId);

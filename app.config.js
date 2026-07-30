@@ -48,22 +48,44 @@ if (
   );
 }
 
+// Fail EAS iOS builds early if Firebase client config is missing (APNs/FCM).
+if (
+  process.env.EAS_BUILD &&
+  process.env.EAS_BUILD_PLATFORM === 'ios' &&
+  !iosGoogleServicesFile
+) {
+  throw new Error(
+    '[app.config] iOS EAS build requires GoogleService-Info.plist. ' +
+      'Download it from Firebase Console for bundle com.priteepriyadarshini.savefulbusiness, ' +
+      'then run: eas env:create --name GOOGLE_SERVICES_PLIST --type file --value ./GoogleService-Info.plist --environment <env>',
+  );
+}
+
 const firebasePlugins = includeFirebase
   ? ['@react-native-firebase/app', '@react-native-firebase/messaging']
   : [];
 
+// production / store builds use production APNs; everything else uses development.
+const apsEnvironment =
+  process.env.EAS_BUILD_PROFILE === 'production' ? 'production' : 'development';
+
 // When Firebase is enabled, omit defaultChannel here — the channel is created at
 // runtime in pushNotifications.ts. Including defaultChannel makes expo-notifications
 // emit FCM channel meta-data that conflicts with @react-native-firebase/messaging.
-const expoNotificationsPlugin = includeFirebase
-  ? [
-      'expo-notifications',
-      {
-        icon: './assets/intro/notification_icon.png',
-        color: '#9B8AFB',
-      },
-    ]
-  : ['expo-notifications'];
+const expoNotificationsPlugin = [
+  'expo-notifications',
+  {
+    ...(includeFirebase
+      ? {
+          icon: './assets/intro/notification_icon.png',
+          color: '#9B8AFB',
+        }
+      : {}),
+    // Required for iOS remote push (aps-environment + UIBackgroundModes).
+    mode: apsEnvironment,
+    enableBackgroundRemoteNotifications: true,
+  },
+];
 
 export default {
   expo: {
@@ -85,14 +107,18 @@ export default {
       supportsTablet: true,
       requireFullScreen: true,
       icon: './assets/intro/Saveful-for-Business-logo.png',
-      bundleIdentifier: 'com.priteepriyadarshini.savefulbusiness',
+      bundleIdentifier: 'com.saveful.business.app',
       ...(iosGoogleServicesFile && { googleServicesFile: iosGoogleServicesFile }),
+      entitlements: {
+        'aps-environment': apsEnvironment,
+      },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSPhotoLibraryUsageDescription:
           'Allow Saveful for Business to access your photo library to upload a logo.',
         UISupportedInterfaceOrientations: ['UIInterfaceOrientationPortrait'],
         'UISupportedInterfaceOrientations~ipad': ['UIInterfaceOrientationPortrait'],
+        UIBackgroundModes: ['remote-notification'],
       },
     },
 

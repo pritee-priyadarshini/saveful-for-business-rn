@@ -70,8 +70,6 @@ export type CreateListingPayload = {
   isSafeForDonation?: boolean;
   allergens?: string[];
   photoUrls?: string[];
-  storage?: string;
-  reheating?: string;
 };
 
 export type UpdateListingPayload = {
@@ -89,9 +87,6 @@ export type UpdateListingPayload = {
   isGlutenFree?: boolean;
   isSafeForDonation?: boolean;
   allergens?: string[];
-  storage?: string | string[];
-  contaminants?: string[];
-  reheating?: string;
 };
 
 export type RelistPayload = {
@@ -254,8 +249,6 @@ function normalizeCreateListingPayload(payload: CreateListingPayload): CreateLis
     isSafeForDonation: payload.isSafeForDonation ?? true,
     allergens: Array.isArray(payload.allergens) ? payload.allergens : [],
     photoUrls: Array.isArray(payload.photoUrls) ? payload.photoUrls : [],
-    storage: payload.storage?.trim() || undefined,
-    reheating: payload.reheating?.trim() || undefined,
     foodItems,
   };
 }

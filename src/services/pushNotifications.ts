@@ -264,11 +264,15 @@ export async function registerDeviceToken(
   }
 
   if (!FIREBASE_ENABLED) {
-    console.log(
-      '[Push] Skipped — Firebase not configured (google-services.json missing). ' +
-        'Add google-services.json and rebuild the dev client to enable FCM push.',
-      { expoGo: IS_EXPO_GO, firebaseEnabled: FIREBASE_ENABLED },
-    );
+    const missingConfig =
+      Platform.OS === 'ios'
+        ? 'GoogleService-Info.plist missing — download from Firebase Console for this iOS app and rebuild.'
+        : 'google-services.json missing — add it and rebuild the dev client to enable FCM push.';
+    console.log(`[Push] Skipped — Firebase not configured (${missingConfig})`, {
+      expoGo: IS_EXPO_GO,
+      firebaseEnabled: FIREBASE_ENABLED,
+      platform: Platform.OS,
+    });
     return;
   }
 
@@ -288,6 +292,12 @@ export async function registerDeviceToken(
     });
     if (!permitted) return;
 
+    // iOS must be registered with APNs before FCM can issue a token.
+    if (Platform.OS === 'ios' && !messaging().isDeviceRegisteredForRemoteMessages) {
+      await messaging().registerDeviceForRemoteMessages();
+      console.log('[Push] iOS registered for remote messages (APNs)');
+    }
+
     const fcmToken = await messaging().getToken();
     if (!fcmToken) {
       console.log('[Push] No FCM token available');
@@ -295,7 +305,7 @@ export async function registerDeviceToken(
     }
 
     await notificationsService.registerToken(buildTokenPayload(fcmToken, 'fcm'));
-    console.log('[Push] FCM token registered');
+    console.log('[Push] FCM token registered', { platform: Platform.OS });
 
     if (!tokenRefreshUnsubscribe) {
       tokenRefreshUnsubscribe = messaging().onTokenRefresh(async (newToken) => {
