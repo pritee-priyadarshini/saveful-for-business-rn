@@ -28,11 +28,17 @@ import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
+import { ImpactReportDownload } from '@/components/ImpactReportDownload';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
+import {
+  canDownloadImpactReports,
+  canShowSpecificFoodSavings,
+} from '@/utils/impactAccess';
 import { palette } from '../../theme/colors';
 import { elevation } from '@/theme/elevation';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
@@ -94,6 +100,9 @@ export function FarmerAnalyticsScreen() {
   );
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentProfile, authUser } = useAppContext();
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
+  const showFoodSavings = canShowSpecificFoodSavings(entitlements);
+  const showReportDownload = canDownloadImpactReports(entitlements);
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const { width } = useWindowDimensions();
   const chartWidth = dashboardChartWidth(r, width);
@@ -139,6 +148,12 @@ export function FarmerAnalyticsScreen() {
   const displayStats = toFarmerStats(stats);
 
   const organization = currentProfile.organization || 'Your farm';
+  const selectedSiteLabel =
+    selectedSiteId == null
+      ? isMultiSite
+        ? 'All sites'
+        : null
+      : sites.find((site) => site.id === selectedSiteId)?.name ?? null;
 
   const renderMetricCard = (
     icon: ImageSourcePropType,
@@ -515,13 +530,26 @@ export function FarmerAnalyticsScreen() {
             </View>
           </View>
 
-          <SpecificFoodSavings
-            filter={filter}
-            siteId={selectedSiteId}
-            peoplePercent={stats.peoplePercent}
-            animalPercent={stats.animalPercent}
-            refreshNonce={foodsRefreshNonce}
-          />
+          {showFoodSavings ? (
+            <SpecificFoodSavings
+              filter={filter}
+              siteId={selectedSiteId}
+              peoplePercent={stats.peoplePercent}
+              animalPercent={stats.animalPercent}
+              refreshNonce={foodsRefreshNonce}
+            />
+          ) : null}
+
+          {showReportDownload ? (
+            <ImpactReportDownload
+              stats={stats}
+              filter={filter}
+              filterLabel={filterLabel}
+              siteId={selectedSiteId}
+              siteLabel={selectedSiteLabel}
+              organisationName={organization}
+            />
+          ) : null}
         </View>
       </ScrollView>
     </Screen>

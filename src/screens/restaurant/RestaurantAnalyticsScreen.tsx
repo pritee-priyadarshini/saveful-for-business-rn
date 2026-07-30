@@ -25,7 +25,13 @@ import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
+import { ImpactReportDownload } from '@/components/ImpactReportDownload';
 import { useAppContext } from '../../store/AppContext';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
+import {
+  canDownloadImpactReports,
+  canShowSpecificFoodSavings,
+} from '@/utils/impactAccess';
 import { useNavigation } from '@react-navigation/native';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
@@ -122,6 +128,9 @@ export function RestaurantAnalyticsScreen({
   const bottomPadding = variant === 'stack' ? stackBottomPadding : tabBottomPadding;
   const { width } = useWindowDimensions();
   const { currentProfile } = useAppContext();
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
+  const showFoodSavings = canShowSpecificFoodSavings(entitlements);
+  const showReportDownload = canDownloadImpactReports(entitlements);
   const stackNavigation = useNavigation();
   const chartWidth = dashboardChartWidth(r, width);
 
@@ -651,13 +660,26 @@ export function RestaurantAnalyticsScreen({
             </View>
           </View>
 
-          <SpecificFoodSavings
-            filter={filter}
-            siteId={selectedSiteId}
-            peoplePercent={stats.peoplePercent}
-            animalPercent={stats.animalPercent}
-            refreshNonce={foodsRefreshNonce}
-          />
+          {showFoodSavings ? (
+            <SpecificFoodSavings
+              filter={filter}
+              siteId={selectedSiteId}
+              peoplePercent={stats.peoplePercent}
+              animalPercent={stats.animalPercent}
+              refreshNonce={foodsRefreshNonce}
+            />
+          ) : null}
+
+          {showReportDownload ? (
+            <ImpactReportDownload
+              stats={stats}
+              filter={filter}
+              filterLabel={filterLabel}
+              siteId={selectedSiteId}
+              siteLabel={selectedSiteLabel}
+              organisationName={currentProfile.organization}
+            />
+          ) : null}
         </View>
       </ScrollView>
     </Screen>
