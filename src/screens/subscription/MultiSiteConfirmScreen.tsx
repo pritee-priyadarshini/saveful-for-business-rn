@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,39 +13,121 @@ import { hp, normalize, wp } from '@/utils/responsive';
 import { useAppContext } from '@/store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { MULTI_SITE_TRUST_POINTS } from './multiSitePlans';
+import type { BillingCycle } from './singleSitePlans';
+import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
 import {
-  MULTI_SITE_TRUST_POINTS,
-  getMultiSiteBillingAmount,
-  getMultiSitePlanById,
-  type BillingCycle,
-} from './multiSitePlans';
+  findPlanById,
+  formatPlanPrice,
+  openBillingUrl,
+  pickDefaultPlanId,
+  toApiBillingCycle,
+} from '@/utils/billingHelpers';
+import { isTrialAlreadyUsedError } from '@/utils/billingErrors';
+import { showErrorAlert, showSuccessAlert, getUserFriendlyErrorMessage } from '@/utils/apiError';
 
 const ACCENT = palette.kale;
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'MultiSiteConfirm'>;
+type Route = RouteProp<RootStackParamList, 'MultiSiteConfirm'>;
+
+function popSubscriptionStack(navigation: Nav) {
+  const state = navigation.getState();
+  const firstSubIdx = state.routes.findIndex(
+    (navRoute) =>
+      navRoute.name === 'MultiSitePlans' ||
+      navRoute.name === 'MultiSiteConfirm' ||
+      navRoute.name === 'RestaurantPlan',
+  );
+  const pops = firstSubIdx >= 0 ? state.index - firstSubIdx + 1 : 1;
+  navigation.pop(Math.max(1, pops));
+}
 
 export function MultiSiteConfirmScreen() {
   useTransparentStatusBar('dark');
   const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
   const insets = useSafeAreaInsets();
   const { selectPlan } = useAppContext();
 
-  const plan = useMemo(() => getMultiSitePlanById('multi'), []);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
-  const afterTrial = getMultiSiteBillingAmount(billingCycle);
+  const plans = useSubscriptionStore((s) => s.plans);
+  const isMutating = useSubscriptionStore((s) => s.isMutating);
+  const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
+  const startTrial = useSubscriptionStore((s) => s.startTrial);
+  const startCheckout = useSubscriptionStore((s) => s.startCheckout);
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
 
-  const onStartTrial = () => {
-    selectPlan('multi');
-    const state = navigation.getState();
-    const firstSubIdx = state.routes.findIndex(
-      (navRoute) =>
-        navRoute.name === 'MultiSitePlans' ||
-        navRoute.name === 'MultiSiteConfirm' ||
-        navRoute.name === 'RestaurantPlan',
-    );
-    const pops = firstSubIdx >= 0 ? state.index - firstSubIdx + 1 : 1;
-    navigation.pop(Math.max(1, pops));
+  const purchasable = useMemo(
+    () => plans.filter((p) => !p.contactSalesOnly),
+    [plans],
+  );
+  const planId = route.params?.planId ?? pickDefaultPlanId(purchasable);
+  const plan = useMemo(() => findPlanById(purchasable, planId), [purchasable, planId]);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [forceCheckout, setForceCheckout] = useState(false);
+  const canManageBilling = selectCanManageBilling();
+
+  useEffect(() => {
+    void fetchAvailablePlans();
+  }, [fetchAvailablePlans]);
+
+  const trialUsed = Boolean(forceCheckout || entitlements?.status);
+  const afterAmount =
+    billingCycle === 'annual'
+      ? formatPlanPrice(plan?.priceAnnual, plan?.currency)
+      : formatPlanPrice(plan?.priceMonthly, plan?.currency);
+  const afterSuffix =
+    billingCycle === 'annual'
+      ? plan?.isPerSite
+        ? '/year per site'
+        : '/year'
+      : plan?.isPerSite
+        ? '/month per site'
+        : '/month';
+
+  const onPrimary = async () => {
+    if (planId == null || !plan) {
+      showErrorAlert(null, 'Plan unavailable', 'Please go back and choose a plan.');
+      return;
+    }
+    if (!canManageBilling) {
+      showErrorAlert(
+        null,
+        'Admin required',
+        'Only an organisation admin can start a trial or checkout.',
+      );
+      return;
+    }
+
+    try {
+      if (!trialUsed) {
+        try {
+          await startTrial(planId);
+          selectPlan(String(planId));
+          showSuccessAlert('Your 30-day free trial has started.', 'Trial started', () => {
+            popSubscriptionStack(navigation);
+          });
+          return;
+        } catch (error) {
+          if (isTrialAlreadyUsedError(error)) {
+            setForceCheckout(true);
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      const checkoutUrl = await startCheckout(planId, toApiBillingCycle(billingCycle));
+      await openBillingUrl(checkoutUrl);
+      await useSubscriptionStore.getState().fetchEntitlements(true);
+      selectPlan(String(planId));
+      popSubscriptionStack(navigation);
+    } catch (error) {
+      showErrorAlert(error, 'Could not continue', getUserFriendlyErrorMessage(error));
+    }
   };
+
+  const primaryLabel = trialUsed ? 'Continue to checkout' : 'Start Free 30 Day Trial';
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
@@ -65,8 +147,6 @@ export function MultiSiteConfirmScreen() {
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
           hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={normalize(22)} color={palette.black} />
         </Pressable>
@@ -78,168 +158,171 @@ export function MultiSiteConfirmScreen() {
           Please confirm your plan and billing cycle
         </AppText>
 
-        <AppText color={palette.midgray} style={styles.sectionLabel}>
-          Your plan
-        </AppText>
-
-        <View style={styles.planCard}>
-          <AppText color={ACCENT} style={styles.planName}>
-            {plan.name}
-          </AppText>
-
-          <View style={styles.priceRow}>
-            <AppText color={palette.black} style={styles.price}>
-              {plan.monthlyPrice}
+        {!plan ? (
+          <ActivityIndicator color={ACCENT} style={{ marginVertical: hp(4) }} />
+        ) : (
+          <>
+            <AppText color={palette.midgray} style={styles.sectionLabel}>
+              Your plan
             </AppText>
-            <AppText color={palette.black} style={styles.priceUnit}>
-              {' '}
-              {plan.monthlySuffix}
-            </AppText>
-          </View>
 
-          {plan.annualPrice ? (
-            <AppText color={palette.midgray} style={styles.annualLine}>
-              or{' '}
-              <AppText color={ACCENT} style={styles.annualPriceBold}>
-                {plan.annualPrice}
+            <View style={styles.planCard}>
+              <AppText color={ACCENT} style={styles.planName}>
+                {plan.displayName}
               </AppText>
-              {' '}
-              annually ({plan.annualNote})
-            </AppText>
-          ) : null}
 
-          <AppText color={palette.midgray} style={styles.description}>
-            {plan.description}
-          </AppText>
-
-          <View style={styles.featureList}>
-            {plan.features.map((feature) => (
-              <View key={feature} style={styles.featureRow}>
-                <View style={styles.checkIcon}>
-                  <Ionicons name="checkmark" size={normalize(11)} color={palette.white} />
-                </View>
-                <AppText color={palette.black} style={styles.featureText}>
-                  {feature}
+              <View style={styles.priceRow}>
+                <AppText color={palette.black} style={styles.price}>
+                  {formatPlanPrice(plan.priceMonthly, plan.currency)}
+                </AppText>
+                <AppText color={palette.black} style={styles.priceUnit}>
+                  {' '}
+                  {plan.isPerSite ? '/month per site' : '/month'}
                 </AppText>
               </View>
-            ))}
-          </View>
-        </View>
 
-        <AppText color={palette.midgray} style={styles.sectionLabel}>
-          Billing cycle
-        </AppText>
+              {plan.priceAnnual != null ? (
+                <AppText color={palette.midgray} style={styles.annualLine}>
+                  or{' '}
+                  <AppText color={ACCENT} style={styles.annualPriceBold}>
+                    {formatPlanPrice(plan.priceAnnual, plan.currency)}
+                  </AppText>
+                  {' '}
+                  annually
+                </AppText>
+              ) : null}
 
-        <View style={styles.billingRow}>
-          <Pressable
-            style={[
-              styles.billingBtn,
-              billingCycle === 'monthly' ? styles.billingBtnActive : styles.billingBtnIdle,
-            ]}
-            onPress={() => setBillingCycle('monthly')}
-            accessibilityRole="button"
-            accessibilityState={{ selected: billingCycle === 'monthly' }}
-          >
-            <AppText
-              color={billingCycle === 'monthly' ? palette.white : ACCENT}
-              style={styles.billingText}
-            >
-              Monthly
-            </AppText>
-          </Pressable>
+              {plan.description ? (
+                <AppText color={palette.midgray} style={styles.description}>
+                  {plan.description}
+                </AppText>
+              ) : null}
 
-          <Pressable
-            style={[
-              styles.billingBtn,
-              billingCycle === 'annual' ? styles.billingBtnActive : styles.billingBtnIdle,
-            ]}
-            onPress={() => setBillingCycle('annual')}
-            accessibilityRole="button"
-            accessibilityState={{ selected: billingCycle === 'annual' }}
-          >
-            <AppText
-              color={billingCycle === 'annual' ? palette.white : ACCENT}
-              style={styles.billingText}
-            >
-              Annual
-            </AppText>
-            <AppText
-              color={billingCycle === 'annual' ? palette.white : ACCENT}
-              style={styles.billingSubText}
-            >
-              2 months free
-            </AppText>
-          </Pressable>
-        </View>
-
-        <View style={styles.trialCard}>
-          <View style={styles.trialRow}>
-            <View style={styles.trialLabelWrap}>
-              <AppText color={palette.black} style={styles.trialLabel}>
-                Today
-              </AppText>
-            </View>
-            <AppText color={ACCENT} style={styles.trialValue}>
-              AU $0.00
-            </AppText>
-          </View>
-
-          <View style={styles.trialDivider} />
-
-          <View style={styles.trialRow}>
-            <View style={styles.trialLabelWrap}>
-              <AppText color={palette.black} style={styles.trialLabel}>
-                After 30 day free Trial
-              </AppText>
-            </View>
-            <View style={styles.trialValueWrap}>
-              <AppText color={ACCENT} style={styles.trialValue}>
-                AU {afterTrial.amount}
-              </AppText>
-              <AppText color={ACCENT} style={styles.trialSuffix}>
-                {afterTrial.suffix}
-              </AppText>
-            </View>
-          </View>
-
-          <AppText color={palette.midgray} style={styles.taxNote}>
-            Final billing will be based on the number of locations you add. Applicable local
-            taxes will be added at checkout.
-          </AppText>
-        </View>
-
-        <AppText color={palette.midgray} style={styles.remindText}>
-          We'll remind you before your trial ends
-        </AppText>
-
-        <View style={styles.trustRow}>
-          {MULTI_SITE_TRUST_POINTS.map((point) => (
-            <View key={point.key} style={styles.trustItem}>
-              <View style={styles.trustIconWrap}>
-                <Ionicons name={point.icon} size={normalize(22)} color={ACCENT} />
+              <View style={styles.featureList}>
+                {(plan.features ?? []).map((feature) => (
+                  <View key={feature} style={styles.featureRow}>
+                    <View style={styles.checkIcon}>
+                      <Ionicons name="checkmark" size={normalize(11)} color={palette.white} />
+                    </View>
+                    <AppText color={palette.black} style={styles.featureText}>
+                      {feature}
+                    </AppText>
+                  </View>
+                ))}
               </View>
-              <AppText color={ACCENT} style={styles.trustLabel}>
-                {point.label}
-              </AppText>
             </View>
-          ))}
-        </View>
 
-        <Pressable
-          style={({ pressed }) => [styles.ctaBtn, pressed && styles.pressed]}
-          onPress={onStartTrial}
-          accessibilityRole="button"
-          accessibilityLabel="Start my Free Trial"
-        >
-          <AppText color={palette.white} style={styles.ctaText}>
-            Start my Free Trial
-          </AppText>
-          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
-        </Pressable>
+            <AppText color={palette.midgray} style={styles.sectionLabel}>
+              Billing cycle
+            </AppText>
+
+            <View style={styles.billingRow}>
+              <Pressable
+                style={[
+                  styles.billingBtn,
+                  billingCycle === 'monthly' ? styles.billingBtnActive : styles.billingBtnIdle,
+                ]}
+                onPress={() => setBillingCycle('monthly')}
+              >
+                <AppText
+                  color={billingCycle === 'monthly' ? palette.white : ACCENT}
+                  style={styles.billingText}
+                >
+                  Monthly
+                </AppText>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.billingBtn,
+                  billingCycle === 'annual' ? styles.billingBtnActive : styles.billingBtnIdle,
+                ]}
+                onPress={() => setBillingCycle('annual')}
+              >
+                <AppText
+                  color={billingCycle === 'annual' ? palette.white : ACCENT}
+                  style={styles.billingText}
+                >
+                  Annual
+                </AppText>
+                <AppText
+                  color={billingCycle === 'annual' ? palette.white : ACCENT}
+                  style={styles.billingSubText}
+                >
+                  2 months free
+                </AppText>
+              </Pressable>
+            </View>
+
+            <View style={styles.trialCard}>
+              <View style={styles.trialRow}>
+                <View style={styles.trialLabelWrap}>
+                  <AppText color={palette.black} style={styles.trialLabel}>
+                    Today
+                  </AppText>
+                </View>
+                <AppText color={ACCENT} style={styles.trialValue}>
+                  {trialUsed
+                    ? afterAmount
+                    : `${(plan.currency || 'AUD').toUpperCase()} $0.00`}
+                </AppText>
+              </View>
+
+              <View style={styles.trialDivider} />
+
+              <View style={styles.trialRow}>
+                <View style={styles.trialLabelWrap}>
+                  <AppText color={palette.black} style={styles.trialLabel}>
+                    {trialUsed ? 'Billed' : 'After 30 day free Trial'}
+                  </AppText>
+                </View>
+                <View style={styles.trialValueWrap}>
+                  <AppText color={ACCENT} style={styles.trialValue}>
+                    {afterAmount}
+                  </AppText>
+                  <AppText color={ACCENT} style={styles.trialSuffix}>
+                    {afterSuffix}
+                  </AppText>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.trustRow}>
+              {MULTI_SITE_TRUST_POINTS.map((point) => (
+                <View key={point.key} style={styles.trustItem}>
+                  <View style={styles.trustIconWrap}>
+                    <Ionicons name={point.icon} size={normalize(22)} color={ACCENT} />
+                  </View>
+                  <AppText color={ACCENT} style={styles.trustLabel}>
+                    {point.label}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+
+            <Pressable
+              style={[styles.ctaBtn, isMutating && styles.pressed]}
+              onPress={() => void onPrimary()}
+              disabled={isMutating}
+            >
+              {isMutating ? (
+                <ActivityIndicator color={palette.white} />
+              ) : (
+                <>
+                  <AppText color={palette.white} style={styles.ctaText}>
+                    {primaryLabel}
+                  </AppText>
+                  <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+                </>
+              )}
+            </Pressable>
+          </>
+        )}
       </ScrollView>
     </Screen>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

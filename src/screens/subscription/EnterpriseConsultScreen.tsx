@@ -31,6 +31,12 @@ import {
   BUSINESS_VENUE_OPTIONS,
   getBusinessVenueLabel,
 } from '@/constants/venueTypes';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
+import {
+  mapEnterpriseContactWindow,
+  mapEnterpriseLocationBand,
+} from '@/utils/billingHelpers';
+import { showErrorAlert } from '@/utils/apiError';
 
 const ACCENT = palette.kale;
 const FIELD_BORDER = '#D6D6D0';
@@ -183,13 +189,46 @@ export function EnterpriseConsultScreen() {
   const [locationRange, setLocationRange] = useState<EnterpriseLocationRange | null>(null);
   const [contactPref, setContactPref] = useState<EnterpriseContactPref | null>(null);
   const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const submitEnterpriseEnquiry = useSubscriptionStore((s) => s.submitEnterpriseEnquiry);
+  const isMutating = useSubscriptionStore((s) => s.isMutating);
 
   const updateDetail = (key: DetailKey, value: string) => {
     setDetails((prev) => ({ ...prev, [key]: value }));
   };
 
-  const onSubmit = () => {
-    navigation.navigate('EnterpriseThanks');
+  const onSubmit = async () => {
+    if (
+      !details.firstName.trim() ||
+      !details.lastName.trim() ||
+      !details.businessName.trim() ||
+      !details.businessType.trim() ||
+      !details.mobile.trim() ||
+      !locationRange ||
+      !contactPref
+    ) {
+      showErrorAlert(null, 'Missing details', 'Please complete all required fields.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await submitEnterpriseEnquiry({
+        firstName: details.firstName.trim(),
+        lastName: details.lastName.trim(),
+        businessName: details.businessName.trim(),
+        businessType: details.businessType.trim(),
+        mobile: details.mobile.trim(),
+        locationBand: mapEnterpriseLocationBand(locationRange),
+        contactWindow: mapEnterpriseContactWindow(contactPref),
+        message: notes.trim() || undefined,
+      });
+      navigation.navigate('EnterpriseThanks');
+    } catch (error) {
+      showErrorAlert(error, 'Could not submit enquiry');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -322,13 +361,18 @@ export function EnterpriseConsultScreen() {
           </View>
 
           <Pressable
-            style={({ pressed }) => [styles.submitBtn, pressed && styles.pressed]}
-            onPress={onSubmit}
+            style={({ pressed }) => [
+              styles.submitBtn,
+              pressed && styles.pressed,
+              (submitting || isMutating) && { opacity: 0.6 },
+            ]}
+            onPress={() => void onSubmit()}
+            disabled={submitting || isMutating}
             accessibilityRole="button"
             accessibilityLabel="Request Enterprise Consultation"
           >
             <AppText color={ACCENT} style={styles.submitText}>
-              Request Enterprise Consultation
+              {submitting || isMutating ? 'Submitting...' : 'Request Enterprise Consultation'}
             </AppText>
             <Ionicons name="arrow-forward" size={normalize(18)} color={ACCENT} />
           </Pressable>

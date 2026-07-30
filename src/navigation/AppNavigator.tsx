@@ -5,6 +5,17 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAppContext } from '../store/AppContext';
 import { AuthStack } from './AuthStack';
 import { RoleTabs } from './RoleTabs';
+import { setBillingRequiredHandler } from '../services/api';
+import {
+  selectCanManageBilling,
+  selectNeedsPlan,
+  useSubscriptionStore,
+} from '../store/subscriptionStore';
+import {
+  canAccessSubscription,
+  getSubscriptionRoute,
+  showSubscriptionRequiredPrompt,
+} from '@/utils/subscriptionAccess';
 
 import { CharityHistoryScreen } from '../screens/charity/CharityHistoryScreen';
 import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
@@ -47,10 +58,10 @@ export type RootStackParamList = {
   CharityPostCollectSurvey: undefined;
   RestaurantPlan: undefined;
   SingleSitePlans: undefined;
-  SingleSiteCompare: { selectedPlanId?: 'single' | 'single_plus' } | undefined;
-  SingleSiteConfirm: { selectedPlanId?: 'single' | 'single_plus' } | undefined;
+  SingleSiteCompare: { planId?: number } | undefined;
+  SingleSiteConfirm: { planId?: number } | undefined;
   MultiSitePlans: undefined;
-  MultiSiteConfirm: undefined;
+  MultiSiteConfirm: { planId?: number } | undefined;
   EnterpriseConsult: undefined;
   EnterpriseThanks: undefined;
   //ManageAccess: undefined;
@@ -185,6 +196,54 @@ export function AppNavigator() {
     flushPendingNotification();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
+
+  // On app open: if billable org has no plan/trial, show a professional prompt once.
+  useEffect(() => {
+    if (!isAuthenticated || !canAccessSubscription(effectiveRole)) return;
+
+    const promptIfNeeded = () => {
+      const state = useSubscriptionStore.getState();
+      if (!selectNeedsPlan(state) || state.planGatePrompted) return;
+      if (!navigationRef.current?.isReady()) return;
+
+      const route = getSubscriptionRoute(effectiveRoleRef.current);
+      if (!route) return;
+
+      state.markPlanGatePrompted();
+      showSubscriptionRequiredPrompt({
+        canManageBilling: selectCanManageBilling(),
+        onContinue: () => {
+          navigationRef.current?.navigate(route);
+        },
+      });
+    };
+
+    const unsub = useSubscriptionStore.subscribe((state) => {
+      if (!selectNeedsPlan(state) || state.planGatePrompted) return;
+      promptIfNeeded();
+    });
+
+    promptIfNeeded();
+    return unsub;
+  }, [isAuthenticated, effectiveRole]);
+
+  // Global 402 / subscription-required from write APIs → same prompt, then Plans.
+  useEffect(() => {
+    setBillingRequiredHandler(({ message }) => {
+      if (!isAuthenticatedRef.current) return;
+      const route = getSubscriptionRoute(effectiveRoleRef.current);
+      if (!route || !navigationRef.current?.isReady()) return;
+
+      showSubscriptionRequiredPrompt({
+        canManageBilling: selectCanManageBilling(),
+        messageOverride: message,
+        onContinue: () => {
+          navigationRef.current?.navigate(route);
+        },
+      });
+    });
+    return () => setBillingRequiredHandler(null);
+  }, []);
 
   return (
     <NavigationContainer

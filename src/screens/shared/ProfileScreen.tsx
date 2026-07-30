@@ -36,6 +36,8 @@ import { showConfirmAlert } from '@/store/appAlertStore';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
+import { openBillingUrl } from '@/utils/billingHelpers';
 import {
   canAccessSubscription,
   getSubscriptionRoute,
@@ -854,6 +856,32 @@ export function ProfileScreen() {
               }}
             >
               <AppText variant='body'>Plans</AppText>
+              <Ionicons name="chevron-forward" size={18} />
+            </Pressable>
+          )}
+
+          {canAccessSubscription(selectedRole) &&
+            String(authUser?.orgRole ?? '').toUpperCase() === 'SUPER_ADMIN' && (
+            <Pressable
+              style={styles.linkRow}
+              onPress={() => {
+                void (async () => {
+                  try {
+                    const url = await useSubscriptionStore.getState().openPortal();
+                    await openBillingUrl(url);
+                    await useSubscriptionStore.getState().fetchEntitlements(true);
+                  } catch (error) {
+                    const route = getSubscriptionRoute(selectedRole);
+                    if (route) {
+                      navigation.navigate(route as any);
+                      return;
+                    }
+                    showErrorAlert(error, 'Billing');
+                  }
+                })();
+              }}
+            >
+              <AppText variant="body">Manage billing</AppText>
               <Ionicons name="chevron-forward" size={18} />
             </Pressable>
           )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +21,7 @@ import {
   type CompareCell,
   type SingleSitePlanId,
 } from './singleSitePlans';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = '#D8F0E0';
@@ -35,15 +36,32 @@ export function SingleSiteCompareScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const insets = useSafeAreaInsets();
+  const plans = useSubscriptionStore((s) => s.plans);
+  const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
 
-  const [selectedPlanId, setSelectedPlanId] = useState<SingleSitePlanId>(
-    route.params?.selectedPlanId ?? 'single_plus',
-  );
+  const purchasable = plans.filter((p) => !p.contactSalesOnly);
+  const resolveApiPlanId = (uiId: SingleSitePlanId): number | undefined => {
+    if (uiId === 'single') return purchasable[0]?.id;
+    return purchasable[1]?.id ?? purchasable[0]?.id;
+  };
+
+  const initialUiId: SingleSitePlanId =
+    route.params?.planId != null && route.params.planId === purchasable[0]?.id
+      ? 'single'
+      : 'single_plus';
+
+  const [selectedPlanId, setSelectedPlanId] = useState<SingleSitePlanId>(initialUiId);
+
+  useEffect(() => {
+    void fetchAvailablePlans();
+  }, [fetchAvailablePlans]);
 
   const continueLabel = getContinueLabel(selectedPlanId);
 
   const onContinue = () => {
-    navigation.navigate('SingleSiteConfirm', { selectedPlanId });
+    const planId = resolveApiPlanId(selectedPlanId);
+    if (planId == null) return;
+    navigation.navigate('SingleSiteConfirm', { planId });
   };
 
   return (

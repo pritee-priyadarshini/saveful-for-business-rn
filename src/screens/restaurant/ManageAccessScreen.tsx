@@ -22,12 +22,19 @@ import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { useSitesStore } from '@/store/sitesStore';
+import { useSubscriptionStore, selectCanManageBilling } from '@/store/subscriptionStore';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { openBillingUrl } from '@/utils/billingHelpers';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize } from '@/utils/responsive';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
+import { getSubscriptionRoute } from '@/utils/subscriptionAccess';
+import { useAppContext } from '@/store/AppContext';
 
 const RESTAURANT_ROLE_OPTIONS = [
   { label: 'Site Admin', value: 'SITE_ADMIN' },
@@ -38,6 +45,27 @@ const inputProps = { compact: true as const, labelVariant: 'bodyBold' as const }
 
 export default function ManageAccessScreen() {
   useTransparentStatusBar('light');
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { selectedRole } = useAppContext();
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
+  const openPortal = useSubscriptionStore((s) => s.openPortal);
+  const isMutating = useSubscriptionStore((s) => s.isMutating);
+  const canManageBilling = selectCanManageBilling();
+
+  const planLabel =
+    entitlements?.planDisplayName ||
+    entitlements?.planName ||
+    'No active plan';
+  const planStatus = entitlements?.status
+    ? entitlements.status.replace(/_/g, ' ').toLowerCase()
+    : entitlements?.billingRequired
+      ? 'not subscribed'
+      : 'free';
+  const priceHint = entitlements?.entitled
+    ? entitlements.status === 'TRIALING' && entitlements.trialEndsAt
+      ? `Trial ends ${new Date(entitlements.trialEndsAt).toLocaleDateString()}`
+      : planStatus
+    : 'Choose a plan to unlock write access';
   const route = useRoute();
   const routeLocationId = (route.params as { locationId?: number } | undefined)?.locationId;
   const insets = useSafeAreaInsets();
@@ -234,12 +262,47 @@ export default function ManageAccessScreen() {
           </AppText>
 
           <AppText variant="bodySmall">
-            $69 / month
+            {planLabel}
           </AppText>
 
           <AppText variant="bodySmall">
-            {members.length} / {maxUsers} users have been added
+            {priceHint}
           </AppText>
+
+          <AppText variant="bodySmall">
+            {members.length} / {maxUsers || '—'} users have been added
+          </AppText>
+
+          {canManageBilling ? (
+            <Pressable
+              style={{ marginTop: spacing.sm }}
+              onPress={() => {
+                const route = getSubscriptionRoute(selectedRole);
+                if (!entitlements?.entitled && route) {
+                  navigation.navigate(route);
+                  return;
+                }
+                void (async () => {
+                  try {
+                    const url = await openPortal();
+                    await openBillingUrl(url);
+                    await useSubscriptionStore.getState().fetchEntitlements(true);
+                  } catch (error) {
+                    if (route) {
+                      navigation.navigate(route);
+                      return;
+                    }
+                    showErrorAlert(error, 'Billing');
+                  }
+                })();
+              }}
+              disabled={isMutating}
+            >
+              <AppText variant="bodyBold" color={palette.primary}>
+                {!entitlements?.entitled ? 'Choose a plan' : 'Manage billing'}
+              </AppText>
+            </Pressable>
+          ) : null}
         </View>
 
         {/* FORM CARD */}

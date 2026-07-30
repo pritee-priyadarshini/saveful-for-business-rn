@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
@@ -10,19 +16,22 @@ import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
-import { useAppContext } from '@/store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import {
   SINGLE_SITE_CORE_FEATURES,
-  SINGLE_SITE_PLANS,
   SINGLE_SITE_UPGRADE_BODY,
   SINGLE_SITE_UPGRADE_TITLE,
-  getContinueLabel,
-  type SingleSitePlan,
-  type SingleSitePlanId,
 } from './singleSitePlans';
 import { useSubscriptionGate } from './useSubscriptionGate';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
+import type { AvailablePlan } from '@/services/subscriptions.service';
+import {
+  findPlanById,
+  formatPlanAnnualLabel,
+  formatPlanPrice,
+  pickDefaultPlanId,
+} from '@/utils/billingHelpers';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = `${palette.mint}66`;
@@ -34,12 +43,35 @@ export function SingleSitePlansScreen() {
   useSubscriptionGate('single');
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const [selectedPlanId, setSelectedPlanId] = useState<SingleSitePlanId>('single_plus');
 
-  const continueLabel = getContinueLabel(selectedPlanId);
+  const plans = useSubscriptionStore((s) => s.plans);
+  const isFetchingPlans = useSubscriptionStore((s) => s.isFetchingPlans);
+  const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
+
+  const purchasablePlans = useMemo(
+    () => plans.filter((plan) => !plan.contactSalesOnly),
+    [plans],
+  );
+
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+
+  useEffect(() => {
+    void fetchAvailablePlans(true);
+  }, [fetchAvailablePlans]);
+
+  useEffect(() => {
+    if (selectedPlanId != null) return;
+    setSelectedPlanId(pickDefaultPlanId(purchasablePlans));
+  }, [purchasablePlans, selectedPlanId]);
+
+  const selectedPlan = findPlanById(purchasablePlans, selectedPlanId);
+  const continueLabel = selectedPlan
+    ? `Continue with ${selectedPlan.displayName}`
+    : 'Continue';
 
   const onContinue = () => {
-    navigation.navigate('SingleSiteConfirm', { selectedPlanId });
+    if (selectedPlanId == null) return;
+    navigation.navigate('SingleSiteConfirm', { planId: selectedPlanId });
   };
 
   return (
@@ -89,7 +121,11 @@ export function SingleSitePlansScreen() {
           </View>
         </View>
 
-        {SINGLE_SITE_PLANS.map((plan) => (
+        {isFetchingPlans && !purchasablePlans.length ? (
+          <ActivityIndicator color={ACCENT} style={{ marginVertical: hp(4) }} />
+        ) : null}
+
+        {purchasablePlans.map((plan) => (
           <PlanCard
             key={plan.id}
             plan={plan}
@@ -97,6 +133,12 @@ export function SingleSitePlansScreen() {
             onSelect={() => setSelectedPlanId(plan.id)}
           />
         ))}
+
+        {!isFetchingPlans && !purchasablePlans.length ? (
+          <AppText color={palette.stone} style={styles.emptyText}>
+            No plans are available for your organisation right now.
+          </AppText>
+        ) : null}
 
         <View style={styles.tipBox}>
           <Ionicons name="bulb-outline" size={normalize(24)} color={ACCENT} />
@@ -111,8 +153,9 @@ export function SingleSitePlansScreen() {
         </View>
 
         <Pressable
-          style={styles.continueBtn}
+          style={[styles.continueBtn, selectedPlanId == null && styles.continueBtnDisabled]}
           onPress={onContinue}
+          disabled={selectedPlanId == null}
           accessibilityRole="button"
           accessibilityLabel={continueLabel}
         >
@@ -122,19 +165,23 @@ export function SingleSitePlansScreen() {
           <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
         </Pressable>
 
-        <Pressable
-          style={styles.compareBtn}
-          onPress={() =>
-            navigation.navigate('SingleSiteCompare', { selectedPlanId })
-          }
-          accessibilityRole="button"
-          accessibilityLabel="Open compare plans page"
-        >
-          <AppText color={ACCENT} style={styles.compareBtnText}>
-            Compare plans
-          </AppText>
-          <Ionicons name="chevron-down" size={normalize(18)} color={ACCENT} />
-        </Pressable>
+        {purchasablePlans.length >= 2 ? (
+          <Pressable
+            style={styles.compareBtn}
+            onPress={() =>
+              navigation.navigate('SingleSiteCompare', {
+                planId: selectedPlanId ?? undefined,
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Open compare plans page"
+          >
+            <AppText color={ACCENT} style={styles.compareBtnText}>
+              Compare plans
+            </AppText>
+            <Ionicons name="chevron-down" size={normalize(18)} color={ACCENT} />
+          </Pressable>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -145,61 +192,56 @@ function PlanCard({
   selected,
   onSelect,
 }: {
-  plan: SingleSitePlan;
+  plan: AvailablePlan;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const monthly = formatPlanPrice(plan.priceMonthly, plan.currency);
+  const annual = formatPlanAnnualLabel(plan);
+
   return (
     <Pressable
-      onPress={onSelect}
       style={[styles.planCard, selected && styles.planCardSelected]}
-      accessibilityRole="radio"
+      onPress={onSelect}
+      accessibilityRole="button"
       accessibilityState={{ selected }}
     >
-      {plan.badge ? (
-        <View style={styles.badge}>
-          <AppText color={palette.white} style={styles.badgeText}>
-            {plan.badge}
-          </AppText>
-        </View>
-      ) : null}
-
       <View style={styles.planHeader}>
         <AppText color={palette.black} style={styles.planName}>
-          {plan.name}
+          {plan.displayName}
         </AppText>
-        <View style={[styles.radioOuter, selected && styles.radioOuterSelected]} />
+        {plan.isMostPopular ? (
+          <View style={styles.badge}>
+            <AppText color={palette.white} style={styles.badgeText}>
+              Most Popular
+            </AppText>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.priceRow}>
         <AppText color={palette.black} style={styles.price}>
-          {plan.monthlyPrice}
+          {monthly}
         </AppText>
         <AppText color={palette.black} style={styles.priceUnit}>
-          {' '}/month
+          {' '}
+          /month
         </AppText>
       </View>
-
-      <AppText color={palette.midgray} style={styles.annualLine}>
-        or{' '}
-        <AppText color={ACCENT} style={styles.annualPriceBold}>
-          {plan.annualPrice}
+      {annual ? (
+        <AppText color={palette.midgray} style={styles.annualLine}>
+          or {annual}
         </AppText>
-        {' '}annually ({plan.annualNote})
-      </AppText>
+      ) : null}
 
-      <AppText color={palette.midgray} style={styles.planDescription}>
-        {plan.description}
-      </AppText>
-
-      {plan.includesLabel ? (
-        <AppText color={ACCENT} style={styles.includesLabel}>
-          {plan.includesLabel}
+      {plan.description ? (
+        <AppText color={palette.midgray} style={styles.description}>
+          {plan.description}
         </AppText>
       ) : null}
 
       <View style={styles.featureList}>
-        {plan.features.map((feature) => (
+        {(plan.features ?? []).map((feature) => (
           <View key={feature} style={styles.featureRow}>
             <View style={styles.checkIcon}>
               <Ionicons name="checkmark" size={normalize(11)} color={palette.white} />
@@ -220,162 +262,116 @@ const styles = StyleSheet.create({
     gap: hp(1.4),
   },
   backBtn: {
-    width: normalize(40),
-    height: normalize(36),
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: hp(0.4),
   },
   title: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(30),
-    lineHeight: normalize(34),
-    textAlign: 'center',
+    fontSize: normalize(28),
     textTransform: 'none',
   },
   subtitle: {
     fontFamily: 'Saveful-Regular',
-    fontSize: normalize(14),
-    lineHeight: normalize(19),
-    textAlign: 'center',
+    fontSize: normalize(15),
     textTransform: 'none',
-    marginTop: -hp(0.2),
-    marginBottom: hp(0.3),
+    marginBottom: hp(0.6),
   },
   coreBanner: {
     backgroundColor: ACCENT_SOFT,
-    borderRadius: normalize(18),
-    paddingVertical: hp(1.6),
-    paddingHorizontal: wp(2),
-    gap: hp(1.2),
+    borderRadius: normalize(14),
+    padding: wp(3.5),
+    gap: hp(1),
   },
   coreBannerTitle: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(13),
-    lineHeight: normalize(17),
-    textAlign: 'center',
+    fontSize: normalize(14),
     textTransform: 'none',
   },
   coreRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: wp(1),
   },
   coreItem: {
     flex: 1,
     alignItems: 'center',
-    gap: hp(0.55),
-    paddingHorizontal: wp(0.5),
+    gap: hp(0.4),
   },
   coreLabel: {
     fontFamily: 'Saveful-SemiBold',
     fontSize: normalize(10),
-    lineHeight: normalize(12),
     textAlign: 'center',
     textTransform: 'none',
   },
   planCard: {
-    borderWidth: 1.5,
-    borderColor: ACCENT,
-    borderRadius: normalize(18),
-    paddingHorizontal: wp(4),
-    paddingTop: hp(2.1),
-    paddingBottom: hp(1.7),
+    borderWidth: normalize(1.5),
+    borderColor: '#D6D6D0',
+    borderRadius: normalize(14),
+    padding: wp(4),
     backgroundColor: palette.white,
-    gap: hp(0.55),
-    marginTop: hp(0.7),
+    gap: hp(0.6),
   },
   planCardSelected: {
-    borderWidth: 2,
+    borderColor: ACCENT,
+    backgroundColor: '#F4FBF5',
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(2),
+  },
+  planName: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(16),
+    textTransform: 'uppercase',
+    flex: 1,
   },
   badge: {
-    position: 'absolute',
-    top: -normalize(11),
-    left: wp(4),
     backgroundColor: ACCENT,
-    paddingHorizontal: wp(2.8),
-    paddingVertical: hp(0.4),
-    borderRadius: normalize(8),
-    zIndex: 2,
+    borderRadius: normalize(999),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.3),
   },
   badgeText: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(10),
     textTransform: 'none',
   },
-  planHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  planName: {
-    fontFamily: 'Saveful-Bold',
-    fontSize: normalize(17),
-    lineHeight: normalize(21),
-    textTransform: 'uppercase',
-  },
-  radioOuter: {
-    width: normalize(20),
-    height: normalize(20),
-    borderRadius: normalize(10),
-    borderWidth: 2,
-    borderColor: ACCENT,
-    backgroundColor: 'transparent',
-  },
-  radioOuterSelected: {
-    backgroundColor: ACCENT,
-    borderColor: ACCENT,
-  },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginTop: hp(0.2),
   },
   price: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(26),
-    lineHeight: normalize(30),
+    fontSize: normalize(28),
     textTransform: 'none',
   },
   priceUnit: {
-    fontFamily: 'Saveful-Bold',
-    fontSize: normalize(15),
-    lineHeight: normalize(20),
-    marginBottom: hp(0.3),
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(14),
+    marginBottom: hp(0.4),
     textTransform: 'none',
   },
   annualLine: {
     fontFamily: 'Saveful-Regular',
-    fontSize: normalize(12),
-    lineHeight: normalize(16),
+    fontSize: normalize(13),
     textTransform: 'none',
   },
-  annualPriceBold: {
-    fontFamily: 'Saveful-Bold',
-    fontSize: normalize(12),
-    lineHeight: normalize(16),
-    textTransform: 'none',
-  },
-  planDescription: {
+  description: {
     fontFamily: 'Saveful-Regular',
-    fontSize: normalize(12),
-    lineHeight: normalize(17),
+    fontSize: normalize(13),
     textTransform: 'none',
-    marginTop: hp(0.25),
-  },
-  includesLabel: {
-    fontFamily: 'Saveful-Bold',
-    fontSize: normalize(12),
-    lineHeight: normalize(16),
-    textTransform: 'none',
-    marginTop: hp(0.4),
+    marginTop: hp(0.3),
   },
   featureList: {
-    gap: hp(0.75),
-    marginTop: hp(0.5),
+    marginTop: hp(0.6),
+    gap: hp(0.5),
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: wp(2.2),
+    gap: wp(2),
   },
   checkIcon: {
     width: normalize(16),
@@ -389,18 +385,16 @@ const styles = StyleSheet.create({
   featureText: {
     flex: 1,
     fontFamily: 'Saveful-Regular',
-    fontSize: normalize(12),
-    lineHeight: normalize(17),
+    fontSize: normalize(13),
     textTransform: 'none',
   },
   tipBox: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: wp(2.8),
+    gap: wp(3),
     backgroundColor: ACCENT_SOFT,
-    borderRadius: normalize(16),
-    paddingVertical: hp(1.4),
-    paddingHorizontal: wp(3.5),
+    borderRadius: normalize(12),
+    padding: wp(3.5),
+    alignItems: 'flex-start',
   },
   tipCopy: {
     flex: 1,
@@ -409,45 +403,48 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(13),
-    lineHeight: normalize(17),
     textTransform: 'none',
   },
   tipBody: {
     fontFamily: 'Saveful-Regular',
     fontSize: normalize(12),
-    lineHeight: normalize(17),
     textTransform: 'none',
   },
   continueBtn: {
+    marginTop: hp(0.6),
     backgroundColor: ACCENT,
-    borderRadius: normalize(14),
-    minHeight: normalize(50),
-    paddingHorizontal: wp(4),
+    borderRadius: normalize(12),
+    minHeight: hp(6),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: wp(2),
   },
+  continueBtnDisabled: {
+    opacity: 0.5,
+  },
   continueText: {
     fontFamily: 'Saveful-Bold',
-    fontSize: normalize(14),
+    fontSize: normalize(15),
     textTransform: 'none',
   },
   compareBtn: {
-    borderWidth: 1.5,
-    borderColor: ACCENT,
-    borderRadius: normalize(14),
-    minHeight: normalize(46),
-    paddingHorizontal: wp(4),
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: wp(1.5),
-    backgroundColor: palette.creme,
+    gap: wp(1),
+    paddingVertical: hp(0.8),
   },
   compareBtnText: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(14),
     textTransform: 'none',
+  },
+  emptyText: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(14),
+    textAlign: 'center',
+    textTransform: 'none',
+    marginVertical: hp(2),
   },
 });

@@ -8,6 +8,7 @@ export const FORGOT_PASSWORD_ACCOUNT_NOT_FOUND_MESSAGE =
 const STATUS_MESSAGES: Record<number, string> = {
   400: 'Please check your details and try again.',
   401: 'Your session has expired. Please sign in again.',
+  402: 'Please choose a plan to continue.',
   403: "You don't have permission to do that.",
   404: "We couldn't find what you're looking for.",
   409: 'This already exists. Please try something different.',

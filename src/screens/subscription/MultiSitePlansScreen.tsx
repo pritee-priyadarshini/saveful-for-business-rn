@@ -1,5 +1,11 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
@@ -14,12 +20,16 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import {
   MULTI_SITE_INTRO,
-  MULTI_SITE_PLANS,
   MULTI_SITE_SUCCESS_BANNER,
   MULTI_SITE_TRUST_POINTS,
-  type MultiSitePlan,
 } from './multiSitePlans';
 import { useSubscriptionGate } from './useSubscriptionGate';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
+import type { AvailablePlan } from '@/services/subscriptions.service';
+import {
+  formatPlanMonthlyLabel,
+  formatPlanAnnualLabel,
+} from '@/utils/billingHelpers';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = '#E8F6EC';
@@ -32,12 +42,27 @@ export function MultiSitePlansScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
 
-  const onPlanAction = (plan: MultiSitePlan) => {
-    if (plan.id === 'enterprise') {
+  const plans = useSubscriptionStore((s) => s.plans);
+  const isFetchingPlans = useSubscriptionStore((s) => s.isFetchingPlans);
+  const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
+
+  useEffect(() => {
+    void fetchAvailablePlans(true);
+  }, [fetchAvailablePlans]);
+
+  const sortedPlans = useMemo(() => {
+    return [...plans].sort((a, b) => {
+      if (a.contactSalesOnly === b.contactSalesOnly) return 0;
+      return a.contactSalesOnly ? 1 : -1;
+    });
+  }, [plans]);
+
+  const onPlanAction = (plan: AvailablePlan) => {
+    if (plan.contactSalesOnly) {
       navigation.navigate('EnterpriseConsult');
       return;
     }
-    navigation.navigate('MultiSiteConfirm');
+    navigation.navigate('MultiSiteConfirm', { planId: plan.id });
   };
 
   return (
@@ -81,15 +106,80 @@ export function MultiSitePlansScreen() {
           {MULTI_SITE_INTRO}
         </AppText>
 
-        {MULTI_SITE_PLANS.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} onPress={() => onPlanAction(plan)} />
-        ))}
+        {isFetchingPlans && !sortedPlans.length ? (
+          <ActivityIndicator color={ACCENT} style={{ marginVertical: hp(3) }} />
+        ) : null}
+
+        {sortedPlans.map((plan) => {
+          const isEnterprise = plan.contactSalesOnly;
+          return (
+            <View key={plan.id} style={styles.planCard}>
+              <AppText
+                color={isEnterprise ? palette.black : ACCENT}
+                style={styles.planName}
+              >
+                {plan.displayName}
+              </AppText>
+
+              <AppText color={palette.black} style={isEnterprise ? styles.customPrice : styles.price}>
+                {formatPlanMonthlyLabel(plan)}
+              </AppText>
+              {formatPlanAnnualLabel(plan) ? (
+                <AppText color={palette.midgray} style={styles.annualLine}>
+                  or {formatPlanAnnualLabel(plan)}
+                </AppText>
+              ) : null}
+
+              {plan.description ? (
+                <AppText color={palette.midgray} style={styles.description}>
+                  {plan.description}
+                </AppText>
+              ) : null}
+
+              {plan.inheritsFrom ? (
+                <AppText color={ACCENT} style={styles.includesLabel}>
+                  Includes everything in {plan.inheritsFrom}, plus;
+                </AppText>
+              ) : null}
+
+              <View style={styles.featureList}>
+                {(plan.features ?? []).map((feature) => (
+                  <View key={feature} style={styles.featureRow}>
+                    <View style={styles.checkIcon}>
+                      <Ionicons name="checkmark" size={normalize(11)} color={palette.white} />
+                    </View>
+                    <AppText color={palette.black} style={styles.featureText}>
+                      {feature}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+
+              <Pressable
+                style={isEnterprise ? styles.outlineBtn : styles.solidBtn}
+                onPress={() => onPlanAction(plan)}
+              >
+                <AppText
+                  color={isEnterprise ? ACCENT : palette.white}
+                  style={styles.ctaText}
+                >
+                  {isEnterprise ? 'Talk to Sales Team' : 'Start Free 30 Day Trial'}
+                </AppText>
+                <Ionicons
+                  name="arrow-forward"
+                  size={normalize(18)}
+                  color={isEnterprise ? ACCENT : palette.white}
+                />
+              </Pressable>
+            </View>
+          );
+        })}
 
         <View style={styles.trustRow}>
           {MULTI_SITE_TRUST_POINTS.map((point) => (
             <View key={point.key} style={styles.trustItem}>
               <View style={styles.trustIconWrap}>
-                <Ionicons name={point.icon} size={normalize(22)} color={ACCENT} />
+                <Ionicons name={point.icon} size={normalize(20)} color={ACCENT} />
               </View>
               <AppText color={ACCENT} style={styles.trustLabel}>
                 {point.label}
@@ -102,99 +192,6 @@ export function MultiSitePlansScreen() {
   );
 }
 
-function PlanCard({
-  plan,
-  onPress,
-}: {
-  plan: MultiSitePlan;
-  onPress: () => void;
-}) {
-  const isOutline = plan.ctaVariant === 'outline';
-
-  return (
-    <View style={styles.planCard}>
-      <AppText
-        color={plan.nameAccent ? ACCENT : palette.black}
-        style={styles.planName}
-      >
-        {plan.name}
-      </AppText>
-
-      {plan.customPricing ? (
-        <AppText color={palette.black} style={styles.customPrice}>
-          {plan.monthlyPrice}
-        </AppText>
-      ) : (
-        <>
-          <View style={styles.priceRow}>
-            <AppText color={palette.black} style={styles.price}>
-              {plan.monthlyPrice}
-            </AppText>
-            <AppText color={palette.black} style={styles.priceUnit}>
-              {' '}
-              {plan.monthlySuffix}
-            </AppText>
-          </View>
-          {plan.annualPrice ? (
-            <AppText color={palette.midgray} style={styles.annualLine}>
-              or{' '}
-              <AppText color={ACCENT} style={styles.annualPriceBold}>
-                {plan.annualPrice}
-              </AppText>
-              {' '}
-              annually ({plan.annualNote})
-            </AppText>
-          ) : null}
-        </>
-      )}
-
-      <AppText color={palette.midgray} style={styles.description}>
-        {plan.description}
-      </AppText>
-
-      {plan.includesLabel ? (
-        <AppText color={ACCENT} style={styles.includesLabel}>
-          {plan.includesLabel}
-        </AppText>
-      ) : null}
-
-      <View style={styles.featureList}>
-        {plan.features.map((feature) => (
-          <View key={feature} style={styles.featureRow}>
-            <View style={styles.checkIcon}>
-              <Ionicons name="checkmark" size={normalize(11)} color={palette.white} />
-            </View>
-            <AppText color={palette.black} style={styles.featureText}>
-              {feature}
-            </AppText>
-          </View>
-        ))}
-      </View>
-
-      <Pressable
-        style={({ pressed }) => [
-          isOutline ? styles.outlineBtn : styles.solidBtn,
-          pressed && styles.pressed,
-        ]}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={plan.primaryCta}
-      >
-        <AppText
-          color={isOutline ? ACCENT : palette.white}
-          style={styles.ctaText}
-        >
-          {plan.primaryCta}
-        </AppText>
-        <Ionicons
-          name="arrow-forward"
-          size={normalize(18)}
-          color={isOutline ? ACCENT : palette.white}
-        />
-      </Pressable>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {

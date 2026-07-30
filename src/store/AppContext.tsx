@@ -10,6 +10,7 @@ import { UserProfile } from '../types';
 import { AppContextValue } from './types';
 import { setUnauthorizedHandler } from '../services/api';
 import { useNotificationsStore } from './notificationsStore';
+import { useSubscriptionStore } from './subscriptionStore';
 
 import { useAuthStore } from './authStore';
 import { useRegistrationStore } from './registrationStore';
@@ -47,11 +48,14 @@ export function AppProvider({ children }: PropsWithChildren) {
     resetForms,
   } = useRegistrationStore();
 
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
+
   useEffect(() => {
     setUnauthorizedHandler(async () => {
       const notificationsStore = useNotificationsStore.getState();
       notificationsStore.teardownPushHandlers();
       await notificationsStore.unregisterDeviceToken().catch(() => undefined);
+      useSubscriptionStore.getState().teardownBillingRefreshOnFocus();
       await authStoreLogout();
       resetForms();
       resetAllDataStores();
@@ -63,12 +67,17 @@ export function AppProvider({ children }: PropsWithChildren) {
     if (!isAuthenticated) return;
 
     const notificationsStore = useNotificationsStore.getState();
+    const subscriptionStore = useSubscriptionStore.getState();
     // Prompt at most once after login; handlers stay active for the session.
     void notificationsStore.registerDeviceToken({ prompt: true });
     notificationsStore.setupPushHandlers();
+    subscriptionStore.resetPlanGatePrompted();
+    void subscriptionStore.fetchEntitlements(true);
+    subscriptionStore.setupBillingRefreshOnFocus();
 
     return () => {
       useNotificationsStore.getState().teardownPushHandlers();
+      useSubscriptionStore.getState().teardownBillingRefreshOnFocus();
     };
   }, [isAuthenticated]);
 
@@ -134,11 +143,18 @@ export function AppProvider({ children }: PropsWithChildren) {
           email: '',
         };
 
+    const isFreeTier =
+      resolvedRole.includes('charity') || resolvedRole === 'farmer';
+
+    const billingCycleRaw = null as 'monthly' | 'annual' | null;
     const subscription = {
-      planId: null,
-      billingCycle: null,
-      isActive: true,
-      isFreeTier: resolvedRole.includes('charity'),
+      planId:
+        entitlements?.planId != null
+          ? String(entitlements.planId)
+          : entitlements?.planName ?? null,
+      billingCycle: billingCycleRaw,
+      isActive: entitlements ? entitlements.entitled || isFreeTier : true,
+      isFreeTier,
     };
 
     const currentPlan =
@@ -161,7 +177,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       setRoleFlow,
       selectPlan,
       upgradePlan: () => {
-        // Upgrade handled via backend / API when available.
+        void useSubscriptionStore.getState().fetchAvailablePlans(true);
       },
       updateRestaurantField,
       updateCharityField,
@@ -173,6 +189,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       logout: async () => {
         const notificationsStore = useNotificationsStore.getState();
         notificationsStore.teardownPushHandlers();
+        useSubscriptionStore.getState().teardownBillingRefreshOnFocus();
         await notificationsStore.unregisterDeviceToken();
         await authStoreLogout();
         resetForms();
@@ -189,6 +206,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     restaurantForm,
     charityForm,
     farmerForm,
+    entitlements,
     setRole,
     setRoleFlow,
     selectPlan,

@@ -7,12 +7,28 @@ import {
   UpdateSitePayload,
 } from '../services/sites.service';
 import { useAuthStore } from './authStore';
+import { useSubscriptionStore } from './subscriptionStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
 
 const STALE_TIME_MS = 5 * 60 * 1000;
 
 function isStale(lastFetched: number | null): boolean {
   return !lastFetched || Date.now() - lastFetched > STALE_TIME_MS;
+}
+
+function resolveSeatLimits(orgSubscription: any) {
+  const entitlements = useSubscriptionStore.getState().entitlements;
+  return {
+    maxUsersPerSite:
+      entitlements?.maxUserPerSite ??
+      orgSubscription?.plan?.maxUserPerSite ??
+      orgSubscription?.plan?.maxUsersPerSite ??
+      0,
+    maxSites:
+      entitlements?.maxSites ??
+      orgSubscription?.plan?.maxSites ??
+      0,
+  };
 }
 
 export type SiteWithManager = {
@@ -74,6 +90,7 @@ interface SitesState {
   staffBySiteId: Record<number, SiteStaffMember[]>;
   firstSiteId: number | null;
   maxUsersPerSite: number;
+  maxSites: number;
   isFetching: boolean;
   isFetchingManagers: boolean;
   lastFetched: number | null;
@@ -105,6 +122,7 @@ const INITIAL: SitesState = {
   staffBySiteId: {},
   firstSiteId: null,
   maxUsersPerSite: 0,
+  maxSites: 0,
   isFetching: false,
   isFetchingManagers: false,
   lastFetched: null,
@@ -129,13 +147,16 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
       const sites: any[] = Array.isArray(data)
         ? data
         : (data?.sites ?? data?.data ?? []);
+      const subscription = data?.subscription ?? null;
+      const limits = resolveSeatLimits(subscription);
 
       set({
         organisation: data?.organisation ?? null,
-        subscription: data?.subscription ?? null,
+        subscription,
         sites,
         firstSiteId: sites[0]?.id ?? null,
-        maxUsersPerSite: data?.subscription?.plan?.maxUsersPerSite ?? 0,
+        maxUsersPerSite: limits.maxUsersPerSite,
+        maxSites: limits.maxSites,
         lastFetched: Date.now(),
       });
     } catch (error: unknown) {
@@ -191,7 +212,8 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
         sitesWithManagers,
         staffBySiteId,
         firstSiteId: rawSites[0]?.id ?? null,
-        maxUsersPerSite: data?.subscription?.plan?.maxUsersPerSite ?? 0,
+        maxUsersPerSite: resolveSeatLimits(data?.subscription).maxUsersPerSite,
+        maxSites: resolveSeatLimits(data?.subscription).maxSites,
         lastFetched: Date.now(),
         managersLastFetched: Date.now(),
       });
