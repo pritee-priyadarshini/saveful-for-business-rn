@@ -14,15 +14,14 @@ import { useAppContext } from '@/store/AppContext';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { CONFIRM_TRUST_POINTS, type BillingCycle } from './singleSitePlans';
-import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   findPlanById,
   formatPlanPrice,
-  openBillingUrl,
-  toApiBillingCycle,
+  fromApiBillingCycle,
 } from '@/utils/billingHelpers';
-import { isTrialAlreadyUsedError } from '@/utils/billingErrors';
-import { showErrorAlert, showSuccessAlert, getUserFriendlyErrorMessage } from '@/utils/apiError';
+import { usePlanPurchase } from './usePlanPurchase';
+import { showErrorAlert } from '@/utils/apiError';
 
 const ACCENT = palette.kale;
 
@@ -50,23 +49,29 @@ export function SingleSiteConfirmScreen() {
   const { selectPlan } = useAppContext();
 
   const plans = useSubscriptionStore((s) => s.plans);
-  const isMutating = useSubscriptionStore((s) => s.isMutating);
   const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
-  const startTrial = useSubscriptionStore((s) => s.startTrial);
-  const startCheckout = useSubscriptionStore((s) => s.startCheckout);
   const entitlements = useSubscriptionStore((s) => s.entitlements);
-
   const planId = route.params?.planId;
   const plan = useMemo(() => findPlanById(plans, planId), [plans, planId]);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
-  const [forceCheckout, setForceCheckout] = useState(false);
-  const canManageBilling = selectCanManageBilling();
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(() =>
+    fromApiBillingCycle(entitlements?.billingCycle),
+  );
+
+  const {
+    purchase,
+    primaryLabel,
+    trialAvailable,
+    busy,
+    isPlanChange,
+    isCurrentSelection,
+    preview,
+    previewLoading,
+  } = usePlanPurchase({ plan, billingCycle });
 
   useEffect(() => {
     void fetchAvailablePlans();
   }, [fetchAvailablePlans]);
 
-  const trialUsed = Boolean(forceCheckout || entitlements?.status);
   const afterAmount =
     billingCycle === 'annual'
       ? formatPlanPrice(plan?.priceAnnual, plan?.currency)
@@ -80,49 +85,35 @@ export function SingleSiteConfirmScreen() {
         ? '/month per site'
         : '/month';
 
+  // A switch is prorated against the plan already paid for, so the list price
+  // is not what gets charged today — only Stripe's quote is.
+  const todayAmount = previewLoading
+    ? '…'
+    : preview
+      ? formatPlanPrice(preview.amountDueToday, preview.currency)
+      : trialAvailable
+        ? formatPlanPrice(0, plan?.currency)
+        : afterAmount;
+
   const onPrimary = async () => {
     if (planId == null || !plan) {
       showErrorAlert(null, 'Plan unavailable', 'Please go back and choose a plan.');
       return;
     }
-    if (!canManageBilling) {
-      showErrorAlert(
-        null,
-        'Admin required',
-        'Only an organisation admin can start a trial or checkout.',
-      );
+    if (plan.contactSalesOnly) {
+      navigation.navigate('EnterpriseConsult');
       return;
     }
 
-    try {
-      if (!trialUsed) {
-        try {
-          await startTrial(planId);
-          selectPlan(String(planId));
-          showSuccessAlert('Your 30-day free trial has started.', 'Trial started', () => {
-            popSubscriptionStack(navigation);
-          });
-          return;
-        } catch (error) {
-          if (isTrialAlreadyUsedError(error)) {
-            setForceCheckout(true);
-          } else {
-            throw error;
-          }
-        }
-      }
-
-      const checkoutUrl = await startCheckout(planId, toApiBillingCycle(billingCycle));
-      await openBillingUrl(checkoutUrl);
-      await useSubscriptionStore.getState().fetchEntitlements(true);
-      selectPlan(String(planId));
-      popSubscriptionStack(navigation);
-    } catch (error) {
-      showErrorAlert(error, 'Could not continue', getUserFriendlyErrorMessage(error));
-    }
+    await purchase({
+      plan,
+      billingCycle,
+      onSettled: () => {
+        selectPlan(String(plan.id));
+        popSubscriptionStack(navigation);
+      },
+    });
   };
-
-  const primaryLabel = trialUsed ? 'Continue to checkout' : 'Start Free 30 Day Trial';
 
   return (
     <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
@@ -265,9 +256,7 @@ export function SingleSiteConfirmScreen() {
                   </AppText>
                 </View>
                 <AppText color={ACCENT} style={styles.trialValue}>
-                  {trialUsed
-                    ? afterAmount
-                    : `${(plan.currency || 'AUD').toUpperCase()} $0.00`}
+                  {todayAmount}
                 </AppText>
               </View>
 
@@ -276,7 +265,11 @@ export function SingleSiteConfirmScreen() {
               <View style={styles.trialRow}>
                 <View style={styles.trialLabelWrap}>
                   <AppText color={palette.black} style={styles.trialLabel}>
-                    {trialUsed ? 'Billed' : 'After 30 day free Trial'}
+                    {trialAvailable
+                      ? 'After 30 day free Trial'
+                      : isPlanChange && !isCurrentSelection
+                        ? 'Then'
+                        : 'Billed'}
                   </AppText>
                 </View>
                 <View style={styles.trialValueWrap}>
@@ -294,9 +287,17 @@ export function SingleSiteConfirmScreen() {
               </AppText>
             </View>
 
-            {!trialUsed ? (
+            {trialAvailable ? (
               <AppText color={palette.midgray} style={styles.remindText}>
-                We'll remind you before your trial ends
+                Your card is saved now but not charged for 30 days. Cancel any time before
+                then and you pay nothing.
+              </AppText>
+            ) : null}
+
+            {isCurrentSelection ? (
+              <AppText color={palette.midgray} style={styles.remindText}>
+                This is your current plan and billing cycle. Pick a different cycle above, or
+                go back to choose another plan.
               </AppText>
             ) : null}
 
@@ -314,18 +315,20 @@ export function SingleSiteConfirmScreen() {
             </View>
 
             <Pressable
-              style={[styles.ctaBtn, isMutating && styles.pressed]}
+              style={[styles.ctaBtn, (busy || isCurrentSelection) && styles.pressed]}
               onPress={() => void onPrimary()}
-              disabled={isMutating}
+              disabled={busy || isCurrentSelection}
             >
-              {isMutating ? (
+              {busy ? (
                 <ActivityIndicator color={palette.white} />
               ) : (
                 <>
                   <AppText color={palette.white} style={styles.ctaText}>
                     {primaryLabel}
                   </AppText>
-                  <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+                  {isCurrentSelection ? null : (
+                    <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
+                  )}
                 </>
               )}
             </Pressable>

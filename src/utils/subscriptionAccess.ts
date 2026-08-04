@@ -12,6 +12,16 @@ export function canAccessSubscription(role: UserRole | null | undefined): boolea
 }
 
 /**
+ * The plans screens a role can be sent to. Narrower than `keyof
+ * RootStackParamList` so `navigate(route)` resolves — the wider type made every
+ * call site ambiguous across screens with required params.
+ */
+export type SubscriptionRoute = Extract<
+  keyof RootStackParamList,
+  'SingleSitePlans' | 'MultiSitePlans'
+>;
+
+/**
  * Resolve which plans screen a role should open.
  * - restaurant multi → multi-site plans
  * - restaurant single + farmer producer → single-site plans
@@ -19,7 +29,7 @@ export function canAccessSubscription(role: UserRole | null | undefined): boolea
  */
 export function getSubscriptionRoute(
   role: UserRole | null | undefined,
-): keyof RootStackParamList | null {
+): SubscriptionRoute | null {
   if (role === 'restaurant_multi') return 'MultiSitePlans';
   if (role === 'restaurant_single' || role === 'farm_business') return 'SingleSitePlans';
   return null;

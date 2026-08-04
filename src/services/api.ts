@@ -41,8 +41,6 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   }
 
   if (isFormData(config.data)) {
-    // Let React Native's XHR set Content-Type with the multipart boundary.
-    // Bypass axios's transformRequest to prevent any serialization of FormData.
     config.headers.delete('Content-Type');
     config.transformRequest = [(data: any) => data];
   } else if (!config.headers.get('Content-Type')) {

@@ -37,7 +37,8 @@ import { NotificationPermissionSettings } from '@/components/NotificationPermiss
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
-import { openBillingUrl } from '@/utils/billingHelpers';
+import { runPortalSession } from '@/utils/billingFlow';
+import { getBillingErrorMessage, isNoBillingAccountError } from '@/utils/billingErrors';
 import {
   canAccessSubscription,
   getSubscriptionRoute,
@@ -852,7 +853,7 @@ export function ProfileScreen() {
               style={styles.linkRow}
               onPress={() => {
                 const route = getSubscriptionRoute(selectedRole);
-                if (route) navigation.navigate(route as any);
+                if (route) navigation.navigate(route);
               }}
             >
               <AppText variant='body'>Plans</AppText>
@@ -868,15 +869,23 @@ export function ProfileScreen() {
                 void (async () => {
                   try {
                     const url = await useSubscriptionStore.getState().openPortal();
-                    await openBillingUrl(url);
-                    await useSubscriptionStore.getState().fetchEntitlements(true);
+                    await runPortalSession(url);
                   } catch (error) {
+                    // No Stripe customer yet (trial-only org) — send them to plans
+                    // instead of showing an error they cannot act on.
                     const route = getSubscriptionRoute(selectedRole);
-                    if (route) {
-                      navigation.navigate(route as any);
+                    if (isNoBillingAccountError(error) && route) {
+                      navigation.navigate(route);
                       return;
                     }
-                    showErrorAlert(error, 'Billing');
+                    showErrorAlert(
+                      error,
+                      'Billing',
+                      getBillingErrorMessage(
+                        error,
+                        'We could not open the billing portal. Please try again.',
+                      ),
+                    );
                   }
                 })();
               }}

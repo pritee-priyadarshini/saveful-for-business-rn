@@ -22,6 +22,9 @@ import {
   type SingleSitePlanId,
 } from './singleSitePlans';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
+import type { AvailablePlan } from '@/services/subscriptions.service';
+import { formatPlanPrice } from '@/utils/billingHelpers';
+import { CurrentPlanCard } from '@/components/CurrentPlanCard';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = '#D8F0E0';
@@ -38,12 +41,16 @@ export function SingleSiteCompareScreen() {
   const insets = useSafeAreaInsets();
   const plans = useSubscriptionStore((s) => s.plans);
   const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
+  const fetchEntitlements = useSubscriptionStore((s) => s.fetchEntitlements);
 
   const purchasable = plans.filter((p) => !p.contactSalesOnly);
-  const resolveApiPlanId = (uiId: SingleSitePlanId): number | undefined => {
-    if (uiId === 'single') return purchasable[0]?.id;
-    return purchasable[1]?.id ?? purchasable[0]?.id;
+  const resolveApiPlan = (uiId: SingleSitePlanId): AvailablePlan | null => {
+    if (uiId === 'single') return purchasable[0] ?? null;
+    return purchasable[1] ?? purchasable[0] ?? null;
   };
+  const resolveApiPlanId = (uiId: SingleSitePlanId): number | undefined =>
+    resolveApiPlan(uiId)?.id;
 
   const initialUiId: SingleSitePlanId =
     route.params?.planId != null && route.params.planId === purchasable[0]?.id
@@ -54,9 +61,26 @@ export function SingleSiteCompareScreen() {
 
   useEffect(() => {
     void fetchAvailablePlans();
-  }, [fetchAvailablePlans]);
+    void fetchEntitlements(true);
+  }, [fetchAvailablePlans, fetchEntitlements]);
 
-  const continueLabel = getContinueLabel(selectedPlanId);
+  const currentPlanId = entitlements?.entitled ? entitlements.planId : null;
+  const isCurrentColumn = (uiId: SingleSitePlanId) =>
+    currentPlanId != null && resolveApiPlanId(uiId) === currentPlanId;
+
+  const selectedIsCurrent = isCurrentColumn(selectedPlanId);
+  const continueLabel = selectedIsCurrent
+    ? 'Change billing cycle'
+    : currentPlanId != null
+      ? `Switch to ${resolveApiPlan(selectedPlanId)?.displayName ?? 'this plan'}`
+      : getContinueLabel(selectedPlanId);
+
+  /** Real prices come from the API — the static copy is only a pre-load fallback. */
+  const columnPrice = (uiId: SingleSitePlanId, fallback: string) => {
+    const apiPlan = resolveApiPlan(uiId);
+    if (!apiPlan) return fallback;
+    return formatPlanPrice(apiPlan.priceMonthly, apiPlan.currency);
+  };
 
   const onContinue = () => {
     const planId = resolveApiPlanId(selectedPlanId);
@@ -94,6 +118,8 @@ export function SingleSiteCompareScreen() {
         <AppText color={palette.stone} style={styles.subtitle}>
           See what's included in each plan
         </AppText>
+
+        <CurrentPlanCard />
 
         <View style={styles.toggleWrap}>
           <Pressable
@@ -140,7 +166,13 @@ export function SingleSiteCompareScreen() {
                     key={plan.id}
                     style={[styles.priceCol, isSelected && styles.priceColSelected]}
                   >
-                    {plan.badge ? (
+                    {isCurrentColumn(plan.id) ? (
+                      <View style={[styles.mostPopularBadge, styles.currentBadge]}>
+                        <AppText color={palette.white} style={styles.mostPopularText}>
+                          Current
+                        </AppText>
+                      </View>
+                    ) : plan.badge ? (
                       <View style={styles.mostPopularBadge}>
                         <AppText color={palette.white} style={styles.mostPopularText}>
                           {plan.badge}
@@ -153,7 +185,7 @@ export function SingleSiteCompareScreen() {
                       {plan.name}
                     </AppText>
                     <AppText color={ACCENT} style={styles.priceAmount}>
-                      {plan.monthlyPrice}
+                      {columnPrice(plan.id, plan.monthlyPrice)}
                       <AppText color={ACCENT} style={styles.priceUnit}>
                         {' '}
                         /month
@@ -353,6 +385,9 @@ const styles = StyleSheet.create({
     minHeight: normalize(18),
     justifyContent: 'center',
   },
+  currentBadge: {
+    backgroundColor: palette.eggplant,
+  },
   mostPopularText: {
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(9),
@@ -470,6 +505,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: hp(0.2),
+  },
+  continueBtnDisabled: {
+    opacity: 0.5,
   },
   continueText: {
     fontFamily: 'Saveful-Bold',

@@ -25,7 +25,11 @@ import { useSitesStore } from '@/store/sitesStore';
 import { useSubscriptionStore, selectCanManageBilling } from '@/store/subscriptionStore';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
-import { openBillingUrl } from '@/utils/billingHelpers';
+import { runPortalSession } from '@/utils/billingFlow';
+import { getBillingErrorMessage, isNoBillingAccountError } from '@/utils/billingErrors';
+import { billingCycleLabel, formatBillingDate } from '@/utils/billingHelpers';
+import { usePlanCancellation } from '@/hooks/usePlanCancellation';
+import { PendingPlanChangeBanner } from '@/components/PendingPlanChangeBanner';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize } from '@/utils/responsive';
@@ -66,6 +70,28 @@ export default function ManageAccessScreen() {
       ? `Trial ends ${new Date(entitlements.trialEndsAt).toLocaleDateString()}`
       : planStatus
     : 'Choose a plan to unlock write access';
+
+  const { cancelPlan, resumePlan, canCancel, canResume, accessUntilLabel } =
+    usePlanCancellation();
+
+  // Billing cycle and billed site count only became visible with the plan-change API.
+  const billingSummary = React.useMemo(() => {
+    if (!entitlements?.entitled) return null;
+    const parts: string[] = [];
+    if (entitlements.billingCycle) {
+      parts.push(`Billed ${billingCycleLabel(entitlements.billingCycle)}`);
+    }
+    if (entitlements.quantity != null && entitlements.quantity > 0) {
+      parts.push(
+        `${entitlements.quantity} ${entitlements.quantity === 1 ? 'site' : 'sites'} billed`,
+      );
+    }
+    const renews = formatBillingDate(entitlements.currentPeriodEnd);
+    if (renews) {
+      parts.push(entitlements.cancelAtPeriodEnd ? `Ends ${renews}` : `Renews ${renews}`);
+    }
+    return parts.length ? parts.join(' · ') : null;
+  }, [entitlements]);
   const route = useRoute();
   const routeLocationId = (route.params as { locationId?: number } | undefined)?.locationId;
   const insets = useSafeAreaInsets();
@@ -273,6 +299,39 @@ export default function ManageAccessScreen() {
             {members.length} / {maxUsers || '—'} users have been added
           </AppText>
 
+          {billingSummary ? (
+            <AppText variant="bodySmall">{billingSummary}</AppText>
+          ) : null}
+
+          {entitlements?.cancelAtPeriodEnd ? (
+            <AppText variant="bodySmall" color={palette.danger}>
+              {accessUntilLabel
+                ? `Cancelled — access continues until ${accessUntilLabel}.`
+                : 'Cancelled — access continues until the end of this period.'}
+            </AppText>
+          ) : null}
+
+          {entitlements?.pendingPlanId ? (
+            <View style={{ marginTop: spacing.sm }}>
+              <PendingPlanChangeBanner canManageBilling={canManageBilling} />
+            </View>
+          ) : null}
+
+          {canManageBilling && entitlements?.entitled ? (
+            <Pressable
+              style={{ marginTop: spacing.sm }}
+              onPress={() => {
+                const route = getSubscriptionRoute(selectedRole);
+                if (route) navigation.navigate(route);
+              }}
+              disabled={isMutating}
+            >
+              <AppText variant="bodyBold" color={palette.primary}>
+                Change plan
+              </AppText>
+            </Pressable>
+          ) : null}
+
           {canManageBilling ? (
             <Pressable
               style={{ marginTop: spacing.sm }}
@@ -285,14 +344,20 @@ export default function ManageAccessScreen() {
                 void (async () => {
                   try {
                     const url = await openPortal();
-                    await openBillingUrl(url);
-                    await useSubscriptionStore.getState().fetchEntitlements(true);
+                    await runPortalSession(url);
                   } catch (error) {
-                    if (route) {
+                    if (isNoBillingAccountError(error) && route) {
                       navigation.navigate(route);
                       return;
                     }
-                    showErrorAlert(error, 'Billing');
+                    showErrorAlert(
+                      error,
+                      'Billing',
+                      getBillingErrorMessage(
+                        error,
+                        'We could not open the billing portal. Please try again.',
+                      ),
+                    );
                   }
                 })();
               }}
@@ -300,6 +365,21 @@ export default function ManageAccessScreen() {
             >
               <AppText variant="bodyBold" color={palette.primary}>
                 {!entitlements?.entitled ? 'Choose a plan' : 'Manage billing'}
+              </AppText>
+            </Pressable>
+          ) : null}
+
+          {canManageBilling && (canCancel || canResume) ? (
+            <Pressable
+              style={{ marginTop: spacing.sm }}
+              onPress={canResume ? resumePlan : cancelPlan}
+              disabled={isMutating}
+            >
+              <AppText
+                variant="bodyBold"
+                color={canResume ? palette.primary : palette.danger}
+              >
+                {canResume ? 'Resume plan' : 'Cancel plan'}
               </AppText>
             </Pressable>
           ) : null}

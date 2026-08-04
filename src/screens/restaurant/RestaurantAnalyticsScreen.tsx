@@ -25,11 +25,13 @@ import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
+import { DonationRecipients } from '@/components/DonationRecipients';
 import { ImpactReportDownload } from '@/components/ImpactReportDownload';
 import { useAppContext } from '../../store/AppContext';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   canDownloadImpactReports,
+  canShowDonationRecipients,
   canShowSpecificFoodSavings,
 } from '@/utils/impactAccess';
 import { useNavigation } from '@react-navigation/native';
@@ -130,6 +132,7 @@ export function RestaurantAnalyticsScreen({
   const { currentProfile } = useAppContext();
   const entitlements = useSubscriptionStore((s) => s.entitlements);
   const showFoodSavings = canShowSpecificFoodSavings(entitlements);
+  const showRecipients = canShowDonationRecipients(entitlements);
   const showReportDownload = canDownloadImpactReports(entitlements);
   const stackNavigation = useNavigation();
   const chartWidth = dashboardChartWidth(r, width);
@@ -666,6 +669,16 @@ export function RestaurantAnalyticsScreen({
               siteId={selectedSiteId}
               peoplePercent={stats.peoplePercent}
               animalPercent={stats.animalPercent}
+              refreshNonce={foodsRefreshNonce}
+            />
+          ) : null}
+
+          {showRecipients ? (
+            <DonationRecipients
+              filter={filter}
+              filterLabel={filterLabel}
+              siteId={selectedSiteId}
+              mode={stats.mode}
               refreshNonce={foodsRefreshNonce}
             />
           ) : null}

@@ -62,6 +62,48 @@ export type TopFoodsResponse = {
   topFoods: TopFoodItem[];
 };
 
+export type RecipientFoodItem = {
+  foodName: string;
+  category: string | null;
+  unit?: string;
+  totalKg: number;
+};
+
+/**
+ * A partner organisation on the other side of a collection: for a donor this is
+ * the charity or farm that collected the food, for a receiver it is the business
+ * the food came from.
+ */
+export type ImpactRecipient = {
+  rank: number;
+  organisationId: number;
+  name: string;
+  organizationType?: string | null;
+  logoUrl?: string | null;
+  collections: number;
+  totalKg: number;
+  peopleKg?: number;
+  animalKg?: number;
+  sharePercent?: number;
+  mealsCreated?: number;
+  co2AvoidedKg?: number;
+  totalFoodSavedUsd?: number;
+  firstCollectionAt?: string | null;
+  lastCollectionAt?: string | null;
+  foods?: RecipientFoodItem[];
+};
+
+export type ImpactRecipientsResponse = {
+  siteId: number | null;
+  organisationId: number | null;
+  mode?: 'DONOR' | 'RECEIVER';
+  rangeStart: string | null;
+  rangeEnd: string;
+  totalRecipients?: number;
+  totalKg?: number;
+  recipients: ImpactRecipient[];
+};
+
 export const impactService = {
   getSiteImpact(siteId: number, period: Exclude<ImpactPeriod, 'range'> = 'week') {
     return api.get<SiteImpactResponse>(`/impact/sites/${siteId}`, {
@@ -108,6 +150,26 @@ export const impactService = {
   /** Top foods for a site — GET /impact/sites/:siteId/top-foods */
   getSiteTopFoods(siteId: number, range?: Partial<ImpactDateRange>) {
     return api.get<TopFoodsResponse>(`/impact/sites/${siteId}/top-foods`, {
+      params: {
+        startDate: range?.startDate,
+        endDate: range?.endDate,
+      },
+    });
+  },
+
+  /** Partner organisations for an org — GET /impact/organisations/:orgId/recipients */
+  getOrgRecipients(orgId: number, range?: Partial<ImpactDateRange>) {
+    return api.get<ImpactRecipientsResponse>(`/impact/organisations/${orgId}/recipients`, {
+      params: {
+        startDate: range?.startDate,
+        endDate: range?.endDate,
+      },
+    });
+  },
+
+  /** Partner organisations for a site — GET /impact/sites/:siteId/recipients */
+  getSiteRecipients(siteId: number, range?: Partial<ImpactDateRange>) {
+    return api.get<ImpactRecipientsResponse>(`/impact/sites/${siteId}/recipients`, {
       params: {
         startDate: range?.startDate,
         endDate: range?.endDate,

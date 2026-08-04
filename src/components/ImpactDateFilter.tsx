@@ -58,6 +58,22 @@ function parseApiDate(isoDate?: string): Date {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
+const PRESET_DAYS = [7, 30, 90] as const;
+
+/** Inclusive of today, so "7 days" covers today plus the six before it. */
+function presetRange(days: number) {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - (days - 1));
+  return { startDate: toApiDate(start), endDate: toApiDate(end) };
+}
+
+function isPresetActive(filter: ImpactFilter, days: number) {
+  if (filter.mode !== 'custom') return false;
+  const range = presetRange(days);
+  return filter.startDate === range.startDate && filter.endDate === range.endDate;
+}
+
 export function ImpactDateFilter({ filter, onChange }: Props) {
   const r = useResponsiveLayout();
   const compact = r.isTablet;
@@ -152,6 +168,38 @@ export function ImpactDateFilter({ filter, onChange }: Props) {
             All time
           </AppText>
         </Pressable>
+      </View>
+
+      <View style={styles.presetRow}>
+        {PRESET_DAYS.map((days) => {
+          const active = isPresetActive(filter, days);
+          return (
+            <Pressable
+              key={days}
+              style={[
+                styles.presetChip,
+                compact && styles.presetChipCompact,
+                active && styles.presetChipActive,
+              ]}
+              onPress={() => onChange({ mode: 'custom', ...presetRange(days) })}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`Last ${days} days`}
+              hitSlop={4}
+            >
+              <AppText
+                style={[
+                  styles.presetText,
+                  compact && styles.presetTextCompact,
+                  active && styles.presetTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                Last {days} days
+              </AppText>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View style={styles.dateRow}>
@@ -294,6 +342,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   allTimeTextActive: {
+    color: palette.white,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: wp(2),
+  },
+  presetChip: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: `${palette.kale}44`,
+    backgroundColor: palette.white,
+    borderRadius: normalize(20),
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.6),
+  },
+  presetChipCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  presetChipActive: {
+    borderColor: palette.kale,
+    backgroundColor: palette.kale,
+  },
+  presetText: {
+    fontFamily: 'Saveful-SemiBold',
+    fontSize: normalize(12),
+    color: palette.kale,
+    textTransform: 'none',
+  },
+  presetTextCompact: {
+    fontSize: 11,
+  },
+  presetTextActive: {
+    fontFamily: 'Saveful-Bold',
     color: palette.white,
   },
   dateRow: {

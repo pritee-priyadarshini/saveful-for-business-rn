@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   FlatList,
@@ -8,6 +8,7 @@ import {
   View,
   Image,
   Linking,
+  RefreshControl,
   type TextStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +22,18 @@ import { palette } from '../../theme/colors';
 import { elevation } from '@/theme/elevation';
 import { PostPickupSurveyModal } from './components/postPickupSurveyModal';
 import { estimateMealsSaved } from '../../utils/foodListing';
-import { showErrorAlert } from '@/utils/apiError';
+import { getUserFriendlyErrorMessage, showErrorAlert } from '@/utils/apiError';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAppContext } from '../../store/AppContext';
+import { useListingsStore } from '../../store/listingsStore';
+import {
+  mapListingsToRestaurantUpdates,
+  type RestaurantUpdate,
+  type UpdateAudience,
+} from '@/utils/restaurantUpdates';
 
 const DETAIL_ICONS = {
   calendar: require('../../../assets/placeholder/calender_icon.png'),
@@ -36,7 +43,7 @@ const DETAIL_ICONS = {
 };
 
 type UpdateFilter = 'all' | 'people' | 'animals';
-type Audience = 'people' | 'animals';
+type Audience = UpdateAudience;
 
 type UpdateTheme = {
   accent: string;
@@ -61,67 +68,6 @@ const ANIMAL_THEME: UpdateTheme = {
   categoryLabel: 'For Animals',
   categoryIcon: require('../../../assets/placeholder/cow_front.png'),
 };
-
-const MOCK_UPDATES = [
-  {
-    id: '1',
-    audience: 'people' as Audience,
-    cardType: 'claimed' as const,
-    section: 'TODAY',
-    claimerName: 'Food Rescue Org',
-    location: 'Patia, Bhubaneswar',
-    assigneeLabel: 'Driver',
-    assigneeName: 'Rakesh Sahu',
-    assigneeStatus: 'driver_assigned',
-    pickupFrom: '2026-05-18T08:04:00',
-    pickupTo: '2026-05-18T18:04:00',
-    quantityKg: 18,
-    items: [
-      { name: 'Rice', qty: '5kg' },
-      { name: 'Dal', qty: '3kg' },
-    ],
-    claimerPhone: '+91 9876543210',
-    assigneePhone: '+91 9123456789',
-  },
-  {
-    id: '2',
-    audience: 'animals' as Audience,
-    cardType: 'claimed' as const,
-    section: 'TODAY',
-    claimerName: 'Green Valley Farm',
-    location: 'Khandagiri, Bhubaneswar',
-    assigneeLabel: 'Farmer',
-    assigneeName: 'Amit Das',
-    assigneeStatus: 'farmer_assigned',
-    pickupFrom: '2026-05-18T09:00:00',
-    pickupTo: '2026-05-18T17:00:00',
-    quantityKg: 24,
-    items: [
-      { name: 'Food scraps – no meat', qty: '12kg' },
-      { name: 'Grain / cereal', qty: '12kg' },
-    ],
-    claimerPhone: '+91 9988776655',
-    assigneePhone: '+91 9001122334',
-  },
-  {
-    id: '3',
-    audience: 'people' as Audience,
-    cardType: 'collected' as const,
-    section: 'YESTERDAY',
-    quantityKg: 18,
-    collectedDate: '2026-05-17T11:15:00',
-    mealsCreated: 40,
-  },
-  {
-    id: '4',
-    audience: 'animals' as Audience,
-    cardType: 'collected' as const,
-    section: 'YESTERDAY',
-    quantityKg: 65,
-    collectedDate: '2026-05-17T14:30:00',
-    co2Avoided: 260,
-  },
-];
 
 function getTheme(audience: Audience): UpdateTheme {
   return audience === 'animals' ? ANIMAL_THEME : PEOPLE_THEME;
@@ -178,28 +124,61 @@ function renderCardHeadline(
 export function RestaurantUpdatesScreen() {
   useTransparentStatusBar('light');
   const r = useResponsiveLayout();
-  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 20 }), [r]);
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 16 }), [r]);
   const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(3));
   const { currentProfile } = useAppContext();
 
+  const {
+    orgListings,
+    isFetchingOrg,
+    fetchOrgListings,
+  } = useListingsStore();
+
   const [loading, setLoading] = useState(true);
-  const [updates, setUpdates] = useState<typeof MOCK_UPDATES>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [updateFilter, setUpdateFilter] = useState<UpdateFilter>('all');
   const [modalVisible, setModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [impactModalVisible, setImpactModalVisible] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<any[]>([]);
-  const [selectedImpact, setSelectedImpact] = useState<any>(null);
+  const [selectedItems, setSelectedItems] = useState<{ name: string; qty: string }[]>([]);
+  const [selectedImpact, setSelectedImpact] = useState<RestaurantUpdate | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickupStatus, setPickupStatus] = useState<Record<string, 'completed' | 'cancelled'>>({});
 
+  const loadUpdates = useCallback(
+    async (force = false) => {
+      setLoadError(null);
+      try {
+        await fetchOrgListings(force);
+      } catch (error) {
+        setLoadError(
+          getUserFriendlyErrorMessage(error, 'Could not load your updates. Pull to try again.'),
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchOrgListings],
+  );
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setUpdates(MOCK_UPDATES);
-      setLoading(false);
-    }, 900);
-    return () => clearTimeout(timer);
-  }, []);
+    void loadUpdates(true);
+  }, [loadUpdates]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadUpdates(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadUpdates]);
+
+  const updates = useMemo(
+    () => mapListingsToRestaurantUpdates(orgListings),
+    [orgListings],
+  );
 
   const peopleCount = useMemo(
     () => updates.filter((u) => u.audience === 'people').length,
@@ -217,7 +196,7 @@ export function RestaurantUpdatesScreen() {
   }, [updates, updateFilter]);
 
   const sections = useMemo(() => {
-    const titles = ['TODAY', 'YESTERDAY'] as const;
+    const titles = ['TODAY', 'YESTERDAY', 'EARLIER'] as const;
     return titles
       .map((title) => ({
         title,
@@ -228,20 +207,20 @@ export function RestaurantUpdatesScreen() {
 
   const makeCall = async (phone?: string | null) => {
     if (!phone) {
-      showErrorAlert('Phone number not available', 'Unavailable');
+      showErrorAlert(null, 'Unavailable', 'Phone number not available');
       return;
     }
     const cleanPhone = phone.replace(/[^+\d]/g, '');
     try {
       await Linking.openURL(`tel:${cleanPhone}`);
     } catch {
-      showErrorAlert('Unable to open dialer', 'Error');
+      showErrorAlert(null, 'Error', 'Unable to open dialer');
     }
   };
 
   const sendMessage = async (phone?: string | null) => {
     if (!phone) {
-      showErrorAlert('Phone number not available', 'Unavailable');
+      showErrorAlert(null, 'Unavailable', 'Phone number not available');
       return;
     }
     const url = `sms:${phone}`;
@@ -288,11 +267,12 @@ export function RestaurantUpdatesScreen() {
     );
   };
 
-  const renderClaimedCard = (item: (typeof MOCK_UPDATES)[number]) => {
+  const renderClaimedCard = (item: RestaurantUpdate) => {
     const theme = getTheme(item.audience);
     const statusLabel = prettyStatus(item.assigneeStatus || '');
     const claimerLabel = item.audience === 'animals' ? 'Farmer' : 'Charity';
     const assigneeLabel = item.assigneeLabel ?? 'Driver';
+    const hasCollectionWindow = Boolean(item.pickupFrom && item.pickupTo);
 
     return (
       <View
@@ -331,12 +311,14 @@ export function RestaurantUpdatesScreen() {
           })}
 
           <View style={[styles.metaStack, adaptive.updateMetaStack]}>
-            <View style={styles.metaRow}>
-              <Ionicons name="location-outline" size={normalize(13)} color={theme.accent} />
-              <AppText variant="bodySmall" color={palette.stone} style={styles.metaText} numberOfLines={1}>
-                {item.location}
-              </AppText>
-            </View>
+            {item.location ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="location-outline" size={normalize(13)} color={theme.accent} />
+                <AppText variant="bodySmall" color={palette.stone} style={styles.metaText} numberOfLines={1}>
+                  {item.location}
+                </AppText>
+              </View>
+            ) : null}
             <View style={styles.metaRow}>
               <Ionicons
                 name={item.assigneeLabel === 'Farmer' ? 'person-outline' : 'navigate-circle-outline'}
@@ -344,7 +326,9 @@ export function RestaurantUpdatesScreen() {
                 color={theme.accent}
               />
               <AppText variant="bodySmall" color={palette.stone} style={styles.metaText} numberOfLines={1}>
-                {item.assigneeLabel}: {item.assigneeName}
+                {item.assigneeName
+                  ? `${item.assigneeLabel}: ${item.assigneeName}`
+                  : `${item.assigneeLabel} not assigned yet`}
               </AppText>
             </View>
           </View>
@@ -359,11 +343,13 @@ export function RestaurantUpdatesScreen() {
               <View style={styles.detailTextWrap}>
                 <AppText style={[styles.detailLabel, adaptive.detailLabel]}>COLLECTION</AppText>
                 <AppText variant="bodyBold" style={[styles.detailValue, adaptive.detailValue]} numberOfLines={1}>
-                  {formatCollectionDate(item.pickupFrom!)}
+                  {hasCollectionWindow ? formatCollectionDate(item.pickupFrom!) : 'Window TBC'}
                 </AppText>
-                <AppText variant="bodySmall" color={palette.stone} style={styles.detailSub} numberOfLines={1}>
-                  {formatCollectionTimeRange(item.pickupFrom!, item.pickupTo!)}
-                </AppText>
+                {hasCollectionWindow ? (
+                  <AppText variant="bodySmall" color={palette.stone} style={styles.detailSub} numberOfLines={1}>
+                    {formatCollectionTimeRange(item.pickupFrom!, item.pickupTo!)}
+                  </AppText>
+                ) : null}
               </View>
             </View>
             <View style={[styles.detailBox, adaptive.detailBox, r.isTablet ? styles.detailActionGrow : { flex: 1 }]}>
@@ -452,17 +438,7 @@ export function RestaurantUpdatesScreen() {
             </View>
           </View>
 
-          {pickupStatus[item.id] === 'completed' ? (
-            <View style={[styles.statusBanner, { backgroundColor: theme.statusBg }]}>
-              <Ionicons name="checkmark-circle" size={normalize(18)} color={theme.accent} />
-              <AppText
-                variant="bodyBold"
-                style={{ color: theme.accent, textTransform: 'none', fontSize: normalize(14) }}
-              >
-                Pickup & survey completed
-              </AppText>
-            </View>
-          ) : pickupStatus[item.id] === 'cancelled' ? (
+          {pickupStatus[item.id] === 'cancelled' ? (
             <View style={[styles.statusBanner, { backgroundColor: '#FFF0EB' }]}>
               <Ionicons name="close-circle" size={normalize(18)} color={palette.chilli} />
               <AppText
@@ -470,6 +446,18 @@ export function RestaurantUpdatesScreen() {
                 style={{ color: palette.chilli, textTransform: 'none', fontSize: normalize(14) }}
               >
                 Pickup cancelled
+              </AppText>
+            </View>
+          ) : pickupStatus[item.id] === 'completed' ||
+            item.assigneeStatus === 'collected' ||
+            Boolean(item.collectedDate) ? (
+            <View style={[styles.statusBanner, { backgroundColor: theme.statusBg }]}>
+              <Ionicons name="checkmark-circle" size={normalize(18)} color={theme.accent} />
+              <AppText
+                variant="bodyBold"
+                style={{ color: theme.accent, textTransform: 'none', fontSize: normalize(14) }}
+              >
+                Pickup completed
               </AppText>
             </View>
           ) : (
@@ -493,7 +481,7 @@ export function RestaurantUpdatesScreen() {
     );
   };
 
-  const renderCollectedCard = (item: (typeof MOCK_UPDATES)[number]) => {
+  const renderCollectedCard = (item: RestaurantUpdate) => {
     const theme = getTheme(item.audience);
     const meals = item.mealsCreated ?? estimateMealsSaved(item.quantityKg || 0);
     const co2 = item.co2Avoided ?? Math.round((item.quantityKg || 0) * 4);
@@ -542,7 +530,7 @@ export function RestaurantUpdatesScreen() {
               <View style={styles.detailTextWrap}>
                 <AppText style={[styles.detailLabel, adaptive.detailLabel]}>COLLECTED ON</AppText>
                 <AppText variant="bodyBold" style={[styles.detailValue, adaptive.detailValue]} numberOfLines={1}>
-                  {formatCollectedDate(item.collectedDate!)}
+                  {item.collectedDate ? formatCollectedDate(item.collectedDate) : '—'}
                 </AppText>
               </View>
             </View>
@@ -624,7 +612,7 @@ export function RestaurantUpdatesScreen() {
     );
   };
 
-  const renderCard = (item: (typeof MOCK_UPDATES)[number]) =>
+  const renderCard = (item: RestaurantUpdate) =>
     item.cardType === 'collected' ? renderCollectedCard(item) : renderClaimedCard(item);
 
   const renderSkeleton = () => (
@@ -659,7 +647,7 @@ export function RestaurantUpdatesScreen() {
     </View>
   );
 
-  if (loading) {
+  if (loading && updates.length === 0) {
     return (
       <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
@@ -680,6 +668,14 @@ export function RestaurantUpdatesScreen() {
       <FlatList
         data={sections}
         keyExtractor={(item) => item.title}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing || (isFetchingOrg && updates.length > 0)}
+            onRefresh={() => void onRefresh()}
+            tintColor={palette.kale}
+            colors={[palette.kale]}
+          />
+        }
         contentContainerStyle={[
           styles.container,
           adaptive.scrollContent,
@@ -770,17 +766,27 @@ export function RestaurantUpdatesScreen() {
         )}
         ListEmptyComponent={
           <View style={[styles.emptyState, adaptive.section]}>
-            <Ionicons name="notifications-outline" size={normalize(52)} color={palette.strokecream} />
+            <Ionicons
+              name={loadError ? 'cloud-offline-outline' : 'notifications-outline'}
+              size={normalize(52)}
+              color={palette.strokecream}
+            />
             <AppText
               variant="bodyBold"
               color={palette.stone}
               style={[styles.emptyTitle, adaptive.emptyText]}
             >
-              No updates yet
+              {loadError ? 'Could not load updates' : 'No updates yet'}
             </AppText>
             <AppText variant="bodySmall" color={palette.stone} style={styles.emptyBody}>
-              When your listings are claimed or collected, they'll appear here.
+              {loadError ??
+                "When your listings are claimed or collected, they'll appear here."}
             </AppText>
+            {loadError ? (
+              <Pressable style={styles.retryBtn} onPress={() => void onRefresh()}>
+                <AppText style={styles.retryText}>Try again</AppText>
+              </Pressable>
+            ) : null}
           </View>
         }
       />
@@ -792,6 +798,9 @@ export function RestaurantUpdatesScreen() {
         onComplete={(id, status) => {
           setPickupStatus((prev) => ({ ...prev, [id]: status }));
           setModalVisible(false);
+          if (status === 'completed') {
+            void fetchOrgListings(true);
+          }
         }}
       />
 
@@ -863,7 +872,9 @@ export function RestaurantUpdatesScreen() {
                   <View style={styles.impactModalRow}>
                     <AppText variant="bodySmall" color={palette.stone}>Date collected</AppText>
                     <AppText variant="bodyBold" color={palette.black}>
-                      {formatCollectedDate(selectedImpact.collectedDate)}
+                      {selectedImpact.collectedDate
+                        ? formatCollectedDate(selectedImpact.collectedDate)
+                        : '—'}
                     </AppText>
                   </View>
                   <View style={[styles.impactHighlightBox, { backgroundColor: theme.lightBg, borderColor: theme.accent + '40' }]}>
@@ -886,7 +897,7 @@ export function RestaurantUpdatesScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: -hp(2),
+    
   },
 
   containerGrow: {
@@ -1399,6 +1410,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: normalize(18),
     fontSize: normalize(13),
+  },
+  retryBtn: {
+    marginTop: hp(1),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(5),
+    borderRadius: normalize(10),
+    borderWidth: normalize(1.5),
+    borderColor: palette.kale,
+  },
+  retryText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(13),
+    color: palette.kale,
+    textTransform: 'none',
   },
 
   // ── Modals ────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import { AppContextValue } from './types';
 import { setUnauthorizedHandler } from '../services/api';
 import { useNotificationsStore } from './notificationsStore';
 import { useSubscriptionStore } from './subscriptionStore';
+import { fromApiBillingCycle } from '@/utils/billingHelpers';
 
 import { useAuthStore } from './authStore';
 import { useRegistrationStore } from './registrationStore';
@@ -146,7 +147,9 @@ export function AppProvider({ children }: PropsWithChildren) {
     const isFreeTier =
       resolvedRole.includes('charity') || resolvedRole === 'farmer';
 
-    const billingCycleRaw = null as 'monthly' | 'annual' | null;
+    const billingCycleRaw: 'monthly' | 'annual' | null = entitlements?.billingCycle
+      ? fromApiBillingCycle(entitlements.billingCycle)
+      : null;
     const subscription = {
       planId:
         entitlements?.planId != null

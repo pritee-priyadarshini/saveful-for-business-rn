@@ -30,8 +30,14 @@ import {
   findPlanById,
   formatPlanAnnualLabel,
   formatPlanPrice,
+  fromApiBillingCycle,
+  getPlanRelation,
   pickDefaultPlanId,
+  planRelationLabel,
+  type PlanRelation,
 } from '@/utils/billingHelpers';
+import { PendingPlanChangeBanner } from '@/components/PendingPlanChangeBanner';
+import { CurrentPlanCard } from '@/components/CurrentPlanCard';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = `${palette.mint}66`;
@@ -47,6 +53,10 @@ export function SingleSitePlansScreen() {
   const plans = useSubscriptionStore((s) => s.plans);
   const isFetchingPlans = useSubscriptionStore((s) => s.isFetchingPlans);
   const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
+  const plansError = useSubscriptionStore((s) => s.error);
+  const available = useSubscriptionStore((s) => s.available);
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
+  const fetchEntitlements = useSubscriptionStore((s) => s.fetchEntitlements);
 
   const purchasablePlans = useMemo(
     () => plans.filter((plan) => !plan.contactSalesOnly),
@@ -57,16 +67,32 @@ export function SingleSitePlansScreen() {
 
   useEffect(() => {
     void fetchAvailablePlans(true);
-  }, [fetchAvailablePlans]);
+    // A plan bought moments ago must show as current, so this cannot use the cache.
+    void fetchEntitlements(true);
+  }, [fetchAvailablePlans, fetchEntitlements]);
 
+  const currentPlanId = entitlements?.entitled ? entitlements.planId : null;
+  const currentPlan = findPlanById(purchasablePlans, currentPlanId);
+  const currentCycle = fromApiBillingCycle(entitlements?.billingCycle);
+
+  // Open on the plan the org already holds so the screen reads as "manage",
+  // not as a fresh purchase.
   useEffect(() => {
     if (selectedPlanId != null) return;
-    setSelectedPlanId(pickDefaultPlanId(purchasablePlans));
-  }, [purchasablePlans, selectedPlanId]);
+    setSelectedPlanId(currentPlanId ?? pickDefaultPlanId(purchasablePlans));
+  }, [currentPlanId, purchasablePlans, selectedPlanId]);
 
   const selectedPlan = findPlanById(purchasablePlans, selectedPlanId);
+  const selectedRelation = selectedPlan
+    ? getPlanRelation({
+        plan: selectedPlan,
+        currentPlan,
+        targetCycle: currentCycle,
+        currentCycle,
+      })
+    : 'NEW';
   const continueLabel = selectedPlan
-    ? `Continue with ${selectedPlan.displayName}`
+    ? planRelationLabel(selectedRelation, selectedPlan.displayName)
     : 'Continue';
 
   const onContinue = () => {
@@ -99,11 +125,15 @@ export function SingleSitePlansScreen() {
         </Pressable>
 
         <AppText color={palette.black} style={styles.title}>
-          Compare plans
+          {currentPlan ? 'Your plan' : 'Compare plans'}
         </AppText>
         <AppText color={palette.black} style={styles.subtitle}>
-          Choose the plan that's right for you
+          {currentPlan
+            ? 'Review your subscription or move to a different plan'
+            : "Choose the plan that's right for you"}
         </AppText>
+
+        <CurrentPlanCard />
 
         <View style={styles.coreBanner}>
           <AppText color={ACCENT} style={styles.coreBannerTitle}>
@@ -121,6 +151,8 @@ export function SingleSitePlansScreen() {
           </View>
         </View>
 
+        <PendingPlanChangeBanner />
+
         {isFetchingPlans && !purchasablePlans.length ? (
           <ActivityIndicator color={ACCENT} style={{ marginVertical: hp(4) }} />
         ) : null}
@@ -130,14 +162,39 @@ export function SingleSitePlansScreen() {
             key={plan.id}
             plan={plan}
             selected={selectedPlanId === plan.id}
+            isCurrent={plan.id === currentPlanId}
+            relation={getPlanRelation({
+              plan,
+              currentPlan,
+              targetCycle: currentCycle,
+              currentCycle,
+            })}
             onSelect={() => setSelectedPlanId(plan.id)}
           />
         ))}
 
         {!isFetchingPlans && !purchasablePlans.length ? (
-          <AppText color={palette.stone} style={styles.emptyText}>
-            No plans are available for your organisation right now.
-          </AppText>
+          plansError ? (
+            <View style={styles.errorBox}>
+              <AppText color={palette.stone} style={styles.emptyText}>
+                {plansError}
+              </AppText>
+              <Pressable
+                style={styles.retryBtn}
+                onPress={() => void fetchAvailablePlans(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading plans"
+              >
+                <AppText color={ACCENT} style={styles.retryText}>
+                  Try again
+                </AppText>
+              </Pressable>
+            </View>
+          ) : (
+            <AppText color={palette.stone} style={styles.emptyText}>
+              {available?.message ?? 'No plans are available for your organisation right now.'}
+            </AppText>
+          )
         ) : null}
 
         <View style={styles.tipBox}>
@@ -190,10 +247,14 @@ export function SingleSitePlansScreen() {
 function PlanCard({
   plan,
   selected,
+  isCurrent,
+  relation,
   onSelect,
 }: {
   plan: AvailablePlan;
   selected: boolean;
+  isCurrent: boolean;
+  relation: PlanRelation;
   onSelect: () => void;
 }) {
   const monthly = formatPlanPrice(plan.priceMonthly, plan.currency);
@@ -201,7 +262,11 @@ function PlanCard({
 
   return (
     <Pressable
-      style={[styles.planCard, selected && styles.planCardSelected]}
+      style={[
+        styles.planCard,
+        selected && styles.planCardSelected,
+        isCurrent && styles.planCardCurrent,
+      ]}
       onPress={onSelect}
       accessibilityRole="button"
       accessibilityState={{ selected }}
@@ -210,7 +275,13 @@ function PlanCard({
         <AppText color={palette.black} style={styles.planName}>
           {plan.displayName}
         </AppText>
-        {plan.isMostPopular ? (
+        {isCurrent ? (
+          <View style={[styles.badge, styles.badgeCurrent]}>
+            <AppText color={palette.white} style={styles.badgeText}>
+              Current plan
+            </AppText>
+          </View>
+        ) : plan.isMostPopular ? (
           <View style={styles.badge}>
             <AppText color={palette.white} style={styles.badgeText}>
               Most Popular
@@ -218,6 +289,12 @@ function PlanCard({
           </View>
         ) : null}
       </View>
+
+      {!isCurrent && relation !== 'NEW' ? (
+        <AppText color={ACCENT} style={styles.relationHint}>
+          {relation === 'UPGRADE' ? 'Upgrade — applies today' : 'Applies at your next renewal'}
+        </AppText>
+      ) : null}
 
       <View style={styles.priceRow}>
         <AppText color={palette.black} style={styles.price}>
@@ -315,6 +392,15 @@ const styles = StyleSheet.create({
     borderColor: ACCENT,
     backgroundColor: '#F4FBF5',
   },
+  planCardCurrent: {
+    borderColor: ACCENT,
+    borderWidth: 2,
+  },
+  relationHint: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(11),
+    textTransform: 'none',
+  },
   planHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,6 +418,9 @@ const styles = StyleSheet.create({
     borderRadius: normalize(999),
     paddingHorizontal: wp(2.5),
     paddingVertical: hp(0.3),
+  },
+  badgeCurrent: {
+    backgroundColor: palette.eggplant,
   },
   badgeText: {
     fontFamily: 'Saveful-Bold',
@@ -446,5 +535,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'none',
     marginVertical: hp(2),
+  },
+  errorBox: {
+    alignItems: 'center',
+    gap: hp(0.4),
+  },
+  retryBtn: {
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(4),
+  },
+  retryText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(14),
+    textTransform: 'none',
   },
 });

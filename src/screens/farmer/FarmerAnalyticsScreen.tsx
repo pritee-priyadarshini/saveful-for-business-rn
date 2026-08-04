@@ -28,6 +28,7 @@ import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
+import { DonationRecipients } from '@/components/DonationRecipients';
 import { ImpactReportDownload } from '@/components/ImpactReportDownload';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
@@ -37,6 +38,7 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   canDownloadImpactReports,
+  canShowDonationRecipients,
   canShowSpecificFoodSavings,
 } from '@/utils/impactAccess';
 import { palette } from '../../theme/colors';
@@ -102,6 +104,7 @@ export function FarmerAnalyticsScreen() {
   const { currentProfile, authUser } = useAppContext();
   const entitlements = useSubscriptionStore((s) => s.entitlements);
   const showFoodSavings = canShowSpecificFoodSavings(entitlements);
+  const showRecipients = canShowDonationRecipients(entitlements);
   const showReportDownload = canDownloadImpactReports(entitlements);
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const { width } = useWindowDimensions();
@@ -536,6 +539,16 @@ export function FarmerAnalyticsScreen() {
               siteId={selectedSiteId}
               peoplePercent={stats.peoplePercent}
               animalPercent={stats.animalPercent}
+              refreshNonce={foodsRefreshNonce}
+            />
+          ) : null}
+
+          {showRecipients ? (
+            <DonationRecipients
+              filter={filter}
+              filterLabel={filterLabel}
+              siteId={selectedSiteId}
+              mode={stats.mode}
               refreshNonce={foodsRefreshNonce}
             />
           ) : null}

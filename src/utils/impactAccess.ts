@@ -59,6 +59,12 @@ export function canShowSpecificFoodSavings(
   return hasAdvancedImpactAccess(entitlements);
 }
 
+export function canShowDonationRecipients(
+  entitlements: Entitlements | null | undefined,
+): boolean {
+  return hasAdvancedImpactAccess(entitlements);
+}
+
 export function canDownloadImpactReports(
   entitlements: Entitlements | null | undefined,
 ): boolean {

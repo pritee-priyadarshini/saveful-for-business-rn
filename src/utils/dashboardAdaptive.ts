@@ -179,7 +179,8 @@ export function buildDashboardShellStyles(
   options?: { heroPhoneHp?: number; stackHero?: boolean },
 ): DashboardShellAdaptive {
   const phoneHero = options?.heroPhoneHp ?? 22;
-  const empty = emptyShell(options?.stackHero ? hp(24) : hp(phoneHero));
+  // Stack screens only need room for back + title — hp(24) left a huge empty band on phones.
+  const empty = emptyShell(options?.stackHero ? hp(13) : hp(phoneHero));
 
   if (!r.isTablet) return empty;
 

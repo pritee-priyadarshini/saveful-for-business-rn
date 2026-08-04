@@ -1,5 +1,3 @@
-import * as WebBrowser from 'expo-web-browser';
-
 import type { BillingCycleApi } from '@/services/billing.service';
 import type { AvailablePlan } from '@/services/subscriptions.service';
 import type { BillingCycle } from '@/screens/subscription/singleSitePlans';
@@ -16,21 +14,61 @@ export function toApiBillingCycle(cycle: BillingCycle): BillingCycleApi {
   return cycle === 'annual' ? 'ANNUAL' : 'MONTHLY';
 }
 
+/**
+ * Backend bills India in INR and every other region in AUD, and returns the
+ * already-converted amount with its currency code. Symbols are mapped here
+ * rather than via Intl, which is not dependable across Hermes builds.
+ */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  AUD: 'A$',
+  INR: '₹',
+  USD: 'US$',
+  NZD: 'NZ$',
+  GBP: '£',
+  EUR: '€',
+};
+
+export function currencySymbol(currency?: string | null): string {
+  const code = (currency || 'AUD').toUpperCase();
+  return CURRENCY_SYMBOLS[code] ?? `${code} `;
+}
+
+export function fromApiBillingCycle(cycle?: BillingCycleApi | null): BillingCycle {
+  return cycle === 'ANNUAL' ? 'annual' : 'monthly';
+}
+
+/** Human date for billing copy, e.g. "24 Aug 2026". */
+export function formatBillingDate(value?: string | Date | null): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+export function billingCycleLabel(cycle?: BillingCycleApi | null): string {
+  return cycle === 'ANNUAL' ? 'yearly' : 'monthly';
+}
+
+function groupThousands(value: string): string {
+  return value.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 export function formatPlanPrice(
   amount: number | null | undefined,
   currency = 'AUD',
 ): string {
   if (amount == null || Number.isNaN(Number(amount))) return '—';
-  const code = currency.toUpperCase();
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: code,
-      maximumFractionDigits: Number(amount) % 1 === 0 ? 0 : 2,
-    }).format(Number(amount));
-  } catch {
-    return `${code} ${Number(amount).toFixed(0)}`;
-  }
+
+  const value = Number(amount);
+  const hasCents = Math.abs(value % 1) > 0.001;
+  const [whole, cents] = value.toFixed(hasCents ? 2 : 0).split('.');
+  const formatted = cents ? `${groupThousands(whole)}.${cents}` : groupThousands(whole);
+
+  return `${currencySymbol(currency)}${formatted}`;
 }
 
 export function formatPlanMonthlyLabel(plan: AvailablePlan): string {
@@ -98,10 +136,46 @@ export function findPlanById(
   return plans.find((p) => p.id === planId) ?? null;
 }
 
-export async function openBillingUrl(url: string): Promise<void> {
-  if (!url) throw new Error('Missing billing URL');
-  await WebBrowser.openBrowserAsync(url, {
-    enableBarCollapsing: true,
-    showTitle: true,
-  });
+/** How a plan relates to the one the org is already on. */
+export type PlanRelation = 'CURRENT' | 'UPGRADE' | 'DOWNGRADE' | 'NEW';
+
+/**
+ * Labels a plan card relative to the current subscription.
+ *
+ * Mirrors the backend rule — compare monthly list price, and treat a move to
+ * annual on the same tier as an upgrade because it prepays. This only drives
+ * copy; the charged direction and amount always come from the preview endpoint.
+ */
+export function getPlanRelation(params: {
+  plan: AvailablePlan;
+  currentPlan: AvailablePlan | null;
+  targetCycle: BillingCycle;
+  currentCycle: BillingCycle;
+}): PlanRelation {
+  const { plan, currentPlan, targetCycle, currentCycle } = params;
+  if (!currentPlan) return 'NEW';
+
+  if (plan.id === currentPlan.id) {
+    if (targetCycle === currentCycle) return 'CURRENT';
+    return targetCycle === 'annual' ? 'UPGRADE' : 'DOWNGRADE';
+  }
+
+  const next = plan.priceMonthly ?? 0;
+  const now = currentPlan.priceMonthly ?? 0;
+  if (next === now) return targetCycle === 'annual' ? 'UPGRADE' : 'DOWNGRADE';
+  return next > now ? 'UPGRADE' : 'DOWNGRADE';
+}
+
+export function planRelationLabel(relation: PlanRelation, planName: string): string {
+  switch (relation) {
+    // Still actionable — the cycle can change even when the tier does not.
+    case 'CURRENT':
+      return 'Change billing cycle';
+    case 'UPGRADE':
+      return `Upgrade to ${planName}`;
+    case 'DOWNGRADE':
+      return `Switch to ${planName}`;
+    default:
+      return `Continue with ${planName}`;
+  }
 }

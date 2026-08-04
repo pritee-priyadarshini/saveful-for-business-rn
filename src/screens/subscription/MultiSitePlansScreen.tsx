@@ -27,9 +27,15 @@ import { useSubscriptionGate } from './useSubscriptionGate';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import type { AvailablePlan } from '@/services/subscriptions.service';
 import {
+  findPlanById,
   formatPlanMonthlyLabel,
   formatPlanAnnualLabel,
+  fromApiBillingCycle,
+  getPlanRelation,
 } from '@/utils/billingHelpers';
+import { selectHasLiveSubscription } from '@/store/subscriptionStore';
+import { PendingPlanChangeBanner } from '@/components/PendingPlanChangeBanner';
+import { CurrentPlanCard } from '@/components/CurrentPlanCard';
 
 const ACCENT = palette.kale;
 const ACCENT_SOFT = '#E8F6EC';
@@ -45,10 +51,19 @@ export function MultiSitePlansScreen() {
   const plans = useSubscriptionStore((s) => s.plans);
   const isFetchingPlans = useSubscriptionStore((s) => s.isFetchingPlans);
   const fetchAvailablePlans = useSubscriptionStore((s) => s.fetchAvailablePlans);
+  const plansError = useSubscriptionStore((s) => s.error);
+  const available = useSubscriptionStore((s) => s.available);
+  const entitlements = useSubscriptionStore((s) => s.entitlements);
+  const fetchEntitlements = useSubscriptionStore((s) => s.fetchEntitlements);
+  const hasLiveSubscription = useSubscriptionStore(selectHasLiveSubscription);
+  const trialAvailable = Boolean(entitlements?.freeTrialAvailable) && !hasLiveSubscription;
+  const currentPlanId = entitlements?.entitled ? entitlements.planId : null;
 
   useEffect(() => {
     void fetchAvailablePlans(true);
-  }, [fetchAvailablePlans]);
+    // A plan bought moments ago must show as current, so this cannot use the cache.
+    void fetchEntitlements(true);
+  }, [fetchAvailablePlans, fetchEntitlements]);
 
   const sortedPlans = useMemo(() => {
     return [...plans].sort((a, b) => {
@@ -57,12 +72,31 @@ export function MultiSitePlansScreen() {
     });
   }, [plans]);
 
+  const currentPlan = findPlanById(plans, currentPlanId);
+  const currentCycle = fromApiBillingCycle(entitlements?.billingCycle);
+
   const onPlanAction = (plan: AvailablePlan) => {
     if (plan.contactSalesOnly) {
       navigation.navigate('EnterpriseConsult');
       return;
     }
     navigation.navigate('MultiSiteConfirm', { planId: plan.id });
+  };
+
+  const ctaLabel = (plan: AvailablePlan) => {
+    if (plan.contactSalesOnly) return 'Talk to Sales Team';
+    // Still actionable — the cycle can change even when the tier does not.
+    if (plan.id === currentPlanId) return 'Change billing cycle';
+    if (!hasLiveSubscription) {
+      return trialAvailable ? 'Start Free 30 Day Trial' : 'Choose this plan';
+    }
+    const relation = getPlanRelation({
+      plan,
+      currentPlan,
+      targetCycle: currentCycle,
+      currentCycle,
+    });
+    return relation === 'UPGRADE' ? 'Upgrade to this plan' : 'Switch to this plan';
   };
 
   return (
@@ -90,8 +124,10 @@ export function MultiSitePlansScreen() {
         </Pressable>
 
         <AppText color={palette.black} style={styles.title}>
-          Choose your plan
+          {currentPlanId != null ? 'Your plan' : 'Choose your plan'}
         </AppText>
+
+        <CurrentPlanCard />
 
         <View style={styles.successBanner}>
           <View style={styles.bannerIconWrap}>
@@ -106,20 +142,56 @@ export function MultiSitePlansScreen() {
           {MULTI_SITE_INTRO}
         </AppText>
 
+        <PendingPlanChangeBanner />
+
         {isFetchingPlans && !sortedPlans.length ? (
           <ActivityIndicator color={ACCENT} style={{ marginVertical: hp(3) }} />
+        ) : null}
+
+        {!isFetchingPlans && !sortedPlans.length ? (
+          <View style={styles.emptyBox}>
+            <AppText color={palette.stone} style={styles.emptyText}>
+              {plansError ??
+                available?.message ??
+                'No plans are available for your organisation right now.'}
+            </AppText>
+            {plansError ? (
+              <Pressable
+                style={styles.retryBtn}
+                onPress={() => void fetchAvailablePlans(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading plans"
+              >
+                <AppText color={ACCENT} style={styles.retryText}>
+                  Try again
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
 
         {sortedPlans.map((plan) => {
           const isEnterprise = plan.contactSalesOnly;
           return (
-            <View key={plan.id} style={styles.planCard}>
-              <AppText
-                color={isEnterprise ? palette.black : ACCENT}
-                style={styles.planName}
-              >
-                {plan.displayName}
-              </AppText>
+            <View
+              key={plan.id}
+              style={[styles.planCard, plan.id === currentPlanId && styles.planCardCurrent]}
+            >
+              <View style={styles.planHeaderRow}>
+                <AppText
+                  color={isEnterprise ? palette.black : ACCENT}
+                  style={styles.planName}
+                >
+                  {plan.displayName}
+                </AppText>
+                {plan.id === currentPlanId ? (
+                  <View style={styles.currentBadge}>
+                    <AppText color={palette.white} style={styles.currentBadgeText}>
+                      Current plan
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
 
               <AppText color={palette.black} style={isEnterprise ? styles.customPrice : styles.price}>
                 {formatPlanMonthlyLabel(plan)}
@@ -156,19 +228,23 @@ export function MultiSitePlansScreen() {
               </View>
 
               <Pressable
-                style={isEnterprise ? styles.outlineBtn : styles.solidBtn}
+                style={
+                  isEnterprise || plan.id === currentPlanId
+                    ? styles.outlineBtn
+                    : styles.solidBtn
+                }
                 onPress={() => onPlanAction(plan)}
               >
                 <AppText
-                  color={isEnterprise ? ACCENT : palette.white}
+                  color={isEnterprise || plan.id === currentPlanId ? ACCENT : palette.white}
                   style={styles.ctaText}
                 >
-                  {isEnterprise ? 'Talk to Sales Team' : 'Start Free 30 Day Trial'}
+                  {ctaLabel(plan)}
                 </AppText>
                 <Ionicons
                   name="arrow-forward"
                   size={normalize(18)}
-                  color={isEnterprise ? ACCENT : palette.white}
+                  color={isEnterprise || plan.id === currentPlanId ? ACCENT : palette.white}
                 />
               </Pressable>
             </View>
@@ -197,6 +273,26 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: wp(5),
     gap: hp(1.4),
+  },
+  emptyBox: {
+    alignItems: 'center',
+    gap: hp(0.4),
+    marginVertical: hp(2),
+  },
+  emptyText: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(14),
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  retryBtn: {
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(4),
+  },
+  retryText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(14),
+    textTransform: 'none',
   },
   backBtn: {
     width: normalize(40),
@@ -252,11 +348,36 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.8),
     gap: hp(0.45),
   },
+  planCardCurrent: {
+    borderWidth: 2,
+    backgroundColor: '#F4FBF5',
+  },
+  planHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(2),
+  },
   planName: {
+    flexShrink: 1,
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(16),
     lineHeight: normalize(21),
     textTransform: 'uppercase',
+  },
+  currentBadge: {
+    backgroundColor: palette.eggplant,
+    borderRadius: normalize(999),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.3),
+  },
+  currentBadgeText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(10),
+    textTransform: 'none',
+  },
+  disabledBtn: {
+    opacity: 0.5,
   },
   priceRow: {
     flexDirection: 'row',

@@ -42,6 +42,8 @@ export type AvailablePlansResponse = {
   plans: AvailablePlan[];
 };
 
+export type BillingCycleApi = 'MONTHLY' | 'ANNUAL';
+
 export type Entitlements = {
   billingRequired: boolean;
   entitled: boolean;
@@ -49,12 +51,23 @@ export type Entitlements = {
   planId: number | null;
   planName: string | null;
   planDisplayName: string | null;
+  /** Which cycle the org is billed on — drives the monthly/annual toggle. */
+  billingCycle: BillingCycleApi | null;
+  /** Billed site count on per-site plans. */
+  quantity: number | null;
   maxSites: number | null;
   maxUserPerSite: number | null;
   features: string[];
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
+  /** false once the org has consumed its one trial. */
+  freeTrialAvailable: boolean;
+  /** Set while a downgrade waits for the current period to close. */
+  pendingPlanId: number | null;
+  pendingPlanDisplayName: string | null;
+  pendingBillingCycle: BillingCycleApi | null;
+  pendingChangeEffectiveAt: string | null;
 };
 
 function unwrapData<T>(payload: unknown): T {
@@ -86,12 +99,21 @@ export const subscriptionsService = {
       planId: data?.planId ?? null,
       planName: data?.planName ?? null,
       planDisplayName: data?.planDisplayName ?? null,
+      billingCycle: data?.billingCycle ?? null,
+      quantity: data?.quantity ?? null,
       maxSites: data?.maxSites ?? null,
       maxUserPerSite: data?.maxUserPerSite ?? null,
       features: Array.isArray(data?.features) ? data.features : [],
       trialEndsAt: data?.trialEndsAt ?? null,
       currentPeriodEnd: data?.currentPeriodEnd ?? null,
       cancelAtPeriodEnd: Boolean(data?.cancelAtPeriodEnd),
+      // Older backends omit this; assume no trial rather than offering one that
+      // the server will reject.
+      freeTrialAvailable: Boolean(data?.freeTrialAvailable),
+      pendingPlanId: data?.pendingPlanId ?? null,
+      pendingPlanDisplayName: data?.pendingPlanDisplayName ?? null,
+      pendingBillingCycle: data?.pendingBillingCycle ?? null,
+      pendingChangeEffectiveAt: data?.pendingChangeEffectiveAt ?? null,
     };
   },
 };

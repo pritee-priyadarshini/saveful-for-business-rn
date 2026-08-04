@@ -2,20 +2,48 @@ import api from './api';
 
 export type BillingCycleApi = 'MONTHLY' | 'ANNUAL';
 
-export type StartTrialResponse = {
-  message: string;
-  subscription: {
-    planName: string;
-    planDisplayName: string;
-    status: string;
-    trialEndsAt: string;
-  };
-};
-
 export type CheckoutSessionResponse = {
   checkoutUrl: string;
   sessionId: string;
   currency: string;
+};
+
+/**
+ * The trial now runs through Stripe Checkout so the card is captured up front
+ * and converts on its own — the response is a checkout URL, not a subscription.
+ */
+export type StartTrialResponse = CheckoutSessionResponse & {
+  trialDays: number;
+  message: string;
+};
+
+export type PlanChangeDirection = 'UPGRADE' | 'DOWNGRADE';
+
+/** `UPGRADED` applies today and is prorated; `SCHEDULED` waits for the period end. */
+export type ChangePlanResponse = {
+  type: 'UPGRADED' | 'SCHEDULED';
+  planId: number;
+  planDisplayName: string;
+  billingCycle: BillingCycleApi;
+  effectiveAt: string;
+  nextBillingDate: string | null;
+  message: string;
+};
+
+export type ChangePlanPreview = {
+  direction: PlanChangeDirection;
+  currency: string;
+  /** Prorated amount Stripe will charge now; always 0 for a downgrade. */
+  amountDueToday: number;
+  recurringAmount: number;
+  effectiveAt: string;
+  nextBillingDate: string | null;
+  planDisplayName: string;
+  billingCycle: BillingCycleApi;
+};
+
+export type CancelPendingChangeResponse = {
+  message: string;
 };
 
 export type PortalSessionResponse = {
@@ -25,6 +53,11 @@ export type PortalSessionResponse = {
 export type CancelSubscriptionResponse = {
   message: string;
   accessUntil?: string | null;
+};
+
+export type ResumeSubscriptionResponse = {
+  message: string;
+  nextBillingDate?: string | null;
 };
 
 export type PaymentRecord = {
@@ -74,8 +107,11 @@ function unwrapData<T>(payload: unknown): T {
 }
 
 export const billingService = {
-  async startTrial(planId: number): Promise<StartTrialResponse> {
-    const res = await api.post('/billing/trial', { planId });
+  async startTrial(
+    planId: number,
+    billingCycle?: BillingCycleApi,
+  ): Promise<StartTrialResponse> {
+    const res = await api.post('/billing/trial', { planId, billingCycle });
     return unwrapData<StartTrialResponse>(res.data);
   },
 
@@ -87,6 +123,31 @@ export const billingService = {
     return unwrapData<CheckoutSessionResponse>(res.data);
   },
 
+  async changePlan(
+    planId: number,
+    billingCycle?: BillingCycleApi,
+  ): Promise<ChangePlanResponse> {
+    const res = await api.post('/billing/change-plan', { planId, billingCycle });
+    return unwrapData<ChangePlanResponse>(res.data);
+  },
+
+  /**
+   * Dry run behind the confirmation dialog. Proration is never computed on the
+   * client — it would drift from what Stripe actually charges.
+   */
+  async previewChangePlan(
+    planId: number,
+    billingCycle?: BillingCycleApi,
+  ): Promise<ChangePlanPreview> {
+    const res = await api.post('/billing/change-plan/preview', { planId, billingCycle });
+    return unwrapData<ChangePlanPreview>(res.data);
+  },
+
+  async cancelPendingChange(): Promise<CancelPendingChangeResponse> {
+    const res = await api.delete('/billing/change-plan/pending');
+    return unwrapData<CancelPendingChangeResponse>(res.data);
+  },
+
   async createPortal(): Promise<PortalSessionResponse> {
     const res = await api.post('/billing/portal');
     return unwrapData<PortalSessionResponse>(res.data);
@@ -95,6 +156,12 @@ export const billingService = {
   async cancelSubscription(): Promise<CancelSubscriptionResponse> {
     const res = await api.post('/billing/cancel');
     return unwrapData<CancelSubscriptionResponse>(res.data);
+  },
+
+  /** Undoes a scheduled cancellation while the paid period is still running. */
+  async resumeSubscription(): Promise<ResumeSubscriptionResponse> {
+    const res = await api.post('/billing/resume');
+    return unwrapData<ResumeSubscriptionResponse>(res.data);
   },
 
   async listPayments(): Promise<PaymentRecord[]> {

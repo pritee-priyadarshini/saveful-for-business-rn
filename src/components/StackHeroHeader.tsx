@@ -39,7 +39,7 @@ export function StackHeroHeader({
   title,
   subtitle,
   source = DEFAULT_SOURCE,
-  height = hp(18),
+  height = hp(13),
   showBack = true,
   onBack,
   right,
@@ -64,7 +64,7 @@ export function StackHeroHeader({
       <HeroHeader
         source={source}
         height={height}
-        style={[{ marginBottom: hp(2) }, style]}
+        style={StyleSheet.flatten([{ marginBottom: hp(2) }, style])}
         contentStyle={contentStyle}
       >
         <View style={styles.inner}>
@@ -106,38 +106,40 @@ const styles = StyleSheet.create({
   inner: {
     flex: 1,
     paddingHorizontal: wp(4),
-    paddingBottom: hp(1.8),
+    paddingBottom: hp(1.2),
     justifyContent: 'space-between',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: normalize(40),
-    paddingTop: hp(0.4),
+    minHeight: normalize(36),
+    paddingTop: hp(0.2),
   },
   backBtn: {
-    width: normalize(40),
-    height: normalize(40),
-    borderRadius: normalize(20),
+    width: normalize(36),
+    height: normalize(36),
+    borderRadius: normalize(18),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.18)',
   },
   backBtnSpacer: {
-    width: normalize(40),
-    height: normalize(40),
+    width: normalize(36),
+    height: normalize(36),
   },
   rightSlot: {
-    minWidth: normalize(40),
+    minWidth: normalize(36),
     alignItems: 'flex-end',
   },
   titleBlock: {
     paddingRight: wp(2),
-    gap: hp(0.4),
+    gap: hp(0.25),
   },
   title: {
     color: palette.white,
+    fontSize: normalize(22),
+    lineHeight: normalize(28),
   },
   subtitle: {
     color: palette.white,
