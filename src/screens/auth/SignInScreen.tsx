@@ -716,15 +716,18 @@ export function SignInScreen() {
           ref={scrollRef}
           contentContainerStyle={[
             styles.scrollContent,
-            (mode === 'login' || mode === 'forgot') && !keyboardVisible && styles.scrollContentCentered,
+            // Vertical centering is a tablet affordance — on phones it leaves a
+            // huge empty band above the form and reads as broken padding.
+            r.isTablet &&
+              (mode === 'login' || mode === 'forgot') &&
+              !keyboardVisible &&
+              styles.scrollContentCentered,
             {
-              paddingTop: insets.top + hp(3.5),
+              paddingTop: insets.top + (r.isTablet ? hp(3.5) : hp(1.5)),
               paddingBottom: keyboardVisible
                 ? keyboardHeight + hp(3)
-                : insets.bottom + hp(2.5),
-              ...(r.isTablet
-                ? { paddingHorizontal: r.pagePadH }
-                : null),
+                : insets.bottom + (r.isTablet ? hp(2.5) : hp(1.5)),
+              paddingHorizontal: r.isTablet ? r.pagePadH : wp(5),
             },
           ]}
           onScroll={(event) => {
@@ -738,8 +741,12 @@ export function SignInScreen() {
           <View
             style={
               r.isTablet
-                ? { width: '100%', maxWidth: r.contentMaxWidth, alignSelf: 'center' as const }
-                : undefined
+                ? {
+                    width: '100%',
+                    maxWidth: r.formMaxWidth,
+                    alignSelf: 'center' as const,
+                  }
+                : styles.phoneColumn
             }
           >
           <Pressable
@@ -763,7 +770,7 @@ export function SignInScreen() {
             </AppText>
           </Pressable>
 
-          <View style={styles.formShell}>
+          <View style={[styles.formShell, r.isTablet && styles.formShellTablet]}>
             {mode === 'login' ? (
               <View style={styles.iconRow}>
                 {valueProps.map((item) => (
@@ -942,12 +949,15 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: wp(5),
     gap: hp(1.2),
   },
 
   scrollContentCentered: {
     justifyContent: 'center',
+  },
+
+  phoneColumn: {
+    width: '100%',
   },
 
   backRow: {
@@ -966,6 +976,11 @@ const styles = StyleSheet.create({
   },
 
   formShell: {
+    gap: hp(1.4),
+    marginTop: hp(0.8),
+  },
+
+  formShellTablet: {
     flex: 1,
     gap: hp(1.8),
     marginTop: hp(1.5),
