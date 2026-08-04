@@ -9,6 +9,8 @@ import {
   Linking,
   ViewStyle,
   TextStyle,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -22,39 +24,17 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
+import { useReceiverFeed } from '@/hooks/useReceiverFeed';
+import type {
+  ReceiverPickup,
+  ReceiverPickupCardStatus,
+} from '@/utils/receiverFeed';
 
 type StatusFilter = 'all' | 'completed' | 'cancelled';
 
-type PickupCardStatus =
-  | 'unclaimed'
-  | 'claimed'
-  | 'awaiting_driver'
-  | 'enroute'
-  | 'completed'
-  | 'cancelled';
-
-type PickupItem = {
-  name: string;
-  available: number;
-  claimed: number;
-};
-
-type Pickup = {
-  id: string;
-  restaurantName: string;
-  restaurantAddress: string;
-  distance: string;
-  restaurantPhone: string;
-  driverName: string | null;
-  driverPhone: string | null;
-  pickupDateLabel: string;
-  pickupTimeLabel: string;
-  instructions: string;
-  weightKg: number;
-  cardStatus: PickupCardStatus;
-  isNextPickup?: boolean;
-  items: PickupItem[];
-};
+type PickupCardStatus = ReceiverPickupCardStatus;
+type PickupItem = ReceiverPickup['items'][number];
+type Pickup = ReceiverPickup;
 
 type ThemeStyleSet = {
   card: ViewStyle;
@@ -88,118 +68,6 @@ const STATUS_LABELS: Record<PickupCardStatus, string> = {
   cancelled: 'CANCELLED',
 };
 
-const initialPickups: Pickup[] = [
-  {
-    id: 'next-1',
-    restaurantName: 'Green Bowl Cafe',
-    restaurantAddress: 'Nayapalli, Bhubaneswar',
-    distance: '0.9 kms away',
-    restaurantPhone: '+91 9876543001',
-    driverName: null,
-    driverPhone: null,
-    pickupDateLabel: 'Today',
-    pickupTimeLabel: '4.00pm - 4.30pm',
-    instructions: 'Collect from back entrance',
-    weightKg: 12,
-    cardStatus: 'unclaimed',
-    isNextPickup: true,
-    items: [
-      { name: 'Salad', available: 6, claimed: 0 },
-      { name: 'Bread', available: 6, claimed: 0 },
-    ],
-  },
-  {
-    id: '1',
-    restaurantName: 'Spice Route Kitchen',
-    restaurantAddress: 'Patia Main Road, Bhubaneswar',
-    distance: '1.8 kms away',
-    restaurantPhone: '+91 9876543210',
-    driverName: 'Rakesh Sahu',
-    driverPhone: '+91 9876512345',
-    pickupDateLabel: 'Today',
-    pickupTimeLabel: '5.30pm - 6.00pm',
-    instructions: 'Needs refrigeration',
-    weightKg: 18,
-    cardStatus: 'claimed',
-    items: [
-      { name: 'Rice', available: 10, claimed: 10 },
-      { name: 'Dal', available: 8, claimed: 8 },
-    ],
-  },
-  {
-    id: '2',
-    restaurantName: 'Biryani Box',
-    restaurantAddress: 'Saheed Nagar, Bhubaneswar',
-    distance: '3.2 kms away',
-    restaurantPhone: '+91 9876500000',
-    driverName: null,
-    driverPhone: null,
-    pickupDateLabel: 'Today',
-    pickupTimeLabel: '7.00pm - 7.30pm',
-    instructions: 'Reheat before serving',
-    weightKg: 22,
-    cardStatus: 'awaiting_driver',
-    items: [
-      { name: 'Biryani', available: 15, claimed: 15 },
-      { name: 'Raita', available: 7, claimed: 7 },
-    ],
-  },
-  {
-    id: '3',
-    restaurantName: 'ABC Box',
-    restaurantAddress: 'Khandagiri, Bhubaneswar',
-    distance: '2.5 kms away',
-    restaurantPhone: '+91 9876501111',
-    driverName: 'Sanjay Rout',
-    driverPhone: '+91 9876523456',
-    pickupDateLabel: 'Today',
-    pickupTimeLabel: '6.00pm - 6.30pm',
-    instructions: 'Ring bell on arrival',
-    weightKg: 22,
-    cardStatus: 'enroute',
-    items: [
-      { name: 'Curry', available: 12, claimed: 12 },
-      { name: 'Rice', available: 10, claimed: 10 },
-    ],
-  },
-  {
-    id: '4',
-    restaurantName: 'XYZ Box',
-    restaurantAddress: 'Chandrasekharpur, Bhubaneswar',
-    distance: '4.1 kms away',
-    restaurantPhone: '+91 9876502222',
-    driverName: 'Amit Sahu',
-    driverPhone: '+91 9876534567',
-    pickupDateLabel: 'May 14th 2026',
-    pickupTimeLabel: '',
-    instructions: 'Completed pickup',
-    weightKg: 22,
-    cardStatus: 'completed',
-    items: [
-      { name: 'Meals', available: 14, claimed: 14 },
-      { name: 'Dessert', available: 8, claimed: 8 },
-    ],
-  },
-  {
-    id: '5',
-    restaurantName: 'Sunrise Kitchen',
-    restaurantAddress: 'Unit 3, Bhubaneswar',
-    distance: '5.0 kms away',
-    restaurantPhone: '+91 9876503333',
-    driverName: null,
-    driverPhone: null,
-    pickupDateLabel: 'May 10th 2026',
-    pickupTimeLabel: '',
-    instructions: 'Cancelled by restaurant',
-    weightKg: 16,
-    cardStatus: 'cancelled',
-    items: [
-      { name: 'Pasta', available: 10, claimed: 0 },
-      { name: 'Soup', available: 6, claimed: 0 },
-    ],
-  },
-];
-
 function isCompletedStatus(status: PickupCardStatus) {
   return status === 'completed';
 }
@@ -220,7 +88,13 @@ function formatTimeLine(pickup: Pickup) {
 
 function getDriverLabel(pickup: Pickup) {
   if (pickup.cardStatus === 'unclaimed') return null;
-  return pickup.driverName ? `Driver: ${pickup.driverName}` : 'Driver: No Driver assigned';
+  const label = pickup.assigneeLabel || 'Driver';
+  if (pickup.driverName) return `${label}: ${pickup.driverName}`;
+  // Completed with no assignee — don't show a misleading empty driver line.
+  if (pickup.cardStatus === 'completed' || pickup.cardStatus === 'cancelled') {
+    return null;
+  }
+  return `${label}: Not assigned yet`;
 }
 
 export default function FarmerPickupScreen({ navigation }: any) {
@@ -229,20 +103,18 @@ export default function FarmerPickupScreen({ navigation }: any) {
   const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
   const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(3));
   const tabletInsetReset = r.isTablet ? { paddingHorizontal: 0 } : null;
+  const {
+    nextPickup,
+    claimedPickups,
+    loading,
+    refreshing,
+    error,
+    reload,
+  } = useReceiverFeed('animal');
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPickup, setSelectedPickup] = useState<Pickup | null>(null);
-
-  const nextPickup = useMemo(
-    () => initialPickups.find((p) => p.isNextPickup || p.cardStatus === 'unclaimed') ?? null,
-    [],
-  );
-
-  const claimedPickups = useMemo(
-    () => initialPickups.filter((p) => p.cardStatus !== 'unclaimed' && !p.isNextPickup),
-    [],
-  );
 
   const filteredPickups = useMemo(() => {
     return claimedPickups.filter((pickup) => {
@@ -268,7 +140,7 @@ export default function FarmerPickupScreen({ navigation }: any) {
     try {
       await Linking.openURL(url);
     } catch {
-      showErrorAlert('Unable to open dialer', 'Error');
+      showErrorAlert(null, 'Error', 'Unable to open dialer');
     }
   };
 
@@ -326,10 +198,8 @@ export default function FarmerPickupScreen({ navigation }: any) {
   const renderPickupCard = (pickup: Pickup) => {
     const theme = themeStyles[pickup.cardStatus];
     const driverLabel = getDriverLabel(pickup);
-    const showDriverContact =
-      pickup.cardStatus !== 'unclaimed' &&
-      pickup.cardStatus !== 'completed' &&
-      pickup.cardStatus !== 'cancelled';
+    const hasDriverPhone = Boolean(pickup.driverPhone);
+    const showDriverContact = hasDriverPhone && pickup.cardStatus !== 'unclaimed';
     const statusLabel = STATUS_LABELS[pickup.cardStatus];
 
     return (
@@ -364,9 +234,11 @@ export default function FarmerPickupScreen({ navigation }: any) {
               </AppText>
             </View>
 
-            <AppText variant="bodySmall" style={styles.distanceText}>
-              {pickup.distance}
-            </AppText>
+            {pickup.distance ? (
+              <AppText variant="bodySmall" style={styles.distanceText}>
+                {pickup.distance}
+              </AppText>
+            ) : null}
 
             <View style={styles.detailLine}>
               <Image
@@ -407,29 +279,24 @@ export default function FarmerPickupScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.contactSection}>
-          <View style={styles.contactGroup}>
-            <AppText variant="caption" style={styles.contactLabel}>
-              Contact Collection Site
-            </AppText>
-            <View style={styles.contactBtnRow}>
-              {renderContactButton('Call', () => makeCall(pickup.restaurantPhone), theme, 'call-outline')}
-              {renderContactButton('Message', () => sendMessage(pickup.restaurantPhone), theme, 'chatbubble-outline')}
-            </View>
-          </View>
-
-          {showDriverContact ? (
+        {showDriverContact ? (
+          <View style={styles.contactSection}>
             <View style={styles.contactGroup}>
               <AppText variant="caption" style={styles.contactLabel}>
-                Contact Driver
+                Contact {pickup.assigneeLabel || 'Driver'}
               </AppText>
               <View style={styles.contactBtnRow}>
                 {renderContactButton('Call', () => makeCall(pickup.driverPhone), theme, 'call-outline')}
-                {renderContactButton('Message', () => sendMessage(pickup.driverPhone), theme, 'chatbubble-outline')}
+                {renderContactButton(
+                  'Message',
+                  () => sendMessage(pickup.driverPhone),
+                  theme,
+                  'chatbubble-outline',
+                )}
               </View>
             </View>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -472,8 +339,17 @@ export default function FarmerPickupScreen({ navigation }: any) {
           styles.container,
           adaptive.scrollContent,
           { paddingBottom: bottomPadding },
+          !loading && !nextPickup && filteredPickups.length === 0 ? { flexGrow: 1 } : null,
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void reload()}
+            tintColor={palette.kale}
+            colors={[palette.kale]}
+          />
+        }
       >
         <View
           style={
@@ -488,6 +364,28 @@ export default function FarmerPickupScreen({ navigation }: any) {
             style={r.isTablet ? adaptive.heroBleed : undefined}
           />
         </View>
+
+        {loading && !nextPickup && claimedPickups.length === 0 ? (
+          <View style={[styles.emptyWrap, contentColumn, tabletInsetReset]}>
+            <ActivityIndicator color={palette.kale} />
+            <AppText variant="bodySmall" style={[styles.emptyText, adaptive.emptyText]}>
+              Loading pickups…
+            </AppText>
+          </View>
+        ) : null}
+
+        {error && !loading ? (
+          <View style={[styles.emptyWrap, contentColumn, tabletInsetReset]}>
+            <AppText variant="bodySmall" style={[styles.emptyText, adaptive.emptyText]}>
+              {error}
+            </AppText>
+            <Pressable onPress={() => void reload()}>
+              <AppText variant="bodyBold" color={palette.kale}>
+                Try again
+              </AppText>
+            </Pressable>
+          </View>
+        ) : null}
 
         {nextPickup ? (
           <View style={[styles.sectionBlock, contentColumn, tabletInsetReset]}>
@@ -510,7 +408,9 @@ export default function FarmerPickupScreen({ navigation }: any) {
           ) : (
             <View style={styles.emptyWrap}>
               <AppText variant="bodySmall" style={[styles.emptyText, adaptive.emptyText]}>
-                No pickups match this filter.
+                {claimedPickups.length === 0
+                  ? 'No claimed pickups yet. Available surplus will appear under Next Pickup.'
+                  : 'No pickups match this filter.'}
               </AppText>
             </View>
           )}
@@ -541,29 +441,6 @@ export default function FarmerPickupScreen({ navigation }: any) {
                 <AppText variant="bodyBold" style={styles.modalSubtitle}>
                   {selectedPickup.restaurantName}
                 </AppText>
-
-                <View style={styles.modalMetaBlock}>
-                  <AppText variant="bodySmall" style={styles.modalMetaText}>
-                    {selectedPickup.restaurantAddress}
-                  </AppText>
-                  <AppText variant="bodySmall" style={styles.modalMetaText}>
-                    {selectedPickup.distance}
-                  </AppText>
-                  <AppText variant="bodySmall" style={styles.modalMetaText}>
-                    {formatTimeLine(selectedPickup)}
-                  </AppText>
-                  {getDriverLabel(selectedPickup) ? (
-                    <AppText variant="bodySmall" style={styles.modalMetaText}>
-                      {getDriverLabel(selectedPickup)}
-                    </AppText>
-                  ) : null}
-                  <AppText variant="bodySmall" style={styles.modalMetaText}>
-                    Status: {STATUS_LABELS[selectedPickup.cardStatus]}
-                  </AppText>
-                  <AppText variant="bodySmall" style={styles.modalMetaText}>
-                    Total weight: {selectedPickup.weightKg} kg
-                  </AppText>
-                </View>
 
                 <View style={styles.modalHeaderRow}>
                   <AppText variant="bodyBold" style={styles.modalColWide}>
@@ -853,17 +730,6 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     textTransform: 'none',
     color: palette.midgray,
-  },
-  modalMetaBlock: {
-    gap: hp(0.35),
-    paddingBottom: hp(0.5),
-    borderBottomWidth: 1,
-    borderColor: palette.border,
-  },
-  modalMetaText: {
-    color: palette.midgray,
-    textTransform: 'none',
-    lineHeight: normalize(16),
   },
   modalHeaderRow: {
     flexDirection: 'row',

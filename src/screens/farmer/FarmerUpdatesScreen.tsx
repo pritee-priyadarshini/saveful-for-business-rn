@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   FlatList,
   Image,
+  Modal,
   Pressable,
+  RefreshControl,
   StyleSheet,
   View,
 } from 'react-native';
@@ -21,21 +23,15 @@ import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAppContext } from '../../store/AppContext';
+import { useReceiverFeed } from '@/hooks/useReceiverFeed';
+import type {
+  ReceiverUpdateItem,
+  ReceiverUpdateType,
+} from '@/utils/receiverFeed';
 
-type UpdateType = 'new_surplus' | 'pickup' | 'collected' | 'feedback';
+type UpdateType = ReceiverUpdateType;
 type UpdateFilter = 'all' | UpdateType;
-
-type UpdateItem = {
-  id: string;
-  type: UpdateType;
-  section: 'Today' | 'Previous';
-  title: string;
-  quantityKg: number;
-  distance: string;
-  city: string;
-  timeLabel: string;
-  driverName?: string;
-};
+type UpdateItem = ReceiverUpdateItem;
 
 const CRATE_ICON = require('../../../assets/placeholder/storage_box_green.png');
 const FEEDBACK_ICON = require('../../../assets/placeholder/chat_orange_icon.png');
@@ -49,50 +45,6 @@ const FILTER_ROW_1: { key: UpdateFilter; label: string; type?: UpdateType }[] = 
 const FILTER_ROW_2: { key: UpdateFilter; label: string; type?: UpdateType }[] = [
   { key: 'collected', label: 'Collected', type: 'collected' },
   { key: 'feedback', label: 'Feedback', type: 'feedback' },
-];
-
-const MOCK_UPDATES: UpdateItem[] = [
-  {
-    id: '1',
-    type: 'new_surplus',
-    section: 'Today',
-    title: 'Saveful Bakery',
-    quantityKg: 18,
-    distance: '1.8 kms away',
-    city: 'Bhubaneswar',
-    timeLabel: 'Today - 5.30pm - 6.00pm',
-  },
-  {
-    id: '2',
-    type: 'pickup',
-    section: 'Today',
-    title: 'Green Bowl',
-    quantityKg: 18,
-    distance: '6.2 kms away',
-    city: 'Chennai',
-    timeLabel: 'Today - 5.30pm - 6.00pm',
-    driverName: 'Rakesh Sahu',
-  },
-  {
-    id: '3',
-    type: 'feedback',
-    section: 'Today',
-    title: 'URBAN BITES',
-    quantityKg: 0,
-    distance: '',
-    city: '',
-    timeLabel: '',
-  },
-  {
-    id: '4',
-    type: 'collected',
-    section: 'Previous',
-    title: 'Saveful Bakery',
-    quantityKg: 18,
-    distance: '1.8 kms away',
-    city: 'Bhubaneswar',
-    timeLabel: 'Today - 5.30pm - 6.00pm',
-  },
 ];
 
 const CARD_THEMES: Record<
@@ -148,31 +100,31 @@ const CARD_THEMES: Record<
 export function FarmerUpdatesScreen() {
   useTransparentStatusBar('light');
   const r = useResponsiveLayout();
-  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 20 }), [r]);
+  const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 16 }), [r]);
   const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(3));
   const { currentProfile } = useAppContext();
+  const {
+    updates,
+    counts,
+    loading,
+    refreshing,
+    error,
+    reload,
+  } = useReceiverFeed('animal');
 
   const navigation = useNavigation<any>();
-  const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<UpdateFilter>('all');
-  const [updates] = useState(MOCK_UPDATES);
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedDetails, setSelectedDetails] = useState<UpdateItem | null>(null);
   const [initialAnswer, setInitialAnswer] = useState<'yes' | 'no' | null>(null);
   const [selectedUpdateId, setSelectedUpdateId] = useState<string | null>(null);
+  const [selectedClaimId, setSelectedClaimId] = useState<number | null>(null);
+  const [selectedBusinessName, setSelectedBusinessName] = useState<string>('');
+  const [selectedSurveyItems, setSelectedSurveyItems] = useState<
+    { id: string; name: string; quantity: number }[]
+  >([]);
   const [surveyCompletedIds, setSurveyCompletedIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 900);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const counts = useMemo(() => ({
-    all: updates.length,
-    new_surplus: updates.filter((u) => u.type === 'new_surplus').length,
-    pickup: updates.filter((u) => u.type === 'pickup').length,
-    collected: updates.filter((u) => u.type === 'collected').length,
-    feedback: updates.filter((u) => u.type === 'feedback').length,
-  }), [updates]);
 
   const filteredUpdates = useMemo(() => {
     if (activeFilter === 'all') return updates;
@@ -188,6 +140,28 @@ export function FarmerUpdatesScreen() {
       }))
       .filter((section) => section.data.length > 0);
   }, [filteredUpdates]);
+
+  const detailsTotals = useMemo(() => {
+    const items = selectedDetails?.items || [];
+    return {
+      available: items.reduce((sum, i) => sum + Number(i.available || 0), 0),
+      claimed: items.reduce((sum, i) => sum + Number(i.claimed || 0), 0),
+    };
+  }, [selectedDetails]);
+
+  const openItemsModal = (item: UpdateItem) => {
+    setSelectedDetails(item);
+    setDetailsModalVisible(true);
+  };
+
+  const handleViewDetails = (item: UpdateItem) => {
+    if (item.type === 'new_surplus') {
+      navigation.navigate('Available', { screen: 'FarmerMap' });
+      return;
+    }
+    // Pickup + collected: same items popup as the Pickups screen.
+    openItemsModal(item);
+  };
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
@@ -272,20 +246,6 @@ export function FarmerUpdatesScreen() {
         </AppText>
       </View>
     );
-  };
-
-  const handleViewDetails = (item: UpdateItem) => {
-    if (item.type === 'new_surplus') {
-      navigation.navigate('Available', { screen: 'FarmerMap' });
-      return;
-    }
-    if (item.type === 'pickup') {
-      navigation.navigate('Available', { screen: 'FarmerPickup' });
-      return;
-    }
-    if (item.type === 'collected') {
-      navigation.navigate('FarmerHistory');
-    }
   };
 
   const renderStandardCard = (item: UpdateItem) => {
@@ -390,6 +350,15 @@ export function FarmerUpdatesScreen() {
                 onPress={() => {
                   setInitialAnswer('yes');
                   setSelectedUpdateId(item.id);
+                  setSelectedClaimId(item.claimId ?? null);
+                  setSelectedBusinessName(item.title);
+                  setSelectedSurveyItems(
+                    (item.items || []).map((food, index) => ({
+                      id: String(index),
+                      name: food.name,
+                      quantity: Number(food.claimed || food.available || 0),
+                    })),
+                  );
                   setModalVisible(true);
                 }}
               >
@@ -402,6 +371,15 @@ export function FarmerUpdatesScreen() {
                 onPress={() => {
                   setInitialAnswer('no');
                   setSelectedUpdateId(item.id);
+                  setSelectedClaimId(item.claimId ?? null);
+                  setSelectedBusinessName(item.title);
+                  setSelectedSurveyItems(
+                    (item.items || []).map((food, index) => ({
+                      id: String(index),
+                      name: food.name,
+                      quantity: Number(food.claimed || food.available || 0),
+                    })),
+                  );
                   setModalVisible(true);
                 }}
               >
@@ -417,7 +395,7 @@ export function FarmerUpdatesScreen() {
   const renderCard = (item: UpdateItem) =>
     item.type === 'feedback' ? renderFeedbackCard(item) : renderStandardCard(item);
 
-  if (loading) {
+  if (loading && updates.length === 0) {
     return (
       <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
         <StatusBar style="light" translucent backgroundColor="transparent" />
@@ -438,10 +416,19 @@ export function FarmerUpdatesScreen() {
       <FlatList
         data={sections}
         keyExtractor={(item) => item.title}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void reload()}
+            tintColor={palette.kale}
+            colors={[palette.kale]}
+          />
+        }
         contentContainerStyle={[
           styles.container,
           adaptive.scrollContent,
           { paddingBottom: bottomPadding },
+          sections.length === 0 && { flexGrow: 1 },
         ]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
@@ -459,7 +446,7 @@ export function FarmerUpdatesScreen() {
                       style={[styles.heroEyebrow, adaptive.heroEyebrow]}
                       numberOfLines={1}
                     >
-                      {currentProfile.organization || 'Your farm'}
+                      {currentProfile.organization || 'Your charity'}
                     </AppText>
                     <AppText
                       variant="h6"
@@ -521,23 +508,113 @@ export function FarmerUpdatesScreen() {
         )}
         ListEmptyComponent={
           <View style={[styles.emptyWrap, adaptive.section]}>
-            <AppText variant="body1" color={palette.stone}>
-              No updates to show
+            <AppText variant="body1" color={palette.stone} style={{ textAlign: 'center' }}>
+              {error ?? 'No updates yet. New surplus and your pickups will show up here.'}
             </AppText>
+            {error ? (
+              <Pressable onPress={() => void reload()} style={{ marginTop: hp(1.2) }}>
+                <AppText variant="bodyBold" color={palette.kale}>
+                  Try again
+                </AppText>
+              </Pressable>
+            ) : null}
           </View>
         }
       />
 
+      <Modal
+        visible={detailsModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailsModalVisible(false)}
+      >
+        <View style={[styles.modalWrap, r.isTablet && { paddingHorizontal: r.pagePadH }]}>
+          <View
+            style={[
+              styles.modalCard,
+              r.isTablet && {
+                width: '100%',
+                maxWidth: Math.min(520, r.contentMaxWidth),
+                alignSelf: 'center',
+              },
+            ]}
+          >
+            <View style={styles.modalTopBar}>
+              <AppText variant="h6">Items</AppText>
+              <Pressable
+                style={styles.closeIconBtn}
+                onPress={() => setDetailsModalVisible(false)}
+              >
+                <Ionicons name="close" size={normalize(20)} color={palette.black} />
+              </Pressable>
+            </View>
+
+            {selectedDetails ? (
+              <>
+                <AppText variant="bodyBold" style={styles.modalSubtitle}>
+                  {selectedDetails.title}
+                </AppText>
+
+                <View style={styles.modalHeaderRow}>
+                  <AppText variant="bodyBold" style={styles.modalColWide}>
+                    Item Name
+                  </AppText>
+                  <AppText variant="bodyBold" style={styles.modalCol}>
+                    Available
+                  </AppText>
+                  <AppText variant="bodyBold" style={styles.modalCol}>
+                    Claimed
+                  </AppText>
+                </View>
+
+                {(selectedDetails.items || []).length > 0 ? (
+                  selectedDetails.items!.map((food, idx) => (
+                    <View key={idx} style={styles.modalItemRow}>
+                      <AppText variant="bodyBold" style={styles.modalColWide}>
+                        {food.name}
+                      </AppText>
+                      <AppText variant="bodySmall" style={styles.modalCol}>
+                        {food.available} kg
+                      </AppText>
+                      <AppText variant="bodySmall" style={styles.modalCol}>
+                        {food.claimed} kg
+                      </AppText>
+                    </View>
+                  ))
+                ) : (
+                  <AppText variant="bodySmall" color={palette.stone} style={styles.modalEmpty}>
+                    No item breakdown available for this update.
+                  </AppText>
+                )}
+
+                <AppText variant="bodyBold">
+                  Total claimed: {detailsTotals.claimed || selectedDetails.quantityKg} kg
+                </AppText>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
       <PostCollectSurveyModal
         visible={modalVisible}
         initialAnswer={initialAnswer}
-        onClose={() => {
+        claimId={selectedClaimId}
+        businessName={selectedBusinessName}
+        items={selectedSurveyItems}
+        onSubmitted={() => {
           if (selectedUpdateId) {
             setSurveyCompletedIds((prev) => [...prev, selectedUpdateId]);
           }
+          void reload();
+        }}
+        onClose={() => {
           setModalVisible(false);
           setInitialAnswer(null);
           setSelectedUpdateId(null);
+          setSelectedClaimId(null);
+          setSelectedBusinessName('');
+          setSelectedSurveyItems([]);
         }}
       />
     </Screen>
@@ -546,7 +623,7 @@ export function FarmerUpdatesScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: -hp(2),
+
   },
 
   listHeader: {
@@ -878,6 +955,62 @@ const styles = StyleSheet.create({
   emptyWrap: {
     paddingVertical: hp(4),
     alignItems: 'center',
+  },
+
+  modalWrap: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: palette.white,
+    borderTopLeftRadius: normalize(24),
+    borderTopRightRadius: normalize(24),
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    paddingBottom: hp(4),
+    gap: hp(1.2),
+  },
+  modalTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  closeIconBtn: {
+    width: normalize(36),
+    height: normalize(36),
+    borderRadius: normalize(18),
+    backgroundColor: palette.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubtitle: {
+    textTransform: 'none',
+    color: palette.midgray,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    paddingBottom: hp(1),
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+  },
+  modalItemRow: {
+    flexDirection: 'row',
+    paddingVertical: hp(0.5),
+  },
+  modalColWide: {
+    flex: 2,
+    textTransform: 'none',
+  },
+  modalCol: {
+    flex: 1,
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  modalEmpty: {
+    textTransform: 'none',
+    textAlign: 'center',
+    paddingVertical: hp(1),
   },
 
   skeletonWrap: {

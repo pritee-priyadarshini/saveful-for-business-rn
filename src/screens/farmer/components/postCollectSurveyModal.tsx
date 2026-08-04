@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -15,6 +16,8 @@ import { AppText } from '@/components/AppText';
 import { palette } from '@/theme/colors';
 import { spacing } from '@/theme/spacing';
 import { normalize, useResponsiveLayout } from '@/utils/responsive';
+import { claimsService } from '@/services/claims.service';
+import { getUserFriendlyErrorMessage, showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 
 type Item = {
   id: string;
@@ -26,13 +29,27 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   initialAnswer?: 'yes' | 'no' | null;
+  claimId?: number | null;
+  businessName?: string;
+  items?: Item[];
+  /** Called after a successful backend submit so the feed can refresh. */
+  onSubmitted?: () => void;
 };
 
-export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Props) {
+export function PostCollectSurveyModal({
+  visible,
+  onClose,
+  initialAnswer,
+  claimId,
+  businessName,
+  items: initialItems,
+  onSubmitted,
+}: Props) {
   const navigation = useNavigation<any>();
   const r = useResponsiveLayout();
   const [step, setStep] = useState(1);
   const [isPartial, setIsPartial] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -40,15 +57,25 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
   const [reason, setReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
 
-  const [items, setItems] = useState<Item[]>([
-    { id: '1', name: 'Rice Meals', quantity: 5 },
-    { id: '2', name: 'Bread Packs', quantity: 3 },
-  ]);
+  const [items, setItems] = useState<Item[]>(
+    initialItems?.length
+      ? initialItems
+      : [
+          { id: '1', name: 'Rice Meals', quantity: 5 },
+          { id: '2', name: 'Bread Packs', quantity: 3 },
+        ],
+  );
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (!visible) return;
     if (initialAnswer === 'yes') setStep(2);
-    if (initialAnswer === 'no') setStep(6);
-  }, [initialAnswer]);
+    else if (initialAnswer === 'no') setStep(6);
+    else setStep(1);
+
+    if (initialItems?.length) {
+      setItems(initialItems);
+    }
+  }, [visible, initialAnswer, initialItems]);
 
   const totalKg = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -66,7 +93,7 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
   const updateQty = (id: string, delta: number) => {
     setItems((prev) =>
       prev.map((i) =>
-        i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i,
+        i.id === id ? { ...i, quantity: Math.max(0, Math.round((i.quantity + delta) * 10) / 10) } : i,
       ),
     );
   };
@@ -78,6 +105,7 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
     setReason('');
     setOtherReason('');
     setIsPartial(false);
+    setSubmitting(false);
   };
 
   const handleClose = () => {
@@ -88,6 +116,85 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
   const handleGoHome = () => {
     handleClose();
     navigation.navigate('Home');
+  };
+
+  const submitRating = async () => {
+    if (!claimId || rating < 1) {
+      setStep(5);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const noteParts = [
+        comment.trim() || null,
+        isPartial ? `Partial collection (~${totalKg} kg)` : null,
+      ].filter(Boolean);
+
+      await claimsService.rateClaim(claimId, {
+        rating,
+        ratingNote: noteParts.length ? noteParts.join(' · ') : undefined,
+      });
+      showSuccessAlert('Thanks for your feedback', 'Feedback sent');
+      onSubmitted?.();
+      setStep(5);
+    } catch (error) {
+      // Claim may still be CONFIRMED — mark collected with the rating instead.
+      try {
+        await claimsService.markClaimCollected(claimId, {
+          rating,
+          ratingNote: comment.trim() || undefined,
+        });
+        showSuccessAlert('Collection confirmed. Thanks for your feedback.', 'Done');
+        onSubmitted?.();
+        setStep(5);
+      } catch (inner) {
+        showErrorAlert(
+          inner,
+          'Could not submit feedback',
+          getUserFriendlyErrorMessage(inner, 'Could not submit feedback. Please try again.'),
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitNotCollected = async () => {
+    if (!claimId) {
+      setStep(7);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const note = reason === 'Other' ? otherReason.trim() || reason : reason;
+      await claimsService.cancelClaim(claimId);
+      showSuccessAlert(
+        note ? `Pickup cancelled: ${note}` : 'Pickup cancelled',
+        'Updated',
+      );
+      onSubmitted?.();
+      setStep(7);
+    } catch (error) {
+      // Already collected claims cannot be cancelled — record the note as feedback.
+      try {
+        await claimsService.rateClaim(claimId, {
+          rating: 1,
+          ratingNote: `Not collected: ${reason === 'Other' ? otherReason || 'Other' : reason}`,
+        });
+        onSubmitted?.();
+        setStep(7);
+      } catch (inner) {
+        showErrorAlert(
+          inner,
+          'Could not update pickup',
+          getUserFriendlyErrorMessage(inner, 'Could not update this pickup. Please try again.'),
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const reasons = [
@@ -119,7 +226,9 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
               <>
                 {questionIcon}
                 <AppText variant="label" style={styles.title}>
-                  Did you collect the food?
+                  {businessName
+                    ? `Did you collect from ${businessName}?`
+                    : 'Did you collect the food?'}
                 </AppText>
 
                 <View style={styles.row}>
@@ -144,7 +253,13 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                 </AppText>
 
                 <View style={styles.row}>
-                  <Pressable style={styles.primaryBtn} onPress={() => setStep(4)}>
+                  <Pressable
+                    style={styles.primaryBtn}
+                    onPress={() => {
+                      setIsPartial(false);
+                      setStep(4);
+                    }}
+                  >
                     <AppText variant="label" style={styles.primaryText}>
                       Full
                     </AppText>
@@ -172,16 +287,18 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
 
                 {items.map((item) => (
                   <View key={item.id} style={styles.itemRow}>
-                    <AppText variant="bodySmall">{item.name}</AppText>
+                    <AppText variant="bodySmall" style={{ flex: 1 }}>
+                      {item.name}
+                    </AppText>
 
                     <View style={styles.counter}>
-                      <Pressable onPress={() => updateQty(item.id, -1)}>
+                      <Pressable onPress={() => updateQty(item.id, -0.5)}>
                         <Ionicons name="remove" size={normalize(18)} />
                       </Pressable>
 
                       <AppText variant="label">{item.quantity} kg</AppText>
 
-                      <Pressable onPress={() => updateQty(item.id, 1)}>
+                      <Pressable onPress={() => updateQty(item.id, 0.5)}>
                         <Ionicons name="add" size={normalize(18)} />
                       </Pressable>
                     </View>
@@ -189,7 +306,7 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                 ))}
 
                 <AppText variant="label" style={styles.total}>
-                  Total: {totalKg} kg
+                  Total: {Math.round(totalKg * 100) / 100} kg
                 </AppText>
 
                 <Pressable style={styles.primaryBtn} onPress={() => setStep(4)}>
@@ -204,7 +321,7 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
               <>
                 {questionIcon}
                 <AppText variant="subheading" style={styles.title}>
-                  How much will you rate the surplus?
+                  How would you rate this surplus?
                 </AppText>
 
                 <View style={styles.ratingRow}>
@@ -233,13 +350,17 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                 />
 
                 <Pressable
-                  style={[styles.primaryBtn, !canSubmitRating && { opacity: 0.5 }]}
-                  disabled={!canSubmitRating}
-                  onPress={() => setStep(5)}
+                  style={[styles.primaryBtn, (!canSubmitRating || submitting) && { opacity: 0.5 }]}
+                  disabled={!canSubmitRating || submitting}
+                  onPress={() => void submitRating()}
                 >
-                  <AppText variant="label" style={styles.primaryText}>
-                    Submit
-                  </AppText>
+                  {submitting ? (
+                    <ActivityIndicator color={palette.white} />
+                  ) : (
+                    <AppText variant="label" style={styles.primaryText}>
+                      Submit
+                    </AppText>
+                  )}
                 </Pressable>
               </>
             )}
@@ -248,7 +369,7 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
               <>
                 {questionIcon}
                 <AppText variant="subheading" style={styles.title}>
-                  🌍 You made a difference
+                  You made a difference
                 </AppText>
 
                 <AppText variant="bodyLarge" style={styles.success}>
@@ -296,10 +417,18 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
                   />
                 )}
 
-                <Pressable style={styles.primaryBtn} onPress={() => setStep(7)}>
-                  <AppText variant="label" style={styles.primaryText}>
-                    Submit
-                  </AppText>
+                <Pressable
+                  style={[styles.primaryBtn, (!reason || submitting) && { opacity: 0.5 }]}
+                  disabled={!reason || submitting}
+                  onPress={() => void submitNotCollected()}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color={palette.white} />
+                  ) : (
+                    <AppText variant="label" style={styles.primaryText}>
+                      Submit
+                    </AppText>
+                  )}
                 </Pressable>
               </>
             )}
@@ -308,7 +437,7 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
               <>
                 {questionIcon}
                 <AppText variant="subheading" style={styles.title}>
-                  🙏 You tried to help
+                  You tried to help
                 </AppText>
 
                 <AppText variant="bodyLarge" style={styles.success}>
@@ -332,145 +461,123 @@ export function PostCollectSurveyModal({ visible, onClose, initialAnswer }: Prop
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  card: {
-    width: '92%',
-    maxHeight: '90%',
-    backgroundColor: palette.white,
-    borderRadius: normalize(20),
     padding: spacing.lg,
   },
-
-  content: {
-    paddingBottom: spacing.md,
-  },
-
-  title: {
-    textAlign: 'center',
-  },
-
-  row: {
-    flexDirection: 'row',
-    marginTop: spacing.md,
+  card: {
+    backgroundColor: palette.white,
+    borderRadius: 20,
+    padding: spacing.lg,
+    maxHeight: '88%',
   },
   closeIcon: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    zIndex: 10,
+    alignSelf: 'flex-end',
+    padding: 4,
   },
-
+  content: {
+    gap: spacing.md,
+    paddingBottom: spacing.md,
+  },
   questionIcon: {
-    width: 150,
-    height: 150,
     alignSelf: 'center',
-    marginBottom: spacing.md,
     resizeMode: 'contain',
   },
-
+  title: {
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   primaryBtn: {
     flex: 1,
-    backgroundColor: palette.primary,
-    padding: spacing.sm,
-    borderRadius: normalize(10),
+    backgroundColor: palette.kale,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginRight: spacing.sm,
-    marginTop: spacing.md,
+    justifyContent: 'center',
+    minHeight: 48,
   },
-
-  secondaryBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: palette.strokecream,
-    padding: spacing.sm,
-    borderRadius: normalize(10),
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-
   primaryText: {
     color: palette.white,
+    textTransform: 'none',
   },
-
-  ratingRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: palette.strokecream,
-    borderRadius: normalize(10),
-    padding: spacing.sm,
-    marginTop: spacing.sm,
-  },
-
-  success: {
-    marginTop: spacing.sm,
-    textAlign: 'center',
-  },
-
-  itemRow: {
-    marginTop: spacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  secondaryBtn: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: palette.kale,
+    borderRadius: 12,
+    paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: palette.strokecream,
+  },
   counter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 12,
   },
-
   total: {
-    marginTop: spacing.sm,
     textAlign: 'center',
+    textTransform: 'none',
   },
-
+  ratingRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  appleWrapper: {
+    padding: 4,
+  },
+  apple: {
+    fontSize: normalize(28),
+    opacity: 0.35,
+  },
+  appleSelected: {
+    opacity: 1,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: 'Saveful-Regular',
+    fontSize: normalize(14),
+  },
+  success: {
+    textAlign: 'center',
+    textTransform: 'none',
+    color: palette.stone,
+  },
   radioRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    gap: 12,
+    paddingVertical: 8,
   },
-
   radioOuter: {
-    width: normalize(18),
-    height: normalize(18),
-    borderRadius: normalize(9),
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
-    borderColor: palette.primary,
-    justifyContent: 'center',
+    borderColor: palette.kale,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-
   radioInner: {
-    width: normalize(8),
-    height: normalize(8),
-    backgroundColor: palette.primary,
-    borderRadius: normalize(4),
-  },
-
-  appleWrapper: {
-    padding: 6,
-    borderRadius: normalize(8),
-  },
-
-  apple: {
-    fontSize: normalize(32),
-    lineHeight: normalize(36),
-    opacity: 0.3,
-  },
-
-  appleSelected: {
-    opacity: 1,
-    transform: [{ scale: 1.2 }],
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: palette.kale,
   },
 });
