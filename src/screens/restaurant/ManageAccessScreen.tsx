@@ -38,6 +38,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { getSubscriptionRoute } from '@/utils/subscriptionAccess';
+import { formatMobileForDisplay } from '@/data/countryCodes';
 import { useAppContext } from '@/store/AppContext';
 
 const RESTAURANT_ROLE_OPTIONS = [
@@ -277,7 +278,7 @@ export default function ManageAccessScreen() {
         {/* SUBTEXT */}
         <View style={styles.subTextBox}>
           <AppText variant="bodySmall">
-            Your restaurant is now live. We’ve notified nearby charities and we’ll let you know as soon as surplus is noted and someone claims it
+            Your site is now live. We’ve notified nearby charities and we’ll let you know as soon as surplus is noted and someone claims it
           </AppText>
         </View>
 
@@ -513,7 +514,7 @@ export default function ManageAccessScreen() {
             <View>
               <AppText variant="bodyBold"> {member.firstName} {member.lastName} </AppText>
               <AppText variant="bodySmall">{member.email}</AppText>
-              <AppText variant="bodySmall">{member.mobile}</AppText>
+              <AppText variant="bodySmall">{formatMobileForDisplay(member.mobile)}</AppText>
               <AppText variant="bodySmall"> Role: {member.role === 'SITE_ADMIN' ? 'Site Admin' : 'Staff'}</AppText>
             </View>
 

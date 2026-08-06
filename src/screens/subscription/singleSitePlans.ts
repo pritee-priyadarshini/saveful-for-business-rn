@@ -64,7 +64,7 @@ export const SINGLE_SITE_PLANS: SingleSitePlan[] = [
     annualNote: '2 months free',
     description:
       'For businesses ready to optimise operations with advanced insights, reporting & ESG measurement.',
-    includesLabel: 'Includes everything in Single Site, plus;',
+    includesLabel: 'Includes everything in Single Site plan, plus',
     features: [
       'Up to 6 users',
       'Advanced reporting dashboard',

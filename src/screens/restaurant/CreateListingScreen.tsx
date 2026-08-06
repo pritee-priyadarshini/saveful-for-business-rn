@@ -139,6 +139,7 @@ export function CreateListingScreen({ navigation }: any) {
   const [images, setImages] = useState<string[]>([]);
 
   const [location, setLocation] = useState(currentProfile?.address || '');
+  const [addressEditing, setAddressEditing] = useState(false);
   const [bestBeforeDate, setBestBeforeDate] = useState<Date | null>(null);
   const [bestBeforeTimeSet, setBestBeforeTimeSet] = useState(false);
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
@@ -470,6 +471,7 @@ export function CreateListingScreen({ navigation }: any) {
     <Screen
       backgroundColor="#F2F5E9"
       scrollable
+      scrollKey={step}
       contentStyle={{ ...styles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[styles.pageWrap, adaptive.pageWrap]}>
@@ -688,16 +690,35 @@ export function CreateListingScreen({ navigation }: any) {
             </AppText>
             <View style={styles.card}>
               <View style={styles.locationBox}>
-                <TextInput
-                  value={location}
-                  onChangeText={(value) => {
-                    setLocation(value);
-                    setStepErrors((prev) => ({ ...prev, location: undefined }));
-                  }}
-                  placeholder="Enter pickup address"
-                  placeholderTextColor={palette.stone}
-                  style={styles.locationInput}
-                />
+                {addressEditing ? (
+                  <TextInput
+                    value={location}
+                    onChangeText={(value) => {
+                      setLocation(value);
+                      setStepErrors((prev) => ({ ...prev, location: undefined }));
+                    }}
+                    placeholder="Enter pickup address"
+                    placeholderTextColor={palette.stone}
+                    style={styles.locationInput}
+                    autoFocus
+                    onBlur={() => setAddressEditing(false)}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={() => setAddressEditing(false)}
+                  />
+                ) : (
+                  <Pressable onPress={() => setAddressEditing(true)} hitSlop={4}>
+                    <AppText
+                      variant="body1"
+                      color={location ? palette.midgray : palette.stone}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={styles.locationInput}
+                    >
+                      {location || 'Enter pickup address'}
+                    </AppText>
+                  </Pressable>
+                )}
               </View>
             </View>
             {stepErrors.location ? (
@@ -1420,9 +1441,11 @@ const styles = StyleSheet.create({
   },
   locationInput: {
     paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
     color: palette.midgray,
     fontSize: normalize(14),
     fontFamily: 'Saveful-Regular',
+    textAlign: 'left',
   },
   selectorRow: {
     minHeight: hp(5.2),

@@ -188,8 +188,8 @@ export function SingleSiteConfirmScreen() {
 
               <AppText color={ACCENT} style={styles.includesLabel}>
                 {plan.inheritsFrom
-                  ? `Includes everything in ${plan.inheritsFrom}, plus;`
-                  : 'Includes'}
+                  ? `Includes everything in ${plan.inheritsFrom.replace(/\s*plan$/i, '')} plan, plus`
+                  : 'Includes everything in Single Site plan, plus'}
               </AppText>
 
               <View style={styles.featureList}>

@@ -263,6 +263,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
 const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
 
+const EMAIL_ALREADY_REGISTERED_MESSAGE =
+  'An account with this email already exists. Try signing in instead.';
+
 function FormErrorBanner({ message }: { message: string | null }) {
   if (!message) return null;
 
@@ -272,6 +275,21 @@ function FormErrorBanner({ message }: { message: string | null }) {
       <AppText variant="bodySmall" style={styles.errorBannerText}>
         {message}
       </AppText>
+    </View>
+  );
+}
+
+function SignInFooter({ onPress }: { onPress: () => void }) {
+  return (
+    <View style={styles.signInFooter}>
+      <AppText variant="bodySmall" color={palette.textMuted} style={styles.signInPrompt}>
+        Already have an account?
+      </AppText>
+      <Pressable onPress={onPress} hitSlop={8}>
+        <AppText variant="bodyBold" color={palette.primary} style={styles.signInLink}>
+          Sign in
+        </AppText>
+      </Pressable>
     </View>
   );
 }
@@ -302,6 +320,7 @@ export function AuthScreen() {
   const isFarmer = isFarmerProducer || isFarmerConsumer;
 
   const [loading, setLoading] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [formError, setFormError] = useState<string | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -371,6 +390,10 @@ export function AuthScreen() {
       hideSub.remove();
     };
   }, [scrollActiveFieldIntoView]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [currentStep]);
 
   const inputProps = {
     ...inputPropsBase,
@@ -842,14 +865,36 @@ export function AuthScreen() {
     return null;
   };
 
-  const handleContinueStep1 = () => {
+  const goToSignIn = useCallback(() => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'SignIn' }],
+    });
+  }, [navigation]);
+
+  const handleContinueStep1 = async () => {
     const error = validateStep1();
     if (error) {
       setFormError(error);
       return;
     }
+
+    const email = getPersonalForm().email.trim().toLowerCase();
+    setCheckingEmail(true);
     setFormError(null);
-    setCurrentStep(2);
+    try {
+      const alreadyRegistered = await authService.checkEmailRegistered(email);
+      if (alreadyRegistered) {
+        setFormError(EMAIL_ALREADY_REGISTERED_MESSAGE);
+        return;
+      }
+      setCurrentStep(2);
+    } catch {
+      // If the probe fails, continue — final register still validates uniqueness.
+      setCurrentStep(2);
+    } finally {
+      setCheckingEmail(false);
+    }
   };
 
   const handleContinueStep2 = () => {
@@ -1215,8 +1260,23 @@ export function AuthScreen() {
               />
 
               <FormErrorBanner message={formError} />
+              {formError === EMAIL_ALREADY_REGISTERED_MESSAGE ? (
+                <Pressable onPress={goToSignIn} style={styles.signInFromErrorBtn} hitSlop={8}>
+                  <AppText variant="bodyBold" color={palette.primary} style={styles.signInLink}>
+                    Go to Sign in
+                  </AppText>
+                </Pressable>
+              ) : null}
 
-              <AuthContinueButton onPress={handleContinueStep1} />
+              <AuthContinueButton
+                label={checkingEmail ? 'CHECKING...' : 'CONTINUE'}
+                disabled={checkingEmail}
+                onPress={() => {
+                  void handleContinueStep1();
+                }}
+              />
+
+              <SignInFooter onPress={goToSignIn} />
             </View>
           )}
 
@@ -1397,6 +1457,8 @@ export function AuthScreen() {
                 disabled={!isChecked}
                 onPress={handleContinueStep2}
               />
+
+              <SignInFooter onPress={goToSignIn} />
             </View>
           )}
 
@@ -1450,12 +1512,21 @@ export function AuthScreen() {
               </View>
 
               <FormErrorBanner message={formError} />
+              {formError === EMAIL_ALREADY_REGISTERED_MESSAGE ? (
+                <Pressable onPress={goToSignIn} style={styles.signInFromErrorBtn} hitSlop={8}>
+                  <AppText variant="bodyBold" color={palette.primary} style={styles.signInLink}>
+                    Go to Sign in
+                  </AppText>
+                </Pressable>
+              ) : null}
 
               <AuthContinueButton
                 label={loading ? 'CREATING...' : 'CREATE ACCOUNT'}
                 disabled={!isChecked || loading}
                 onPress={handleRegister}
               />
+
+              <SignInFooter onPress={goToSignIn} />
 
               {isRestaurant ? (
                 <AppText variant="bodySmall" style={styles.tip}>
@@ -2228,7 +2299,35 @@ const styles = StyleSheet.create({
     flex: 1,
     color: palette.validation,
     textTransform: 'none',
-    lineHeight: normalize(18),
   },
 
+  signInFromErrorBtn: {
+    alignSelf: 'flex-start',
+    marginTop: hp(-0.4),
+    marginBottom: hp(0.4),
+    paddingVertical: hp(0.4),
+  },
+
+  signInFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: wp(1.5),
+    marginTop: hp(1.2),
+    paddingTop: hp(1.4),
+    borderTopWidth: 1,
+    borderTopColor: palette.strokecream,
+  },
+
+  signInPrompt: {
+    fontSize: normalize(14),
+    textTransform: 'none',
+  },
+
+  signInLink: {
+    fontSize: normalize(14),
+    textTransform: 'none',
+    textDecorationLine: 'underline',
+  },
 });
+

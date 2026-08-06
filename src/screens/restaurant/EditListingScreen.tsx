@@ -216,6 +216,7 @@ function EditPeopleListingForm({
   const [images, setImages] = useState<string[]>([]);
 
   const [location, setLocation] = useState('');
+  const [addressEditing, setAddressEditing] = useState(false);
   const [bestBeforeDate, setBestBeforeDate] = useState<Date | null>(null);
   const [bestBeforeTimeSet, setBestBeforeTimeSet] = useState(false);
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
@@ -512,6 +513,7 @@ function EditPeopleListingForm({
     <Screen
       backgroundColor="#F2F5E9"
       scrollable
+      scrollKey={step}
       contentStyle={{ ...peopleStyles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[peopleStyles.pageWrap, adaptive.pageWrap]}>
@@ -699,13 +701,32 @@ function EditPeopleListingForm({
             </AppText>
             <View style={peopleStyles.card}>
               <View style={peopleStyles.locationBox}>
-                <TextInput
-                  value={location}
-                  onChangeText={setLocation}
-                  placeholder="Enter pickup address"
-                  placeholderTextColor={palette.stone}
-                  style={peopleStyles.locationInput}
-                />
+                {addressEditing ? (
+                  <TextInput
+                    value={location}
+                    onChangeText={setLocation}
+                    placeholder="Enter pickup address"
+                    placeholderTextColor={palette.stone}
+                    style={peopleStyles.locationInput}
+                    autoFocus
+                    onBlur={() => setAddressEditing(false)}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={() => setAddressEditing(false)}
+                  />
+                ) : (
+                  <Pressable onPress={() => setAddressEditing(true)} hitSlop={4}>
+                    <AppText
+                      variant="body1"
+                      color={location ? palette.midgray : palette.stone}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={peopleStyles.locationInput}
+                    >
+                      {location || 'Enter pickup address'}
+                    </AppText>
+                  </Pressable>
+                )}
               </View>
             </View>
 
@@ -1116,6 +1137,7 @@ function EditFarmListingForm({
   const [images, setImages] = useState<string[]>([]);
 
   const [location, setLocation] = useState('');
+  const [addressEditing, setAddressEditing] = useState(false);
   const [bestBeforeDate, setBestBeforeDate] = useState<Date | null>(null);
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
   const [pickupToDate, setPickupToDate] = useState<Date | null>(null);
@@ -1374,6 +1396,7 @@ function EditFarmListingForm({
     <Screen
       backgroundColor={FARM_BG}
       scrollable
+      scrollKey={step}
       contentStyle={{ ...farmStyles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[farmStyles.pageWrap, adaptive.pageWrap]}>
@@ -1550,13 +1573,32 @@ function EditFarmListingForm({
             </AppText>
             <View style={farmStyles.card}>
               <View style={farmStyles.locationBox}>
-                <TextInput
-                  value={location}
-                  onChangeText={setLocation}
-                  placeholder="Enter pickup address"
-                  placeholderTextColor={palette.stone}
-                  style={farmStyles.locationInput}
-                />
+                {addressEditing ? (
+                  <TextInput
+                    value={location}
+                    onChangeText={setLocation}
+                    placeholder="Enter pickup address"
+                    placeholderTextColor={palette.stone}
+                    style={farmStyles.locationInput}
+                    autoFocus
+                    onBlur={() => setAddressEditing(false)}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={() => setAddressEditing(false)}
+                  />
+                ) : (
+                  <Pressable onPress={() => setAddressEditing(true)} hitSlop={4}>
+                    <AppText
+                      variant="body1"
+                      color={location ? palette.midgray : palette.stone}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={farmStyles.locationInput}
+                    >
+                      {location || 'Enter pickup address'}
+                    </AppText>
+                  </Pressable>
+                )}
               </View>
             </View>
 
@@ -2253,9 +2295,11 @@ const peopleStyles = StyleSheet.create({
   },
   locationInput: {
     paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
     color: palette.midgray,
     fontSize: normalize(14),
     fontFamily: 'Saveful-Regular',
+    textAlign: 'left',
   },
   selectorRow: {
     minHeight: hp(5.2),
@@ -2797,9 +2841,11 @@ const farmStyles = StyleSheet.create({
   },
   locationInput: {
     paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
     color: palette.midgray,
     fontSize: normalize(14),
     fontFamily: 'Saveful-Regular',
+    textAlign: 'left',
   },
   selectorRow: {
     minHeight: hp(5.2),

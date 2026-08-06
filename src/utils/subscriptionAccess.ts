@@ -35,13 +35,12 @@ export function getSubscriptionRoute(
   return null;
 }
 
-export const SUBSCRIPTION_REQUIRED_TITLE = 'Activate your workspace';
+export const SUBSCRIPTION_REQUIRED_TITLE = 'Start your 30-day free trial';
 
 export function getSubscriptionRequiredMessage(canManageBilling: boolean): string {
   if (canManageBilling) {
     return (
-      'Your organisation does not have an active plan yet. ' +
-      'Start a free 30-day trial or choose a plan to create listings, invite your team, and track impact.'
+      'Start your free trial to create listings, invite your team, and begin tracking your impact.'
     );
   }
   return (
@@ -59,7 +58,7 @@ export function showSubscriptionRequiredPrompt(options: {
   showConfirmAlert({
     title: SUBSCRIPTION_REQUIRED_TITLE,
     message: options.messageOverride?.trim() || getSubscriptionRequiredMessage(options.canManageBilling),
-    confirmLabel: options.canManageBilling ? 'Continue' : 'View plans',
+    confirmLabel: 'Start free trial',
     cancelLabel: 'Not now',
     onConfirm: options.onContinue,
   });

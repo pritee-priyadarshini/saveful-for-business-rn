@@ -210,7 +210,7 @@ export function MultiSitePlansScreen() {
 
               {plan.inheritsFrom ? (
                 <AppText color={ACCENT} style={styles.includesLabel}>
-                  Includes everything in {plan.inheritsFrom}, plus;
+                  Includes everything in {plan.inheritsFrom}, plus
                 </AppText>
               ) : null}
 

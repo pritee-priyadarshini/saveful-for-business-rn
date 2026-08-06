@@ -1,3 +1,5 @@
+import { isAxiosError } from 'axios';
+
 import api from './api';
 
 const BASE_URL = 'https://s4b.saveful.app/api/v1';
@@ -68,4 +70,52 @@ export const authService = {
 
   updateProfile: (data: { phoneNumber?: string }) =>
     api.patch('/auth/profile', data),
+
+  /**
+   * Probe login to see if an email is already registered.
+   * - "User not found" → available
+   * - "Invalid Credentials" / verify prompts → taken
+   */
+  checkEmailRegistered: async (email: string): Promise<boolean> => {
+    try {
+      await api.post('/auth/login', {
+        email: normalizeEmail(email),
+        password: '__email_availability_probe__',
+      });
+      return true;
+    } catch (error: unknown) {
+      const data =
+        isAxiosError(error)
+          ? error.response?.data
+          : (error as { response?: { data?: unknown } })?.response?.data;
+      const raw =
+        typeof data === 'object' && data && 'message' in data
+          ? String((data as { message?: unknown }).message ?? '')
+          : error instanceof Error
+            ? error.message
+            : '';
+      const lower = raw.toLowerCase();
+
+      if (
+        lower.includes('user not found') ||
+        lower.includes('no account') ||
+        lower.includes('no user')
+      ) {
+        return false;
+      }
+
+      if (
+        lower.includes('invalid credentials') ||
+        lower.includes('wrong password') ||
+        lower.includes('verify') ||
+        lower.includes('not verified') ||
+        lower.includes('already')
+      ) {
+        return true;
+      }
+
+      // Network / unknown — don't block signup; final register will catch duplicates.
+      return false;
+    }
+  },
 };

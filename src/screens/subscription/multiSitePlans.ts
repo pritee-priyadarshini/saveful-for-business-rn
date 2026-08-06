@@ -54,7 +54,7 @@ export const MULTI_SITE_PLANS: MultiSitePlan[] = [
     customPricing: true,
     description:
       'For organisations requiring enterprise-scale deployment and support.',
-    includesLabel: 'Includes everything in Multi Site Plan, plus;',
+    includesLabel: 'Includes everything in Multi Site plan, plus',
     features: [
       'Unlimited locations',
       'Enterprise analytics & executive dashboards',

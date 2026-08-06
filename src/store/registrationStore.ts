@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { CharityForm, FarmerForm, RestaurantForm } from './types';
-import { DEFAULT_COUNTRY_CODE } from '../data/countryCodes';
+import { DEFAULT_COUNTRY_CODE, DEFAULT_COUNTRY_ISO } from '../data/countryCodes';
 
 const DEFAULT_RESTAURANT_FORM: RestaurantForm = {
   firstName: '',
@@ -10,7 +10,7 @@ const DEFAULT_RESTAURANT_FORM: RestaurantForm = {
   confirmPassword: '',
   mobile: '',
   mobileCountryCode: DEFAULT_COUNTRY_CODE,
-  mobileCountryIso: 'IN',
+  mobileCountryIso: DEFAULT_COUNTRY_ISO,
   businessName: '',
   businessAddress: '',
   registrationNumber: '',
@@ -30,7 +30,7 @@ const DEFAULT_CHARITY_FORM: CharityForm = {
   confirmPassword: '',
   mobile: '',
   mobileCountryCode: DEFAULT_COUNTRY_CODE,
-  mobileCountryIso: 'IN',
+  mobileCountryIso: DEFAULT_COUNTRY_ISO,
   charityName: '',
   charityAddress: '',
   registrationNumber: '',
@@ -52,7 +52,7 @@ const DEFAULT_FARMER_FORM: FarmerForm = {
   confirmPassword: '',
   mobile: '',
   mobileCountryCode: DEFAULT_COUNTRY_CODE,
-  mobileCountryIso: 'IN',
+  mobileCountryIso: DEFAULT_COUNTRY_ISO,
   businessName: '',
   businessAddress: '',
   venueType: '',

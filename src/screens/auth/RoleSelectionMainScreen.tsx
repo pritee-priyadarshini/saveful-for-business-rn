@@ -29,7 +29,7 @@ const roleCards = [
 		title: 'I HAVE SURPLUS FOOD',
 		subTitle: 'For Businesses, venues & farms',
 		description:
-			'List surplus edible food for charities to help communities in need. Or list non-edible for farmers to feed livestock.',
+			'List surplus edible food for charities to help communities in need. Or list non-edible to be recovered for livestock feed and circular solutions.',
 		borderColor: palette.kale,
 		titleColor: palette.kale,
 		buttonColor: palette.kale,
@@ -40,10 +40,10 @@ const roleCards = [
 	{
 		id: 'charity_single' as const,
 		illustration: require('../../../assets/placeholder/truck.png'),
-		title: 'I COLLECT & REDISTRIBUTE FOOD',
-		subTitle: 'For Charities and farmers',
+		title: 'I COLLECT & RECOVER FOOD',
+		subTitle: 'For Charities, farmers & circular solutions',
 		description:
-			'Collect surplus edible food to help communities in need. Or collect non-edible to be used for farm livestock feed.',
+			'Collect surplus edible food to help communities in need. Or collect non-edible to be used for livestock feed or circular solutions.',
 		borderColor: palette.eggplant,
 		titleColor: palette.kale,
 		buttonColor: palette.eggplant,

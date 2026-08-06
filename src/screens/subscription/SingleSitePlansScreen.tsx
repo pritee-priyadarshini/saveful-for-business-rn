@@ -317,6 +317,12 @@ function PlanCard({
         </AppText>
       ) : null}
 
+      {plan.inheritsFrom ? (
+        <AppText color={ACCENT} style={styles.includesLabel}>
+          {`Includes everything in ${plan.inheritsFrom.replace(/\s*plan$/i, '')} plan, plus`}
+        </AppText>
+      ) : null}
+
       <View style={styles.featureList}>
         {(plan.features ?? []).map((feature) => (
           <View key={feature} style={styles.featureRow}>
@@ -452,6 +458,13 @@ const styles = StyleSheet.create({
     fontSize: normalize(13),
     textTransform: 'none',
     marginTop: hp(0.3),
+  },
+  includesLabel: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
+    textTransform: 'none',
+    marginTop: hp(0.45),
   },
   featureList: {
     marginTop: hp(0.6),

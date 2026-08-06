@@ -139,6 +139,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
   const [images, setImages] = useState<string[]>([]);
 
   const [location, setLocation] = useState(currentProfile?.address || '');
+  const [addressEditing, setAddressEditing] = useState(false);
   const [bestBeforeDate, setBestBeforeDate] = useState<Date | null>(null);
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
   const [pickupToDate, setPickupToDate] = useState<Date | null>(null);
@@ -427,6 +428,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
     <Screen
       backgroundColor={FARM_BG}
       scrollable
+      scrollKey={step}
       contentStyle={{ ...styles.screenContent, ...adaptive.screenContent }}
     >
       <View style={[styles.pageWrap, adaptive.pageWrap]}>
@@ -455,10 +457,10 @@ export function CreateFarmListingScreen({ navigation }: any) {
           />
 
           <AppText variant="h5" color={palette.black} style={styles.topTitle}>
-            Surplus for Livestock
+            Surplus for Farm & Recovery
           </AppText>
           <AppText variant="body1" color={palette.midgray} style={styles.topSubtitle}>
-            List food not suitable for humans to be used as animal feed
+            List food not suitable for humans
           </AppText>
 
           {/* STEPPER */}
@@ -620,7 +622,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
                 </Pressable>
               </View>
               <AppText variant="caption" color={palette.stone} style={styles.helperText}>
-                PHOTOS HELP FARMERS PLAN COLLECTIONS
+                PHOTOS HELP PLAN COLLECTIONS
               </AppText>
             </View>
           </View>
@@ -634,16 +636,35 @@ export function CreateFarmListingScreen({ navigation }: any) {
             </AppText>
             <View style={styles.card}>
               <View style={styles.locationBox}>
-                <TextInput
-                  value={location}
-                  onChangeText={(value) => {
-                    setLocation(value);
-                    setStepErrors((prev) => ({ ...prev, location: undefined }));
-                  }}
-                  placeholder="Enter pickup address"
-                  placeholderTextColor={palette.stone}
-                  style={styles.locationInput}
-                />
+                {addressEditing ? (
+                  <TextInput
+                    value={location}
+                    onChangeText={(value) => {
+                      setLocation(value);
+                      setStepErrors((prev) => ({ ...prev, location: undefined }));
+                    }}
+                    placeholder="Enter pickup address"
+                    placeholderTextColor={palette.stone}
+                    style={styles.locationInput}
+                    autoFocus
+                    onBlur={() => setAddressEditing(false)}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={() => setAddressEditing(false)}
+                  />
+                ) : (
+                  <Pressable onPress={() => setAddressEditing(true)} hitSlop={4}>
+                    <AppText
+                      variant="body1"
+                      color={location ? palette.midgray : palette.stone}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={styles.locationInput}
+                    >
+                      {location || 'Enter pickup address'}
+                    </AppText>
+                  </Pressable>
+                )}
               </View>
             </View>
             {stepErrors.location ? (
@@ -930,10 +951,10 @@ export function CreateFarmListingScreen({ navigation }: any) {
                   <Ionicons name="restaurant-outline" size={normalize(18)} color={palette.middlegreen} />
                   <View style={styles.impactBlockContent}>
                     <AppText variant="h7" color={palette.middlegreen} style={styles.impactValue}>
-                      {Math.max(estimatedMeals, 0)}
+                      {Math.max(totalQuantity, 0)}
                     </AppText>
                     <AppText variant="bodySmall" color={palette.middlegreen} style={styles.impactLabel}>
-                      meals saved
+                      Kg Food Provided
                     </AppText>
                   </View>
                 </View>
@@ -953,9 +974,6 @@ export function CreateFarmListingScreen({ navigation }: any) {
                   </View>
                 </View>
               </View>
-              <AppText variant="bodySmall" color={palette.middlegreen} style={styles.impactFootnote}>
-                420g = 1 meal · CO₂ = food kg × 2.1
-              </AppText>
             </View>
           </View>
         ) : null}
@@ -967,7 +985,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
           disabled={submitting}
         >
           <AppText variant="bodyBold" color={palette.white}>
-            {step === 3 ? (submitting ? 'CREATING...' : 'CREATE FARM LISTING') : 'CONTINUE'}
+            {step === 3 ? (submitting ? 'CREATING...' : 'CREATE LISTING') : 'CONTINUE'}
           </AppText>
           {!submitting ? (
             <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
@@ -1330,9 +1348,11 @@ const styles = StyleSheet.create({
   },
   locationInput: {
     paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
     color: palette.midgray,
     fontSize: normalize(14),
     fontFamily: 'Saveful-Regular',
+    textAlign: 'left',
   },
   selectorRow: {
     minHeight: hp(5.2),

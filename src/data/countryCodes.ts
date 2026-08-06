@@ -5,7 +5,7 @@ export type CountryCode = {
   flag: string;
 };
 
-const PRIORITY_ISO = ['IN', 'AU', 'US'] as const;
+const PRIORITY_ISO = ['AU', 'IN', 'US'] as const;
 
 const ALL_COUNTRIES: CountryCode[] = [
   { iso: 'IN', name: 'India', dialCode: '+91', flag: '🇮🇳' },
@@ -55,7 +55,8 @@ export const COUNTRY_CODES: CountryCode[] = [
   ),
 ];
 
-export const DEFAULT_COUNTRY_CODE = '+91';
+export const DEFAULT_COUNTRY_CODE = '+61';
+export const DEFAULT_COUNTRY_ISO = 'AU';
 
 export function findCountryByDialCode(dialCode: string): CountryCode | undefined {
   return COUNTRY_CODES.find((country) => country.dialCode === dialCode);
@@ -69,6 +70,39 @@ export function formatMobileWithCountryCode(dialCode: string, nationalNumber: st
   const digits = nationalNumber.replace(/\D/g, '');
   const code = dialCode.startsWith('+') ? dialCode : `+${dialCode}`;
   return `${code}${digits}`;
+}
+
+/**
+ * Display phones without country code. Australian numbers become `04XXXXXXXX`.
+ * Handles both E.164 (`+61412228301`) and local-with-zero-after-code (`+610412228301`).
+ */
+export function formatMobileForDisplay(raw: string | null | undefined): string {
+  if (raw == null) return '';
+  const trimmed = String(raw).trim();
+  if (!trimmed || trimmed === '-') return trimmed;
+
+  let digits = trimmed.replace(/\D/g, '');
+  if (!digits) return trimmed;
+
+  if (digits.startsWith('61') && digits.length >= 10) {
+    const national = digits.slice(2);
+    return national.startsWith('0') ? national : `0${national}`;
+  }
+
+  if (digits.startsWith('91') && digits.length >= 12) {
+    return digits.slice(2);
+  }
+
+  if (digits.startsWith('1') && digits.length === 11) {
+    return digits.slice(1);
+  }
+
+  if (digits.startsWith('44') && digits.length >= 12) {
+    const national = digits.slice(2);
+    return national.startsWith('0') ? national : `0${national}`;
+  }
+
+  return digits;
 }
 
 export type SignupMobileFields = {

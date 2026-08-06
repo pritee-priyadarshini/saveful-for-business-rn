@@ -36,9 +36,9 @@ const surplusCards = [
 	},
 	{
 		id: 'livestock',
-		title: 'SURPLUS FOOD FOR\nFARM LIVESTOCK',
+		title: 'SURPLUS NOT FIT FOR\nHUMAN CONSUMPTION',
 		titleColor: palette.orange,
-		summary: 'Not suitable for human consumption',
+		summary: 'Suitable for livestock feed, bio energy or agricultural re-use',
 		description:
 			'Food past its use-by date, food scraps or surplus suitable for livestock feed or agricultural re-use',
 		borderColor: palette.orange,
