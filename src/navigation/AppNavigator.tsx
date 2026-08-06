@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { NavigationContainer, DefaultTheme, NavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -16,6 +16,9 @@ import {
   getSubscriptionRoute,
   showSubscriptionRequiredPrompt,
 } from '@/utils/subscriptionAccess';
+import { ReceiverWelcomeModal } from '@/components/ReceiverWelcomeModal';
+import { useReceiverWelcomeModal } from '@/hooks/useReceiverWelcomeModal';
+import { isReceiverWelcomeRole } from '@/data/receiverWelcome';
 
 import { CharityHistoryScreen } from '../screens/charity/CharityHistoryScreen';
 import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
@@ -82,11 +85,13 @@ export type RootStackParamList = {
   CharityManageAccess: {
     locationId: number;
     orgType: 'restaurant' | 'charity' | 'farmer';
+    initialTab?: 'user' | 'driver';
   };
 
   FarmerManageAccess: {
     locationId: number;
     orgType: 'restaurant' | 'charity' | 'farmer';
+    initialTab?: 'user' | 'driver';
   };
   
 
@@ -123,6 +128,16 @@ export function AppNavigator() {
   const { isAuthenticated, selectedRole } = useAppContext();
   const effectiveRole = selectedRole;
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+
+  const welcomeVariant = useMemo(
+    () => (isReceiverWelcomeRole(effectiveRole) ? effectiveRole : null),
+    [effectiveRole],
+  );
+  const {
+    visible: welcomeVisible,
+    dismiss: dismissWelcome,
+    content: welcomeContent,
+  } = useReceiverWelcomeModal(isAuthenticated ? welcomeVariant : null);
 
   // Always-current auth state readable inside stable callbacks without re-subscribing.
   const isAuthenticatedRef = useRef(isAuthenticated);
@@ -252,47 +267,57 @@ export function AppNavigator() {
       onReady={flushPendingNotification}
     >
       {isAuthenticated ? (
-        <RootStack.Navigator
-          screenOptions={{ headerShown: false, orientation: 'portrait' }}
-          initialRouteName={initialRouteName}
-        >
-          <RootStack.Screen name="Tabs" component={RoleTabs} />
+        <>
+          <RootStack.Navigator
+            screenOptions={{ headerShown: false, orientation: 'portrait' }}
+            initialRouteName={initialRouteName}
+          >
+            <RootStack.Screen name="Tabs" component={RoleTabs} />
 
-          {effectiveRole === 'restaurant_multi' ? (
-            <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
-          ) : null}
+            {effectiveRole === 'restaurant_multi' ? (
+              <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
+            ) : null}
 
-          {effectiveRole === 'charity_multi' ? (
-            <RootStack.Screen
-              name="MultiCharityManageSites"
-              component={MultiCharityManageSitesScreen}
-            />
-          ) : null}
+            {effectiveRole === 'charity_multi' ? (
+              <RootStack.Screen
+                name="MultiCharityManageSites"
+                component={MultiCharityManageSitesScreen}
+              />
+            ) : null}
 
-          {/* GLOBAL */}
-          <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />
-          <RootStack.Screen name="FarmerHistory" component={FarmerHistoryScreen} />
-          <RootStack.Screen name="SingleSitePlans" component={SingleSitePlansScreen} />
-          <RootStack.Screen name="SingleSiteCompare" component={SingleSiteCompareScreen} />
-          <RootStack.Screen name="SingleSiteConfirm" component={SingleSiteConfirmScreen} />
-          <RootStack.Screen name="MultiSitePlans" component={MultiSitePlansScreen} />
-          <RootStack.Screen name="MultiSiteConfirm" component={MultiSiteConfirmScreen} />
-          <RootStack.Screen name="EnterpriseConsult" component={EnterpriseConsultScreen} />
-          <RootStack.Screen name="EnterpriseThanks" component={EnterpriseThanksScreen} />
-          <RootStack.Screen name="RestaurantPlan" component={RestaurantPlanRouter} />
-          <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
-          <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
-          <RootStack.Screen name="SiteAnalytics" component={SiteAnalyticsScreen} />
-          <RootStack.Screen name="Account" component={ProfileScreen} />
-          <RootStack.Screen name="Calculation" component={CalculationScreen} />
-          <RootStack.Screen name="CreateCharitySite" component={CreateCharitySiteScreen} />
-          <RootStack.Screen name="CharitySiteAnalytics" component={CharitySiteAnalyticsScreen} />
-          <RootStack.Screen name="DriverTracking" component={DriverTrackingScreen} />
-          <RootStack.Screen name="CharityManageAccess" component={CharityManageAccessScreen} />
-          <RootStack.Screen name="FarmerManageAccess" component={FarmerManageAccessScreen} />
-          <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            {/* GLOBAL */}
+            <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />
+            <RootStack.Screen name="FarmerHistory" component={FarmerHistoryScreen} />
+            <RootStack.Screen name="SingleSitePlans" component={SingleSitePlansScreen} />
+            <RootStack.Screen name="SingleSiteCompare" component={SingleSiteCompareScreen} />
+            <RootStack.Screen name="SingleSiteConfirm" component={SingleSiteConfirmScreen} />
+            <RootStack.Screen name="MultiSitePlans" component={MultiSitePlansScreen} />
+            <RootStack.Screen name="MultiSiteConfirm" component={MultiSiteConfirmScreen} />
+            <RootStack.Screen name="EnterpriseConsult" component={EnterpriseConsultScreen} />
+            <RootStack.Screen name="EnterpriseThanks" component={EnterpriseThanksScreen} />
+            <RootStack.Screen name="RestaurantPlan" component={RestaurantPlanRouter} />
+            <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
+            <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
+            <RootStack.Screen name="SiteAnalytics" component={SiteAnalyticsScreen} />
+            <RootStack.Screen name="Account" component={ProfileScreen} />
+            <RootStack.Screen name="Calculation" component={CalculationScreen} />
+            <RootStack.Screen name="CreateCharitySite" component={CreateCharitySiteScreen} />
+            <RootStack.Screen name="CharitySiteAnalytics" component={CharitySiteAnalyticsScreen} />
+            <RootStack.Screen name="DriverTracking" component={DriverTrackingScreen} />
+            <RootStack.Screen name="CharityManageAccess" component={CharityManageAccessScreen} />
+            <RootStack.Screen name="FarmerManageAccess" component={FarmerManageAccessScreen} />
+            <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
 
-        </RootStack.Navigator>
+          </RootStack.Navigator>
+
+          <ReceiverWelcomeModal
+            visible={welcomeVisible}
+            content={welcomeContent}
+            onDismiss={() => {
+              void dismissWelcome();
+            }}
+          />
+        </>
       ) : (
         <AuthStack />
       )}

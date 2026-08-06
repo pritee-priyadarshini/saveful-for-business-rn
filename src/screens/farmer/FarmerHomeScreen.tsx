@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import {
   FlatList,
   Image,
@@ -25,6 +25,7 @@ import { AssignDriverModal } from '@/components/AssignDriverModal';
 
 import { useAppContext } from '../../store/AppContext';
 import { useAuthStore } from '../../store/authStore';
+import { useFarmerConsumerStore } from '../../store/farmerConsumerStore';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
 import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
@@ -101,45 +102,101 @@ export function FarmerHomeScreen() {
   const [assignDriver, setAssignDriver] = useState<SiteDriverRow | null>(null);
 
   const siteIds = useMemo(() => resolveFarmerSiteIds(authUser), [authUser]);
+  const fetchUsers = useFarmerConsumerStore((s) => s.fetchUsers);
+
+  const resolvePrimaryLocationId = useCallback(() => {
+    const current = useAuthStore.getState().authUser;
+    const fromSites = resolveFarmerSiteIds(current)[0];
+    if (fromSites) return fromSites;
+    const fromProfile = Number(current?.profile?.sites?.[0]?.id);
+    if (Number.isFinite(fromProfile) && fromProfile > 0) return fromProfile;
+    return 0;
+  }, []);
 
   const loadSiteDrivers = useCallback(async () => {
     setDriversLoading(true);
     setDriversError(null);
     try {
-      const ids = siteIds;
+      await fetchUsers(true).catch(() => undefined);
+
+      let ids = resolveFarmerSiteIds(useAuthStore.getState().authUser);
       if (ids.length === 0) {
-        setSiteDrivers([]);
-        setDriversError('No farm site found for drivers.');
-        return;
+        const fallback = resolvePrimaryLocationId();
+        if (fallback > 0) ids = [fallback];
       }
 
-      const batches = await Promise.all(
-        ids.map(async (siteId) => {
-          const drivers = await driversService.getDriversForSite(siteId);
-          return drivers.map((driver) => ({ ...driver, siteId }));
-        }),
-      );
+      const liveBatches =
+        ids.length > 0
+          ? await Promise.all(
+              ids.map(async (siteId) => {
+                try {
+                  const drivers = await driversService.getDriversForSite(siteId);
+                  return drivers.map((driver) => ({ ...driver, siteId }));
+                } catch {
+                  return [] as SiteDriverRow[];
+                }
+              }),
+            )
+          : [];
 
-      setSiteDrivers(dedupeSiteDrivers(batches.flat()));
+      const liveDrivers = dedupeSiteDrivers(liveBatches.flat());
+      const teamDrivers = useFarmerConsumerStore
+        .getState()
+        .users.filter((member) => member.role === 'DRIVER' && member.isActive !== false)
+        .map((member) => {
+          const matchedLive = liveDrivers.find((driver) => driver.id === member.id);
+          if (matchedLive) return matchedLive;
+          return {
+            id: member.id,
+            name: [member.firstName, member.lastName].filter(Boolean).join(' ').trim() || 'Driver',
+            phone: member.mobile || '',
+            online: false,
+            vehicleType: null,
+            lat: null,
+            lng: null,
+            siteId: ids[0] ?? resolvePrimaryLocationId(),
+          } satisfies SiteDriverRow;
+        });
+
+      const merged = dedupeSiteDrivers([...liveDrivers, ...teamDrivers]);
+      setSiteDrivers(merged);
+
+      if (merged.length === 0 && ids.length === 0) {
+        setDriversError('No farm site found for drivers.');
+      }
     } catch (e) {
       setDriversError('Could not load drivers');
       showErrorAlert(e, 'Could not load drivers', 'Could not load drivers');
     } finally {
       setDriversLoading(false);
     }
-  }, [siteIds]);
+  }, [fetchUsers, resolvePrimaryLocationId]);
+
+  const loadSiteDriversRef = useRef(loadSiteDrivers);
+  loadSiteDriversRef.current = loadSiteDrivers;
 
   useFocusEffect(
     useCallback(() => {
       refreshProfile().catch(() => undefined);
-    }, [refreshProfile]),
+      if (viewMode === 'drivers') {
+        void loadSiteDriversRef.current();
+      }
+    }, [refreshProfile, viewMode]),
   );
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
     if (viewMode !== 'drivers') return;
-    void loadSiteDrivers();
-  }, [authUser?.accessToken, loadSiteDrivers, viewMode]);
+    void loadSiteDriversRef.current();
+  }, [authUser?.accessToken, viewMode]);
+
+  const openAddDriver = useCallback(() => {
+    navigation.navigate('FarmerManageAccess', {
+      locationId: resolvePrimaryLocationId(),
+      orgType: 'farmer',
+      initialTab: 'driver',
+    });
+  }, [navigation, resolvePrimaryLocationId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -471,10 +528,24 @@ export function FarmerHomeScreen() {
         <AppText variant="h7">
           {viewMode === 'list' ? 'Active Listings' : 'Active Drivers'}
         </AppText>
-        <View style={styles.activeBadge}>
-          <AppText variant="h7" style={{ color: palette.white }}>
-            {viewMode === 'list' ? listings.length : siteDrivers.length}
-          </AppText>
+        <View style={styles.activeListingActions}>
+          {viewMode === 'drivers' && siteDrivers.length > 0 ? (
+            <Pressable
+              onPress={openAddDriver}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Add a driver"
+            >
+              <AppText variant="bodyBold" style={styles.addDriverLink}>
+                + Add a Driver
+              </AppText>
+            </Pressable>
+          ) : null}
+          <View style={styles.activeBadge}>
+            <AppText variant="h7" style={{ color: palette.white }}>
+              {viewMode === 'list' ? listings.length : siteDrivers.length}
+            </AppText>
+          </View>
         </View>
       </View>
     </View>
@@ -561,6 +632,16 @@ export function FarmerHomeScreen() {
                     {driversError ||
                       'Drivers added to your farm will appear here with Online/Offline status.'}
                   </AppText>
+                  <Pressable
+                    style={styles.addDriverBtn}
+                    onPress={openAddDriver}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add a driver"
+                  >
+                    <AppText variant="bodyBold" style={styles.addDriverBtnText}>
+                      + Add a Driver
+                    </AppText>
+                  </Pressable>
                 </>
               )}
             </View>
@@ -761,6 +842,35 @@ const styles = StyleSheet.create({
     marginTop: hp(1.8),
     marginHorizontal: wp(4),
     marginBottom: hp(0.5),
+  },
+
+  activeListingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+  },
+
+  addDriverLink: {
+    color: palette.kale,
+    textTransform: 'none',
+    fontSize: normalize(14),
+  },
+
+  addDriverBtn: {
+    marginTop: hp(1.6),
+    minHeight: normalize(48),
+    minWidth: '72%',
+    paddingHorizontal: wp(6),
+    borderRadius: normalize(999),
+    backgroundColor: palette.kale,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  addDriverBtnText: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(16),
   },
 
   activeBadge: {

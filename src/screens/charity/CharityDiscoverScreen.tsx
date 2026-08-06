@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import {
   FlatList,
   Image,
@@ -23,6 +23,7 @@ import { DiscoverListingDetailModal } from '../../components/DiscoverListingDeta
 import { AssignDriverModal } from '@/components/AssignDriverModal';
 
 import { useAppContext } from '../../store/AppContext';
+import { useAuthStore } from '../../store/authStore';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useCharityStore } from '../../store/charityStore';
 import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
@@ -30,7 +31,7 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { mapDiscoverListing } from '../../services/foodListing.service';
 import { driversService, type SiteDriver } from '@/services/drivers.service';
 import { normalizeAuthProfile } from '@/utils/coordinates';
@@ -99,7 +100,7 @@ export function CharityDiscoverScreen() {
     locationRequired,
     reload,
   } = useAvailableFoodFeed({ audience: 'people' });
-  const { locations, fetchLocations } = useCharityStore();
+  const { locations, fetchLocations, fetchUsers } = useCharityStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<HomeTab>('list');
@@ -114,37 +115,82 @@ export function CharityDiscoverScreen() {
     [authUser, locations],
   );
 
+  const resolvePrimaryLocationId = useCallback(() => {
+    const stateLocations = useCharityStore.getState().locations;
+    const fromProfile = Number(useAuthStore.getState().authUser?.profile?.sites?.[0]?.id);
+    const fromSites = resolveCharitySiteIds(useAuthStore.getState().authUser, stateLocations)[0];
+    if (fromSites) return fromSites;
+    if (Number.isFinite(fromProfile) && fromProfile > 0) return fromProfile;
+    const fromLocations = Number(stateLocations?.[0]?.id);
+    if (Number.isFinite(fromLocations) && fromLocations > 0) return fromLocations;
+    return 0;
+  }, []);
+
   const loadSiteDrivers = useCallback(async () => {
     setDriversLoading(true);
     setDriversError(null);
     try {
-      let ids = siteIds;
+      const currentAuthUser = useAuthStore.getState().authUser;
+      await Promise.all([
+        fetchLocations(true).catch(() => undefined),
+        fetchUsers(true).catch(() => undefined),
+      ]);
+
+      let ids = resolveCharitySiteIds(currentAuthUser, useCharityStore.getState().locations);
       if (ids.length === 0) {
-        await fetchLocations(true);
-        ids = resolveCharitySiteIds(authUser, useCharityStore.getState().locations);
+        const fallback = resolvePrimaryLocationId();
+        if (fallback > 0) ids = [fallback];
       }
 
-      if (ids.length === 0) {
-        setSiteDrivers([]);
+      const liveBatches =
+        ids.length > 0
+          ? await Promise.all(
+              ids.map(async (siteId) => {
+                try {
+                  const drivers = await driversService.getDriversForSite(siteId);
+                  return drivers.map((driver) => ({ ...driver, siteId }));
+                } catch {
+                  return [] as SiteDriverRow[];
+                }
+              }),
+            )
+          : [];
+
+      const liveDrivers = dedupeSiteDrivers(liveBatches.flat());
+      const teamDrivers = useCharityStore
+        .getState()
+        .users.filter((member) => member.role === 'DRIVER' && member.isActive !== false)
+        .map((member) => {
+          const matchedLive = liveDrivers.find((driver) => driver.id === member.id);
+          if (matchedLive) return matchedLive;
+          return {
+            id: member.id,
+            name: [member.firstName, member.lastName].filter(Boolean).join(' ').trim() || 'Driver',
+            phone: member.mobile || '',
+            online: false,
+            vehicleType: null,
+            lat: null,
+            lng: null,
+            siteId: ids[0] ?? resolvePrimaryLocationId(),
+          } satisfies SiteDriverRow;
+        });
+
+      const merged = dedupeSiteDrivers([...liveDrivers, ...teamDrivers]);
+      setSiteDrivers(merged);
+
+      if (merged.length === 0 && ids.length === 0) {
         setDriversError('No charity site found for drivers.');
-        return;
       }
-
-      const batches = await Promise.all(
-        ids.map(async (siteId) => {
-          const drivers = await driversService.getDriversForSite(siteId);
-          return drivers.map((driver) => ({ ...driver, siteId }));
-        }),
-      );
-
-      setSiteDrivers(dedupeSiteDrivers(batches.flat()));
     } catch (e) {
       setDriversError('Could not load drivers');
       showErrorAlert(e, 'Could not load drivers', 'Could not load drivers');
     } finally {
       setDriversLoading(false);
     }
-  }, [authUser, fetchLocations, siteIds]);
+  }, [fetchLocations, fetchUsers, resolvePrimaryLocationId]);
+
+  const loadSiteDriversRef = useRef(loadSiteDrivers);
+  loadSiteDriversRef.current = loadSiteDrivers;
 
   useEffect(() => {
     if (!authUser?.accessToken) return;
@@ -154,8 +200,23 @@ export function CharityDiscoverScreen() {
   useEffect(() => {
     if (!authUser?.accessToken) return;
     if (viewMode !== 'drivers') return;
-    void loadSiteDrivers();
-  }, [authUser?.accessToken, loadSiteDrivers, viewMode]);
+    void loadSiteDriversRef.current();
+  }, [authUser?.accessToken, viewMode]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (viewMode !== 'drivers') return;
+      void loadSiteDriversRef.current();
+    }, [viewMode]),
+  );
+
+  const openAddDriver = useCallback(() => {
+    navigation.navigate('CharityManageAccess', {
+      locationId: resolvePrimaryLocationId(),
+      orgType: 'charity',
+      initialTab: 'driver',
+    });
+  }, [navigation, resolvePrimaryLocationId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -462,10 +523,24 @@ export function CharityDiscoverScreen() {
         <AppText variant="h7">
           {viewMode === 'list' ? 'Active Listings' : 'Active Drivers'}
         </AppText>
-        <View style={styles.activeBadge}>
-          <AppText variant="h7" style={{ color: palette.white }}>
-            {viewMode === 'list' ? listings.length : siteDrivers.length}
-          </AppText>
+        <View style={styles.activeListingActions}>
+          {viewMode === 'drivers' && siteDrivers.length > 0 ? (
+            <Pressable
+              onPress={openAddDriver}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Add a driver"
+            >
+              <AppText variant="bodyBold" style={styles.addDriverLink}>
+                + Add a Driver
+              </AppText>
+            </Pressable>
+          ) : null}
+          <View style={styles.activeBadge}>
+            <AppText variant="h7" style={{ color: palette.white }}>
+              {viewMode === 'list' ? listings.length : siteDrivers.length}
+            </AppText>
+          </View>
         </View>
       </View>
     </View>
@@ -558,6 +633,16 @@ export function CharityDiscoverScreen() {
                     {driversError ||
                       'Drivers added to your charity sites will appear here with Online/Offline status.'}
                   </AppText>
+                  <Pressable
+                    style={styles.addDriverBtn}
+                    onPress={openAddDriver}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add a driver"
+                  >
+                    <AppText variant="bodyBold" style={styles.addDriverBtnText}>
+                      + Add a Driver
+                    </AppText>
+                  </Pressable>
                 </>
               )}
             </View>
@@ -714,6 +799,35 @@ const styles = StyleSheet.create({
     marginTop: hp(1.8),
     marginHorizontal: wp(4),
     marginBottom: hp(0.5),
+  },
+
+  activeListingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+  },
+
+  addDriverLink: {
+    color: palette.kale,
+    textTransform: 'none',
+    fontSize: normalize(14),
+  },
+
+  addDriverBtn: {
+    marginTop: hp(1.6),
+    minHeight: normalize(48),
+    minWidth: '72%',
+    paddingHorizontal: wp(6),
+    borderRadius: normalize(999),
+    backgroundColor: palette.kale,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  addDriverBtnText: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(16),
   },
 
   activeBadge: {

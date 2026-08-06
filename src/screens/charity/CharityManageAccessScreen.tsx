@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,8 +33,9 @@ import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
 const MIN_PASSWORD_LENGTH = 6;
+const FALLBACK_KEYBOARD_HEIGHT = Platform.OS === 'ios' ? 336 : 280;
 
-const inputProps = { compact: true as const, labelVariant: 'bodyBold' as const };
+const inputPropsBase = { compact: true as const, labelVariant: 'bodyBold' as const };
 
 const CHARITY_ROLE_OPTIONS = [
   { label: 'Site Admin', value: 'site_admin' },
@@ -60,17 +62,27 @@ export default function CharityManageAccessScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const safeBottomPadding = useSafeBottomPadding(hp(4));
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const { locationId: routeLocationId } = route.params as {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const { locationId: routeLocationId, initialTab } = route.params as {
     locationId?: number;
     orgType: 'charity' | 'restaurant' | 'farmer';
+    initialTab?: AccessType;
   };
   const authUser = useAuthStore((state) => state.authUser);
 
-  const [activeTab, setActiveTab] = useState<AccessType>('user');
+  const [activeTab, setActiveTab] = useState<AccessType>(
+    initialTab === 'driver' ? 'driver' : 'user',
+  );
   const [selectedLocationId, setSelectedLocationId] = useState<number | ''>('');
   const [roleExpanded, setRoleExpanded] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const activeFieldRef = useRef<View | null>(null);
+  const keyboardHeightRef = useRef(0);
 
   const {
     users: members,
@@ -86,6 +98,43 @@ export default function CharityManageAccessScreen() {
   const { submitting, withLock } = useSubmitLock();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const scrollActiveFieldIntoView = useCallback(() => {
+    const field = activeFieldRef.current;
+    if (!field) return;
+
+    requestAnimationFrame(() => {
+      field.measureInWindow((_x, fieldY, _w, fieldH) => {
+        const gap = hp(2.5);
+        const activeKeyboardHeight = keyboardHeightRef.current || FALLBACK_KEYBOARD_HEIGHT;
+        const visibleBottom = windowHeight - activeKeyboardHeight - gap;
+        const fieldBottom = fieldY + fieldH;
+
+        if (fieldBottom > visibleBottom) {
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, scrollYRef.current + (fieldBottom - visibleBottom)),
+            animated: true,
+          });
+        }
+      });
+    });
+  }, [windowHeight]);
+
+  const handleFieldFocus = useCallback(
+    (field: View) => {
+      activeFieldRef.current = field;
+      const shortDelay = Platform.OS === 'ios' ? 80 : 150;
+      const longDelay = Platform.OS === 'ios' ? 320 : 420;
+      setTimeout(scrollActiveFieldIntoView, shortDelay);
+      setTimeout(scrollActiveFieldIntoView, longDelay);
+    },
+    [scrollActiveFieldIntoView],
+  );
+
+  const inputProps = {
+    ...inputPropsBase,
+    onFieldFocus: handleFieldFocus,
+  };
 
   useEffect(() => {
     Promise.all([fetchUsers(true), fetchLocations(true)]).catch((e) =>
@@ -107,13 +156,23 @@ export default function CharityManageAccessScreen() {
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      keyboardHeightRef.current = event.endCoordinates.height;
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+      setTimeout(scrollActiveFieldIntoView, Platform.OS === 'ios' ? 80 : 150);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      keyboardHeightRef.current = 0;
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      activeFieldRef.current = null;
+    });
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [scrollActiveFieldIntoView]);
 
   useFocusEffect(
     useCallback(() => {
@@ -362,11 +421,21 @@ export default function CharityManageAccessScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <Screen backgroundColor={palette.creme} scrollable={false} transparentTop>
           <ScrollView
+            ref={scrollRef}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScroll={(event) => {
+              scrollYRef.current = event.nativeEvent.contentOffset.y;
+            }}
+            scrollEventThrottle={16}
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingBottom: safeBottomPadding + (keyboardVisible ? hp(3) : 0),
+                paddingBottom:
+                  safeBottomPadding +
+                  (keyboardVisible
+                    ? Math.max(keyboardHeight, FALLBACK_KEYBOARD_HEIGHT) * 0.35 + hp(3)
+                    : hp(2)),
               },
             ]}
             showsVerticalScrollIndicator={false}

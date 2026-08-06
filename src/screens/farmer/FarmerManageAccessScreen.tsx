@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { InputField } from '../../components/InputField';
@@ -60,12 +60,17 @@ export default function FarmerManageAccessScreen() {
   useTransparentStatusBar('light');
   const r = useResponsiveLayout();
   const insets = useSafeAreaInsets();
+  const route = useRoute();
   const { height: windowHeight } = useWindowDimensions();
   const safeBottomPadding = useSafeBottomPadding(hp(4));
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  const [activeTab, setActiveTab] = useState<AccessType>('user');
+  const { initialTab } = (route.params as { initialTab?: AccessType } | undefined) ?? {};
+
+  const [activeTab, setActiveTab] = useState<AccessType>(
+    initialTab === 'driver' ? 'driver' : 'user',
+  );
   const [roleExpanded, setRoleExpanded] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);

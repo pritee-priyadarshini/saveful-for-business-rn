@@ -25,6 +25,7 @@ import {
   buildAuthUserFromProfile,
   resolveUserRole,
 } from '@/utils/authSession';
+import { markPendingReceiverWelcome, isReceiverWelcomeRole } from '@/data/receiverWelcome';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
@@ -99,7 +100,30 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
         data.accessToken,
       );
 
-      setRole(resolveUserRole(authUser));
+      // Prefer the role chosen during signup so charity_multi isn't lost if the
+      // profile payload is incomplete right after verify.
+      const resolvedRole = resolveUserRole(authUser, selectedRole);
+      const welcomeRole = isReceiverWelcomeRole(selectedRole)
+        ? selectedRole
+        : isReceiverWelcomeRole(resolvedRole)
+          ? resolvedRole
+          : null;
+
+      // Write pending BEFORE authenticating so the welcome hook never races an
+      // empty SecureStore read (especially charity_multi → Manage Sites).
+      if (welcomeRole) {
+        const identity =
+          authUser?.id ??
+          authUser?.profile?.user?.id ??
+          authUser?.email ??
+          authUser?.profile?.user?.email ??
+          null;
+        await markPendingReceiverWelcome(welcomeRole, identity);
+      }
+
+      // Keep the signup-selected receiver role (charity_multi etc.) over a
+      // premature site-role mapping that would land them on single-site UI.
+      setRole(welcomeRole ?? resolvedRole);
       setAuthUser(authUser);
 
       setShowSuccess(true);

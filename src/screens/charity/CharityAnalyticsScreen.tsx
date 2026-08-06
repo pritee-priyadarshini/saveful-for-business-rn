@@ -361,6 +361,7 @@ export function CharityAnalyticsScreen({
           <View
             style={[
               styles.heroContent,
+              !r.isTablet && styles.heroContentPhone,
               variant === 'stack' && styles.heroContentWithBack,
               adaptive.heroContent,
             ]}
@@ -370,6 +371,7 @@ export function CharityAnalyticsScreen({
                 onPress={() => navigation.goBack()}
                 style={[
                   styles.heroBackBtnAbsolute,
+                  !r.isTablet && styles.heroBackBtnPhone,
                   r.isTablet && { left: r.pagePadH, top: 20 },
                 ]}
                 hitSlop={12}
@@ -574,17 +576,20 @@ const chartConfig = {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    marginTop: -hp(2),
+    marginTop: 0,
   },
   heroContent: {
     flex: 1,
     paddingHorizontal: wp(5),
     justifyContent: 'flex-end',
-    paddingBottom: hp(3),
+    paddingBottom: hp(1),
     gap: hp(1.2),
   },
+  heroContentPhone: {
+    paddingTop: hp(2.4),
+  },
   heroContentWithBack: {
-    paddingTop: normalize(56),
+    paddingTop: normalize(64),
   },
   heroBackBtnAbsolute: {
     position: 'absolute',
@@ -597,6 +602,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  heroBackBtnPhone: {
+    top: hp(2.4),
   },
   heroTopRow: {
     flexDirection: 'row',
