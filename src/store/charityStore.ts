@@ -31,6 +31,8 @@ export type CharityMember = {
 export function normalizeCharityLocations(data: any): any[] {
   const raw = Array.isArray(data) ? data : data?.locations || [];
 
+  // Keep inactive sites — soft-deleted default HQ was disappearing from Home
+  // because we filtered isActive === false (Impact still saw it via profile merge).
   return raw
     .map((location: any) => ({
       ...location,
@@ -42,7 +44,15 @@ export function normalizeCharityLocations(data: any): any[] {
       logoUrl: location.logoUrl ?? null,
       isActive: location.isActive ?? true,
     }))
-    .filter((location: any) => location.isActive !== false && location.id != null);
+    .filter((location: any) => location.id != null)
+    .sort((a: any, b: any) => {
+      // Active first, then oldest (default HQ) first.
+      if (a.isActive === false && b.isActive !== false) return 1;
+      if (a.isActive !== false && b.isActive === false) return -1;
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return aTime - bTime;
+    });
 }
 
 export function extractCharityLocationId(data: any): number | null {
@@ -211,6 +221,7 @@ interface CharityActions {
     data: UpdateCharityLocationPayload,
   ) => Promise<any>;
   deactivateLocation: (locationId: number) => Promise<void>;
+  reactivateLocation: (locationId: number) => Promise<void>;
   addMember: (data: AddCharityMemberPayload) => Promise<any>;
   updateUser: (userId: number, data: UpdateCharityMemberPayload) => Promise<any>;
   deleteUser: (userId: number) => Promise<void>;
@@ -233,29 +244,48 @@ const INITIAL: CharityState = {
   error: null,
 };
 
+/** Shared in-flight locations request — Home + Impact both force-refresh. */
+let locationsInFlight: Promise<void> | null = null;
+
 export const useCharityStore = create<CharityState & CharityActions>((set, get) => ({
   ...INITIAL,
 
   fetchLocations: async (force = false) => {
-    const { isFetchingLocations, locationsLastFetched } = get();
-    if (isFetchingLocations && !force) return;
+    const { isFetchingLocations, locationsLastFetched, locations } = get();
     if (!force && !isStale(locationsLastFetched)) return;
+    // Coalesce concurrent force refreshes (Impact + Home focus) so the default
+    // site doesn't flicker empty when a second call races the first.
+    if (locationsInFlight) return locationsInFlight;
+    if (isFetchingLocations) return;
 
     const { authUser } = useAuthStore.getState();
     if (!authUser?.accessToken) return;
 
     set({ isFetchingLocations: true, error: null });
-    try {
-      const res = await charityService.listLocations();
-      const locations = normalizeCharityLocations(res.data);
-      set({ locations, locationsLastFetched: Date.now() });
-    } catch (error: unknown) {
-      const message = getUserFriendlyErrorMessage(error, 'Failed to load locations');
-      set({ error: message });
-      throw new Error(message);
-    } finally {
-      set({ isFetchingLocations: false });
-    }
+    locationsInFlight = (async () => {
+      try {
+        const res = await charityService.listLocations();
+        const nextLocations = normalizeCharityLocations(res.data);
+        // Never wipe a good list with an empty payload (transient API blip).
+        if (nextLocations.length > 0 || locations.length === 0) {
+          set({ locations: nextLocations, locationsLastFetched: Date.now() });
+        } else {
+          set({ locationsLastFetched: Date.now() });
+        }
+      } catch (error: unknown) {
+        const message = getUserFriendlyErrorMessage(error, 'Failed to load locations');
+        set({ error: message });
+        // Keep last good locations so Home default site doesn't disappear.
+        if (locations.length === 0) {
+          throw new Error(message);
+        }
+      } finally {
+        set({ isFetchingLocations: false });
+        locationsInFlight = null;
+      }
+    })();
+
+    return locationsInFlight;
   },
 
   fetchUsers: async (force = false) => {
@@ -341,10 +371,25 @@ export const useCharityStore = create<CharityState & CharityActions>((set, get) 
 
   deactivateLocation: async (locationId) => {
     await charityService.deactivateLocation(locationId);
+    // Soft-delete: keep the row so the default HQ doesn't vanish from Home.
     set((state) => ({
-      locations: state.locations.filter((location) => location.id !== locationId),
+      locations: state.locations.map((location) =>
+        location.id === locationId ? { ...location, isActive: false } : location,
+      ),
       locationsLastFetched: Date.now(),
     }));
+    get().invalidateLocations();
+  },
+
+  reactivateLocation: async (locationId: number) => {
+    await charityService.reactivateLocation(locationId);
+    set((state) => ({
+      locations: state.locations.map((location) =>
+        location.id === locationId ? { ...location, isActive: true } : location,
+      ),
+      locationsLastFetched: Date.now(),
+    }));
+    get().invalidateLocations();
   },
 
   addMember: async (data) => {

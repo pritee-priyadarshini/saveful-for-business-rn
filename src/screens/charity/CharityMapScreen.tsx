@@ -22,11 +22,13 @@ import {
   type ClaimLineItem,
 } from '../../components/ClaimConfirmModal';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
+import { SelfPickupClaimsSection } from '../../components/SelfPickupClaimsSection';
 import type { ClaimMode } from '../../services/claims.service';
 import { palette } from '../../theme/colors';
-import { showErrorAlert, showInfoAlert, showSuccessAlert } from '@/utils/apiError';
+import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
+import { useSelfPickupClaims } from '@/hooks/useSelfPickupClaims';
 import { useOrganizationLocation } from '@/hooks/useOrganizationLocation';
 import { fetchListingDetail, mapDiscoverListing, type FoodItem, invalidateListingDetail } from '../../services/foodListing.service';
 import {
@@ -149,6 +151,11 @@ export function CharityMapScreen({ navigation }: any) {
       setClaimState({});
     },
   });
+  const {
+    claims: selfPickupClaims,
+    loading: selfPickupLoading,
+    reload: reloadSelfPickupClaims,
+  } = useSelfPickupClaims();
 
   useEffect(() => {
     pendingClaimRef.current = pendingClaim;
@@ -205,13 +212,13 @@ export function CharityMapScreen({ navigation }: any) {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await reload();
+      await Promise.all([reload(), reloadSelfPickupClaims()]);
     } catch (e) {
       showErrorAlert(e, 'Could not load listings', 'Could not load listings');
     } finally {
       setRefreshing(false);
     }
-  }, [reload]);
+  }, [reload, reloadSelfPickupClaims]);
   const getKey = (listingId: string, foodItemId: number) => `${listingId}-${foodItemId}`;
 
   const updateQty = (
@@ -332,12 +339,10 @@ export function CharityMapScreen({ navigation }: any) {
         showErrorAlert(e, 'Claim submitted', 'Could not refresh listings');
       }
 
-      showSuccessAlert(
-        'The restaurant will review and confirm your claim soon.',
-        'Claim submitted',
-      );
+      void reloadSelfPickupClaims();
+      // Success UX lives in ClaimConfirmModal; unassigned claims stay on Available.
     },
-    [reload, refreshListingFoodItems],
+    [reload, refreshListingFoodItems, reloadSelfPickupClaims],
   );
 
   const charityCoords = useMemo(() => {
@@ -731,6 +736,15 @@ export function CharityMapScreen({ navigation }: any) {
           View Your Pickups
         </AppText>
       </Pressable>
+
+      <SelfPickupClaimsSection
+        variant="charity"
+        claims={selfPickupClaims}
+        loading={selfPickupLoading}
+        onChanged={() => {
+          void reloadSelfPickupClaims();
+        }}
+      />
 
       {!notificationsOn ? (
         <View style={styles.fallbackHint}>

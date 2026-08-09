@@ -16,6 +16,44 @@ export function buildAuthUserFromProfile(
   const siteRole =
     profile?.role?.siteRole ?? siteAccessFromLogin?.siteRole ?? undefined;
 
+  // Seed profile.sites from login siteAccess when /auth/profile omits site rows
+  // (common for LOCATION_ADMIN) so headers show the site name, not the org.
+  let nextProfile = profile;
+  const loginSiteId = Number(siteAccessFromLogin?.siteId);
+  const hasSites = Array.isArray(profile?.sites) && profile.sites.length > 0;
+  if (!hasSites && Number.isFinite(loginSiteId) && loginSiteId > 0) {
+    const siteName =
+      siteAccessFromLogin?.siteName?.trim() ||
+      `Site ${loginSiteId}`;
+    nextProfile = {
+      ...profile,
+      sites: [
+        {
+          id: loginSiteId,
+          locationName: siteName,
+          name: siteName,
+          organisationName: siteName,
+          address: siteAccessFromLogin?.address || '',
+        },
+      ],
+    };
+  } else if (
+    hasSites &&
+    Number.isFinite(loginSiteId) &&
+    loginSiteId > 0
+  ) {
+    // Prefer the assigned site first when profile returns multiple sites.
+    const sites = [...profile.sites];
+    const idx = sites.findIndex(
+      (site: any) => Number(site?.id ?? site?.siteId) === loginSiteId,
+    );
+    if (idx > 0) {
+      const [assigned] = sites.splice(idx, 1);
+      sites.unshift(assigned);
+      nextProfile = { ...profile, sites };
+    }
+  }
+
   return {
     ...profile.user,
     accessToken,
@@ -23,7 +61,7 @@ export function buildAuthUserFromProfile(
     orgType: profile.organisation?.type,
     orgRole: profile.role?.orgRole,
     siteRole,
-    profile,
+    profile: nextProfile,
   };
 }
 

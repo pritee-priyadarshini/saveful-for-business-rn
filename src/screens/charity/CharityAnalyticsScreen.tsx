@@ -92,11 +92,12 @@ export function CharityAnalyticsScreen({
   useTransparentStatusBar('light');
   const r = useResponsiveLayout();
   const adaptive = React.useMemo(
-    () => buildDashboardShellStyles(r, { heroPhoneHp: 22, stackHero: variant === 'stack' }),
+    () => buildDashboardShellStyles(r, { heroPhoneHp: 16, stackHero: variant === 'stack' }),
     [r, variant],
   );
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { currentProfile } = useAppContext();
+  const { currentProfile, selectedRole } = useAppContext();
+  const isCharityMulti = selectedRole === 'charity_multi';
   const { width } = useWindowDimensions();
   const chartWidth = dashboardChartWidth(r, width);
   const tabBottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(2));
@@ -104,7 +105,7 @@ export function CharityAnalyticsScreen({
   const bottomPadding = variant === 'stack' ? stackBottomPadding : tabBottomPadding;
 
   const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
-  /** null = All sites (aggregated). */
+  /** null = All sites (multi charity only). Single charity locks to its site. */
   const [selectedSiteId, setSelectedSiteId] = React.useState<number | null>(null);
   const [range, setRange] = React.useState<TimeRange>('week');
   const [selectedMetric, setSelectedMetric] = React.useState<ImpactMetric>('mealsCreated');
@@ -122,6 +123,15 @@ export function CharityAnalyticsScreen({
     reload,
     filterLabel,
   } = useImpactAnalytics({ filter, chartPeriod: range, siteId: selectedSiteId });
+
+  // Single-site charity: always scope Impact to that site (never org / All sites).
+  React.useEffect(() => {
+    if (isCharityMulti) return;
+    const onlySiteId = sites[0]?.id;
+    if (onlySiteId != null && selectedSiteId !== onlySiteId) {
+      setSelectedSiteId(onlySiteId);
+    }
+  }, [isCharityMulti, sites, selectedSiteId]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -393,22 +403,32 @@ export function CharityAnalyticsScreen({
                 </AppText>
                 <AppText
                   variant="h6"
-                  style={[styles.heroTitle, adaptive.heroTitle]}
+                  style={[
+                    styles.heroTitle,
+                    !r.isTablet && styles.heroTitlePhone,
+                    adaptive.heroTitle,
+                  ]}
                   numberOfLines={1}
                 >
                   Your insights
                 </AppText>
-                <AppText
-                  variant="bodySmall"
-                  style={[styles.heroSubtitle, adaptive.heroSubtitle]}
-                  numberOfLines={2}
-                >
-                  See the difference your surplus makes
-                </AppText>
+                {r.isTablet ? (
+                  <AppText
+                    variant="bodySmall"
+                    style={[styles.heroSubtitle, adaptive.heroSubtitle]}
+                    numberOfLines={2}
+                  >
+                    See the difference your surplus makes
+                  </AppText>
+                ) : null}
               </View>
 
               <Pressable
-                style={[styles.heroIconCircle, adaptive.heroIconCircle]}
+                style={[
+                  styles.heroIconCircle,
+                  !r.isTablet && styles.heroIconCirclePhone,
+                  adaptive.heroIconCircle,
+                ]}
                 onPress={() => navigation.navigate('Account')}
                 accessibilityRole="button"
                 accessibilityLabel="Open account profile"
@@ -420,19 +440,29 @@ export function CharityAnalyticsScreen({
                     resizeMode="cover"
                   />
                 ) : (
-                  <Ionicons name="bar-chart" size={26} color={palette.eggplant} />
+                  <Ionicons
+                    name="bar-chart"
+                    size={r.isTablet ? 26 : 22}
+                    color={palette.eggplant}
+                  />
                 )}
               </Pressable>
             </View>
 
-            <View style={[styles.heroStatsPill, adaptive.heroStatsPill]}>
+            <View
+              style={[
+                styles.heroStatsPill,
+                !r.isTablet && styles.heroStatsPillPhone,
+                adaptive.heroStatsPill,
+              ]}
+            >
               <Ionicons name="leaf-outline" size={14} color={palette.white} />
               <AppText
                 variant="caption"
                 style={[styles.heroStatsText, adaptive.heroStatsText]}
                 numberOfLines={1}
               >
-                {selectedSiteId == null && isMultiSite ? 'All sites · ' : ''}
+                {isCharityMulti && selectedSiteId == null && isMultiSite ? 'All sites · ' : ''}
                 {formatNumber(displayStats.mealsCreated)} meals ·{' '}
                 {formatNumber(displayStats.foodRecoveredKg)} kg · {filterLabel}
               </AppText>
@@ -464,16 +494,18 @@ export function CharityAnalyticsScreen({
             <Ionicons name="arrow-forward" size={16} color={palette.white} />
           </Pressable>
 
-          <View style={styles.siteSelectorSlot}>
-            <ImpactSiteSelector
-              sites={sites}
-              selectedSiteId={selectedSiteId}
-              onChange={setSelectedSiteId}
-              loading={sitesLoading}
-              includeAllSites
-              label="Site"
-            />
-          </View>
+          {isCharityMulti ? (
+            <View style={styles.siteSelectorSlot}>
+              <ImpactSiteSelector
+                sites={sites}
+                selectedSiteId={selectedSiteId}
+                onChange={setSelectedSiteId}
+                loading={sitesLoading}
+                includeAllSites
+                label="Site"
+              />
+            </View>
+          ) : null}
           <ImpactDateFilter filter={filter} onChange={setFilter} />
           {renderImpactMetricsSection(
             filter.mode === 'all_time' ? 'All-time impact' : `Impact · ${filterLabel}`,
@@ -586,7 +618,9 @@ const styles = StyleSheet.create({
     gap: hp(1.2),
   },
   heroContentPhone: {
-    paddingTop: hp(2.4),
+    paddingTop: hp(0.6),
+    paddingBottom: hp(0.8),
+    gap: hp(0.7),
   },
   heroContentWithBack: {
     paddingTop: normalize(64),
@@ -629,6 +663,10 @@ const styles = StyleSheet.create({
     fontSize: normalize(26),
     lineHeight: normalize(34),
   },
+  heroTitlePhone: {
+    fontSize: normalize(22),
+    lineHeight: normalize(28),
+  },
   heroSubtitle: {
     color: 'rgba(255,255,255,0.9)',
     textTransform: 'none',
@@ -645,6 +683,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...elevation.soft,
   },
+  heroIconCirclePhone: {
+    width: normalize(44),
+    height: normalize(44),
+    borderRadius: normalize(22),
+  },
   logoImage: {
     width: '100%',
     height: '100%',
@@ -659,6 +702,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     borderRadius: normalize(20),
     maxWidth: '100%',
+  },
+  heroStatsPillPhone: {
+    paddingVertical: hp(0.45),
+    paddingHorizontal: wp(2.5),
   },
   heroStatsText: {
     color: palette.white,

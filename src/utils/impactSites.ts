@@ -55,11 +55,11 @@ function sitesFromProfile(authUser: any): AccessibleSite[] {
     .filter((site: AccessibleSite | null): site is AccessibleSite => site !== null);
 }
 
-function isCharityOrg(authUser: any): boolean {
+function isCharityMultiOrg(authUser: any): boolean {
   const orgType = String(
     authUser?.orgType ?? normalizeAuthProfile(authUser)?.organisation?.organizationType ?? '',
   ).toUpperCase();
-  return orgType.startsWith('CHARITY');
+  return orgType === 'CHARITY_MULTI';
 }
 
 function isBusinessMultiOrg(authUser: any): boolean {
@@ -82,9 +82,11 @@ function mergeSites(...groups: AccessibleSite[][]): AccessibleSite[] {
 export async function resolveAccessibleSites(authUser: any): Promise<AccessibleSite[]> {
   const fromProfile = sitesFromProfile(authUser);
 
-  if (isCharityOrg(authUser)) {
+  // Single-site charity must stay on its profile site only — never expand to
+  // every location in the org (that mixes multi Impact into single).
+  if (isCharityMultiOrg(authUser)) {
     // Multi-charity SUPER_ADMIN often has no siteAccess rows in the profile.
-    // Always load charity locations so Impact can query every org site.
+    // Load charity locations so Impact can query every org site + All sites.
     try {
       const charityStore = useCharityStore.getState();
       await charityStore.fetchLocations(true);
@@ -127,6 +129,14 @@ export async function resolveAccessibleSites(authUser: any): Promise<AccessibleS
   }
 
   if (fromProfile.length > 0) return fromProfile;
+
+  const orgType = String(
+    authUser?.orgType ?? normalizeAuthProfile(authUser)?.organisation?.organizationType ?? '',
+  ).toUpperCase();
+  // Never fall through to the business sites endpoint for charity orgs.
+  if (orgType.startsWith('CHARITY')) {
+    return fromProfile;
+  }
 
   // Farmer consumer and single-site business orgs use the organisation sites endpoint.
   const sitesStore = useSitesStore.getState();

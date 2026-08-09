@@ -20,6 +20,8 @@ export type ReceiverUpdateItem = {
   city: string;
   timeLabel: string;
   driverName?: string | null;
+  /** Undriven PENDING/CONFIRMED claim — claimant can self-collect. */
+  canMarkCollected?: boolean;
   claimId?: number;
   listingId?: number;
   items?: ReceiverPickupItem[];
@@ -54,6 +56,8 @@ export type ReceiverPickup = {
   instructions: string;
   weightKg: number;
   cardStatus: ReceiverPickupCardStatus;
+  /** Undriven PENDING/CONFIRMED claim — claimant can self-collect. */
+  canMarkCollected?: boolean;
   isNextPickup?: boolean;
   items: ReceiverPickupItem[];
   claimId?: number;
@@ -216,6 +220,10 @@ function isCollectedClaim(claim: any): boolean {
   return pickupStatus === 'COLLECTED';
 }
 
+function hasActiveDriverPickup(claim: any): boolean {
+  return Boolean(pickDriverPickup(claim)?.driver);
+}
+
 function pickupStatusFromClaim(claim: any): ReceiverPickupCardStatus {
   const status = String(claim?.status || '').toUpperCase();
   if (status === 'CANCELLED') return 'cancelled';
@@ -224,8 +232,9 @@ function pickupStatusFromClaim(claim: any): ReceiverPickupCardStatus {
   const pickupStatus = String(pickDriverPickup(claim)?.status || '').toUpperCase();
   if (pickupStatus === 'EN_ROUTE' || pickupStatus === 'ARRIVED') return 'enroute';
   if (pickupStatus === 'ASSIGNED' || pickupStatus === 'ACCEPTED') return 'awaiting_driver';
+  // No live driver assignment → self-pickup ready (Claimed), not awaiting driver.
   if (status === 'CONFIRMED' || status === 'PENDING') {
-    return pickDriverPickup(claim)?.driver ? 'claimed' : 'awaiting_driver';
+    return 'claimed';
   }
   return 'claimed';
 }
@@ -267,6 +276,16 @@ function listingToPickupItems(listing: any): ReceiverPickupItem[] {
   }));
 }
 
+function claimBelongsToViewerSite(claim: any, viewerSiteId?: number | null): boolean {
+  if (viewerSiteId == null) return true;
+  const claimSite = Number(claim?.claimantSiteId ?? claim?.claimantSite?.id);
+  if (!Number.isFinite(claimSite) || claimSite <= 0) {
+    // Legacy org-level claim — treat as belonging to every site.
+    return true;
+  }
+  return claimSite === viewerSiteId;
+}
+
 /**
  * Builds the charity/farmer Updates feed from the org's claims plus available
  * surplus nearby (or from the notification inbox feed).
@@ -274,10 +293,15 @@ function listingToPickupItems(listing: any): ReceiverPickupItem[] {
 export function mapReceiverUpdates(params: {
   claims: any[];
   availableListings: ReturnType<typeof mapDiscoverListing>[];
+  /** When set, only hide surplus for listings claimed by THIS site. */
+  viewerSiteId?: number | null;
 }): ReceiverUpdateItem[] {
-  const { claims, availableListings } = params;
+  const { claims, availableListings, viewerSiteId = null } = params;
   const claimedListingIds = new Set(
-    claims.map((claim) => Number(claim?.listingId || claim?.listing?.id)).filter(Boolean),
+    claims
+      .filter((claim) => claimBelongsToViewerSite(claim, viewerSiteId))
+      .map((claim) => Number(claim?.listingId || claim?.listing?.id))
+      .filter(Boolean),
   );
 
   const updates: ReceiverUpdateItem[] = [];
@@ -318,6 +342,10 @@ export function mapReceiverUpdates(params: {
     const timeLabel = formatTimeLabel(listing?.pickupFromTime, listing?.pickupByTime);
     const collected = isCollectedClaim(claim);
     const needsFeedback = collected && claim?.rating == null;
+    const canMarkCollected =
+      !collected &&
+      (status === 'PENDING' || status === 'CONFIRMED') &&
+      !hasActiveDriverPickup(claim);
     const sectionDate = collected
       ? claim?.collectedAt || claim?.updatedAt || claim?.createdAt
       : claim?.createdAt || claim?.confirmedAt;
@@ -347,7 +375,8 @@ export function mapReceiverUpdates(params: {
       distance,
       city,
       timeLabel,
-      driverName: driverName(claim),
+      driverName: hasActiveDriverPickup(claim) ? driverName(claim) : null,
+      canMarkCollected,
       claimId: Number(claim.id),
       listingId: Number(listing?.id || claim?.listingId),
       items: claimItemsToPickupItems(claim),
@@ -367,10 +396,14 @@ export function mapReceiverUpdates(params: {
 export function mapReceiverPickups(params: {
   claims: any[];
   availableListings: ReturnType<typeof mapDiscoverListing>[];
+  viewerSiteId?: number | null;
 }): { nextPickup: ReceiverPickup | null; claimedPickups: ReceiverPickup[] } {
-  const { claims, availableListings } = params;
+  const { claims, availableListings, viewerSiteId = null } = params;
   const claimedListingIds = new Set(
-    claims.map((claim) => Number(claim?.listingId || claim?.listing?.id)).filter(Boolean),
+    claims
+      .filter((claim) => claimBelongsToViewerSite(claim, viewerSiteId))
+      .map((claim) => Number(claim?.listingId || claim?.listing?.id))
+      .filter(Boolean),
   );
 
   const available = availableListings.find((listing) => {
@@ -404,14 +437,18 @@ export function mapReceiverPickups(params: {
     : null;
 
   const claimedPickups: ReceiverPickup[] = claims
+    .filter((claim) => claimBelongsToViewerSite(claim, viewerSiteId))
     .map((claim) => {
       const listing = claim?.listing || {};
       const cardStatus = pickupStatusFromClaim(claim);
       const from = listing?.pickupFromTime;
       const to = listing?.pickupByTime;
       const collectedAt = claim?.collectedAt || pickDriverPickup(claim)?.collectedAt;
-      const name = driverName(claim);
-      const phone = driverPhone(claim);
+      const activeDriver = hasActiveDriverPickup(claim);
+      const name = activeDriver ? driverName(claim) : null;
+      const phone = activeDriver ? driverPhone(claim) : null;
+      const canMarkCollected =
+        cardStatus === 'claimed' && !activeDriver;
 
       return {
         id: String(claim.id),
@@ -436,6 +473,7 @@ export function mapReceiverPickups(params: {
         instructions: storageInstructions(listing),
         weightKg: claimQuantityKg(claim),
         cardStatus,
+        canMarkCollected,
         items: claimItemsToPickupItems(claim),
         claimId: Number(claim.id),
         listingId: Number(listing?.id || claim?.listingId),
@@ -450,9 +488,65 @@ export async function fetchAvailableListingsForAudience(
   audience: DiscoverAudience,
   mode: AvailableFoodMode,
 ) {
-  const raw =
-    mode === 'nearby_fallback'
-      ? await fetchNearbyDiscoverListings({ page: 1, limit: 20, allPages: true })
-      : await fetchDiscoverListings(audience, { page: 1, limit: 20 });
-  return raw.map(mapDiscoverListing);
+  if (mode === 'nearby_fallback') {
+    const nearby = await fetchNearbyDiscoverListings({ page: 1, limit: 20, allPages: true });
+    return nearby.map(mapDiscoverListing);
+  }
+
+  const push = await fetchDiscoverListings(audience, { page: 1, limit: 20 });
+  try {
+    const nearby = await fetchNearbyDiscoverListings({ page: 1, limit: 20, allPages: true });
+    if (nearby.length === 0) return push.map(mapDiscoverListing);
+    const byId = new Map<number, (typeof push)[number]>();
+    for (const item of push) byId.set(Number(item.id), item);
+    for (const item of nearby) {
+      const id = Number(item.id);
+      const prev = byId.get(id);
+      byId.set(id, prev ? { ...prev, ...item } : item);
+    }
+    return [...byId.values()].map(mapDiscoverListing);
+  } catch {
+    return push.map(mapDiscoverListing);
+  }
+}
+
+/** Claimed by us, not collected, and no driver assigned — self-pickup ready. */
+export type SelfPickupClaim = {
+  claimId: number;
+  listingId: number;
+  businessName: string;
+  address: string;
+  quantityKg: number;
+  timeLabel: string;
+  items: ReceiverPickupItem[];
+};
+
+export function mapSelfPickupClaims(
+  claims: any[],
+  viewerSiteId?: number | null,
+): SelfPickupClaim[] {
+  return claims
+    .filter((claim) => {
+      const status = String(claim?.status || '').toUpperCase();
+      if (status !== 'PENDING' && status !== 'CONFIRMED') return false;
+      if (isCollectedClaim(claim)) return false;
+      if (hasActiveDriverPickup(claim)) return false;
+      return claimBelongsToViewerSite(claim, viewerSiteId);
+    })
+    .map((claim) => {
+      const listing = claim?.listing || {};
+      return {
+        claimId: Number(claim.id),
+        listingId: Number(listing?.id || claim?.listingId),
+        businessName:
+          listing?.organisation?.name ||
+          listing?.site?.organisationName ||
+          'Business',
+        address: listing?.pickupAddress || listing?.site?.address || '',
+        quantityKg: claimQuantityKg(claim),
+        timeLabel: formatTimeLabel(listing?.pickupFromTime, listing?.pickupByTime),
+        items: claimItemsToPickupItems(claim),
+      } satisfies SelfPickupClaim;
+    })
+    .sort((a, b) => b.claimId - a.claimId);
 }

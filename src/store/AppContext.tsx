@@ -95,13 +95,27 @@ export function AppProvider({ children }: PropsWithChildren) {
     const isCharityLocationUser =
       authUser?.orgType === 'CHARITY_MULTI' &&
       (authUser?.siteRole === 'LOCATION_ADMIN' ||
-        authUser?.siteRole === 'TEAM_MEMBER');
+        authUser?.siteRole === 'SITE_ADMIN' ||
+        authUser?.siteRole === 'TEAM_MEMBER' ||
+        authUser?.siteRole === 'STAFF');
 
     const isLocationUser = isBusinessLocationUser || isCharityLocationUser;
+    // Location users (and charity_single mapped from a multi site) should show
+    // their site name in the header — not the parent organisation name.
+    const prefersSiteHeader =
+      isLocationUser ||
+      (authUser?.orgType === 'CHARITY_MULTI' && resolvedRole === 'charity_single');
     const assignedSite =
-      isLocationUser && authUser?.profile?.sites?.length
+      prefersSiteHeader && authUser?.profile?.sites?.length
         ? authUser.profile.sites[0]
         : null;
+    const assignedSiteName =
+      assignedSite?.locationName ||
+      assignedSite?.name ||
+      assignedSite?.organisationName ||
+      assignedSite?.siteName ||
+      assignedSite?.tradingName ||
+      '';
 
     const profileUser = authUser?.profile?.user;
     const firstName = profileUser?.firstName?.trim() || '';
@@ -112,11 +126,10 @@ export function AppProvider({ children }: PropsWithChildren) {
       ? {
           name: displayName,
           organization:
-            assignedSite?.locationName ||
-            assignedSite?.name ||
+            assignedSiteName ||
             authUser.profile.organisation?.name ||
             '',
-          address: isLocationUser
+          address: prefersSiteHeader
             ? assignedSite?.address ||
               resolveProfileDisplayAddress(authUser.profile)
             : resolvedRole === 'restaurant_multi' || resolvedRole === 'charity_multi'

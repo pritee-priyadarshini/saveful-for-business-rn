@@ -130,22 +130,30 @@ export function PostCollectSurveyModal({
         comment.trim() || null,
         isPartial ? `Partial collection (~${totalKg} kg)` : null,
       ].filter(Boolean);
+      const ratingNote = noteParts.length ? noteParts.join(' · ') : undefined;
 
-      await claimsService.rateClaim(claimId, {
+      // Self-pickup may still be PENDING — mark collected first (with rating).
+      // If already COLLECTED, markCollected is a no-op for rating; rate next.
+      const collected = await claimsService.markClaimCollected(claimId, {
         rating,
-        ratingNote: noteParts.length ? noteParts.join(' · ') : undefined,
+        ratingNote,
       });
-      showSuccessAlert('Thanks for your feedback', 'Feedback sent');
+
+      if (collected?.message === 'Already marked as collected') {
+        await claimsService.rateClaim(claimId, { rating, ratingNote });
+        showSuccessAlert('Thanks for your feedback', 'Feedback sent');
+      } else {
+        showSuccessAlert('Collection confirmed. Thanks for your feedback.', 'Done');
+      }
       onSubmitted?.();
       setStep(5);
     } catch (error) {
-      // Claim may still be CONFIRMED — mark collected with the rating instead.
       try {
-        await claimsService.markClaimCollected(claimId, {
+        await claimsService.rateClaim(claimId, {
           rating,
           ratingNote: comment.trim() || undefined,
         });
-        showSuccessAlert('Collection confirmed. Thanks for your feedback.', 'Done');
+        showSuccessAlert('Thanks for your feedback', 'Feedback sent');
         onSubmitted?.();
         setStep(5);
       } catch (inner) {

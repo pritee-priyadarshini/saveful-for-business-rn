@@ -19,12 +19,15 @@ import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '../../theme/colors';
-import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
+import { getUserFriendlyErrorMessage, showErrorAlert, showInfoAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { useReceiverFeed } from '@/hooks/useReceiverFeed';
+import { claimsService } from '@/services/claims.service';
+import { showConfirmAlert } from '@/store/appAlertStore';
+import { PostCollectSurveyModal } from './components/postCollectSurveyModal';
 import type {
   ReceiverPickup,
   ReceiverPickupCardStatus,
@@ -88,6 +91,8 @@ function formatTimeLine(pickup: Pickup) {
 
 function getDriverLabel(pickup: Pickup) {
   if (pickup.cardStatus === 'unclaimed') return null;
+  // Self-pickup — no driver line; card shows Mark as collected instead.
+  if (pickup.canMarkCollected) return null;
   const label = pickup.assigneeLabel || 'Driver';
   if (pickup.driverName) return `${label}: ${pickup.driverName}`;
   // Completed with no assignee — don't show a misleading empty driver line.
@@ -115,6 +120,13 @@ export default function CharityPickupScreen({ navigation }: any) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPickup, setSelectedPickup] = useState<Pickup | null>(null);
+  const [markingClaimId, setMarkingClaimId] = useState<number | null>(null);
+  const [surveyVisible, setSurveyVisible] = useState(false);
+  const [surveyClaimId, setSurveyClaimId] = useState<number | null>(null);
+  const [surveyBusinessName, setSurveyBusinessName] = useState('');
+  const [surveyItems, setSurveyItems] = useState<
+    { id: string; name: string; quantity: number }[]
+  >([]);
 
   const filteredPickups = useMemo(() => {
     return claimedPickups.filter((pickup) => {
@@ -166,6 +178,41 @@ export default function CharityPickupScreen({ navigation }: any) {
       return;
     }
     openDetails(pickup);
+  };
+
+  const handleMarkCollected = (pickup: Pickup) => {
+    if (!pickup.claimId || markingClaimId != null) return;
+    showConfirmAlert({
+      title: 'Mark as collected?',
+      message: `Confirm you collected ${pickup.weightKg} kg from ${pickup.restaurantName}. Only confirm after you’ve picked it up.`,
+      confirmLabel: 'Yes, collected',
+      cancelLabel: 'Not yet',
+      onConfirm: async () => {
+        setMarkingClaimId(pickup.claimId!);
+        try {
+          await claimsService.markClaimCollected(pickup.claimId!);
+          setSurveyClaimId(pickup.claimId!);
+          setSurveyBusinessName(pickup.restaurantName);
+          setSurveyItems(
+            pickup.items.map((food, index) => ({
+              id: String(index),
+              name: food.name,
+              quantity: Number(food.claimed || food.available || 0),
+            })),
+          );
+          setSurveyVisible(true);
+          void reload();
+        } catch (error) {
+          showErrorAlert(
+            error,
+            'Could not mark collected',
+            getUserFriendlyErrorMessage(error, 'Could not mark this claim as collected.'),
+          );
+        } finally {
+          setMarkingClaimId(null);
+        }
+      },
+    });
   };
 
   const contentColumn = useMemo(() => {
@@ -264,18 +311,45 @@ export default function CharityPickupScreen({ navigation }: any) {
               </View>
             ) : null}
 
-            <Pressable
-              style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
-              onPress={() => handleViewDetails(pickup)}
-            >
-              <AppText
-                variant="bodyBold"
-                style={[styles.viewDetailsText, theme.viewDetailsText]}
-                numberOfLines={1}
+            <View style={styles.cardActions}>
+              {pickup.canMarkCollected ? (
+                <Pressable
+                  style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
+                  disabled={markingClaimId != null}
+                  onPress={() => handleMarkCollected(pickup)}
+                >
+                  <AppText
+                    variant="bodyBold"
+                    style={[styles.viewDetailsText, theme.viewDetailsText]}
+                    numberOfLines={1}
+                  >
+                    {markingClaimId === pickup.claimId ? 'Marking…' : 'Mark as collected'}
+                  </AppText>
+                </Pressable>
+              ) : null}
+              <Pressable
+                style={[
+                  styles.viewDetailsBtn,
+                  pickup.canMarkCollected
+                    ? styles.secondaryDetailsBtn
+                    : theme.viewDetailsBtn,
+                ]}
+                onPress={() => handleViewDetails(pickup)}
               >
-                View Details
-              </AppText>
-            </Pressable>
+                <AppText
+                  variant="bodyBold"
+                  style={[
+                    styles.viewDetailsText,
+                    pickup.canMarkCollected
+                      ? styles.secondaryDetailsText
+                      : theme.viewDetailsText,
+                  ]}
+                  numberOfLines={1}
+                >
+                  View Details
+                </AppText>
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -481,6 +555,23 @@ export default function CharityPickupScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      <PostCollectSurveyModal
+        visible={surveyVisible}
+        initialAnswer="yes"
+        claimId={surveyClaimId}
+        businessName={surveyBusinessName}
+        items={surveyItems}
+        onSubmitted={() => {
+          void reload();
+        }}
+        onClose={() => {
+          setSurveyVisible(false);
+          setSurveyClaimId(null);
+          setSurveyBusinessName('');
+          setSurveyItems([]);
+        }}
+      />
     </Screen>
   );
 }
@@ -634,6 +725,12 @@ const styles = StyleSheet.create({
     marginTop: normalize(1),
     flexShrink: 0,
   },
+  cardActions: {
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
+    gap: hp(0.7),
+    marginTop: hp(0.3),
+  },
   viewDetailsBtn: {
     alignSelf: 'flex-end',
     minWidth: normalize(108),
@@ -642,12 +739,19 @@ const styles = StyleSheet.create({
     borderRadius: normalize(8),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(0.3),
+  },
+  secondaryDetailsBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.kale,
   },
   viewDetailsText: {
     fontSize: normalize(12),
     lineHeight: normalize(16),
     textTransform: 'none',
+  },
+  secondaryDetailsText: {
+    color: palette.kale,
   },
 
   /* Contact actions */

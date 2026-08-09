@@ -270,9 +270,10 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
           authUser?.profile?.organization?.organizationType ??
           '',
       ).toUpperCase();
-      // All sites → org endpoint for charity/farmer receivers and multi-site donors.
+      // Org-wide "All sites" only for multi-site orgs. Single-site charity must
+      // always hit the site endpoint so Impact stays scoped to that charity.
       const preferOrgScope =
-        orgType.startsWith('CHARITY') ||
+        orgType === 'CHARITY_MULTI' ||
         orgType === 'FARMER_CONSUMER' ||
         orgType === 'BUSINESS_MULTI' ||
         orgType === 'FARMER_PRODUCER';
@@ -364,7 +365,7 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
           '',
       ).toUpperCase();
       const preferOrgScope =
-        orgType.startsWith('CHARITY') ||
+        orgType === 'CHARITY_MULTI' ||
         orgType === 'FARMER_CONSUMER' ||
         orgType === 'BUSINESS_MULTI' ||
         orgType === 'FARMER_PRODUCER';

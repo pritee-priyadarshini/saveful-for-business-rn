@@ -48,6 +48,7 @@ export function ClaimConfirmModal({
 }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<'confirm' | 'success'>('confirm');
 
   const totalKg = useMemo(
     () => items.reduce((sum, item) => sum + item.qtyKg, 0),
@@ -58,8 +59,14 @@ export function ClaimConfirmModal({
     if (visible) {
       setError(null);
       setSubmitting(false);
+      setStep('confirm');
     }
   }, [visible, claimMode, listing?.listingId, items]);
+
+  const finish = () => {
+    onSuccess();
+    onClose();
+  };
 
   const handleConfirm = async () => {
     if (!listing) return;
@@ -81,8 +88,7 @@ export function ClaimConfirmModal({
             : undefined,
       });
 
-      onSuccess();
-      onClose();
+      setStep('success');
     } catch (err: unknown) {
       setError(getUserFriendlyErrorMessage(err, 'Could not submit claim'));
     } finally {
@@ -95,99 +101,146 @@ export function ClaimConfirmModal({
       visible={visible && !!listing}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={submitting ? undefined : step === 'success' ? finish : onClose}
     >
       {!listing ? null : (
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={submitting ? undefined : onClose} />
+        <Pressable
+          style={styles.backdrop}
+          onPress={submitting ? undefined : step === 'success' ? finish : onClose}
+        />
 
         <View style={styles.sheet}>
           <View style={styles.handle} />
 
-          <View style={styles.sheetHeader}>
-            <View style={{ flex: 1 }}>
-              <AppText variant="h6">Confirm your claim</AppText>
-              <AppText variant="bodySmall" style={styles.provider}>
-                {listing.businessName}
-              </AppText>
-            </View>
-            <Pressable onPress={onClose} hitSlop={12} disabled={submitting}>
-              <Ionicons name="close" size={normalize(24)} color={palette.black} />
-            </Pressable>
-          </View>
+          {step === 'success' ? (
+            <>
+              <View style={styles.sheetHeader}>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="h6">Claim submitted</AppText>
+                  <AppText variant="bodySmall" style={styles.provider}>
+                    {listing.businessName}
+                  </AppText>
+                </View>
+                <Pressable onPress={finish} hitSlop={12}>
+                  <Ionicons name="close" size={normalize(24)} color={palette.black} />
+                </Pressable>
+              </View>
 
-          <View style={styles.modePill}>
-            <AppText variant="label" style={styles.modeText}>
-              {claimMode === 'FULL' ? 'Full claim' : 'Partial claim'}
-            </AppText>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryRow}>
-                <Ionicons name="location-outline" size={normalize(16)} color={palette.middlegreen} />
-                <AppText variant="bodySmall" style={styles.summaryText}>
-                  {listing.pickupAddress}
+              <View style={styles.successBody}>
+                <View style={styles.successIconWrap}>
+                  <Ionicons name="checkmark-circle" size={normalize(48)} color={palette.middlegreen} />
+                </View>
+                <AppText variant="bodySmall" style={styles.successText}>
+                  Your claim stays on Available until a driver is assigned. You can pick it up
+                  yourself anytime from there, Updates, or Pickup.
                 </AppText>
               </View>
-              <View style={styles.summaryRow}>
-                <Ionicons name="time-outline" size={normalize(16)} color={palette.middlegreen} />
-                <AppText variant="bodySmall" style={styles.summaryText}>
-                  {listing.pickupWindow}
+
+              <View style={styles.actionsColumn}>
+                <Button
+                  label="I'll pick this up myself"
+                  size="compact"
+                  onPress={finish}
+                  style={styles.successPrimaryBtn}
+                />
+                <Button
+                  label="Continue"
+                  size="compact"
+                  variant="secondary"
+                  onPress={finish}
+                  style={styles.successSecondaryBtn}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.sheetHeader}>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="h6">Confirm your claim</AppText>
+                  <AppText variant="bodySmall" style={styles.provider}>
+                    {listing.businessName}
+                  </AppText>
+                </View>
+                <Pressable onPress={onClose} hitSlop={12} disabled={submitting}>
+                  <Ionicons name="close" size={normalize(24)} color={palette.black} />
+                </Pressable>
+              </View>
+
+              <View style={styles.modePill}>
+                <AppText variant="label" style={styles.modeText}>
+                  {claimMode === 'FULL' ? 'Full claim' : 'Partial claim'}
                 </AppText>
               </View>
-            </View>
 
-            <AppText variant="label" style={styles.sectionTitle}>
-              You are claiming
-            </AppText>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+                <View style={styles.summaryCard}>
+                  <View style={styles.summaryRow}>
+                    <Ionicons name="location-outline" size={normalize(16)} color={palette.middlegreen} />
+                    <AppText variant="bodySmall" style={styles.summaryText}>
+                      {listing.pickupAddress}
+                    </AppText>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Ionicons name="time-outline" size={normalize(16)} color={palette.middlegreen} />
+                    <AppText variant="bodySmall" style={styles.summaryText}>
+                      {listing.pickupWindow}
+                    </AppText>
+                  </View>
+                </View>
 
-            {items.map((item) => (
-              <View key={item.foodItemId} style={styles.itemRow}>
-                <AppText variant="bodySmall" style={styles.itemName}>
-                  {item.name}
+                <AppText variant="label" style={styles.sectionTitle}>
+                  You are claiming
                 </AppText>
-                <AppText variant="bodyBold">{formatKg(item.qtyKg)} kg</AppText>
+
+                {items.map((item) => (
+                  <View key={item.foodItemId} style={styles.itemRow}>
+                    <AppText variant="bodySmall" style={styles.itemName}>
+                      {item.name}
+                    </AppText>
+                    <AppText variant="bodyBold">{formatKg(item.qtyKg)} kg</AppText>
+                  </View>
+                ))}
+
+                <View style={styles.totalRow}>
+                  <AppText variant="bodyBold">Total</AppText>
+                  <AppText variant="h6" style={styles.totalValue}>
+                    {formatKg(totalKg)} kg
+                  </AppText>
+                </View>
+
+                {!!error && (
+                  <AppText variant="caption" style={styles.errorText}>
+                    {error}
+                  </AppText>
+                )}
+              </ScrollView>
+
+              <View style={styles.actions}>
+                <Button
+                  label="Cancel"
+                  size="compact"
+                  variant="secondary"
+                  onPress={onClose}
+                  disabled={submitting}
+                  style={styles.cancelBtn}
+                />
+                <Button
+                  label={submitting ? 'Submitting…' : 'Confirm claim'}
+                  size="compact"
+                  onPress={handleConfirm}
+                  disabled={submitting || items.length === 0}
+                  loading={submitting}
+                  style={styles.confirmBtn}
+                />
               </View>
-            ))}
 
-            <View style={styles.totalRow}>
-              <AppText variant="bodyBold">Total</AppText>
-              <AppText variant="h6" style={styles.totalValue}>
-                {formatKg(totalKg)} kg
-              </AppText>
-            </View>
-
-            {!!error && (
-              <AppText variant="caption" style={styles.errorText}>
-                {error}
-              </AppText>
-            )}
-          </ScrollView>
-
-          <View style={styles.actions}>
-            <Button
-              label="Cancel"
-              size="compact"
-              variant="secondary"
-              onPress={onClose}
-              disabled={submitting}
-              style={styles.cancelBtn}
-            />
-            <Button
-              label={submitting ? 'Submitting…' : 'Confirm claim'}
-              size="compact"
-              onPress={handleConfirm}
-              disabled={submitting || items.length === 0}
-              loading={submitting}
-              style={styles.confirmBtn}
-            />
-          </View>
-
-          {submitting && (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={palette.middlegreen} />
-            </View>
+              {submitting && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator color={palette.middlegreen} />
+                </View>
+              )}
+            </>
           )}
         </View>
       </View>
@@ -304,12 +357,34 @@ const styles = StyleSheet.create({
     gap: wp(2),
     marginTop: hp(1.5),
   },
+  actionsColumn: {
+    gap: hp(1),
+    marginTop: hp(1.5),
+  },
   cancelBtn: {
     flex: 1,
   },
   confirmBtn: {
     flex: 1.4,
     backgroundColor: palette.middlegreen,
+  },
+  successPrimaryBtn: {
+    backgroundColor: palette.middlegreen,
+  },
+  successSecondaryBtn: {},
+  successBody: {
+    alignItems: 'center',
+    paddingVertical: hp(2),
+    gap: hp(1.5),
+  },
+  successIconWrap: {
+    marginBottom: hp(0.5),
+  },
+  successText: {
+    textAlign: 'center',
+    color: '#444',
+    lineHeight: normalize(20),
+    paddingHorizontal: wp(2),
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

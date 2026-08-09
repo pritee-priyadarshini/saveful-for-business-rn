@@ -63,6 +63,8 @@ type Site = {
     radiusKm?: number;
     logoUrl?: string | null;
     hasManager: boolean;
+    isActive: boolean;
+    isDefault: boolean;
 };
 
 type SiteDriverRow = SiteDriver & { siteId: number };
@@ -125,6 +127,7 @@ export default function MultiCharityManageSitesScreen() {
         fetchUsers,
         updateLocation,
         deactivateLocation,
+        reactivateLocation,
         removeUserFromLocation,
     } = useCharityStore();
 
@@ -167,14 +170,60 @@ export default function MultiCharityManageSitesScreen() {
     const loading = isFetchingLocations || isFetchingUsers;
 
     const sites = useMemo<Site[]>(() => {
-        return locations.map((location: any) => {
-            const admin = findLocationAdmin(users, location.id);
+        const byId = new Map<number, any>();
 
+        for (const location of locations ?? []) {
+            const id = Number(location?.id);
+            if (!Number.isFinite(id) || id <= 0) continue;
+            byId.set(id, location);
+        }
+
+        // Always merge profile sites so the signup default HQ stays visible even
+        // if it was soft-deleted or missing from a stale locations response.
+        const profileSites = Array.isArray(authUser?.profile?.sites)
+            ? authUser.profile.sites
+            : [];
+        for (const site of profileSites) {
+            const id = Number(site?.id ?? site?.siteId);
+            if (!Number.isFinite(id) || id <= 0) continue;
+            const existing = byId.get(id);
+            byId.set(id, {
+                ...site,
+                ...existing,
+                id,
+                locationName:
+                    existing?.locationName ||
+                    site?.locationName ||
+                    site?.name ||
+                    site?.organisationName ||
+                    existing?.name,
+                isActive: existing?.isActive ?? true,
+                createdAt: existing?.createdAt || site?.createdAt,
+            });
+        }
+
+        const merged = [...byId.values()].sort((a, b) => {
+            if (a.isActive === false && b.isActive !== false) return 1;
+            if (a.isActive !== false && b.isActive === false) return -1;
+            return (
+                new Date(a.createdAt || 0).getTime() -
+                new Date(b.createdAt || 0).getTime()
+            );
+        });
+        const defaultId = merged[0]?.id;
+
+        return merged.map((location: any) => {
+            const admin = findLocationAdmin(users, location.id);
             return {
                 id: location.id,
-                tradingName: location.locationName,
-                address: location.address,
-                postCode: location.postcode,
+                tradingName:
+                    location.locationName ||
+                    location.name ||
+                    location.siteName ||
+                    location.organisationName ||
+                    `Site ${location.id}`,
+                address: location.address || '',
+                postCode: location.postcode || location.postCode || '',
                 contactName: admin
                     ? `${admin.firstName} ${admin.lastName}`.trim()
                     : 'No manager assigned',
@@ -182,15 +231,21 @@ export default function MultiCharityManageSitesScreen() {
                 mobile: admin?.mobile || location.contactMobile || '-',
                 latitude: location.latitude,
                 longitude: location.longitude,
-                radiusKm: location.pickupRadiusKm,
+                radiusKm: location.pickupRadiusKm ?? location.radiusKm,
                 logoUrl: location.logoUrl || businessLogo || null,
                 hasManager: !!admin,
+                isActive: location.isActive !== false,
+                isDefault: location.id === defaultId,
             };
         });
-    }, [locations, users, businessLogo]);
+    }, [locations, users, businessLogo, authUser?.profile?.sites]);
 
     const managedCount = useMemo(
-        () => sites.filter((site) => site.hasManager).length,
+        () => sites.filter((site) => site.hasManager && site.isActive).length,
+        [sites],
+    );
+    const activeSiteCount = useMemo(
+        () => sites.filter((site) => site.isActive).length,
         [sites],
     );
 
@@ -405,10 +460,29 @@ export default function MultiCharityManageSitesScreen() {
     };
 
     const requestDeleteLocation = (siteId: number) => {
+        const target = sites.find((site) => site.id === siteId);
+        if (target?.isDefault) {
+            showAppAlert({
+                variant: 'info',
+                title: 'Default site',
+                message:
+                    'Your default head-office site can’t be removed. Rename it if you want a different label.',
+            });
+            return;
+        }
+        if (target?.isActive && activeSiteCount <= 1) {
+            showAppAlert({
+                variant: 'info',
+                title: 'Only active site',
+                message: 'Add another location before removing this one.',
+            });
+            return;
+        }
+
         showConfirmAlert({
             title: 'Delete location?',
             message:
-                'This removes the site from your charity. Managers linked only to this site may lose access.',
+                'This deactivates the site. You can restore it later. Managers linked only to this site may lose access.',
             confirmLabel: 'Delete location',
             destructive: true,
             onConfirm: async () => {
@@ -417,9 +491,27 @@ export default function MultiCharityManageSitesScreen() {
                     setExpandedSite(null);
                     setEditingSiteId(null);
                     await loadData(true);
-                    showSuccessAlert('Site removed successfully', 'Deleted');
+                    showSuccessAlert('Site deactivated. You can restore it anytime.', 'Updated');
                 } catch (err) {
                     showErrorAlert(err, 'Could not remove location', 'Could not remove location');
+                    throw err;
+                }
+            },
+        });
+    };
+
+    const requestRestoreLocation = (siteId: number) => {
+        showConfirmAlert({
+            title: 'Restore location?',
+            message: 'This site will become active again for claims and pickups.',
+            confirmLabel: 'Restore site',
+            onConfirm: async () => {
+                try {
+                    await reactivateLocation(siteId);
+                    await loadData(true);
+                    showSuccessAlert('Site restored successfully', 'Restored');
+                } catch (err) {
+                    showErrorAlert(err, 'Could not restore location', 'Could not restore location');
                     throw err;
                 }
             },
@@ -607,7 +699,7 @@ export default function MultiCharityManageSitesScreen() {
                                             : `${siteDrivers.filter((d) => d.online).length} of ${siteDrivers.length} online`
                                         : sites.length === 0
                                           ? 'No locations yet'
-                                          : `${managedCount} of ${sites.length} sites managed`}
+                                          : `${managedCount} of ${activeSiteCount} active sites managed`}
                                 </AppText>
                             </View>
                         </View>
@@ -719,27 +811,46 @@ export default function MultiCharityManageSitesScreen() {
                                     <View style={{ flex: 1, minWidth: 0 }}>
                                         <View style={styles.siteTitleRow}>
                                             <AppText variant="bodySmall" style={styles.siteIndex}>
-                                                Site {index + 1}
+                                                {site.isDefault ? 'Default' : `Site ${index + 1}`}
                                             </AppText>
+                                            {site.isDefault ? (
+                                                <View style={[styles.statusChip, styles.statusChipDefault]}>
+                                                    <AppText
+                                                        variant="bodySmall"
+                                                        style={[styles.statusChipText, styles.statusChipTextDefault]}
+                                                        numberOfLines={1}
+                                                    >
+                                                        HQ
+                                                    </AppText>
+                                                </View>
+                                            ) : null}
                                             <View
                                                 style={[
                                                     styles.statusChip,
-                                                    site.hasManager
-                                                        ? styles.statusChipOk
-                                                        : styles.statusChipWarn,
+                                                    !site.isActive
+                                                        ? styles.statusChipInactive
+                                                        : site.hasManager
+                                                          ? styles.statusChipOk
+                                                          : styles.statusChipWarn,
                                                 ]}
                                             >
                                                 <AppText
                                                     variant="bodySmall"
                                                     style={[
                                                         styles.statusChipText,
-                                                        site.hasManager
-                                                            ? styles.statusChipTextOk
-                                                            : styles.statusChipTextWarn,
+                                                        !site.isActive
+                                                            ? styles.statusChipTextInactive
+                                                            : site.hasManager
+                                                              ? styles.statusChipTextOk
+                                                              : styles.statusChipTextWarn,
                                                     ]}
                                                     numberOfLines={1}
                                                 >
-                                                    {site.hasManager ? 'Managed' : 'Needs manager'}
+                                                    {!site.isActive
+                                                        ? 'Inactive'
+                                                        : site.hasManager
+                                                          ? 'Managed'
+                                                          : 'Needs manager'}
                                                 </AppText>
                                             </View>
                                         </View>
@@ -872,15 +983,31 @@ export default function MultiCharityManageSitesScreen() {
                                                 </Pressable>
                                             </View>
 
-                                            <Pressable
-                                                style={[styles.dangerOutlineBtn, actionLoading && styles.btnDisabled]}
-                                                disabled={actionLoading}
-                                                onPress={() => requestDeleteLocation(site.id)}
-                                            >
-                                                <AppText variant="bodyBold" style={styles.dangerOutlineText}>
-                                                    Delete location
+                                            {!site.isActive ? (
+                                                <Pressable
+                                                    style={[styles.primaryBtn, actionLoading && styles.btnDisabled]}
+                                                    disabled={actionLoading}
+                                                    onPress={() => requestRestoreLocation(site.id)}
+                                                >
+                                                    <AppText variant="bodyBold" style={styles.primaryBtnText}>
+                                                        Restore location
+                                                    </AppText>
+                                                </Pressable>
+                                            ) : !site.isDefault ? (
+                                                <Pressable
+                                                    style={[styles.dangerOutlineBtn, actionLoading && styles.btnDisabled]}
+                                                    disabled={actionLoading}
+                                                    onPress={() => requestDeleteLocation(site.id)}
+                                                >
+                                                    <AppText variant="bodyBold" style={styles.dangerOutlineText}>
+                                                        Deactivate location
+                                                    </AppText>
+                                                </Pressable>
+                                            ) : (
+                                                <AppText variant="caption" style={styles.helperText}>
+                                                    Default head-office site can’t be removed.
                                                 </AppText>
-                                            </Pressable>
+                                            )}
                                         </>
                                     ) : (
                                         <>
@@ -1387,6 +1514,12 @@ const styles = StyleSheet.create({
     statusChipWarn: {
         backgroundColor: '#FFF4E5',
     },
+    statusChipInactive: {
+        backgroundColor: '#F0F0F0',
+    },
+    statusChipDefault: {
+        backgroundColor: '#EFEAFE',
+    },
     statusChipText: {
         fontSize: normalize(11),
         textTransform: 'none',
@@ -1397,6 +1530,12 @@ const styles = StyleSheet.create({
     },
     statusChipTextWarn: {
         color: '#B45309',
+    },
+    statusChipTextInactive: {
+        color: palette.midgray,
+    },
+    statusChipTextDefault: {
+        color: palette.primary,
     },
     siteName: {
         flexShrink: 1,

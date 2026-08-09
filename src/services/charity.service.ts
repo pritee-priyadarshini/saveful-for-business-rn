@@ -78,6 +78,10 @@ export const charityService = {
         return api.delete(`/charity/locations/${locationId}`);
     },
 
+    reactivateLocation(locationId: number) {
+        return api.post(`/charity/locations/${locationId}/activate`);
+    },
+
     addMember(data: AddCharityMemberPayload) {
         return api.post('/charity/users', data);
     },

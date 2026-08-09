@@ -82,9 +82,23 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     try {
       const profileRes = await authService.profile();
       const nextProfile = profileRes.data as any;
+      // Preserve assigned site identity across refresh when profile sites are sparse.
+      const previousSite = currentUser.profile?.sites?.[0];
+      const siteAccessFromLogin = previousSite?.id
+        ? {
+            siteId: Number(previousSite.id),
+            siteRole: currentUser.siteRole || 'LOCATION_ADMIN',
+            siteName:
+              previousSite.locationName ||
+              previousSite.name ||
+              previousSite.organisationName,
+            address: previousSite.address,
+          }
+        : null;
       const authUser = buildAuthUserFromProfile(
         nextProfile,
         currentUser.accessToken,
+        siteAccessFromLogin,
       );
 
       set({

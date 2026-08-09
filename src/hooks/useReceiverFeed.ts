@@ -56,13 +56,18 @@ export function useReceiverFeed(audience: DiscoverAudience) {
         const permissionOn = await refreshPermissionState();
         const nextMode = permissionOn ? 'push' : 'nearby_fallback';
 
+        const viewerSiteId =
+          Number(authUser?.profile?.sites?.[0]?.id) ||
+          Number((authUser as { siteId?: number } | null)?.siteId) ||
+          null;
+
         const [claims, availableListings] = await Promise.all([
           fetchAllMyClaims(),
           fetchAvailableListingsForAudience(audience, nextMode).catch(() => []),
         ]);
 
-        const updates = mapReceiverUpdates({ claims, availableListings });
-        const pickups = mapReceiverPickups({ claims, availableListings });
+        const updates = mapReceiverUpdates({ claims, availableListings, viewerSiteId });
+        const pickups = mapReceiverPickups({ claims, availableListings, viewerSiteId });
 
         setFeed({
           updates,
@@ -79,7 +84,7 @@ export function useReceiverFeed(audience: DiscoverAudience) {
         setRefreshing(false);
       }
     },
-    [audience, authUser?.accessToken, refreshPermissionState],
+    [audience, authUser, refreshPermissionState],
   );
 
   useEffect(() => {

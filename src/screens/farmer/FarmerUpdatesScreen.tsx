@@ -24,6 +24,9 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAppContext } from '../../store/AppContext';
 import { useReceiverFeed } from '@/hooks/useReceiverFeed';
+import { claimsService } from '@/services/claims.service';
+import { showConfirmAlert } from '@/store/appAlertStore';
+import { getUserFriendlyErrorMessage, showErrorAlert } from '@/utils/apiError';
 import type {
   ReceiverUpdateItem,
   ReceiverUpdateType,
@@ -125,6 +128,7 @@ export function FarmerUpdatesScreen() {
     { id: string; name: string; quantity: number }[]
   >([]);
   const [surveyCompletedIds, setSurveyCompletedIds] = useState<string[]>([]);
+  const [markingClaimId, setMarkingClaimId] = useState<number | null>(null);
 
   const filteredUpdates = useMemo(() => {
     if (activeFilter === 'all') return updates;
@@ -161,6 +165,47 @@ export function FarmerUpdatesScreen() {
     }
     // Pickup + collected: same items popup as the Pickups screen.
     openItemsModal(item);
+  };
+
+  const openSurveyForItem = (item: UpdateItem, answer: 'yes' | 'no' | null = 'yes') => {
+    setInitialAnswer(answer);
+    setSelectedUpdateId(item.id);
+    setSelectedClaimId(item.claimId ?? null);
+    setSelectedBusinessName(item.title);
+    setSelectedSurveyItems(
+      (item.items || []).map((food, index) => ({
+        id: String(index),
+        name: food.name,
+        quantity: Number(food.claimed || food.available || 0),
+      })),
+    );
+    setModalVisible(true);
+  };
+
+  const handleMarkCollected = (item: UpdateItem) => {
+    if (!item.claimId || markingClaimId != null) return;
+    showConfirmAlert({
+      title: 'Mark as collected?',
+      message: `Confirm you collected ${item.quantityKg} kg from ${item.title}. Only confirm after you’ve picked it up.`,
+      confirmLabel: 'Yes, collected',
+      cancelLabel: 'Not yet',
+      onConfirm: async () => {
+        setMarkingClaimId(item.claimId!);
+        try {
+          await claimsService.markClaimCollected(item.claimId!);
+          openSurveyForItem(item, 'yes');
+          void reload();
+        } catch (error) {
+          showErrorAlert(
+            error,
+            'Could not mark collected',
+            getUserFriendlyErrorMessage(error, 'Could not mark this claim as collected.'),
+          );
+        } finally {
+          setMarkingClaimId(null);
+        }
+      },
+    });
   };
 
   const renderSkeleton = () => (
@@ -250,13 +295,21 @@ export function FarmerUpdatesScreen() {
 
   const renderStandardCard = (item: UpdateItem) => {
     const theme = CARD_THEMES[item.type];
+    const selfPickup = item.type === 'pickup' && item.canMarkCollected;
+    const badgeLabel = selfPickup ? 'CLAIMED' : theme.badgeLabel;
+    const primaryLabel =
+      selfPickup && markingClaimId === item.claimId
+        ? 'Marking…'
+        : selfPickup
+          ? 'Mark as collected'
+          : 'View Details';
 
     return (
       <View style={[styles.updateCard, adaptive.updateCard]}>
         <View style={styles.cardTopRow}>
           <View style={[styles.statusBadge, { backgroundColor: theme.badgeBg }]}>
             <AppText variant="bodyBold" style={[styles.statusBadgeText, { color: theme.badgeText }]}>
-              {theme.badgeLabel}
+              {badgeLabel}
             </AppText>
           </View>
           <AppText variant="bodyBold" style={styles.cardTitle} numberOfLines={1}>
@@ -301,14 +354,39 @@ export function FarmerUpdatesScreen() {
               ) : null}
             </View>
 
-            <Pressable
-              style={[styles.viewDetailsBtn, { backgroundColor: theme.btn }]}
-              onPress={() => handleViewDetails(item)}
-            >
-              <AppText variant="bodyBold" style={styles.viewDetailsText} numberOfLines={1}>
-                View Details
-              </AppText>
-            </Pressable>
+            <View style={styles.cardActions}>
+              {selfPickup ? (
+                <Pressable
+                  style={[styles.viewDetailsBtn, { backgroundColor: theme.btn }]}
+                  disabled={markingClaimId != null}
+                  onPress={() => handleMarkCollected(item)}
+                >
+                  <AppText variant="bodyBold" style={styles.viewDetailsText} numberOfLines={1}>
+                    {primaryLabel}
+                  </AppText>
+                </Pressable>
+              ) : null}
+              <Pressable
+                style={[
+                  styles.viewDetailsBtn,
+                  selfPickup
+                    ? styles.secondaryDetailsBtn
+                    : { backgroundColor: theme.btn },
+                ]}
+                onPress={() => handleViewDetails(item)}
+              >
+                <AppText
+                  variant="bodyBold"
+                  style={[
+                    styles.viewDetailsText,
+                    selfPickup ? styles.secondaryDetailsText : null,
+                  ]}
+                  numberOfLines={1}
+                >
+                  View Details
+                </AppText>
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>
@@ -878,6 +956,12 @@ const styles = StyleSheet.create({
     textTransform: 'none',
   },
 
+  cardActions: {
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
+    gap: hp(0.7),
+  },
+
   viewDetailsBtn: {
     alignSelf: 'flex-end',
     minWidth: normalize(108),
@@ -888,11 +972,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  secondaryDetailsBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.primary,
+  },
+
   viewDetailsText: {
     color: palette.white,
     fontSize: normalize(12),
     lineHeight: normalize(16),
     textTransform: 'none',
+  },
+
+  secondaryDetailsText: {
+    color: palette.primary,
   },
 
   feedbackIcon: {
