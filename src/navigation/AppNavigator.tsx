@@ -38,7 +38,6 @@ import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
 import SiteAnalyticsScreen from '@/screens/restaurant/SiteAnalyticsScreen';
 import { ProfileScreen } from '@/screens/shared/ProfileScreen';
 import { CalculationScreen } from '@/screens/shared/CalculationScreen';
-import MultiCharityManageSitesScreen from '@/screens/charity/MultiCharityManageSitesScreen';
 import CreateCharitySiteScreen from '@/screens/charity/CreateCharitySiteScreen';
 import CharitySiteAnalyticsScreen from '@/screens/charity/CharitySiteAnalyticsScreen';
 import DriverTrackingScreen from '@/screens/shared/DriverTrackingScreen';
@@ -96,7 +95,6 @@ export type RootStackParamList = {
   
 
   //MultiCharity
-  MultiCharityManageSites: undefined;
   CreateCharitySite: | undefined | {
     mode?: 'assign-manager';
     siteId?: number;
@@ -180,11 +178,7 @@ export function AppNavigator() {
   }
 
   const initialRouteName: keyof RootStackParamList =
-    effectiveRole === 'restaurant_multi'
-      ? 'ManageSites'
-      : effectiveRole === 'charity_multi'
-        ? 'MultiCharityManageSites'
-        : 'Tabs';
+    effectiveRole === 'restaurant_multi' ? 'ManageSites' : 'Tabs';
 
   // Register notification-tap handlers once on mount.
   useEffect(() => {
@@ -276,13 +270,6 @@ export function AppNavigator() {
 
             {effectiveRole === 'restaurant_multi' ? (
               <RootStack.Screen name="ManageSites" component={ManageSitesScreen} />
-            ) : null}
-
-            {effectiveRole === 'charity_multi' ? (
-              <RootStack.Screen
-                name="MultiCharityManageSites"
-                component={MultiCharityManageSitesScreen}
-              />
             ) : null}
 
             {/* GLOBAL */}

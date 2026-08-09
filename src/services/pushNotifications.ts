@@ -519,8 +519,7 @@ export function isFoodListingNotification(payload: NotificationPayload): boolean
 export type NotificationNavigationTarget =
   | { name: 'DriverTracking'; params: { trackingId: string; source: 'restaurant' | 'charity' | 'farmer' } }
   | { name: 'Tabs'; params?: { screen: string; params?: Record<string, unknown> } }
-  | { name: 'ManageSites'; params?: undefined }
-  | { name: 'MultiCharityManageSites'; params?: undefined };
+  | { name: 'ManageSites'; params?: undefined };
 
 export function resolveNotificationTarget(
   payload: NotificationPayload,
@@ -546,9 +545,6 @@ export function resolveNotificationTarget(
 
   if (role === 'restaurant_multi') {
     return { name: 'ManageSites' };
-  }
-  if (role === 'charity_multi') {
-    return { name: 'MultiCharityManageSites' };
   }
 
   return { name: 'Tabs' };

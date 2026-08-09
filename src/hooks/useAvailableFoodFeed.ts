@@ -37,8 +37,9 @@ export function useAvailableFoodFeed({ audience, onBeforeReload }: Options) {
   const cache = useDiscoverStore((s) => s[audience]);
   const locationRequired = useDiscoverStore((s) => s.locationRequired);
   const fetchListings = useDiscoverStore((s) => s.fetchListings);
-  const modeRef = useRef<AvailableFoodMode>(mode);
-  modeRef.current = mode;
+  const effectiveMode: AvailableFoodMode = cache.feedMode ?? mode;
+  const modeRef = useRef<AvailableFoodMode>(effectiveMode);
+  modeRef.current = effectiveMode;
 
   const load = useCallback(
     async (force = false) => {
@@ -83,7 +84,7 @@ export function useAvailableFoodFeed({ audience, onBeforeReload }: Options) {
   return {
     listings: cache.listings,
     loading: modeLoading || cache.isFetching,
-    mode,
+    mode: effectiveMode,
     notificationsOn,
     locationRequired,
     load,

@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { pickSquareImage } from '@/utils/pickSquareImage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -310,6 +310,7 @@ export function AuthScreen() {
   } = useAppContext();
 
   const navigation = useNavigation<NavProp>();
+  const route = useRoute<RouteProp<AuthStackParamList, 'Auth'>>();
 
   const isRestaurant =
     selectedRole === 'restaurant_single' ||
@@ -323,6 +324,14 @@ export function AuthScreen() {
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const step = route.params?.step;
+    if (step === 1 || step === 2 || step === 3) {
+      setCurrentStep(step);
+      setFormError(null);
+    }
+  }, [route.params?.step]);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 

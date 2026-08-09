@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
     View,
     ScrollView,
@@ -8,16 +8,21 @@ import {
     Linking,
     TextInput,
     RefreshControl,
+    ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, type CompositeNavigationProp } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import type { CharityTabsParamList } from '../../navigation/types';
 
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { AppText } from '../../components/AppText';
+import { Button } from '../../components/Button';
 import { Skeleton } from '../../components/Skeleton';
+import { AssignDriverModal } from '@/components/AssignDriverModal';
 import {
     LocationSetupModal,
     type SelectedLocation,
@@ -27,16 +32,23 @@ import { useCharityStore, type CharityMember } from '@/store/charityStore';
 import { showConfirmAlert, showAppAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { showErrorAlert, showSuccessAlert, showInfoAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { organizationService } from '@/services/organization.service';
 import { useAuthStore } from '@/store/authStore';
+import { driversService, type SiteDriver } from '@/services/drivers.service';
+import { normalizeAuthProfile } from '@/utils/coordinates';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'MultiCharityManageSites'>;
+type NavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<CharityTabsParamList, 'Home'>,
+    NativeStackNavigationProp<RootStackParamList>
+>;
+
+type HomeSection = 'sites' | 'drivers';
 
 type Site = {
     id: number;
@@ -52,6 +64,35 @@ type Site = {
     logoUrl?: string | null;
     hasManager: boolean;
 };
+
+type SiteDriverRow = SiteDriver & { siteId: number };
+
+function resolveCharitySiteIds(authUser: any, locations: any[]): number[] {
+    const profile = normalizeAuthProfile(authUser);
+    const profileSites: any[] = Array.isArray(profile?.sites) ? profile.sites : [];
+    const fromProfile: number[] = [];
+    for (const site of profileSites) {
+        const id = Number(site?.id);
+        if (Number.isFinite(id) && id > 0) fromProfile.push(id);
+    }
+    if (fromProfile.length > 0) return Array.from(new Set(fromProfile));
+
+    const fromLocations: number[] = [];
+    for (const location of locations ?? []) {
+        const id = Number(location?.id);
+        if (Number.isFinite(id) && id > 0) fromLocations.push(id);
+    }
+    return Array.from(new Set(fromLocations));
+}
+
+function dedupeSiteDrivers(rows: SiteDriverRow[]): SiteDriverRow[] {
+    const seen = new Set<number>();
+    return rows.filter((driver) => {
+        if (!driver?.id || seen.has(driver.id)) return false;
+        seen.add(driver.id);
+        return true;
+    });
+}
 
 function findLocationAdmin(users: CharityMember[], locationId: number) {
     const activeUsers = users.filter((user) => user.isActive === true);
@@ -72,9 +113,9 @@ export default function MultiCharityManageSitesScreen() {
     useTransparentStatusBar('light');
     const r = useResponsiveLayout();
     const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
-    const safeBottomPadding = useSafeBottomPadding(r.isTablet ? 24 : hp(1.5));
+    const tabBottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(1.5));
     const navigation = useNavigation<NavigationProp>();
-    const { logout, currentProfile, authUser } = useAppContext();
+    const { currentProfile, authUser } = useAppContext();
     const {
         locations,
         users,
@@ -93,6 +134,11 @@ export default function MultiCharityManageSitesScreen() {
     const [actionLoading, setActionLoading] = useState(false);
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
     const [locationModalVisible, setLocationModalVisible] = useState(false);
+    const [homeSection, setHomeSection] = useState<HomeSection>('sites');
+    const [siteDrivers, setSiteDrivers] = useState<SiteDriverRow[]>([]);
+    const [driversLoading, setDriversLoading] = useState(false);
+    const [driversError, setDriversError] = useState<string | null>(null);
+    const [assignDriver, setAssignDriver] = useState<SiteDriverRow | null>(null);
 
     const contentColumn = useMemo(() => {
         if (!r.isTablet || !adaptive.columnWidth) return null;
@@ -148,26 +194,103 @@ export default function MultiCharityManageSitesScreen() {
         [sites],
     );
 
-    const actions = [
-        { label: 'Add Location', route: 'CreateCharitySite', primary: true },
-        { label: 'View Analytics', route: 'CharitySiteAnalytics' },
-        { label: 'Your Profile', route: 'Account' },
-        {
-            label: 'Contact Saveful',
-            action: () => Linking.openURL('https://www.saveful.com/contact'),
-        },
-    ];
+    const resolvePrimaryLocationId = useCallback(() => {
+        const stateLocations = useCharityStore.getState().locations;
+        const fromSites = resolveCharitySiteIds(useAuthStore.getState().authUser, stateLocations)[0];
+        if (fromSites) return fromSites;
+        const fromProfile = Number(useAuthStore.getState().authUser?.profile?.sites?.[0]?.id);
+        if (Number.isFinite(fromProfile) && fromProfile > 0) return fromProfile;
+        const fromLocations = Number(stateLocations?.[0]?.id);
+        if (Number.isFinite(fromLocations) && fromLocations > 0) return fromLocations;
+        return 0;
+    }, []);
 
     const loadData = async (force = false) => {
         await Promise.all([fetchLocations(force), fetchUsers(force)]);
     };
 
+    const loadSiteDrivers = useCallback(async () => {
+        setDriversLoading(true);
+        setDriversError(null);
+        try {
+            const currentAuthUser = useAuthStore.getState().authUser;
+            await Promise.all([
+                fetchLocations(true).catch(() => undefined),
+                fetchUsers(true).catch(() => undefined),
+            ]);
+
+            let ids = resolveCharitySiteIds(currentAuthUser, useCharityStore.getState().locations);
+            if (ids.length === 0) {
+                const fallback = resolvePrimaryLocationId();
+                if (fallback > 0) ids = [fallback];
+            }
+
+            const liveBatches =
+                ids.length > 0
+                    ? await Promise.all(
+                          ids.map(async (siteId) => {
+                              try {
+                                  const drivers = await driversService.getDriversForSite(siteId);
+                                  return drivers.map((driver) => ({ ...driver, siteId }));
+                              } catch {
+                                  return [] as SiteDriverRow[];
+                              }
+                          }),
+                      )
+                    : [];
+
+            const liveDrivers = dedupeSiteDrivers(liveBatches.flat());
+            const teamDrivers = useCharityStore
+                .getState()
+                .users.filter((member) => member.role === 'DRIVER' && member.isActive !== false)
+                .map((member) => {
+                    const matchedLive = liveDrivers.find((driver) => driver.id === member.id);
+                    if (matchedLive) return matchedLive;
+                    return {
+                        id: member.id,
+                        name:
+                            [member.firstName, member.lastName].filter(Boolean).join(' ').trim() ||
+                            'Driver',
+                        phone: member.mobile || '',
+                        online: false,
+                        vehicleType: null,
+                        lat: null,
+                        lng: null,
+                        siteId: ids[0] ?? resolvePrimaryLocationId(),
+                    } satisfies SiteDriverRow;
+                });
+
+            const merged = dedupeSiteDrivers([...liveDrivers, ...teamDrivers]);
+            setSiteDrivers(merged);
+
+            if (merged.length === 0 && ids.length === 0) {
+                setDriversError('No charity site found for drivers.');
+            }
+        } catch (e) {
+            setDriversError('Could not load drivers');
+            showErrorAlert(e, 'Could not load drivers', 'Could not load drivers');
+        } finally {
+            setDriversLoading(false);
+        }
+    }, [fetchLocations, fetchUsers, resolvePrimaryLocationId]);
+
+    const loadSiteDriversRef = useRef(loadSiteDrivers);
+    loadSiteDriversRef.current = loadSiteDrivers;
+
     const onRefresh = async () => {
         try {
             setRefreshing(true);
-            await loadData(true);
+            if (homeSection === 'drivers') {
+                await loadSiteDrivers();
+            } else {
+                await loadData(true);
+            }
         } catch (e) {
-            showErrorAlert(e, 'Could not load locations', 'Could not load locations');
+            showErrorAlert(
+                e,
+                homeSection === 'drivers' ? 'Could not load drivers' : 'Could not load locations',
+                homeSection === 'drivers' ? 'Could not load drivers' : 'Could not load locations',
+            );
         } finally {
             setRefreshing(false);
         }
@@ -181,6 +304,40 @@ export default function MultiCharityManageSitesScreen() {
             // eslint-disable-next-line react-hooks/exhaustive-deps
         }, []),
     );
+
+    useEffect(() => {
+        if (homeSection !== 'drivers') return;
+        void loadSiteDriversRef.current();
+    }, [homeSection]);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (homeSection !== 'drivers') return;
+            void loadSiteDriversRef.current();
+        }, [homeSection]),
+    );
+
+    const openAddDriver = useCallback(() => {
+        navigation.navigate('CharityManageAccess', {
+            locationId: resolvePrimaryLocationId(),
+            orgType: 'charity',
+            initialTab: 'driver',
+        });
+    }, [navigation, resolvePrimaryLocationId]);
+
+    const callDriver = (phone: string) => {
+        const cleaned = String(phone || '').trim();
+        if (!cleaned) return;
+        void Linking.openURL(`tel:${cleaned.replace(/\s+/g, '')}`);
+    };
+
+    const openAssign = (driver: SiteDriverRow) => {
+        if (!driver.online) {
+            showInfoAlert('Driver must be live to assign a pickup', 'Driver offline');
+            return;
+        }
+        setAssignDriver(driver);
+    };
 
     const toggleExpanded = (siteId: number) => {
         if (expandedSite === siteId) {
@@ -305,16 +462,9 @@ export default function MultiCharityManageSitesScreen() {
                 <Skeleton width="100%" height="100%" borderRadius={0} />
             </View>
 
-            <View style={styles.skeletonTitle}>
-                <Skeleton width={wp(50)} height={normalize(24)} />
-            </View>
-
-            <View style={[styles.actionGrid, tabletInsetReset]}>
-                {[1, 2, 3, 4].map((i) => (
-                    <View key={i} style={[styles.actionCard, styles.skeletonActionCard]}>
-                        <Skeleton width="60%" height={normalize(14)} />
-                    </View>
-                ))}
+            <View style={[styles.toggleWrapper, tabletInsetReset]}>
+                <Skeleton width="48%" height={normalize(40)} borderRadius={normalize(30)} />
+                <Skeleton width="48%" height={normalize(40)} borderRadius={normalize(30)} />
             </View>
 
             <View style={styles.skeletonTitle}>
@@ -391,7 +541,7 @@ export default function MultiCharityManageSitesScreen() {
                 contentContainerStyle={[
                     styles.scrollContent,
                     adaptive.scrollContent,
-                    { paddingBottom: safeBottomPadding },
+                    { paddingBottom: tabBottomPadding },
                 ]}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
@@ -416,7 +566,7 @@ export default function MultiCharityManageSitesScreen() {
                                         style={[styles.heroTitle, adaptive.heroTitle]}
                                         numberOfLines={1}
                                     >
-                                        Your sites
+                                        {homeSection === 'drivers' ? 'Your drivers' : 'Your sites'}
                                     </AppText>
                                     <HeaderAddressRow
                                         address={brandAddress}
@@ -430,7 +580,7 @@ export default function MultiCharityManageSitesScreen() {
                                     style={[styles.heroIconCircle, adaptive.heroIconCircle]}
                                     onPress={() => navigation.navigate('Account')}
                                     accessibilityRole="button"
-                                    accessibilityLabel="Open account profile"
+                                    accessibilityLabel="Open account tab"
                                 >
                                     {businessLogo ? (
                                         <Image
@@ -451,9 +601,13 @@ export default function MultiCharityManageSitesScreen() {
                                     style={[styles.heroStatsText, adaptive.heroStatsText]}
                                     numberOfLines={1}
                                 >
-                                    {sites.length === 0
-                                        ? 'No locations yet'
-                                        : `${managedCount} of ${sites.length} sites managed`}
+                                    {homeSection === 'drivers'
+                                        ? siteDrivers.length === 0
+                                            ? 'No drivers yet'
+                                            : `${siteDrivers.filter((d) => d.online).length} of ${siteDrivers.length} online`
+                                        : sites.length === 0
+                                          ? 'No locations yet'
+                                          : `${managedCount} of ${sites.length} sites managed`}
                                 </AppText>
                             </View>
                         </View>
@@ -461,43 +615,33 @@ export default function MultiCharityManageSitesScreen() {
                 </View>
 
                 <View style={contentColumn}>
-                <AppText
-                    variant="subheading"
-                    style={[styles.sectionTitle, tabletInsetReset, adaptive.sectionTitle]}
-                >
-                    What to do today !
-                </AppText>
-
-                <View style={[styles.actionGrid, tabletInsetReset, r.isTablet && styles.actionGridTablet]}>
-                    {actions.map((item) => (
-                        <Pressable
-                            key={item.label}
-                            style={[
-                                styles.actionCard,
-                                r.isTablet && styles.actionCardTablet,
-                                item.primary && styles.actionCardPrimary,
-                            ]}
-                            onPress={() => {
-                                if (item.route) {
-                                    navigation.navigate(item.route as any);
-                                } else if (item.action) {
-                                    item.action();
-                                }
-                            }}
+                <View style={[styles.toggleWrapper, tabletInsetReset]}>
+                    <Pressable
+                        style={[styles.toggleBtn, homeSection === 'sites' && styles.toggleActive]}
+                        onPress={() => setHomeSection('sites')}
+                    >
+                        <AppText
+                            variant="label"
+                            style={homeSection === 'sites' ? styles.toggleTextActive : styles.toggleText}
                         >
-                            <AppText
-                                variant="bodyBold"
-                                style={[styles.actionText, item.primary && styles.actionTextPrimary]}
-                                numberOfLines={2}
-                                adjustsFontSizeToFit
-                                minimumFontScale={0.8}
-                            >
-                                {item.label}
-                            </AppText>
-                        </Pressable>
-                    ))}
+                            Sites
+                        </AppText>
+                    </Pressable>
+                    <Pressable
+                        style={[styles.toggleBtn, homeSection === 'drivers' && styles.toggleActive]}
+                        onPress={() => setHomeSection('drivers')}
+                    >
+                        <AppText
+                            variant="label"
+                            style={homeSection === 'drivers' ? styles.toggleTextActive : styles.toggleText}
+                        >
+                            Drivers
+                        </AppText>
+                    </Pressable>
                 </View>
 
+                {homeSection === 'sites' ? (
+                <>
                 <View style={[styles.sitesHeader, tabletInsetReset]}>
                     <View style={styles.sitesHeaderLeft}>
                         <AppText variant="subheading" style={styles.sitesTitle}>
@@ -824,27 +968,153 @@ export default function MultiCharityManageSitesScreen() {
                         </View>
                     );
                 })}
+                </>
+                ) : (
+                <>
+                <View style={[styles.sitesHeader, tabletInsetReset]}>
+                    <View style={styles.sitesHeaderLeft}>
+                        <AppText variant="subheading" style={styles.sitesTitle}>
+                            Active Drivers
+                        </AppText>
+                        <View style={styles.countBadge}>
+                            <AppText variant="bodySmall" style={styles.countBadgeText}>
+                                {siteDrivers.length}
+                            </AppText>
+                        </View>
+                    </View>
+                    {siteDrivers.length > 0 ? (
+                        <Pressable style={styles.addLink} onPress={openAddDriver} hitSlop={8}>
+                            <Ionicons name="add" size={normalize(16)} color={palette.kale} />
+                            <AppText variant="bodyBold" style={styles.addLinkText}>
+                                Add
+                            </AppText>
+                        </Pressable>
+                    ) : null}
+                </View>
+
+                {driversLoading && siteDrivers.length === 0 ? (
+                    <View style={[styles.driversEmpty, tabletInsetReset]}>
+                        <ActivityIndicator color={palette.primary} />
+                    </View>
+                ) : siteDrivers.length === 0 ? (
+                    <View style={[styles.emptyCard, tabletInsetReset]}>
+                        <View style={styles.emptyIcon}>
+                            <Ionicons name="car-outline" size={normalize(26)} color={palette.kale} />
+                        </View>
+                        <AppText variant="bodyBold" style={styles.emptyTitle}>
+                            No drivers yet
+                        </AppText>
+                        <AppText variant="bodySmall" style={styles.emptyCopy}>
+                            {driversError ||
+                                'Drivers added to your charity sites will appear here with Online/Offline status.'}
+                        </AppText>
+                        <Pressable style={styles.emptyCta} onPress={openAddDriver}>
+                            <AppText variant="bodyBold" style={styles.emptyCtaText}>
+                                + Add a Driver
+                            </AppText>
+                        </Pressable>
+                    </View>
+                ) : (
+                    siteDrivers.map((driver) => (
+                        <View
+                            key={driver.id}
+                            style={[styles.driverCard, r.isTablet && { marginHorizontal: 0 }]}
+                        >
+                            <View style={styles.driverHeader}>
+                                <View style={styles.driverIdentity}>
+                                    <View style={styles.driverAvatar}>
+                                        <Ionicons
+                                            name="car-outline"
+                                            size={normalize(22)}
+                                            color={palette.middlegreen}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <AppText variant="bodyBold" numberOfLines={1}>
+                                            {driver.name || 'Driver'}
+                                        </AppText>
+                                        <AppText variant="bodySmall" style={styles.driverMeta} numberOfLines={1}>
+                                            {driver.vehicleType?.trim() || 'Vehicle not set'}
+                                        </AppText>
+                                    </View>
+                                </View>
+                                <View
+                                    style={[
+                                        styles.driverStatusBadge,
+                                        driver.online ? styles.onlineBadge : styles.offlineBadge,
+                                    ]}
+                                >
+                                    <View
+                                        style={[
+                                            styles.statusDot,
+                                            driver.online ? styles.onlineDot : styles.offlineDot,
+                                        ]}
+                                    />
+                                    <AppText
+                                        variant="caption"
+                                        style={driver.online ? styles.onlineBadgeText : styles.offlineBadgeText}
+                                    >
+                                        {driver.online ? 'Online' : 'Offline'}
+                                    </AppText>
+                                </View>
+                            </View>
+
+                            <View style={styles.driverMetaRow}>
+                                <Ionicons name="call-outline" size={normalize(16)} color={palette.middlegreen} />
+                                <AppText variant="bodySmall" style={styles.driverMeta}>
+                                    {driver.phone?.trim() || 'No phone number'}
+                                </AppText>
+                            </View>
+
+                            {driver.lat != null &&
+                            driver.lng != null &&
+                            Number.isFinite(driver.lat) &&
+                            Number.isFinite(driver.lng) ? (
+                                <View style={styles.driverMetaRow}>
+                                    <Ionicons
+                                        name="navigate-outline"
+                                        size={normalize(16)}
+                                        color={palette.middlegreen}
+                                    />
+                                    <AppText variant="caption" style={styles.coordsText}>
+                                        Last location · {driver.lat.toFixed(4)}, {driver.lng.toFixed(4)}
+                                    </AppText>
+                                </View>
+                            ) : null}
+
+                            <View style={styles.driverFooter}>
+                                <Button
+                                    label="Call"
+                                    size="compact"
+                                    variant="secondary"
+                                    style={styles.driverActionBtn}
+                                    disabled={!driver.phone?.trim()}
+                                    onPress={() => callDriver(driver.phone)}
+                                />
+                                <Button
+                                    label="Assign"
+                                    size="compact"
+                                    style={styles.driverActionBtn}
+                                    disabled={!driver.online}
+                                    onPress={() => openAssign(driver)}
+                                />
+                            </View>
+                        </View>
+                    ))
+                )}
+                </>
+                )}
                 </View>
             </ScrollView>
 
-            <View
-                style={[
-                    styles.stickyFooter,
-                    { paddingBottom: safeBottomPadding },
-                    r.isTablet && {
-                        width: adaptive.columnWidth,
-                        maxWidth: r.contentMaxWidth,
-                        alignSelf: 'center' as const,
-                        paddingHorizontal: r.pagePadH,
-                    },
-                ]}
-            >
-                <Pressable style={styles.logoutBtn} onPress={logout}>
-                    <AppText variant="bodyBold" style={styles.logoutText}>
-                        Logout
-                    </AppText>
-                </Pressable>
-            </View>
+            <AssignDriverModal
+                visible={!!assignDriver}
+                driver={assignDriver}
+                onClose={() => setAssignDriver(null)}
+                onAssigned={() => {
+                    void loadSiteDrivers();
+                }}
+            />
         </Screen>
     );
 }
@@ -940,47 +1210,34 @@ const styles = StyleSheet.create({
         marginBottom: hp(2),
         textAlign: 'center',
     },
-    actionGrid: {
+    toggleWrapper: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        paddingHorizontal: wp(4),
-        marginBottom: hp(2.5),
-    },
-    actionGridTablet: {
-        width: '100%',
-        gap: 12,
-    },
-    actionCard: {
-        backgroundColor: 'white',
-        width: '48%',
-        paddingVertical: hp(2.3),
-        paddingHorizontal: wp(2),
-        borderRadius: normalize(14),
-        marginBottom: hp(1.4),
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 2,
+        marginHorizontal: wp(4),
+        marginBottom: hp(1.8),
+        backgroundColor: palette.white,
+        borderRadius: normalize(30),
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: palette.strokecream,
+        padding: normalize(4),
+        gap: wp(1),
     },
-    actionCardTablet: {
-        flexGrow: 1,
-        flexBasis: '47%',
-        maxWidth: '48%',
-        minHeight: 56,
+    toggleBtn: {
+        flex: 1,
+        minHeight: normalize(40),
+        borderRadius: normalize(26),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    actionCardPrimary: {
+    toggleActive: {
         backgroundColor: palette.kale,
-        borderColor: palette.kale,
     },
-    actionText: {
-        textAlign: 'center',
-        width: '100%',
-        flexShrink: 1,
+    toggleText: {
+        color: palette.midgray,
+        textTransform: 'none',
     },
-    actionTextPrimary: {
+    toggleTextActive: {
         color: palette.white,
+        textTransform: 'none',
     },
     sitesHeader: {
         marginHorizontal: wp(4),
@@ -1063,25 +1320,6 @@ const styles = StyleSheet.create({
     },
     emptyCtaText: {
         color: palette.white,
-        textTransform: 'none',
-    },
-    stickyFooter: {
-        borderTopWidth: 1,
-        borderTopColor: palette.strokecream,
-        backgroundColor: palette.creme,
-        paddingTop: hp(1.2),
-        paddingHorizontal: wp(4),
-    },
-    logoutBtn: {
-        backgroundColor: palette.white,
-        paddingVertical: hp(1.5),
-        borderRadius: normalize(12),
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: palette.border,
-    },
-    logoutText: {
-        color: palette.black,
         textTransform: 'none',
     },
     siteCard: {
@@ -1290,6 +1528,102 @@ const styles = StyleSheet.create({
     btnDisabled: {
         opacity: 0.65,
     },
+    driversEmpty: {
+        paddingVertical: hp(4),
+        alignItems: 'center',
+    },
+    driverCard: {
+        backgroundColor: palette.white,
+        marginHorizontal: wp(4),
+        marginBottom: hp(1.2),
+        paddingHorizontal: wp(3.5),
+        paddingVertical: hp(1.4),
+        borderRadius: normalize(14),
+        borderWidth: 1,
+        borderColor: palette.strokecream,
+    },
+    driverHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: wp(2),
+    },
+    driverIdentity: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2.5),
+        flex: 1,
+        minWidth: 0,
+    },
+    driverAvatar: {
+        width: normalize(44),
+        height: normalize(44),
+        borderRadius: normalize(22),
+        backgroundColor: '#E8F3EC',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    driverMeta: {
+        color: '#666',
+        textTransform: 'none',
+    },
+    driverMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1.5),
+        marginTop: hp(1),
+    },
+    coordsText: {
+        flex: 1,
+        color: '#888',
+        textTransform: 'none',
+    },
+    driverStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1),
+        paddingHorizontal: wp(2.5),
+        paddingVertical: hp(0.5),
+        borderRadius: normalize(12),
+    },
+    onlineBadge: {
+        backgroundColor: '#E8F3EC',
+    },
+    offlineBadge: {
+        backgroundColor: '#F2F2F2',
+    },
+    statusDot: {
+        width: normalize(8),
+        height: normalize(8),
+        borderRadius: normalize(4),
+    },
+    onlineDot: {
+        backgroundColor: palette.middlegreen,
+    },
+    offlineDot: {
+        backgroundColor: '#9E9E9E',
+    },
+    onlineBadgeText: {
+        color: palette.middlegreen,
+        fontWeight: '700',
+    },
+    offlineBadgeText: {
+        color: '#666',
+        fontWeight: '700',
+    },
+    driverFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: wp(2),
+        marginTop: hp(1.4),
+        paddingTop: hp(1.2),
+        borderTopWidth: 1,
+        borderTopColor: '#F3F3F3',
+    },
+    driverActionBtn: {
+        minWidth: wp(28),
+        backgroundColor: palette.middlegreen,
+    },
     skeletonWrap: {
         paddingBottom: hp(4),
     },
@@ -1302,10 +1636,6 @@ const styles = StyleSheet.create({
     skeletonTitle: {
         alignItems: 'center',
         marginBottom: hp(2),
-    },
-    skeletonActionCard: {
-        elevation: 0,
-        shadowOpacity: 0,
     },
     skeletonSiteCard: {
         elevation: 0,

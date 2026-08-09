@@ -46,6 +46,17 @@ export function resolveUserRole(
   if (orgType === 'BUSINESS_SINGLE') return 'restaurant_single';
 
   if (orgType === 'CHARITY_MULTI') {
+    // Head-office org role wins even when they also have HQ siteAccess
+    // (needed so multi signup with a default site stays on multi tabs).
+    const headOfficeRoles = [
+      'SUPER_ADMIN',
+      'HEAD_OFFICE_ADMIN',
+      'HEAD_OFFICE',
+    ];
+    if (headOfficeRoles.includes(orgRole)) {
+      return 'charity_multi';
+    }
+
     const siteRoles = [
       'SITE_ADMIN',
       'LOCATION_ADMIN',
@@ -54,15 +65,6 @@ export function resolveUserRole(
       'DRIVER',
     ];
     if (siteRoles.includes(siteRole)) return 'charity_single';
-
-    const headOfficeRoles = [
-      'SUPER_ADMIN',
-      'HEAD_OFFICE_ADMIN',
-      'HEAD_OFFICE',
-    ];
-    if (headOfficeRoles.includes(orgRole) || !siteRole) {
-      return 'charity_multi';
-    }
 
     return 'charity_multi';
   }

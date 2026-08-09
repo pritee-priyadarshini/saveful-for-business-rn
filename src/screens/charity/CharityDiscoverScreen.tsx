@@ -332,13 +332,6 @@ export function CharityDiscoverScreen() {
       </View>
 
       <View style={styles.cardFooter}>
-        <View style={styles.storageRow}>
-          <Ionicons name="thermometer-outline" size={normalize(14)} color="#666" />
-          <AppText variant="caption" style={styles.storageText}>
-            {item.storage}
-          </AppText>
-        </View>
-
         <Button
           label="View Details"
           size="compact"
@@ -1001,25 +994,12 @@ const styles = StyleSheet.create({
 
   cardFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: hp(1.5),
     paddingTop: hp(1.2),
     borderTopWidth: 1,
     borderTopColor: '#F3F3F3',
-  },
-
-  storageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1),
-    flex: 1,
-    marginRight: wp(2),
-  },
-
-  storageText: {
-    color: '#666',
-    flex: 1,
   },
 
   detailsBtn: {

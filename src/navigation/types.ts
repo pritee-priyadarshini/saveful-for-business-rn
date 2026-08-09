@@ -3,7 +3,7 @@ export type AuthStackParamList = {
   RoleSelectionMain: undefined;
   RoleSelection: undefined;
   RoleReady: undefined;
-  Auth: undefined;
+  Auth: { step?: number } | undefined;
   EmailVerification: { email?: string; autoResend?: boolean; } | undefined;
   TeamInvite: undefined;
   SignIn: undefined;

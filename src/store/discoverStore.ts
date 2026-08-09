@@ -81,10 +81,29 @@ export const useDiscoverStore = create<DiscoverState & DiscoverActions>((set, ge
     }));
 
     try {
-      const raw =
+      let raw =
         mode === 'nearby_fallback'
           ? await fetchNearbyDiscoverListings({ page: 1, limit: 20, allPages: true })
           : await fetchDiscoverListings(audience, { page: 1, limit: 20 });
+
+      // Same as single-site: if the push inbox is empty (common for multi HQ),
+      // still show nearby surplus on Available.
+      let feedMode: AvailableFoodMode = mode;
+      if (mode === 'push' && raw.length === 0) {
+        try {
+          const nearby = await fetchNearbyDiscoverListings({
+            page: 1,
+            limit: 20,
+            allPages: true,
+          });
+          if (nearby.length > 0) {
+            raw = nearby;
+            feedMode = 'nearby_fallback';
+          }
+        } catch {
+          // Keep empty push result; surface nearby errors only in nearby mode.
+        }
+      }
 
       const mapped = raw.map(mapDiscoverListing);
 
@@ -94,7 +113,7 @@ export const useDiscoverStore = create<DiscoverState & DiscoverActions>((set, ge
           listings: mapped,
           lastFetched: Date.now(),
           isFetching: false,
-          feedMode: mode,
+          feedMode,
         },
         locationRequired: false,
         error: null,

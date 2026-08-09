@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CharityAnalyticsScreen } from '../screens/charity/CharityAnalyticsScreen';
 import { CharityDiscoverScreen } from '../screens/charity/CharityDiscoverScreen';
+import MultiCharityManageSitesScreen from '../screens/charity/MultiCharityManageSitesScreen';
 import { RestaurantAnalyticsScreen } from '../screens/restaurant/RestaurantAnalyticsScreen';
 import { RestaurantHomeScreen } from '../screens/restaurant/RestaurantHomeScreen';
 import { CharityUpdatesScreen } from '../screens/charity/CharityUpdatesScreen';
@@ -120,10 +121,19 @@ export function RoleTabs() {
   const { selectedRole } = useAppContext();
   const screenOptions = useTabScreenOptions();
 
-  if (
-    selectedRole === 'charity_single' ||
-    selectedRole === 'charity_multi'
-  ) {
+  if (selectedRole === 'charity_multi') {
+    return (
+      <CharityTab.Navigator screenOptions={screenOptions}>
+        <CharityTab.Screen component={MultiCharityManageSitesScreen} name="Home" />
+        <CharityTab.Screen component={CharityStack} name="Available" />
+        <CharityTab.Screen component={CharityAnalyticsScreen} name="Impact" />
+        <CharityTab.Screen component={CharityUpdatesScreen} name="Updates" />
+        <CharityTab.Screen component={ProfileScreen} name="Account" />
+      </CharityTab.Navigator>
+    );
+  }
+
+  if (selectedRole === 'charity_single') {
     return (
       <CharityTab.Navigator screenOptions={screenOptions}>
         <CharityTab.Screen component={CharityDiscoverScreen} name="Home" />

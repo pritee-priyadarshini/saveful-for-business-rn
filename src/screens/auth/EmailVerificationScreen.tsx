@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,7 +13,7 @@ import * as SecureStore from 'expo-secure-store';
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
-import { HeroHeader } from '../../components/HeroHeader';
+import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { AuthStackParamList } from '../../navigation/types';
 import { palette } from '../../theme/colors';
 import { useAppContext } from '@/store/AppContext';
@@ -189,21 +189,23 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
     }
   }, [route.params?.autoResend]);
 
+  const goToChangeEmail = useCallback(() => {
+    navigation.navigate('Auth', { step: 1 });
+  }, [navigation]);
+
   return (
     <>
       <Screen scrollable={false} backgroundColor={palette.creme} transparentTop contentStyle={styles.container}>
         <StatusBar style="light" translucent backgroundColor="transparent" />
 
-        <HeroHeader
+        <StackHeroHeader
+          title="Verify your email Id"
           source={require('../../../assets/placeholder/feed-bg.png')}
-          height={r.isTablet ? Math.min(r.height * 0.16, 140) : hp(20)}
-          padContentRight={false}
-          contentStyle={styles.headerContent}
-        >
-          <AppText variant="h5" color={palette.white} style={styles.heading}>
-            Verify your email Id
-          </AppText>
-        </HeroHeader>
+          height={r.isTablet ? Math.min(r.height * 0.16, 140) : hp(16)}
+          showBack
+          onBack={goToChangeEmail}
+          style={r.isTablet ? { width: r.width, alignSelf: 'center' } : undefined}
+        />
 
         <View
           style={[
@@ -222,9 +224,21 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
               A 6-digit OTP has been sent to your email. Please enter it to confirm your account and proceed with Saveful for Business.
             </AppText>
             {verificationEmail ? (
-              <AppText variant="bodySmall" style={styles.emailHint}>
-                Sent to: {verificationEmail}
-              </AppText>
+              <View style={styles.emailRow}>
+                <AppText variant="bodySmall" style={styles.emailHint}>
+                  Sent to: {verificationEmail}
+                </AppText>
+                <Pressable
+                  onPress={goToChangeEmail}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change email address"
+                >
+                  <AppText variant="label" style={styles.changeEmailText}>
+                    Change email
+                  </AppText>
+                </Pressable>
+              </View>
             ) : null}
           </View>
 
@@ -357,11 +371,6 @@ const styles = StyleSheet.create({
   container: {
   },
 
-  headerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
   content: {
     gap: hp(2),
   },
@@ -381,11 +390,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  heading: {
-    textAlign: 'center',
-    fontSize: normalize(20),
-  },
-
   text: {
     opacity: 0.85,
     textAlign: 'center',
@@ -400,10 +404,23 @@ const styles = StyleSheet.create({
     fontSize: normalize(14),
   },
 
+  emailRow: {
+    alignItems: 'center',
+    gap: hp(0.6),
+    paddingHorizontal: wp(4),
+  },
+
   emailHint: {
     textAlign: 'center',
     color: palette.primary,
     fontSize: normalize(13),
+  },
+
+  changeEmailText: {
+    color: palette.primary,
+    textDecorationLine: 'underline',
+    fontSize: normalize(13),
+    textTransform: 'none',
   },
 
   otpContainer: {

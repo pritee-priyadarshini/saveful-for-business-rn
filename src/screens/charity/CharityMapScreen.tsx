@@ -671,11 +671,7 @@ export function CharityMapScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.storageRow}>
-          <Ionicons name="thermometer-outline" size={normalize(14)} color="#666" />
-          <AppText variant="caption" style={styles.storageText}>
-            {item.storage}
-          </AppText>
+        <View style={styles.detailsRow}>
           <Pressable onPress={() => setSelectedListing(item)} hitSlop={8}>
             <AppText variant="caption" style={styles.detailsLink}>
               View details
@@ -1121,19 +1117,14 @@ const styles = StyleSheet.create({
     lineHeight: normalize(16),
   },
 
-  storageRow: {
+  detailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1),
+    justifyContent: 'flex-end',
     marginTop: hp(1.2),
     paddingTop: hp(1),
     borderTopWidth: 1,
     borderTopColor: '#F3F3F3',
-  },
-
-  storageText: {
-    color: '#666',
-    flex: 1,
   },
 
   detailsLink: {

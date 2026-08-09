@@ -147,6 +147,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
   const [selectedStorage, setSelectedStorage] = useState<string[]>([]);
   const [selectedContaminants, setSelectedContaminants] = useState<string[]>([]);
   const [confirmedSafe, setConfirmedSafe] = useState(false);
+  const [relistApplied, setRelistApplied] = useState(false);
 
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
@@ -182,6 +183,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
     setSelectedContaminants(values.selectedContaminants);
     setImages(values.images);
     setConfirmedSafe(false);
+    setRelistApplied(true);
     setStep(1);
   };
 
@@ -509,15 +511,23 @@ export function CreateFarmListingScreen({ navigation }: any) {
           <View style={styles.stepWrap}>
             {hasPreviousListing ? (
               <View style={styles.relistCard}>
-                <AppText variant="bodyBold" color={palette.midgray}>
-                  Same as last time?
-                </AppText>
-                <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
-                  <AppText variant="bodyBold" color={palette.white}>
-                    YES, LIST AGAIN
+                {relistApplied ? (
+                  <AppText variant="bodyBold" color={FARM_ACCENT} style={styles.relistHint}>
+                    Please check details below and Press Continue
                   </AppText>
-                  <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
-                </Pressable>
+                ) : (
+                  <>
+                    <AppText variant="bodyBold" color={palette.midgray}>
+                      Same as last time?
+                    </AppText>
+                    <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
+                      <AppText variant="bodyBold" color={palette.white}>
+                        YES, LIST AGAIN
+                      </AppText>
+                      <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+                    </Pressable>
+                  </>
+                )}
               </View>
             ) : null}
 
@@ -1188,6 +1198,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
+  },
+  relistHint: {
+    textAlign: 'center',
+    textTransform: 'none',
+    lineHeight: normalize(20),
+    paddingVertical: hp(0.6),
   },
   kgHeaderRow: {
     flexDirection: 'row',
