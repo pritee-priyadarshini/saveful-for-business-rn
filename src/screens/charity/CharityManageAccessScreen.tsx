@@ -26,6 +26,7 @@ import { spacing } from '@/theme/spacing';
 import { CharityMemberRole } from '@/services/charity.service';
 import { useCharityStore } from '@/store/charityStore';
 import { useAuthStore } from '@/store/authStore';
+import { useAppContext } from '@/store/AppContext';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
@@ -72,11 +73,18 @@ export default function CharityManageAccessScreen() {
     initialTab?: AccessType;
   };
   const authUser = useAuthStore((state) => state.authUser);
+  const { selectedRole } = useAppContext();
+  // Site picker is only for multi head-office — single-site / site logins are locked.
+  const canPickSite =
+    selectedRole === 'charity_multi' ||
+    (authUser?.orgType === 'CHARITY_MULTI' && authUser?.orgRole === 'SUPER_ADMIN');
 
   const [activeTab, setActiveTab] = useState<AccessType>(
     initialTab === 'driver' ? 'driver' : 'user',
   );
-  const [selectedLocationId, setSelectedLocationId] = useState<number | ''>('');
+  const [selectedLocationId, setSelectedLocationId] = useState<number | ''>(
+    () => routeLocationId ?? authUser?.siteId ?? authUser?.profile?.sites?.[0]?.id ?? '',
+  );
   const [roleExpanded, setRoleExpanded] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
@@ -180,24 +188,32 @@ export default function CharityManageAccessScreen() {
     }, [fetchUsers]),
   );
 
-  const profileLocationId = authUser?.profile?.sites?.[0]?.id;
-  const effectiveLocationId = useMemo(() => {
-    if (selectedLocationId) return Number(selectedLocationId);
-    if (routeLocationId) return routeLocationId;
-    if (profileLocationId) return profileLocationId;
-    if (locations.length === 1) return locations[0].id;
+  const profileLocationId = Number(
+    authUser?.siteId ?? authUser?.profile?.sites?.[0]?.id ?? authUser?.profile?.sites?.[0]?.siteId,
+  );
+  const lockedLocationId = useMemo(() => {
+    const fromRoute = Number(routeLocationId);
+    if (Number.isFinite(fromRoute) && fromRoute > 0) return fromRoute;
+    if (Number.isFinite(profileLocationId) && profileLocationId > 0) return profileLocationId;
+    const fromLocations = Number(locations[0]?.id);
+    if (Number.isFinite(fromLocations) && fromLocations > 0) return fromLocations;
     return undefined;
-  }, [selectedLocationId, routeLocationId, profileLocationId, locations]);
+  }, [routeLocationId, profileLocationId, locations]);
+
+  const effectiveLocationId = useMemo(() => {
+    if (!canPickSite) return lockedLocationId;
+    if (selectedLocationId) return Number(selectedLocationId);
+    return lockedLocationId;
+  }, [canPickSite, selectedLocationId, lockedLocationId]);
 
   useEffect(() => {
-    const initial =
-      routeLocationId ??
-      profileLocationId ??
-      (locations.length === 1 ? locations[0].id : undefined);
-    if (initial) {
-      setSelectedLocationId(initial);
+    if (!canPickSite) {
+      if (lockedLocationId) setSelectedLocationId(lockedLocationId);
+      return;
     }
-  }, [routeLocationId, profileLocationId, locations]);
+    if (selectedLocationId) return;
+    if (lockedLocationId) setSelectedLocationId(lockedLocationId);
+  }, [canPickSite, lockedLocationId, selectedLocationId]);
 
   const emptyForm = {
     firstName: '',
@@ -231,17 +247,23 @@ export default function CharityManageAccessScreen() {
   };
 
   const filteredMembers = activeMembers.filter((member) => {
+    if (activeTab === 'driver') {
+      if (member.role !== 'DRIVER') return false;
+      if (!effectiveLocationId) return true;
+      // Drivers list is site-scoped — never show other sites' drivers.
+      return (
+        Array.isArray(member.locations) &&
+        member.locations.some((loc: any) => Number(loc?.id) === Number(effectiveLocationId))
+      );
+    }
+
     if (effectiveLocationId) {
       const belongsToLocation =
         member.role === 'HEAD_OFFICE_ADMIN' ||
         member.role === 'HEAD_OFFICE' ||
         !member.locations?.length ||
-        member.locations.some((loc: any) => loc.id === effectiveLocationId);
+        member.locations.some((loc: any) => Number(loc?.id) === Number(effectiveLocationId));
       if (!belongsToLocation) return false;
-    }
-
-    if (activeTab === 'driver') {
-      return member.role === 'DRIVER';
     }
 
     return member.role !== 'DRIVER';
@@ -374,7 +396,27 @@ export default function CharityManageAccessScreen() {
   const memberKey = (member: { id?: number; email?: string; role: string }, index: number) =>
     member.id ? `${member.role}-${member.id}` : `${member.role}-${member.email ?? index}`;
 
-  const selectedLocation = locations.find((loc) => loc.id === effectiveLocationId);
+  const selectedLocation = useMemo(() => {
+    const fromStore = locations.find((loc) => loc.id === effectiveLocationId);
+    if (fromStore) return fromStore;
+    const profileSite =
+      authUser?.profile?.sites?.find(
+        (site: any) => Number(site?.id ?? site?.siteId) === Number(effectiveLocationId),
+      ) ?? authUser?.profile?.sites?.[0];
+    if (!profileSite && !effectiveLocationId) return undefined;
+    return {
+      id: Number(profileSite?.id ?? profileSite?.siteId ?? effectiveLocationId),
+      locationName:
+        profileSite?.locationName ||
+        profileSite?.name ||
+        profileSite?.organisationName ||
+        profileSite?.siteName ||
+        '',
+      address: profileSite?.address || '',
+    };
+  }, [locations, effectiveLocationId, authUser?.profile?.sites]);
+
+  const showSitePicker = canPickSite && locations.length > 1;
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
@@ -508,7 +550,7 @@ export default function CharityManageAccessScreen() {
             </View>
 
             <View style={styles.formCard}>
-              {locations.length > 1 ? (
+              {showSitePicker ? (
                 <View style={styles.siteBanner}>
                   <AppText variant="label" style={styles.siteBannerLabel}>
                     Site
@@ -517,13 +559,20 @@ export default function CharityManageAccessScreen() {
                     <Picker
                       selectedValue={selectedLocationId}
                       onValueChange={(v) => setSelectedLocationId(v)}
+                      style={styles.sitePicker}
+                      itemStyle={styles.sitePickerItem}
                     >
-                      <Picker.Item label="Select a site" value="" />
+                      <Picker.Item
+                        label="Select a site"
+                        value=""
+                        color={palette.black}
+                      />
                       {locations.map((location) => (
                         <Picker.Item
                           key={location.id}
                           label={location.locationName || `Site ${location.id}`}
                           value={location.id}
+                          color={palette.black}
                         />
                       ))}
                     </Picker>
@@ -534,12 +583,19 @@ export default function CharityManageAccessScreen() {
                   <AppText variant="label" style={styles.siteBannerLabel}>
                     Site
                   </AppText>
-                  <AppText variant="bodyBold" numberOfLines={1} ellipsizeMode="tail">
-                    {selectedLocation.locationName}
+                  <AppText
+                    variant="bodyBold"
+                    color={palette.black}
+                    style={styles.siteNameText}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {selectedLocation.locationName || `Site ${selectedLocation.id}`}
                   </AppText>
                   {selectedLocation.address ? (
                     <AppText
                       variant="bodySmall"
+                      color={palette.stone}
                       style={styles.sectionHint}
                       numberOfLines={2}
                       ellipsizeMode="tail"
@@ -834,6 +890,17 @@ const styles = StyleSheet.create({
   siteBannerLabel: {
     textTransform: 'none',
     color: palette.stone,
+  },
+  siteNameText: {
+    color: palette.black,
+  },
+  sitePicker: {
+    color: palette.black,
+    width: '100%',
+  },
+  sitePickerItem: {
+    color: palette.black,
+    fontSize: normalize(16),
   },
   sectionHeading: {
     marginTop: hp(0.5),

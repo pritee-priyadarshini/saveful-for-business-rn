@@ -31,6 +31,8 @@ type Props = {
   visible: boolean;
   listing: DiscoverListing | null;
   onClose: () => void;
+  /** When set, shows a Claim action (e.g. navigate to Available to claim). */
+  onClaim?: () => void;
 };
 
 function DetailRow({
@@ -57,7 +59,7 @@ function DetailRow({
   );
 }
 
-export function DiscoverListingDetailModal({ visible, listing, onClose }: Props) {
+export function DiscoverListingDetailModal({ visible, listing, onClose, onClaim }: Props) {
   const [loading, setLoading] = useState(false);
   const [extra, setExtra] = useState<ReturnType<typeof mapDiscoverListing> | null>(null);
 
@@ -184,7 +186,18 @@ export function DiscoverListingDetailModal({ visible, listing, onClose }: Props)
             )}
           </ScrollView>
 
-          <Button label="Close" size="compact" onPress={onClose} style={styles.closeBtn} />
+          <View style={styles.actions}>
+            {onClaim ? (
+              <Button label="Claim" size="compact" onPress={onClaim} style={styles.claimBtn} />
+            ) : null}
+            <Button
+              label="Close"
+              size="compact"
+              variant={onClaim ? 'secondary' : 'primary'}
+              onPress={onClose}
+              style={onClaim ? undefined : styles.closeBtn}
+            />
+          </View>
         </View>
       </View>
     </Modal>
@@ -301,8 +314,14 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1),
     borderRadius: normalize(10),
   },
-  closeBtn: {
+  actions: {
     marginTop: hp(1),
+    gap: hp(1),
+  },
+  claimBtn: {
+    backgroundColor: palette.middlegreen,
+  },
+  closeBtn: {
     backgroundColor: palette.middlegreen,
   },
 });

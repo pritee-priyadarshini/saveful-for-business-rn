@@ -33,7 +33,18 @@ export type RateClaimPayload = {
 
 export async function createClaim(payload: CreateClaimPayload): Promise<FoodClaim> {
   const response = await api.post('/claims', payload);
-  return response.data;
+  const raw = response.data?.data ?? response.data?.claim ?? response.data;
+  // Normalize nested shapes so callers always get a usable claim id.
+  const claim = (raw?.claim ?? raw) as FoodClaim;
+  if (claim && claim.id == null && (raw as any)?.id != null) {
+    return { ...claim, id: Number((raw as any).id) };
+  }
+  return claim;
+}
+
+export async function requestDriverPickup(claimId: number) {
+  const response = await api.post(`/claims/${claimId}/request-driver`);
+  return response.data?.data ?? response.data;
 }
 
 export async function getMyClaims(params?: {
@@ -66,6 +77,7 @@ export async function cancelClaim(claimId: number) {
 
 export const claimsService = {
   createClaim,
+  requestDriverPickup,
   getMyClaims,
   markClaimCollected,
   rateClaim,

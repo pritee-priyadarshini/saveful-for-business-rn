@@ -815,6 +815,10 @@ export function CharityMapScreen({ navigation }: any) {
         visible={!!selectedListing}
         listing={selectedListing}
         onClose={() => setSelectedListing(null)}
+        onClaim={() => {
+          // Already on Available — close the sheet so the claim controls on the list are usable.
+          setSelectedListing(null);
+        }}
       />
 
       <ClaimConfirmModal

@@ -182,8 +182,33 @@ function pickDriverPickup(claim: any): any | null {
       - new Date(a?.collectedAt || a?.createdAt || 0).getTime();
   });
 
-  const best = ranked.find((p) => String(p?.status || '').toUpperCase() !== 'CANCELLED') || ranked[0];
-  return best?.driver ? best : null;
+  // Keep ASSIGNED/ACCEPTED even when nested driver is missing (stale cache / partial payload).
+  return (
+    ranked.find((p) => String(p?.status || '').toUpperCase() !== 'CANCELLED') ||
+    ranked[0] ||
+    null
+  );
+}
+
+const ACTIVE_DRIVER_PICKUP_STATUSES = new Set([
+  'ASSIGNED',
+  'ACCEPTED',
+  'EN_ROUTE',
+  'ARRIVED',
+]);
+
+function hasActiveDriverPickup(claim: any): boolean {
+  const pickups = Array.isArray(claim?.driverPickups) ? claim.driverPickups : [];
+  if (
+    pickups.some((p) =>
+      ACTIVE_DRIVER_PICKUP_STATUSES.has(String(p?.status || '').toUpperCase()),
+    )
+  ) {
+    return true;
+  }
+  const pickup = pickDriverPickup(claim);
+  if (!pickup) return false;
+  return ACTIVE_DRIVER_PICKUP_STATUSES.has(String(pickup.status || '').toUpperCase());
 }
 
 function driverName(claim: any): string | null {
@@ -192,6 +217,7 @@ function driverName(claim: any): string | null {
   if (!driver) {
     // Self-collection by the claimant site — show the site contact instead of
     // a misleading "no driver" line.
+    if (hasActiveDriverPickup(claim)) return null;
     const siteName = claim?.claimantSite?.contactName;
     return siteName ? String(siteName) : null;
   }
@@ -218,10 +244,6 @@ function isCollectedClaim(claim: any): boolean {
   if (claim?.collectedAt) return true;
   const pickupStatus = String(pickDriverPickup(claim)?.status || '').toUpperCase();
   return pickupStatus === 'COLLECTED';
-}
-
-function hasActiveDriverPickup(claim: any): boolean {
-  return Boolean(pickDriverPickup(claim)?.driver);
 }
 
 function pickupStatusFromClaim(claim: any): ReceiverPickupCardStatus {

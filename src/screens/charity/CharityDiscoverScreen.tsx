@@ -44,7 +44,13 @@ type HomeTab = 'list' | 'drivers';
 
 type SiteDriverRow = SiteDriver & { siteId: number };
 
+/** Site-scoped users should only ever resolve their assigned site — not every org location. */
 function resolveCharitySiteIds(authUser: any, locations: any[]): number[] {
+  const jwtSiteId = Number(authUser?.siteId);
+  if (Number.isFinite(jwtSiteId) && jwtSiteId > 0) {
+    return [jwtSiteId];
+  }
+
   const profile = normalizeAuthProfile(authUser);
   const profileSites: any[] = Array.isArray(profile?.sites) ? profile.sites : [];
   const fromProfile: number[] = [];
@@ -53,8 +59,9 @@ function resolveCharitySiteIds(authUser: any, locations: any[]): number[] {
     if (Number.isFinite(id) && id > 0) fromProfile.push(id);
   }
 
+  // Single-site charity / site login: prefer the first assigned site only.
   if (fromProfile.length > 0) {
-    return Array.from(new Set(fromProfile));
+    return [fromProfile[0]];
   }
 
   const fromLocations: number[] = [];
@@ -63,7 +70,13 @@ function resolveCharitySiteIds(authUser: any, locations: any[]): number[] {
     if (Number.isFinite(id) && id > 0) fromLocations.push(id);
   }
 
-  return Array.from(new Set(fromLocations));
+  return fromLocations.length > 0 ? [fromLocations[0]] : [];
+}
+
+function driverBelongsToSite(member: { locations?: any[] }, siteId: number): boolean {
+  const locs = Array.isArray(member.locations) ? member.locations : [];
+  if (locs.length === 0) return false;
+  return locs.some((loc) => Number(loc?.id) === siteId);
 }
 
 function dedupeSiteDrivers(rows: SiteDriverRow[]): SiteDriverRow[] {
@@ -157,9 +170,16 @@ export function CharityDiscoverScreen() {
           : [];
 
       const liveDrivers = dedupeSiteDrivers(liveBatches.flat());
+      const siteId = ids[0] ?? resolvePrimaryLocationId();
+      // Only this site's drivers — never merge every driver in the organisation.
       const teamDrivers = useCharityStore
         .getState()
-        .users.filter((member) => member.role === 'DRIVER' && member.isActive !== false)
+        .users.filter(
+          (member) =>
+            member.role === 'DRIVER' &&
+            member.isActive !== false &&
+            (siteId <= 0 || driverBelongsToSite(member, siteId)),
+        )
         .map((member) => {
           const matchedLive = liveDrivers.find((driver) => driver.id === member.id);
           if (matchedLive) return matchedLive;
@@ -171,11 +191,14 @@ export function CharityDiscoverScreen() {
             vehicleType: null,
             lat: null,
             lng: null,
-            siteId: ids[0] ?? resolvePrimaryLocationId(),
+            siteId,
           } satisfies SiteDriverRow;
         });
 
-      const merged = dedupeSiteDrivers([...liveDrivers, ...teamDrivers]);
+      const merged = dedupeSiteDrivers([
+        ...liveDrivers.filter((driver) => siteId <= 0 || driver.siteId === siteId),
+        ...teamDrivers,
+      ]);
       setSiteDrivers(merged);
 
       if (merged.length === 0 && ids.length === 0) {
@@ -396,19 +419,19 @@ export function CharityDiscoverScreen() {
         </View>
       ) : null}
 
-      <View style={styles.cardFooter}>
+      <View style={styles.driverFooter}>
         <Button
           label="Call"
           size="compact"
           variant="secondary"
-          style={styles.detailsBtn}
+          style={styles.driverActionBtn}
           disabled={!item.phone?.trim()}
           onPress={() => callDriver(item.phone)}
         />
         <Button
           label="Assign"
           size="compact"
-          style={styles.detailsBtn}
+          style={styles.driverActionBtn}
           disabled={!item.online}
           onPress={() => openAssign(item)}
         />
@@ -557,6 +580,10 @@ export function CharityDiscoverScreen() {
         visible={!!selectedListing}
         listing={selectedListing}
         onClose={() => setSelectedListing(null)}
+        onClaim={() => {
+          setSelectedListing(null);
+          navigation.navigate('Available');
+        }}
       />
 
       {viewMode === 'list' ? (
@@ -682,6 +709,9 @@ const styles = StyleSheet.create({
   whiteText: {
     color: palette.white,
     fontSize: normalize(20),
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   locationHeaderRow: {
@@ -996,7 +1026,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
+    gap: wp(2),
     marginTop: hp(1.5),
+    paddingTop: hp(1.2),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F3F3',
+  },
+
+  driverFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: wp(2),
+    marginTop: hp(1.4),
     paddingTop: hp(1.2),
     borderTopWidth: 1,
     borderTopColor: '#F3F3F3',
@@ -1004,8 +1046,15 @@ const styles = StyleSheet.create({
 
   detailsBtn: {
     backgroundColor: palette.middlegreen,
-    minWidth: wp(32),
+    minWidth: wp(28),
+    flexShrink: 1,
     paddingHorizontal: wp(3),
+  },
+
+  driverActionBtn: {
+    minWidth: wp(28),
+    flexShrink: 1,
+    backgroundColor: palette.middlegreen,
   },
 
   emptyContainer: {

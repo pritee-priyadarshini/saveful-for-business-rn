@@ -114,7 +114,7 @@ export function getAssignPickupErrorMessage(error: unknown, fallback = 'Could no
         ? (error.response?.data as any).message[0]
         : null);
     if (typeof message === 'string' && message.trim()) return message;
-    if (status === 400) return 'Driver must be live to assign a pickup.';
+    if (status === 400) return 'Could not assign this pickup. Try another driver or refresh.';
     if (status === 409) return 'This pickup was already assigned. Refresh and try again.';
   }
   if (error instanceof Error && error.message) return error.message;

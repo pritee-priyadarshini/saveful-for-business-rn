@@ -13,8 +13,12 @@ import { AppText } from './AppText';
 import { Button } from './Button';
 import { palette } from '../theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
-import { createClaim, type ClaimMode } from '../services/claims.service';
-import { getUserFriendlyErrorMessage } from '@/utils/apiError';
+import {
+  createClaim,
+  requestDriverPickup,
+  type ClaimMode,
+} from '../services/claims.service';
+import { getUserFriendlyErrorMessage, showInfoAlert } from '@/utils/apiError';
 import type { mapDiscoverListing } from '../services/foodListing.service';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
@@ -38,6 +42,13 @@ function formatKg(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function extractClaimId(raw: unknown): number | null {
+  const id = Number(
+    (raw as any)?.id ?? (raw as any)?.claimId ?? (raw as any)?.claim?.id,
+  );
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 export function ClaimConfirmModal({
   visible,
   listing,
@@ -47,8 +58,10 @@ export function ClaimConfirmModal({
   onSuccess,
 }: Props) {
   const [submitting, setSubmitting] = useState(false);
+  const [requestingDriver, setRequestingDriver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'confirm' | 'success'>('confirm');
+  const [createdClaimId, setCreatedClaimId] = useState<number | null>(null);
 
   const totalKg = useMemo(
     () => items.reduce((sum, item) => sum + item.qtyKg, 0),
@@ -59,7 +72,9 @@ export function ClaimConfirmModal({
     if (visible) {
       setError(null);
       setSubmitting(false);
+      setRequestingDriver(false);
       setStep('confirm');
+      setCreatedClaimId(null);
     }
   }, [visible, claimMode, listing?.listingId, items]);
 
@@ -76,7 +91,7 @@ export function ClaimConfirmModal({
     setError(null);
 
     try {
-      await createClaim({
+      const claim = await createClaim({
         listingId: listing.listingId,
         claimMode,
         claimItems:
@@ -88,6 +103,7 @@ export function ClaimConfirmModal({
             : undefined,
       });
 
+      setCreatedClaimId(extractClaimId(claim));
       setStep('success');
     } catch (err: unknown) {
       setError(getUserFriendlyErrorMessage(err, 'Could not submit claim'));
@@ -96,18 +112,74 @@ export function ClaimConfirmModal({
     }
   };
 
+  const handleSelfPickup = () => {
+    if (requestingDriver) return;
+    // Self-pickup: do not notify drivers — just close.
+    finish();
+  };
+
+  const handleContinueForDriver = async () => {
+    if (requestingDriver) return;
+
+    const claimId = createdClaimId;
+    if (!claimId) {
+      setError(
+        'Claim was saved, but we could not notify drivers. Open Home → Drivers to assign one.',
+      );
+      return;
+    }
+
+    setRequestingDriver(true);
+    setError(null);
+    try {
+      const result = await requestDriverPickup(claimId);
+      const notified = Number(result?.notifiedDrivers ?? result?.onlineDrivers ?? 0);
+      if (result?.alreadyAssigned) {
+        showInfoAlert('A driver is already assigned to this pickup.', 'Driver requested');
+      } else if (notified > 0) {
+        showInfoAlert(
+          `${notified} online driver${notified === 1 ? '' : 's'} notified. They can accept in the driver app.`,
+          'Drivers notified',
+        );
+      } else {
+        showInfoAlert(
+          'No online drivers right now. Assign one from Home → Drivers, or wait until a driver goes live.',
+          'No online drivers',
+        );
+      }
+      finish();
+    } catch (err: unknown) {
+      // Keep the sheet open so Continue can be retried — do not silently dismiss.
+      setError(getUserFriendlyErrorMessage(err, 'Could not notify online drivers'));
+    } finally {
+      setRequestingDriver(false);
+    }
+  };
+
   return (
     <Modal
       visible={visible && !!listing}
       animationType="slide"
       transparent
-      onRequestClose={submitting ? undefined : step === 'success' ? finish : onClose}
+      onRequestClose={
+        submitting || requestingDriver
+          ? undefined
+          : step === 'success'
+            ? handleSelfPickup
+            : onClose
+      }
     >
       {!listing ? null : (
       <View style={styles.overlay}>
         <Pressable
           style={styles.backdrop}
-          onPress={submitting ? undefined : step === 'success' ? finish : onClose}
+          onPress={
+            submitting || requestingDriver
+              ? undefined
+              : step === 'success'
+                ? handleSelfPickup
+                : onClose
+          }
         />
 
         <View style={styles.sheet}>
@@ -122,7 +194,7 @@ export function ClaimConfirmModal({
                     {listing.businessName}
                   </AppText>
                 </View>
-                <Pressable onPress={finish} hitSlop={12}>
+                <Pressable onPress={handleSelfPickup} hitSlop={12} disabled={requestingDriver}>
                   <Ionicons name="close" size={normalize(24)} color={palette.black} />
                 </Pressable>
               </View>
@@ -132,23 +204,31 @@ export function ClaimConfirmModal({
                   <Ionicons name="checkmark-circle" size={normalize(48)} color={palette.middlegreen} />
                 </View>
                 <AppText variant="bodySmall" style={styles.successText}>
-                  Your claim stays on Available until a driver is assigned. You can pick it up
-                  yourself anytime from there, Updates, or Pickup.
+                  Tap Continue to notify online drivers for this site. I’ll pick this up myself
+                  skips driver notifications — you can collect anytime from Available.
                 </AppText>
+                {!!error && (
+                  <AppText variant="caption" style={styles.errorText}>
+                    {error}
+                  </AppText>
+                )}
               </View>
 
               <View style={styles.actionsColumn}>
                 <Button
-                  label="I'll pick this up myself"
+                  label={requestingDriver ? 'Notifying drivers…' : 'Continue'}
                   size="compact"
-                  onPress={finish}
+                  onPress={handleContinueForDriver}
+                  loading={requestingDriver}
+                  disabled={requestingDriver}
                   style={styles.successPrimaryBtn}
                 />
                 <Button
-                  label="Continue"
+                  label="I'll pick this up myself"
                   size="compact"
                   variant="secondary"
-                  onPress={finish}
+                  onPress={handleSelfPickup}
+                  disabled={requestingDriver}
                   style={styles.successSecondaryBtn}
                 />
               </View>

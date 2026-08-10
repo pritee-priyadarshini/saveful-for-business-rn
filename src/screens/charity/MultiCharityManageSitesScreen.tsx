@@ -249,8 +249,16 @@ export default function MultiCharityManageSitesScreen() {
         [sites],
     );
 
-    const resolvePrimaryLocationId = useCallback(() => {
-        const stateLocations = useCharityStore.getState().locations;
+    const resolveDefaultSiteId = useCallback(() => {
+        const stateLocations = useCharityStore.getState().locations ?? [];
+        const active = stateLocations
+            .filter((location: any) => location?.isActive !== false && Number(location?.id) > 0)
+            .sort(
+                (a: any, b: any) =>
+                    new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime(),
+            );
+        if (active[0]?.id) return Number(active[0].id);
+
         const fromSites = resolveCharitySiteIds(useAuthStore.getState().authUser, stateLocations)[0];
         if (fromSites) return fromSites;
         const fromProfile = Number(useAuthStore.getState().authUser?.profile?.sites?.[0]?.id);
@@ -260,6 +268,8 @@ export default function MultiCharityManageSitesScreen() {
         return 0;
     }, []);
 
+    const resolvePrimaryLocationId = resolveDefaultSiteId;
+
     const loadData = async (force = false) => {
         await Promise.all([fetchLocations(force), fetchUsers(force)]);
     };
@@ -268,25 +278,22 @@ export default function MultiCharityManageSitesScreen() {
         setDriversLoading(true);
         setDriversError(null);
         try {
-            const currentAuthUser = useAuthStore.getState().authUser;
             await Promise.all([
                 fetchLocations(true).catch(() => undefined),
                 fetchUsers(true).catch(() => undefined),
             ]);
 
-            let ids = resolveCharitySiteIds(currentAuthUser, useCharityStore.getState().locations);
-            if (ids.length === 0) {
-                const fallback = resolvePrimaryLocationId();
-                if (fallback > 0) ids = [fallback];
-            }
+            // Multi Home Drivers: default (HQ) site only — not every site in the org.
+            const siteId = resolveDefaultSiteId();
+            const ids = siteId > 0 ? [siteId] : [];
 
             const liveBatches =
                 ids.length > 0
                     ? await Promise.all(
-                          ids.map(async (siteId) => {
+                          ids.map(async (id) => {
                               try {
-                                  const drivers = await driversService.getDriversForSite(siteId);
-                                  return drivers.map((driver) => ({ ...driver, siteId }));
+                                  const drivers = await driversService.getDriversForSite(id);
+                                  return drivers.map((driver) => ({ ...driver, siteId: id }));
                               } catch {
                                   return [] as SiteDriverRow[];
                               }
@@ -297,7 +304,13 @@ export default function MultiCharityManageSitesScreen() {
             const liveDrivers = dedupeSiteDrivers(liveBatches.flat());
             const teamDrivers = useCharityStore
                 .getState()
-                .users.filter((member) => member.role === 'DRIVER' && member.isActive !== false)
+                .users.filter((member) => {
+                    if (member.role !== 'DRIVER' || member.isActive === false) return false;
+                    if (siteId <= 0) return false;
+                    const locs = Array.isArray(member.locations) ? member.locations : [];
+                    // Only drivers assigned to the default site.
+                    return locs.some((loc: any) => Number(loc?.id) === siteId);
+                })
                 .map((member) => {
                     const matchedLive = liveDrivers.find((driver) => driver.id === member.id);
                     if (matchedLive) return matchedLive;
@@ -311,15 +324,18 @@ export default function MultiCharityManageSitesScreen() {
                         vehicleType: null,
                         lat: null,
                         lng: null,
-                        siteId: ids[0] ?? resolvePrimaryLocationId(),
+                        siteId,
                     } satisfies SiteDriverRow;
                 });
 
-            const merged = dedupeSiteDrivers([...liveDrivers, ...teamDrivers]);
+            const merged = dedupeSiteDrivers([
+                ...liveDrivers.filter((driver) => driver.siteId === siteId),
+                ...teamDrivers,
+            ]);
             setSiteDrivers(merged);
 
-            if (merged.length === 0 && ids.length === 0) {
-                setDriversError('No charity site found for drivers.');
+            if (merged.length === 0 && siteId <= 0) {
+                setDriversError('No default site found for drivers.');
             }
         } catch (e) {
             setDriversError('Could not load drivers');
@@ -327,7 +343,7 @@ export default function MultiCharityManageSitesScreen() {
         } finally {
             setDriversLoading(false);
         }
-    }, [fetchLocations, fetchUsers, resolvePrimaryLocationId]);
+    }, [fetchLocations, fetchUsers, resolveDefaultSiteId]);
 
     const loadSiteDriversRef = useRef(loadSiteDrivers);
     loadSiteDriversRef.current = loadSiteDrivers;
@@ -1133,7 +1149,7 @@ export default function MultiCharityManageSitesScreen() {
                         </AppText>
                         <AppText variant="bodySmall" style={styles.emptyCopy}>
                             {driversError ||
-                                'Drivers added to your charity sites will appear here with Online/Offline status.'}
+                                'Drivers for your default (HQ) site appear here with Online/Offline status.'}
                         </AppText>
                         <Pressable style={styles.emptyCta} onPress={openAddDriver}>
                             <AppText variant="bodyBold" style={styles.emptyCtaText}>
@@ -1761,6 +1777,7 @@ const styles = StyleSheet.create({
     },
     driverActionBtn: {
         minWidth: wp(28),
+        flexShrink: 1,
         backgroundColor: palette.middlegreen,
     },
     skeletonWrap: {
