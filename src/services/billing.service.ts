@@ -9,8 +9,8 @@ export type CheckoutSessionResponse = {
 };
 
 /**
- * The trial now runs through Stripe Checkout so the card is captured up front
- * and converts on its own — the response is a checkout URL, not a subscription.
+ * The trial opens a Checkout session without requiring a card up front.
+ * Payment details are collected after the free trial ends.
  */
 export type StartTrialResponse = CheckoutSessionResponse & {
   trialDays: number;

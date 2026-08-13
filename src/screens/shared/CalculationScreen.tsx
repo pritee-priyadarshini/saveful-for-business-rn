@@ -140,7 +140,7 @@ export function CalculationScreen({ navigation }: any) {
                 Money saved
               </AppText>
               {' '}
-              = weight of food saved × the average price of food per kg in your country.
+              = weight of food saved × $14.64 per kg.
             </AppText>
           </View>
 

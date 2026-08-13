@@ -18,7 +18,7 @@ import { palette } from '@/theme/colors';
 import { elevation } from '@/theme/elevation';
 import { hp, normalize, wp } from '@/utils/responsive';
 import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
-import type { ImpactDisplayStats } from '@/utils/impactData';
+import { foodSavedUsdFromKg, type ImpactDisplayStats } from '@/utils/impactData';
 import type { ImpactFilter } from '@/store/impactStore';
 import {
   impactService,
@@ -158,7 +158,7 @@ function toFoodReportRows(
       co2AvoidedKg: round2(
         food.co2AvoidedKg != null ? Number(food.co2AvoidedKg) : totalKg * 2.1,
       ),
-      savedUsd: round2(Number(food.totalFoodSavedUsd) || 0),
+      savedUsd: foodSavedUsdFromKg(totalKg),
     };
   });
 }

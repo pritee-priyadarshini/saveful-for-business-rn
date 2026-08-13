@@ -3,7 +3,7 @@ import type { FoodListingType, ListingStatus } from '../types';
 import { isAnimalListing, isPeopleListing } from '../utils/foodListing';
 import {
   formatListingDate,
-  formatListingTimeRange,
+  formatListingPickupWindow,
 } from '../utils/dateFormat';
 
 export type FoodItem = {
@@ -69,7 +69,10 @@ export type CreateListingPayload = {
   needsReheating?: boolean;
   isSafeForDonation?: boolean;
   allergens?: string[];
+  /** Already-hosted http(s) photo URLs. */
   photoUrls?: string[];
+  /** Local ImagePicker / camera URIs to upload as multipart `photos`. */
+  photos?: string[];
 };
 
 export type UpdateListingPayload = {
@@ -223,6 +226,19 @@ export function normalizeListingsResponse(response: any): PaginatedListingsRespo
   };
 }
 
+function isRemotePhotoUrl(uri: string) {
+  return /^https?:\/\//i.test(uri.trim());
+}
+
+function guessImageMime(uri: string): string {
+  const clean = uri.split('?')[0]?.toLowerCase() || '';
+  if (clean.endsWith('.png')) return 'image/png';
+  if (clean.endsWith('.webp')) return 'image/webp';
+  if (clean.endsWith('.heic') || clean.endsWith('.heif')) return 'image/heic';
+  if (clean.endsWith('.gif')) return 'image/gif';
+  return 'image/jpeg';
+}
+
 function normalizeCreateListingPayload(payload: CreateListingPayload): CreateListingPayload {
   const foodItems = payload.foodItems.map((item) => ({
     name: String(item.name).trim(),
@@ -230,6 +246,12 @@ function normalizeCreateListingPayload(payload: CreateListingPayload): CreateLis
     unit: item.unit?.trim() || 'kg',
     category: item.category?.trim() || String(item.name).trim(),
   }));
+
+  const fromPhotoUrls = Array.isArray(payload.photoUrls) ? payload.photoUrls : [];
+  const fromPhotos = Array.isArray(payload.photos) ? payload.photos : [];
+  const allUris = [...fromPhotoUrls, ...fromPhotos]
+    .map((uri) => String(uri || '').trim())
+    .filter(Boolean);
 
   return {
     siteId: Number(payload.siteId),
@@ -248,9 +270,50 @@ function normalizeCreateListingPayload(payload: CreateListingPayload): CreateLis
     needsReheating: Boolean(payload.needsReheating),
     isSafeForDonation: payload.isSafeForDonation ?? true,
     allergens: Array.isArray(payload.allergens) ? payload.allergens : [],
-    photoUrls: Array.isArray(payload.photoUrls) ? payload.photoUrls : [],
+    photoUrls: allUris.filter(isRemotePhotoUrl),
+    photos: allUris.filter((uri) => !isRemotePhotoUrl(uri)),
     foodItems,
   };
+}
+
+function appendBoolean(form: FormData, key: string, value: boolean | undefined) {
+  if (typeof value === 'boolean') {
+    form.append(key, value ? 'true' : 'false');
+  }
+}
+
+function buildCreateListingFormData(body: CreateListingPayload): FormData {
+  const form = new FormData();
+  form.append('siteId', String(body.siteId));
+  form.append('listingType', body.listingType);
+  form.append('pickupAddress', body.pickupAddress);
+  if (body.pickupPostcode) form.append('pickupPostcode', body.pickupPostcode);
+  form.append('pickupLat', String(body.pickupLat));
+  form.append('pickupLng', String(body.pickupLng));
+  form.append('bestBefore', body.bestBefore);
+  if (body.pickupFromTime) form.append('pickupFromTime', body.pickupFromTime);
+  if (body.pickupByTime) form.append('pickupByTime', body.pickupByTime);
+  appendBoolean(form, 'needsRefrigeration', body.needsRefrigeration);
+  appendBoolean(form, 'needsAmbient', body.needsAmbient);
+  appendBoolean(form, 'needsFreezer', body.needsFreezer);
+  appendBoolean(form, 'needsHot', body.needsHot);
+  appendBoolean(form, 'needsReheating', body.needsReheating);
+  appendBoolean(form, 'isSafeForDonation', body.isSafeForDonation);
+  form.append('allergens', JSON.stringify(body.allergens ?? []));
+  form.append('photoUrls', JSON.stringify(body.photoUrls ?? []));
+  form.append('foodItems', JSON.stringify(body.foodItems));
+
+  (body.photos ?? []).slice(0, 5).forEach((uri, index) => {
+    const mime = guessImageMime(uri);
+    const ext = mime.split('/')[1] || 'jpg';
+    form.append('photos', {
+      uri,
+      name: `listing-photo-${index + 1}.${ext === 'jpeg' ? 'jpg' : ext}`,
+      type: mime,
+    } as any);
+  });
+
+  return form;
 }
 
 const listingDetailCache = new Map<number, ListingDetail>();
@@ -309,10 +372,13 @@ export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
     item.pickupByTime ??
     item.updatedAt;
 
+  const pickupFromTime = item.pickupFromTime ?? null;
+  const pickupByTime = item.pickupByTime ?? null;
+
   const pickupWindow =
-    item.pickupFromTime && item.pickupByTime
-      ? formatListingTimeRange(item.pickupFromTime, item.pickupByTime)
-      : formatListingTimeRange(listedAt, expiresAt);
+    pickupFromTime || pickupByTime
+      ? formatListingPickupWindow(pickupFromTime, pickupByTime)
+      : formatListingPickupWindow(listedAt, expiresAt);
 
   return {
     id: String(item.id),
@@ -335,8 +401,10 @@ export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
     date: formatListingDate(item.bestBefore),
     listedAt,
     expiresAt,
+    pickupFromTime,
+    pickupByTime,
     pickupWindow,
-    pickupWindowDate: formatListingDate(listedAt),
+    pickupWindowDate: formatListingDate(pickupFromTime || listedAt),
     storage: item.needsRefrigeration ? 'Keep refrigerated' : 'Room temperature',
     status:
       statusUpper === 'ACTIVE'
@@ -568,7 +636,13 @@ export async function fetchDiscoverListings(
 export const foodListingService = {
   createListing: (payload: CreateListingPayload) => {
     const body = normalizeCreateListingPayload(payload);
-    return api.post('/food-listings', body);
+    const hasLocalPhotos = (body.photos?.length ?? 0) > 0;
+    if (hasLocalPhotos) {
+      return api.post('/food-listings', buildCreateListingFormData(body));
+    }
+    // No local files — keep JSON path (photoUrls may still include remote URLs).
+    const { photos: _photos, ...jsonBody } = body;
+    return api.post('/food-listings', jsonBody);
   },
 
   getOrgListings: (orgId: number, params?: GetListingsParams) =>

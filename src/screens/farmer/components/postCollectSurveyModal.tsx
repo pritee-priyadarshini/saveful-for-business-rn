@@ -18,6 +18,9 @@ import { spacing } from '@/theme/spacing';
 import { normalize, useResponsiveLayout } from '@/utils/responsive';
 import { claimsService } from '@/services/claims.service';
 import { getUserFriendlyErrorMessage, showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
+import { consumeFirstMilestone } from '@/data/milestoneComplete';
+import { useAppContext } from '@/store/AppContext';
 
 type Item = {
   id: string;
@@ -46,10 +49,12 @@ export function PostCollectSurveyModal({
   onSubmitted,
 }: Props) {
   const navigation = useNavigation<any>();
+  const { authUser } = useAppContext();
   const r = useResponsiveLayout();
   const [step, setStep] = useState(1);
   const [isPartial, setIsPartial] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showFirstCollectionModal, setShowFirstCollectionModal] = useState(false);
 
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -118,6 +123,29 @@ export function PostCollectSurveyModal({
     navigation.navigate('Home');
   };
 
+  const presentCollectionSuccess = async (message: string, title: string) => {
+    const identity = authUser?.email || authUser?.profile?.organisation?.id;
+    const isFirst = await consumeFirstMilestone('collection', identity);
+    onSubmitted?.();
+    if (isFirst) {
+      handleClose();
+      setShowFirstCollectionModal(true);
+      return;
+    }
+    showSuccessAlert(message, title);
+    setStep(5);
+  };
+
+  const handleClaimAnother = () => {
+    setShowFirstCollectionModal(false);
+    navigation.getParent()?.navigate('Available', { screen: 'FarmerMap' });
+  };
+
+  const handleBrowseInsights = () => {
+    setShowFirstCollectionModal(false);
+    navigation.getParent()?.navigate('Impact');
+  };
+
   const submitRating = async () => {
     if (!claimId || rating < 1) {
       setStep(5);
@@ -141,21 +169,20 @@ export function PostCollectSurveyModal({
 
       if (collected?.message === 'Already marked as collected') {
         await claimsService.rateClaim(claimId, { rating, ratingNote });
-        showSuccessAlert('Thanks for your feedback', 'Feedback sent');
+        await presentCollectionSuccess('Thanks for your feedback', 'Feedback sent');
       } else {
-        showSuccessAlert('Collection confirmed. Thanks for your feedback.', 'Done');
+        await presentCollectionSuccess(
+          'Collection confirmed. Thanks for your feedback.',
+          'Done',
+        );
       }
-      onSubmitted?.();
-      setStep(5);
     } catch (error) {
       try {
         await claimsService.rateClaim(claimId, {
           rating,
           ratingNote: comment.trim() || undefined,
         });
-        showSuccessAlert('Thanks for your feedback', 'Feedback sent');
-        onSubmitted?.();
-        setStep(5);
+        await presentCollectionSuccess('Thanks for your feedback', 'Feedback sent');
       } catch (inner) {
         showErrorAlert(
           inner,
@@ -223,6 +250,7 @@ export function PostCollectSurveyModal({
   );
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="fade">
       <View style={[styles.overlay, r.isTablet && { paddingHorizontal: r.pagePadH }]}>
         <View style={[styles.card, cardStyle]}>
@@ -463,6 +491,13 @@ export function PostCollectSurveyModal({
         </View>
       </View>
     </Modal>
+    <MilestoneCompleteModal
+      visible={showFirstCollectionModal}
+      kind="collection"
+      onPrimary={handleClaimAnother}
+      onSecondary={handleBrowseInsights}
+    />
+    </>
   );
 }
 

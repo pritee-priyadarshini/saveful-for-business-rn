@@ -33,11 +33,13 @@ import {
   isAnimalListing,
   isListingActive,
   isListingCancelled,
+  isListingClaimed,
   isListingCollected,
   isListingExpired,
   isPeopleListing,
   resolveListingStatus,
 } from '../../utils/foodListing';
+import { formatListingPickupDateRange } from '../../utils/dateFormat';
 import { showErrorAlert } from '../../utils/apiError';
 import { showConfirmAlert } from '../../store/appAlertStore';
 import { useAppContext } from '../../store/AppContext';
@@ -46,11 +48,12 @@ import { fetchListingDetail } from '../../services/foodListing.service';
 
 type MetaBoxLayout = 'half' | 'centered';
 type ListingFilter = 'all' | 'people' | 'animals';
-type StatusFilter = 'all' | 'active' | 'expired' | 'collected' | 'cancelled';
+type StatusFilter = 'all' | 'active' | 'expired' | 'claimed' | 'collected' | 'cancelled';
 
 const STATUS_FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'active', label: 'Active' },
   { key: 'all', label: 'All' },
+  { key: 'claimed', label: 'Claimed' },
   { key: 'expired', label: 'Expired' },
   { key: 'collected', label: 'Collected' },
   { key: 'cancelled', label: 'Cancelled' },
@@ -60,13 +63,15 @@ const LISTING_STATUS_PRIORITY: Record<ListingStatus, number> = {
   ACTIVE: 0,
   PARTIAL: 1,
   CLAIMED: 2,
-  EXPIRED: 3,
-  CANCELLED: 4,
+  COLLECTED: 3,
+  EXPIRED: 4,
+  CANCELLED: 5,
 };
 
 function matchesStatusFilter(listing: any, statusFilter: StatusFilter): boolean {
   if (statusFilter === 'all') return true;
   if (statusFilter === 'active') return isListingActive(listing);
+  if (statusFilter === 'claimed') return isListingClaimed(listing);
   if (statusFilter === 'expired') return isListingExpired(listing);
   if (statusFilter === 'collected') return isListingCollected(listing);
   if (statusFilter === 'cancelled') return isListingCancelled(listing);
@@ -166,6 +171,12 @@ function formatPickupDate(value?: string | null) {
   return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
+function formatPickupDateRange(from?: string | null, to?: string | null) {
+  const range = formatListingPickupDateRange(from, to);
+  if (range !== '—') return range;
+  return formatPickupDate(from || to);
+}
+
 function formatPickupTime(from?: string | null, to?: string | null) {
   if (!from || !to) return '—';
   const fmt = (d: Date) =>
@@ -177,10 +188,41 @@ function formatPickupTime(from?: string | null, to?: string | null) {
 }
 
 function formatCollectedOn(listing: any) {
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  const collectedClaim = claims.find(
+    (claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED' && claim?.collectedAt,
+  );
   const value =
+    collectedClaim?.collectedAt ||
     listing?.collectedAt ||
     listing?.updatedAt ||
     listing?.pickupFromTime ||
+    listing?.createdAt;
+  if (!value) return '—';
+  const date = new Date(value);
+  return date
+    .toLocaleString([], {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    .replace(',', '');
+}
+
+function formatClaimedOn(listing: any) {
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  const openClaim = claims.find((claim: any) => {
+    const status = String(claim?.status || '').toUpperCase();
+    return status === 'PENDING' || status === 'CONFIRMED';
+  });
+  const value =
+    openClaim?.confirmedAt ||
+    openClaim?.createdAt ||
+    claims[0]?.createdAt ||
+    listing?.updatedAt ||
     listing?.createdAt;
   if (!value) return '—';
   const date = new Date(value);
@@ -450,6 +492,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const theme = getListingTheme(item);
     const isAnimal = getListingAudience(item) === 'animal';
     const collected = isListingCollected(item);
+    const claimed = isListingClaimed(item);
     const expired = isListingExpired(item);
     const active = isListingActive(item);
     const partial = isListingPartial(item);
@@ -459,11 +502,27 @@ export function RestaurantListingsScreen({ navigation }: any) {
       ? { bg: '#FFF1D6', color: palette.warning }
       : collected
       ? { bg: '#EEF7F2', color: palette.kale }
+      : claimed
+      ? { bg: '#E8F1FB', color: '#2F6FED' }
       : partial
       ? { bg: '#FFF8E1', color: '#B8860B' }
       : { bg: theme.statusBg, color: theme.accent };
 
     const viewBtnBg = isAnimal ? palette.orange : palette.kale;
+    const dateLabel = collected
+      ? 'Collected on'
+      : claimed
+        ? 'Claimed on'
+        : expired
+          ? 'Expired on'
+          : 'Pickup dates';
+    const dateValue = collected
+      ? formatCollectedOn(item)
+      : claimed
+        ? formatClaimedOn(item)
+        : expired
+          ? formatExpiredOn(item)
+          : formatPickupDateRange(item.pickupFromTime, item.pickupByTime);
 
     return (
       <View key={item.id} style={[styles.listingCard, adaptive.listingCard, { borderColor: theme.border }]}>
@@ -496,6 +555,15 @@ export function RestaurantListingsScreen({ navigation }: any) {
               <Ionicons name="location" size={normalize(13)} color={theme.accent} />
               <AppText variant="caption" style={[styles.notificationText, { color: theme.accent }]}>
                 {theme.notification}
+              </AppText>
+            </View>
+          )}
+
+          {claimed && (
+            <View style={styles.notificationRow}>
+              <Ionicons name="time-outline" size={normalize(13)} color="#2F6FED" />
+              <AppText variant="caption" style={[styles.notificationText, { color: '#2F6FED' }]}>
+                Claimed — awaiting collection
               </AppText>
             </View>
           )}
@@ -535,18 +603,14 @@ export function RestaurantListingsScreen({ navigation }: any) {
               {renderMetaBox(
                 isAnimal,
                 META_ICONS.calendar,
-                collected ? 'Collected on' : expired ? 'Expired on' : 'Pickup date',
+                dateLabel,
                 <AppText
                   variant="caption"
                   style={[styles.metaValueText, adaptive.metaValueText]}
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
-                  {collected
-                    ? formatCollectedOn(item)
-                    : expired
-                    ? formatExpiredOn(item)
-                    : formatPickupDate(item.pickupFromTime || item.createdAt)}
+                  {dateValue}
                 </AppText>,
               )}
             </View>

@@ -9,6 +9,14 @@ import {
 /** Mirrors backend impact.constants */
 export const MEAL_WEIGHT_KG = 0.42;
 export const CO2_PER_KG = 2.1;
+/** Food saved ($) = redistributed kg × this rate. */
+export const FOOD_VALUE_PER_KG = 14.64;
+
+export function foodSavedUsdFromKg(kg: number): number {
+  const n = Number(kg);
+  const safe = Number.isFinite(n) && n > 0 ? n : 0;
+  return round2(safe * FOOD_VALUE_PER_KG);
+}
 
 export type ImpactDisplayStats = {
   redistributedKg: number;
@@ -291,7 +299,7 @@ export function mapImpactToDisplayStats(
     redistributedKg: totals.redistributedKg,
     mealsCreated: totals.mealsCreated,
     co2AvoidedKg: totals.co2AvoidedKg,
-    foodSavedMoney: totals.totalFoodSavedUsd,
+    foodSavedMoney: foodSavedUsdFromKg(totals.redistributedKg),
     collectionsCompleted: totals.collectionsCompleted,
     partnersSupported: totals.partnersSupported,
     peopleKg: totals.forPeople.kg,

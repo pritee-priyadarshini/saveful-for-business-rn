@@ -101,7 +101,7 @@ export function WelcomeScreen({ navigation }: Props) {
                 },
               ]}
             >
-              HELP GOOD FOOD GO FURTHER
+              HELP GOOD FOOD{'\n'}GO FURTHER
             </AppText>
 
             <AppText

@@ -6,6 +6,10 @@ import {
   type DiscoverAudience,
 } from '@/services/foodListing.service';
 import type { AvailableFoodMode } from '@/hooks/useAvailableFoodMode';
+import {
+  formatListingPickupDateRange,
+  formatListingPickupWindow,
+} from '@/utils/dateFormat';
 
 export type ReceiverUpdateType = 'new_surplus' | 'pickup' | 'collected' | 'feedback';
 export type ReceiverUpdateSection = 'Today' | 'Previous';
@@ -125,12 +129,14 @@ function formatDayLabel(iso?: string | null) {
 }
 
 function formatTimeLabel(from?: string | null, to?: string | null) {
-  const day = formatDayLabel(from || to);
-  const fromClock = formatClock(from);
-  const toClock = formatClock(to);
-  if (day && fromClock && toClock) return `${day} - ${fromClock} - ${toClock}`;
-  if (day && fromClock) return `${day} - ${fromClock}`;
-  return day || 'Pickup window TBC';
+  const label = formatListingPickupWindow(from, to);
+  return label === '—' ? 'Pickup window TBC' : label;
+}
+
+function formatPickupDateRangeLabel(from?: string | null, to?: string | null) {
+  const range = formatListingPickupDateRange(from, to);
+  if (range !== '—') return range;
+  return formatDayLabel(from || to);
 }
 
 function cityFromAddress(address?: string | null, postcode?: string | null) {
@@ -447,8 +453,16 @@ export function mapReceiverPickups(params: {
         driverName: null,
         driverPhone: null,
         assigneeLabel: 'Driver',
-        pickupDateLabel: available.pickupWindowDate || formatDayLabel(String(available.listedAt || '')),
-        pickupTimeLabel: available.pickupWindow || '',
+        pickupDateLabel: formatPickupDateRangeLabel(
+          available.pickupFromTime ?? available.listedAt,
+          available.pickupByTime ?? available.expiresAt,
+        ),
+        pickupTimeLabel: [
+          formatClock(available.pickupFromTime),
+          formatClock(available.pickupByTime),
+        ]
+          .filter(Boolean)
+          .join(' – '),
         instructions: available.storage || 'Follow on-site instructions',
         weightKg: formatKg(Number(available.quantityKg || 0)),
         cardStatus: 'unclaimed',
@@ -487,11 +501,11 @@ export function mapReceiverPickups(params: {
         pickupDateLabel:
           cardStatus === 'completed' || cardStatus === 'cancelled'
             ? formatDayLabel(collectedAt || claim?.updatedAt || from)
-            : formatDayLabel(from || to),
+            : formatPickupDateRangeLabel(from, to),
         pickupTimeLabel:
           cardStatus === 'completed' || cardStatus === 'cancelled'
             ? ''
-            : [formatClock(from), formatClock(to)].filter(Boolean).join(' - '),
+            : [formatClock(from), formatClock(to)].filter(Boolean).join(' – '),
         instructions: storageInstructions(listing),
         weightKg: claimQuantityKg(claim),
         cardStatus,

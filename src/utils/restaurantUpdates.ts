@@ -6,7 +6,7 @@ import {
 
 export type UpdateAudience = 'people' | 'animals';
 export type UpdateSection = 'TODAY' | 'YESTERDAY' | 'EARLIER';
-export type UpdateCardType = 'claimed' | 'collected';
+export type UpdateCardType = 'claimed' | 'collected' | 'feedback';
 
 export type UpdateFoodItem = {
   name: string;
@@ -34,6 +34,9 @@ export type RestaurantUpdate = {
   collectedDate: string | null;
   mealsCreated: number;
   co2Avoided: number;
+  /** Claimant already rated the restaurant — provider feedback still needed. */
+  needsProviderFeedback?: boolean;
+  providerConfirmed?: boolean;
 };
 
 function startOfDay(d: Date) {
@@ -175,9 +178,42 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
       const siteContact = claim?.claimantSite?.contactName || null;
 
       const collected = isClaimCollected(claim);
+      const claimantRated = claim?.rating != null;
+      const providerDone =
+        claim?.providerConfirmedAt != null || claim?.providerRating != null;
+      const needsProviderFeedback = collected && claimantRated && !providerDone;
+
       const sectionDate = collected
         ? claim?.collectedAt || pickup?.collectedAt || claim?.updatedAt || claim?.createdAt
         : claim?.createdAt || claim?.confirmedAt;
+
+      // Pending restaurant confirm/rate gets its own feedback card.
+      if (needsProviderFeedback) {
+        updates.push({
+          id: `feedback-${claim.id}`,
+          claimId: Number(claim.id),
+          listingId: Number(listing.id),
+          audience,
+          cardType: 'feedback',
+          section: sectionForDate(sectionDate),
+          claimerName,
+          location: locationLabel(claim, listing),
+          assigneeLabel: farmClaimant ? 'Farmer' : 'Driver',
+          assigneeName: assigneeFromDriver || siteContact,
+          assigneeStatus: 'collected',
+          pickupFrom: listing?.pickupFromTime || listing?.pickupFrom || null,
+          pickupTo: listing?.pickupByTime || listing?.pickupTo || null,
+          quantityKg,
+          items: claimItems(claim, listing),
+          claimerPhone: claim?.claimantSite?.contactMobile || null,
+          assigneePhone: pickup?.driver?.phoneNumber || claim?.claimantSite?.contactMobile || null,
+          collectedDate: claim?.collectedAt || pickup?.collectedAt || null,
+          mealsCreated: estimateMealsSaved(quantityKg),
+          co2Avoided: estimateCo2AvoidedKg(quantityKg),
+          needsProviderFeedback: true,
+          providerConfirmed: false,
+        });
+      }
 
       updates.push({
         id: String(claim.id ?? `${listing.id}-${claim.createdAt}`),
@@ -200,11 +236,15 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
         collectedDate: claim?.collectedAt || pickup?.collectedAt || null,
         mealsCreated: estimateMealsSaved(quantityKg),
         co2Avoided: estimateCo2AvoidedKg(quantityKg),
+        needsProviderFeedback,
+        providerConfirmed: providerDone,
       });
     }
   }
 
   return updates.sort((a, b) => {
+    if (a.cardType === 'feedback' && b.cardType !== 'feedback') return -1;
+    if (b.cardType === 'feedback' && a.cardType !== 'feedback') return 1;
     const aDate = a.collectedDate || a.pickupFrom || '';
     const bDate = b.collectedDate || b.pickupFrom || '';
     const aMs = new Date(aDate).getTime() || 0;

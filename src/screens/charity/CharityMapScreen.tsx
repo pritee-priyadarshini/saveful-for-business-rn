@@ -7,6 +7,8 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -48,6 +50,7 @@ type ClaimFoodItem = {
   foodItemId: number;
   name: string;
   quantityKg: number;
+  category?: string;
 };
 
 type PendingClaim = {
@@ -84,6 +87,7 @@ function toClaimFoodItems(
       return {
         foodItemId,
         name: foodItem.name || foodItem.category || `Item ${index + 1}`,
+        category: foodItem.category,
         quantityKg: foodItem.remainingQtyKg ?? foodItem.totalQtyKg ?? 0,
       };
     })
@@ -685,6 +689,21 @@ export function CharityMapScreen({ navigation }: any) {
         </View>
 
         <View style={styles.section}>
+          {!!item.photoUrls?.length && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.listingPhotoRow}
+            >
+              {item.photoUrls.map((uri: string, index: number) => (
+                <Image
+                  key={`${item.id}-photo-${index}`}
+                  source={{ uri }}
+                  style={styles.listingPhoto}
+                />
+              ))}
+            </ScrollView>
+          )}
           <AppText variant="label" style={styles.sectionTitle}>
             Select quantity per item
           </AppText>
@@ -1244,6 +1263,18 @@ const styles = StyleSheet.create({
 
   itemAvail: {
     color: '#666',
+  },
+
+  listingPhotoRow: {
+    gap: wp(2),
+    paddingBottom: hp(0.6),
+  },
+
+  listingPhoto: {
+    width: wp(20),
+    height: wp(20),
+    borderRadius: normalize(10),
+    backgroundColor: '#EEE',
   },
 
   stepper: {

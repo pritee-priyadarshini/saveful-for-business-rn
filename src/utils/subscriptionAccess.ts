@@ -58,8 +58,9 @@ export function showSubscriptionRequiredPrompt(options: {
   showConfirmAlert({
     title: SUBSCRIPTION_REQUIRED_TITLE,
     message: options.messageOverride?.trim() || getSubscriptionRequiredMessage(options.canManageBilling),
-    confirmLabel: 'Start free trial',
-    cancelLabel: 'Not now',
+    confirmLabel: 'Start your free trial',
+    // Single primary CTA — no "Not now" (matches trial popup design).
+    cancelLabel: '',
     onConfirm: options.onContinue,
   });
 }

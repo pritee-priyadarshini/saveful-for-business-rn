@@ -62,6 +62,7 @@ export function AppAlertHost() {
   const setLoading = useAppAlertStore((s) => s.setLoading);
 
   const isConfirm = variant === 'confirm';
+  const showCancel = isConfirm && Boolean(cancelLabel?.trim());
   const accent = destructive ? palette.danger : TONE[variant].accent;
   const iconBg = destructive ? palette.danger : TONE[variant].iconBg;
   const iconName =
@@ -131,8 +132,8 @@ export function AppAlertHost() {
               </AppText>
             ) : null}
 
-            <View style={[styles.actions, isConfirm && styles.actionsRow]}>
-              {isConfirm ? (
+            <View style={[styles.actions, showCancel && styles.actionsRow]}>
+              {showCancel ? (
                 <Pressable
                   style={[styles.btn, styles.btnGhost, loading && styles.btnDisabled]}
                   disabled={loading}
@@ -147,15 +148,21 @@ export function AppAlertHost() {
               <Pressable
                 style={[
                   styles.btn,
-                  styles.btnOutline,
-                  { borderColor: accent },
-                  isConfirm && styles.btnFlex,
+                  showCancel ? styles.btnOutline : styles.btnSolid,
+                  showCancel ? { borderColor: accent } : { backgroundColor: accent, borderColor: accent },
+                  showCancel && styles.btnFlex,
                   loading && styles.btnDisabled,
                 ]}
                 disabled={loading}
                 onPress={handlePrimary}
               >
-                <AppText variant="bodyBold" style={[styles.btnOutlineText, { color: accent }]}>
+                <AppText
+                  variant="bodyBold"
+                  style={[
+                    showCancel ? styles.btnOutlineText : styles.btnSolidText,
+                    showCancel ? { color: accent } : null,
+                  ]}
+                >
                   {loading ? 'Please wait…' : confirmLabel}
                 </AppText>
               </Pressable>
@@ -342,6 +349,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   btnOutlineText: {
+    textTransform: 'none',
+    fontSize: normalize(16),
+  },
+  btnSolid: {
+    width: '100%',
+    borderWidth: 1.5,
+  },
+  btnSolidText: {
+    color: palette.white,
     textTransform: 'none',
     fontSize: normalize(16),
   },

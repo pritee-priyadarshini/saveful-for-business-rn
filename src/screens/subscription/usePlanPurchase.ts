@@ -152,7 +152,7 @@ export function usePlanPurchase(selection?: Selection) {
       if (outcome === 'activated') {
         showSuccessAlert(
           trialAvailable
-            ? `Your 30-day free trial of ${plan.displayName} has started. Your card will not be charged until it ends.`
+            ? `Your 30-day free trial of ${plan.displayName} has started. No card was charged — add payment details before the trial ends to stay on your plan.`
             : `${plan.displayName} is now active for your organisation.`,
           trialAvailable ? 'Trial started' : 'Payment confirmed',
           onSettled,

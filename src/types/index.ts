@@ -38,6 +38,7 @@ export type ListingStatus =
   | 'ACTIVE'
   | 'PARTIAL'
   | 'CLAIMED'
+  | 'COLLECTED'
   | 'EXPIRED'
   | 'CANCELLED';
 

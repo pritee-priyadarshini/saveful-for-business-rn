@@ -26,6 +26,8 @@ import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getFarmRelistFormValues } from '../../utils/listingRelist';
 import { showErrorAlert } from '../../utils/apiError';
+import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
+import { consumeFirstMilestone } from '@/data/milestoneComplete';
 import {
   getListingDateErrors,
   getListingFoodItemsError,
@@ -133,6 +135,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
     authUser?.profile?.organisation?.name?.[0] ||
     'S';
 
+  const [showFirstListingModal, setShowFirstListingModal] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FarmItem[]>(seedItems);
   const [customItem, setCustomItem] = useState('');
@@ -391,6 +394,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
     await withLock(async () => {
       try {
+        const hadListings = useListingsStore.getState().siteListings.length > 0;
         const payload = {
           siteId: resolvedSiteId,
           listingType: 'ANIMAL' as const,
@@ -414,11 +418,17 @@ export function CreateFarmListingScreen({ navigation }: any) {
             selectedStorage.includes('Dry storage'),
           isSafeForDonation: false,
           allergens: selectedContaminants,
-          photoUrls: images.filter((uri) => uri.startsWith('http')),
+          photos: images,
         };
 
         await foodListingService.createListing(payload);
         useListingsStore.getState().invalidateSite();
+        const identity = authUser?.email || authUser?.profile?.organisation?.id;
+        const showMilestone = !hadListings && (await consumeFirstMilestone('listing', identity));
+        if (showMilestone) {
+          setShowFirstListingModal(true);
+          return;
+        }
         navigation.replace('RestaurantListings');
       } catch (error: any) {
         showErrorAlert(error, 'Could not create listing', 'Please try again.');
@@ -427,6 +437,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
   };
 
   return (
+    <>
     <Screen
       backgroundColor={FARM_BG}
       scrollable
@@ -507,30 +518,30 @@ export function CreateFarmListingScreen({ navigation }: any) {
           </View>
         </View>
 
+        {hasPreviousListing && !relistApplied && step === 1 ? (
+          <View style={styles.relistCard}>
+            <AppText variant="bodyBold" color={palette.midgray}>
+              Same as last time?
+            </AppText>
+            <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
+              <AppText variant="bodyBold" color={palette.white}>
+                YES, LIST AGAIN
+              </AppText>
+              <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {relistApplied ? (
+          <View style={styles.relistCard}>
+            <AppText variant="bodyBold" color={FARM_ACCENT} style={styles.relistHint}>
+              Please check details below and Press Continue
+            </AppText>
+          </View>
+        ) : null}
+
         {step === 1 ? (
           <View style={styles.stepWrap}>
-            {hasPreviousListing ? (
-              <View style={styles.relistCard}>
-                {relistApplied ? (
-                  <AppText variant="bodyBold" color={FARM_ACCENT} style={styles.relistHint}>
-                    Please check details below and Press Continue
-                  </AppText>
-                ) : (
-                  <>
-                    <AppText variant="bodyBold" color={palette.midgray}>
-                      Same as last time?
-                    </AppText>
-                    <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
-                      <AppText variant="bodyBold" color={palette.white}>
-                        YES, LIST AGAIN
-                      </AppText>
-                      <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
-                    </Pressable>
-                  </>
-                )}
-              </View>
-            ) : null}
-
             {/* Food items */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               WHAT FOOD DO YOU HAVE?
@@ -1044,6 +1055,20 @@ export function CreateFarmListingScreen({ navigation }: any) {
         />
       ) : null}
     </Screen>
+    <MilestoneCompleteModal
+      visible={showFirstListingModal}
+      kind="listing"
+      onPrimary={() => {
+        setShowFirstListingModal(false);
+        navigation.replace('CreateFarmListing');
+      }}
+      onSecondary={() => {
+        setShowFirstListingModal(false);
+        navigation.replace('RestaurantListings');
+        navigation.getParent()?.navigate('Insights');
+      }}
+    />
+    </>
   );
 }
 

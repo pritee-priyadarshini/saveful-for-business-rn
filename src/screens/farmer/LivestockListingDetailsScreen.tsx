@@ -22,7 +22,7 @@ import {
 import {
   formatListingDate,
   formatListingDateTime,
-  formatListingTimeRange,
+  formatListingPickupWindow,
 } from '@/utils/dateFormat';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
@@ -200,7 +200,13 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
         <DetailRow
           icon="time-outline"
           label="Pickup window"
-          value={formatListingTimeRange(data?.listedAt, data?.expiresAt)}
+          value={
+            data?.pickupWindow ||
+            formatListingPickupWindow(
+              data?.pickupFromTime ?? data?.listedAt,
+              data?.pickupByTime ?? data?.expiresAt,
+            )
+          }
         />
         <DetailRow
           icon="today-outline"
@@ -216,7 +222,9 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
             </AppText>
             {data.foodItems.map((item: FoodItem, index: number) => (
               <View key={`${item.name}-${index}`} style={styles.foodItemRow}>
-                <AppText variant="bodySmall">{item.name || `Item ${index + 1}`}</AppText>
+                <AppText variant="bodySmall" style={styles.foodItemName}>
+                  {item.name || `Item ${index + 1}`}
+                </AppText>
                 <AppText variant="caption">
                   {item.remainingQtyKg ?? item.totalQtyKg ?? 0}kg
                 </AppText>
@@ -315,13 +323,19 @@ const styles = StyleSheet.create({
   },
   foodItemRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    gap: wp(2),
     backgroundColor: palette.creme,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#D9D9D9',
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     borderRadius: normalize(10),
+  },
+  foodItemName: {
+    flex: 1,
+    flexShrink: 1,
   },
   closeBtn: {
     marginTop: hp(1),

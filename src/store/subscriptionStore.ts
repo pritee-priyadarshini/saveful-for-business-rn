@@ -172,9 +172,8 @@ export const useSubscriptionStore = create<SubscriptionStoreState & Subscription
     },
 
     /**
-     * The trial is a Checkout session now — the card is captured up front so it
-     * converts automatically, so this returns a URL to open rather than
-     * activating anything locally.
+     * Opens Stripe Checkout for the free trial. Card details are not required
+     * up front — collect them after the trial ends.
      */
     startTrial: async (planId, billingCycle) => {
       set({ isMutating: true, error: null });

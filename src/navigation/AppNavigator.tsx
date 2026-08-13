@@ -301,7 +301,19 @@ export function AppNavigator() {
             visible={welcomeVisible}
             content={welcomeContent}
             onDismiss={() => {
+              const action = welcomeContent?.ctaAction;
               void dismissWelcome();
+              if (action === 'create_listing' && navigationRef.current?.isReady()) {
+                navigationRef.current.dispatch(
+                  CommonActions.navigate({
+                    name: 'Tabs',
+                    params: {
+                      screen: 'Listings',
+                      params: { screen: 'CreateListing' },
+                    },
+                  }),
+                );
+              }
             }}
           />
         </>

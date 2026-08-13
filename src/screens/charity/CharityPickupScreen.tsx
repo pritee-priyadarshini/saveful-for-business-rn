@@ -83,9 +83,10 @@ function formatTimeLine(pickup: Pickup) {
   if (isCompletedStatus(pickup.cardStatus) || isCancelledStatus(pickup.cardStatus)) {
     return pickup.pickupDateLabel;
   }
-  if (pickup.pickupTimeLabel) {
-    return `${pickup.pickupDateLabel} - ${pickup.pickupTimeLabel}`;
+  if (pickup.pickupDateLabel && pickup.pickupTimeLabel) {
+    return `${pickup.pickupDateLabel} · ${pickup.pickupTimeLabel}`;
   }
+  if (pickup.pickupTimeLabel) return pickup.pickupTimeLabel;
   return pickup.pickupDateLabel;
 }
 

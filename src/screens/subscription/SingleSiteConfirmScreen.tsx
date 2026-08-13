@@ -289,8 +289,8 @@ export function SingleSiteConfirmScreen() {
 
             {trialAvailable ? (
               <AppText color={palette.midgray} style={styles.remindText}>
-                Your card is saved now but not charged for 30 days. Cancel any time before
-                then and you pay nothing.
+                No card needed to start. Your free trial lasts 30 days — add payment details
+                before it ends to keep your plan active. Cancel any time and you pay nothing.
               </AppText>
             ) : null}
 

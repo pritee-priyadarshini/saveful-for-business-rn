@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -269,6 +270,22 @@ export function ClaimConfirmModal({
                   </View>
                 </View>
 
+                {!!listing.photoUrls?.length && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.photoRow}
+                  >
+                    {listing.photoUrls.map((uri: string, index: number) => (
+                      <Image
+                        key={`${uri}-${index}`}
+                        source={{ uri }}
+                        style={styles.photo}
+                      />
+                    ))}
+                  </ScrollView>
+                )}
+
                 <AppText variant="label" style={styles.sectionTitle}>
                   You are claiming
                 </AppText>
@@ -412,6 +429,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     gap: wp(2),
+  },
+  photoRow: {
+    gap: wp(2),
+    paddingBottom: hp(0.2),
+  },
+  photo: {
+    width: wp(22),
+    height: wp(22),
+    borderRadius: normalize(10),
+    backgroundColor: '#EEE',
   },
   itemName: {
     flex: 1,

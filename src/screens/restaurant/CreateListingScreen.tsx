@@ -26,6 +26,8 @@ import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getPeopleRelistFormValues } from '../../utils/listingRelist';
 import { showErrorAlert } from '../../utils/apiError';
+import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
+import { consumeFirstMilestone } from '@/data/milestoneComplete';
 import {
   getListingDateErrors,
   getListingFoodItemsError,
@@ -133,6 +135,7 @@ export function CreateListingScreen({ navigation }: any) {
     authUser?.profile?.organisation?.name?.[0] ||
     'S';
 
+  const [showFirstListingModal, setShowFirstListingModal] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FoodItem[]>(seedItems);
   const [customItem, setCustomItem] = useState('');
@@ -145,8 +148,8 @@ export function CreateListingScreen({ navigation }: any) {
   const [pickupFromDate, setPickupFromDate] = useState<Date | null>(null);
   const [pickupToDate, setPickupToDate] = useState<Date | null>(null);
 
-  const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient' | 'Hot'>('Freezer');
-  const [reheating, setReheating] = useState<'Yes' | 'No' | 'Not sure'>('No');
+  const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient' | 'Hot' | null>(null);
+  const [reheating, setReheating] = useState<'Yes' | 'No' | 'Not sure' | null>(null);
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
   const [confirmedSafe, setConfirmedSafe] = useState(false);
   const [relistApplied, setRelistApplied] = useState(false);
@@ -156,7 +159,13 @@ export function CreateListingScreen({ navigation }: any) {
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | 'datetime'>('date');
   const [pickerValue, setPickerValue] = useState(new Date());
   const [stepErrors, setStepErrors] = useState<
-    ListingDateFieldErrors & { foodItems?: string; location?: string; confirmedSafe?: string }
+    ListingDateFieldErrors & {
+      foodItems?: string;
+      location?: string;
+      confirmedSafe?: string;
+      storage?: string;
+      reheating?: string;
+    }
   >({});
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
@@ -366,8 +375,15 @@ export function CreateListingScreen({ navigation }: any) {
 
     if (step === 2) {
       const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
-      if (hasListingDateErrors(dateErrors)) {
-        setStepErrors(dateErrors);
+      const nextErrors: typeof stepErrors = { ...dateErrors };
+      if (!storage) {
+        nextErrors.storage = 'Please select a storage requirement.';
+      }
+      if (!reheating) {
+        nextErrors.reheating = 'Please select whether reheating is required.';
+      }
+      if (hasListingDateErrors(dateErrors) || nextErrors.storage || nextErrors.reheating) {
+        setStepErrors(nextErrors);
         return;
       }
       setStepErrors({});
@@ -410,6 +426,15 @@ export function CreateListingScreen({ navigation }: any) {
       return;
     }
 
+    if (!storage || !reheating) {
+      setStepErrors({
+        storage: !storage ? 'Please select a storage requirement.' : undefined,
+        reheating: !reheating ? 'Please select whether reheating is required.' : undefined,
+      });
+      setStep(2);
+      return;
+    }
+
     const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
     if (hasListingDateErrors(dateErrors)) {
       setStepErrors(dateErrors);
@@ -432,6 +457,7 @@ export function CreateListingScreen({ navigation }: any) {
 
     await withLock(async () => {
       try {
+        const hadListings = useListingsStore.getState().siteListings.length > 0;
         const payload = {
           siteId: resolvedSiteId,
           listingType: 'HUMAN' as const,
@@ -456,12 +482,18 @@ export function CreateListingScreen({ navigation }: any) {
           needsReheating: reheating === 'Yes',
           isSafeForDonation: true,
           allergens: selectedAllergens,
-          photoUrls: images.filter((uri) => uri.startsWith('http')),
+          photos: images,
         };
 
         await foodListingService.createListing(payload);
         // Invalidate the site listings cache so the new listing shows immediately
         useListingsStore.getState().invalidateSite();
+        const identity = authUser?.email || authUser?.profile?.organisation?.id;
+        const showMilestone = !hadListings && (await consumeFirstMilestone('listing', identity));
+        if (showMilestone) {
+          setShowFirstListingModal(true);
+          return;
+        }
         navigation.replace('RestaurantListings');
       } catch (error: any) {
         showErrorAlert(error, 'Could not create listing', 'Please try again.');
@@ -470,6 +502,7 @@ export function CreateListingScreen({ navigation }: any) {
   };
 
   return (
+    <>
     <Screen
       backgroundColor="#F2F5E9"
       scrollable
@@ -544,30 +577,30 @@ export function CreateListingScreen({ navigation }: any) {
           </View>
         </View>
 
+        {hasPreviousListing && !relistApplied && step === 1 ? (
+          <View style={styles.relistCard}>
+            <AppText variant="bodyBold" color={palette.midgray}>
+              Same as last time?
+            </AppText>
+            <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
+              <AppText variant="bodyBold" color={palette.white}>
+                YES, LIST AGAIN
+              </AppText>
+              <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {relistApplied ? (
+          <View style={styles.relistCard}>
+            <AppText variant="bodyBold" color={palette.middlegreen} style={styles.relistHint}>
+              Please check details below and Press Continue
+            </AppText>
+          </View>
+        ) : null}
+
         {step === 1 ? (
           <View style={styles.stepWrap}>
-            {hasPreviousListing ? (
-              <View style={styles.relistCard}>
-                {relistApplied ? (
-                  <AppText variant="bodyBold" color={palette.middlegreen} style={styles.relistHint}>
-                    Please check details below and Press Continue
-                  </AppText>
-                ) : (
-                  <>
-                    <AppText variant="bodyBold" color={palette.midgray}>
-                      Same as last time?
-                    </AppText>
-                    <Pressable style={styles.relistBtn} onPress={handleRelistAgain}>
-                      <AppText variant="bodyBold" color={palette.white}>
-                        YES, LIST AGAIN
-                      </AppText>
-                      <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
-                    </Pressable>
-                  </>
-                )}
-              </View>
-            ) : null}
-
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               WHAT FOOD DO YOU HAVE?
             </AppText>
@@ -843,7 +876,10 @@ export function CreateListingScreen({ navigation }: any) {
                 return (
                   <Pressable
                     key={option.label}
-                    onPress={() => setStorage(option.label)}
+                    onPress={() => {
+                      setStorage(option.label);
+                      setStepErrors((prev) => ({ ...prev, storage: undefined }));
+                    }}
                     style={[
                       styles.choiceChip,
                       adaptive.choiceChip,
@@ -857,19 +893,23 @@ export function CreateListingScreen({ navigation }: any) {
                     />
                     <AppText
                       variant="bodyBold"
-                      color={active ? palette.kale : palette.stone}
-                      numberOfLines={1}
+                      color={active ? palette.middlegreen : palette.black}
                       style={styles.storageChoiceText}
                     >
                       {option.label}
                     </AppText>
                     {active ? (
-                      <Ionicons name="checkmark-circle" size={normalize(14)} color={palette.kale} />
+                      <Ionicons name="checkmark" size={normalize(14)} color={palette.middlegreen} />
                     ) : null}
                   </Pressable>
                 );
               })}
             </View>
+            {stepErrors.storage ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.storage}
+              </AppText>
+            ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               REHEATING REQUIRED?
@@ -880,7 +920,10 @@ export function CreateListingScreen({ navigation }: any) {
                 return (
                   <Pressable
                     key={option.label}
-                    onPress={() => setReheating(option.label)}
+                    onPress={() => {
+                      setReheating(option.label);
+                      setStepErrors((prev) => ({ ...prev, reheating: undefined }));
+                    }}
                     style={[styles.choiceChip, adaptive.choiceChip, active && styles.choiceChipActive]}
                   >
                     {option.icon ? (
@@ -889,16 +932,27 @@ export function CreateListingScreen({ navigation }: any) {
                         style={{ width: normalize(18), height: normalize(18) }}
                       />
                     ) : (
-                      <Ionicons name={option.icon} size={normalize(18)} color={active ? palette.kale : palette.stone} />
+                      <Ionicons
+                        name="help-circle-outline"
+                        size={normalize(18)}
+                        color={active ? palette.kale : palette.stone}
+                      />
                     )}
                     <AppText variant="bodyBold" color={active ? palette.kale : palette.stone}>
                       {option.label}
                     </AppText>
-                    {active ? <Ionicons name="checkmark-circle" size={normalize(15)} color={palette.kale} /> : null}
+                    {active ? (
+                      <Ionicons name="checkmark-circle" size={normalize(15)} color={palette.kale} />
+                    ) : null}
                   </Pressable>
                 );
               })}
             </View>
+            {stepErrors.reheating ? (
+              <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
+                {stepErrors.reheating}
+              </AppText>
+            ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               ALLERGENS (OPTIONAL)
@@ -1012,14 +1066,14 @@ export function CreateListingScreen({ navigation }: any) {
               <View style={styles.summaryInfoRow}>
                 <Ionicons name="snow-outline" size={normalize(18)} color={palette.kale} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  {storage}
+                  {storage || 'Not selected'}
                 </AppText>
               </View>
 
               <View style={styles.summaryInfoRow}>
                 <Ionicons name="flame-outline" size={normalize(18)} color={palette.kale} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  Reheating - {reheating}
+                  Reheating - {reheating || 'Not selected'}
                 </AppText>
               </View>
 
@@ -1147,6 +1201,20 @@ export function CreateListingScreen({ navigation }: any) {
         />
       ) : null}
     </Screen>
+    <MilestoneCompleteModal
+      visible={showFirstListingModal}
+      kind="listing"
+      onPrimary={() => {
+        setShowFirstListingModal(false);
+        navigation.replace('CreateListing');
+      }}
+      onSecondary={() => {
+        setShowFirstListingModal(false);
+        navigation.replace('RestaurantListings');
+        navigation.getParent()?.navigate('Insights');
+      }}
+    />
+    </>
   );
 }
 

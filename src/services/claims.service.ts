@@ -31,6 +31,12 @@ export type RateClaimPayload = {
   ratingNote?: string;
 };
 
+export type ProviderFeedbackPayload = {
+  didCollect: boolean;
+  rating?: number;
+  ratingNote?: string;
+};
+
 export async function createClaim(payload: CreateClaimPayload): Promise<FoodClaim> {
   const response = await api.post('/claims', payload);
   const raw = response.data?.data ?? response.data?.claim ?? response.data;
@@ -70,6 +76,15 @@ export async function rateClaim(claimId: number, payload: RateClaimPayload) {
   return response.data;
 }
 
+/** Restaurant confirms collection and rates the charity/farmer. */
+export async function submitProviderFeedback(
+  claimId: number,
+  payload: ProviderFeedbackPayload,
+) {
+  const response = await api.patch(`/claims/${claimId}/provider-feedback`, payload);
+  return response.data;
+}
+
 export async function cancelClaim(claimId: number) {
   const response = await api.delete(`/claims/${claimId}`);
   return response.data;
@@ -81,5 +96,6 @@ export const claimsService = {
   getMyClaims,
   markClaimCollected,
   rateClaim,
+  submitProviderFeedback,
   cancelClaim,
 };

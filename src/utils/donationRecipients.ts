@@ -7,7 +7,7 @@ import {
   type RecipientFoodItem,
 } from '@/services/impact.service';
 import type { ImpactFilter } from '@/store/impactStore';
-import { CO2_PER_KG, MEAL_WEIGHT_KG } from '@/utils/impactData';
+import { CO2_PER_KG, MEAL_WEIGHT_KG, foodSavedUsdFromKg } from '@/utils/impactData';
 
 /** Org types that receive food on behalf of people rather than animals. */
 const CHARITY_TYPES = ['CHARITY', 'CHARITY_SINGLE', 'CHARITY_MULTI'];
@@ -137,7 +137,7 @@ export function toRecipientRows(recipients: ImpactRecipient[]): RecipientRow[] {
           recipient.co2AvoidedKg != null
             ? round2(num(recipient.co2AvoidedKg))
             : round2(totalKg * CO2_PER_KG),
-        savedUsd: round2(num(recipient.totalFoodSavedUsd)),
+        savedUsd: foodSavedUsdFromKg(totalKg),
         firstCollectionAt: recipient.firstCollectionAt ?? null,
         lastCollectionAt: recipient.lastCollectionAt ?? null,
         foods: toFoodRows(recipient.foods),

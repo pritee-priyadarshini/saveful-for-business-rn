@@ -4,7 +4,7 @@ import type { UserRole } from '@/types';
 
 export type ReceiverWelcomeVariant = Extract<
   UserRole,
-  'charity_single' | 'charity_multi' | 'farmer'
+  'charity_single' | 'charity_multi' | 'farmer' | 'restaurant_single'
 >;
 
 export type ReceiverWelcomeContent = {
@@ -15,6 +15,8 @@ export type ReceiverWelcomeContent = {
   tip: string;
   closing: string;
   cta: string;
+  /** Optional post-dismiss navigation for producer onboarding. */
+  ctaAction?: 'create_listing';
 };
 
 const SHARED_EMPTY_STATE =
@@ -67,12 +69,30 @@ export const RECEIVER_WELCOME_CONTENT: Record<ReceiverWelcomeVariant, ReceiverWe
     closing: SHARED_CLOSING,
     cta: 'Start exploring',
   },
+  restaurant_single: {
+    emoji: '🎉',
+    titleLead: 'Welcome to',
+    titleBrand: 'Saveful for Business',
+    paragraphs: [
+      "You're now part of a growing network helping Good Food Go Further.",
+      'Your 30-day free trial starts now. Create your first listing and start seeing the value Saveful can deliver.',
+    ],
+    tip: 'Tip: Listing takes less than 2 minutes - and you can add surplus whenever it becomes available.',
+    closing: 'Ready to get started?',
+    cta: 'Create your first listing',
+    ctaAction: 'create_listing',
+  },
 };
 
 export const PENDING_RECEIVER_WELCOME_KEY = 'pendingReceiverWelcome';
 
 export function isReceiverWelcomeRole(role: UserRole | null | undefined): role is ReceiverWelcomeVariant {
-  return role === 'charity_single' || role === 'charity_multi' || role === 'farmer';
+  return (
+    role === 'charity_single' ||
+    role === 'charity_multi' ||
+    role === 'farmer' ||
+    role === 'restaurant_single'
+  );
 }
 
 export function receiverWelcomeStorageKey(identity: string | number) {

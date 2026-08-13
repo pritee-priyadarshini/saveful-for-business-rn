@@ -72,6 +72,7 @@ export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
   ACTIVE: 'Active',
   PARTIAL: 'Partial',
   CLAIMED: 'Claimed',
+  COLLECTED: 'Collected',
   EXPIRED: 'Expired',
   CANCELLED: 'Cancelled',
 };
@@ -86,6 +87,18 @@ export function isListingTimeWindowClosed(listing: any): boolean {
   return false;
 }
 
+/** True when at least one non-cancelled claim on the listing is COLLECTED. */
+export function listingHasCollectedClaim(listing: any): boolean {
+  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+  if (
+    claims.some((claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED')
+  ) {
+    return true;
+  }
+  const claimStatus = String(listing?.claimStatus || '').toUpperCase();
+  return claimStatus === 'COLLECTED' || claimStatus === 'COMPLETED';
+}
+
 /** Map API / claim status to a canonical listing status for UI. */
 export function resolveListingStatus(listing: any): ListingStatus {
   const status = String(listing?.status || '').toUpperCase();
@@ -96,8 +109,16 @@ export function resolveListingStatus(listing: any): ListingStatus {
   else if (status === 'PARTIAL') resolved = 'PARTIAL';
   else if (status === 'EXPIRED') resolved = 'EXPIRED';
   else if (status === 'CANCELLED') resolved = 'CANCELLED';
-  else if (status === 'CLAIMED' || status === 'COMPLETED' || status === 'COLLECTED') resolved = 'CLAIMED';
-  else if (['collected', 'completed', 'verified'].includes(claimStatus)) resolved = 'CLAIMED';
+  else if (status === 'COLLECTED' || status === 'COMPLETED') {
+    resolved = 'COLLECTED';
+  } else if (status === 'CLAIMED') {
+    // DB only has CLAIMED after full claim — collected is claim-level.
+    resolved = listingHasCollectedClaim(listing) ? 'COLLECTED' : 'CLAIMED';
+  } else if (['collected', 'completed', 'verified'].includes(claimStatus)) {
+    resolved = 'COLLECTED';
+  } else if (['pending', 'confirmed', 'claimed'].includes(claimStatus)) {
+    resolved = 'CLAIMED';
+  }
 
   // Past pickup / best-before should display and filter as expired even before the worker flips DB status.
   if ((resolved === 'ACTIVE' || resolved === 'PARTIAL') && isListingTimeWindowClosed(listing)) {
@@ -120,20 +141,14 @@ export function isListingActive(listing: any): boolean {
   return status === 'ACTIVE' || status === 'PARTIAL';
 }
 
-export function isListingCollected(listing: any): boolean {
+/** Fully claimed, not yet collected — further action still needed. */
+export function isListingClaimed(listing: any): boolean {
   return resolveListingStatus(listing) === 'CLAIMED';
 }
 
-/** True when at least one non-cancelled claim on the listing is COLLECTED. */
-export function listingHasCollectedClaim(listing: any): boolean {
-  const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
-  if (
-    claims.some((claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED')
-  ) {
-    return true;
-  }
-  const claimStatus = String(listing?.claimStatus || '').toUpperCase();
-  return claimStatus === 'COLLECTED' || claimStatus === 'COMPLETED';
+/** At least one claim has been marked collected. */
+export function isListingCollected(listing: any): boolean {
+  return resolveListingStatus(listing) === 'COLLECTED';
 }
 
 /** Kg from COLLECTED claims only (falls back to listing food items if claim qty missing). */

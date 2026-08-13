@@ -144,6 +144,13 @@ export function RestaurantUpdatesScreen() {
   const [selectedItems, setSelectedItems] = useState<{ name: string; qty: string }[]>([]);
   const [selectedImpact, setSelectedImpact] = useState<RestaurantUpdate | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedClaimId, setSelectedClaimId] = useState<number | null>(null);
+  const [selectedPartnerName, setSelectedPartnerName] = useState('your partner');
+  const [selectedSurveyItems, setSelectedSurveyItems] = useState<
+    { id: string; name: string; quantity: number }[]
+  >([]);
+  const [initialAnswer, setInitialAnswer] = useState<'yes' | 'no' | null>(null);
+  const [surveyCompletedIds, setSurveyCompletedIds] = useState<string[]>([]);
   const [pickupStatus, setPickupStatus] = useState<Record<string, 'completed' | 'cancelled'>>({});
 
   const loadUpdates = useCallback(
@@ -438,44 +445,103 @@ export function RestaurantUpdatesScreen() {
             </View>
           </View>
 
-          {pickupStatus[item.id] === 'cancelled' ? (
-            <View style={[styles.statusBanner, { backgroundColor: '#FFF0EB' }]}>
-              <Ionicons name="close-circle" size={normalize(18)} color={palette.chilli} />
-              <AppText
-                variant="bodyBold"
-                style={{ color: palette.chilli, textTransform: 'none', fontSize: normalize(14) }}
-              >
-                Pickup cancelled
-              </AppText>
-            </View>
-          ) : pickupStatus[item.id] === 'completed' ||
-            item.assigneeStatus === 'collected' ||
-            Boolean(item.collectedDate) ? (
-            <View style={[styles.statusBanner, { backgroundColor: theme.statusBg }]}>
-              <Ionicons name="checkmark-circle" size={normalize(18)} color={theme.accent} />
-              <AppText
-                variant="bodyBold"
-                style={{ color: theme.accent, textTransform: 'none', fontSize: normalize(14) }}
-              >
-                Pickup completed
-              </AppText>
-            </View>
-          ) : (
-            <Pressable
-              style={[styles.primaryBtn, adaptive.primaryActionBtn, { backgroundColor: theme.accent }]}
-              onPress={() => {
-                setSelectedId(item.id);
-                setModalVisible(true);
-              }}
+          <View style={[styles.statusBanner, { backgroundColor: theme.statusBg }]}>
+            <Ionicons name="time-outline" size={normalize(18)} color={theme.accent} />
+            <AppText
+              variant="bodyBold"
+              style={{ color: theme.accent, textTransform: 'none', fontSize: normalize(14) }}
             >
-              <AppText variant="bodyBold" style={[styles.primaryBtnText, adaptive.primaryActionBtnText]}>
-                Complete Pickup
+              Claimed — waiting for pickup
+            </AppText>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const openProviderSurvey = (item: RestaurantUpdate, answer: 'yes' | 'no' | null = null) => {
+    setSelectedId(item.id);
+    setSelectedClaimId(item.claimId);
+    setSelectedPartnerName(item.claimerName || 'your partner');
+    setSelectedSurveyItems(
+      (item.items || []).map((food, index) => ({
+        id: String(index),
+        name: food.name,
+        quantity: Number.parseFloat(String(food.qty).replace(/[^\d.]/g, '')) || 0,
+      })),
+    );
+    setInitialAnswer(answer);
+    setModalVisible(true);
+  };
+
+  const renderFeedbackCard = (item: RestaurantUpdate) => {
+    const theme = getTheme(item.audience);
+    const completed = surveyCompletedIds.includes(item.id);
+
+    return (
+      <View
+        style={[
+          styles.card,
+          adaptive.updateCard,
+          elevation.flat,
+          {
+            borderColor: theme.accent,
+            backgroundColor: item.audience === 'animals' ? theme.lightBg : palette.white,
+          },
+        ]}
+      >
+        <View style={[styles.cardBody, adaptive.updateCardBody]}>
+          <View style={styles.badgeRow}>
+            <View style={[styles.tag, { backgroundColor: '#E8F1FB' }]}>
+              <AppText style={[styles.tagText, adaptive.tagText, { color: '#2F6FED' }]}>
+                ACTION NEEDED
               </AppText>
-              <View style={styles.primaryBtnArrow}>
-                <Ionicons name="arrow-forward" size={normalize(17)} color={theme.accent} />
-              </View>
-            </Pressable>
+            </View>
+            <View style={[styles.tagRow, { backgroundColor: theme.statusBg }]}>
+              <Image source={theme.categoryIcon} style={styles.tagIcon} resizeMode="contain" />
+              <AppText style={[styles.tagText, adaptive.tagText, { color: theme.accent }]}>
+                {theme.categoryLabel.toUpperCase()}
+              </AppText>
+            </View>
+          </View>
+
+          {renderCardHeadline(
+            item.claimerName,
+            'collected your listing — please confirm and rate',
+            {
+              primary: adaptive.cardHeadlinePrimary,
+              secondary: adaptive.cardHeadlineSecondary,
+            },
           )}
+
+          <View style={styles.feedbackActions}>
+            <Pressable
+              disabled={completed}
+              style={[
+                styles.feedbackYesBtn,
+                { backgroundColor: theme.accent },
+                completed && styles.disabledBtn,
+              ]}
+              onPress={() => openProviderSurvey(item, 'yes')}
+            >
+              <AppText variant="bodyBold" style={styles.feedbackYesText}>
+                YES, COLLECTED
+              </AppText>
+            </Pressable>
+            <Pressable
+              disabled={completed}
+              style={[
+                styles.feedbackNoBtn,
+                { borderColor: theme.accent },
+                completed && styles.disabledBtn,
+              ]}
+              onPress={() => openProviderSurvey(item, 'no')}
+            >
+              <AppText variant="bodyBold" style={[styles.feedbackNoText, { color: theme.accent }]}>
+                NO
+              </AppText>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -612,8 +678,11 @@ export function RestaurantUpdatesScreen() {
     );
   };
 
-  const renderCard = (item: RestaurantUpdate) =>
-    item.cardType === 'collected' ? renderCollectedCard(item) : renderClaimedCard(item);
+  const renderCard = (item: RestaurantUpdate) => {
+    if (item.cardType === 'feedback') return renderFeedbackCard(item);
+    if (item.cardType === 'collected') return renderCollectedCard(item);
+    return renderClaimedCard(item);
+  };
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
@@ -793,14 +862,21 @@ export function RestaurantUpdatesScreen() {
 
       <PostPickupSurveyModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        onClose={() => {
+          setModalVisible(false);
+          setInitialAnswer(null);
+        }}
         selectedId={selectedId}
+        claimId={selectedClaimId}
+        partnerName={selectedPartnerName}
+        items={selectedSurveyItems}
+        initialAnswer={initialAnswer}
         onComplete={(id, status) => {
           setPickupStatus((prev) => ({ ...prev, [id]: status }));
+          setSurveyCompletedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
           setModalVisible(false);
-          if (status === 'completed') {
-            void fetchOrgListings(true);
-          }
+          setInitialAnswer(null);
+          void fetchOrgListings(true);
         }}
       />
 
@@ -1331,6 +1407,37 @@ const styles = StyleSheet.create({
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(3),
     borderRadius: normalize(10),
+  },
+  feedbackActions: {
+    flexDirection: 'row',
+    gap: wp(2.5),
+    marginTop: hp(0.5),
+  },
+  feedbackYesBtn: {
+    flex: 1,
+    borderRadius: normalize(12),
+    paddingVertical: hp(1.2),
+    alignItems: 'center',
+  },
+  feedbackYesText: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(13),
+  },
+  feedbackNoBtn: {
+    flex: 1,
+    borderRadius: normalize(12),
+    borderWidth: 1.5,
+    paddingVertical: hp(1.2),
+    alignItems: 'center',
+    backgroundColor: palette.white,
+  },
+  feedbackNoText: {
+    textTransform: 'none',
+    fontSize: normalize(13),
+  },
+  disabledBtn: {
+    opacity: 0.55,
   },
 
   // ── Impact card (collected) ───────────────────────────────────────
