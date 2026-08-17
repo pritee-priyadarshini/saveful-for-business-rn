@@ -38,7 +38,7 @@ export function SelfPickupClaimsSection({
     if (claims.length === 0) setExpanded(false);
   }, [claims.length]);
 
-  if (!loading && claims.length === 0) return null;
+  if (!loading && claims.length === 0 && !surveyVisible) return null;
 
   const confirmSelfPickup = (claim: SelfPickupClaim) => {
     if (markingClaimId != null) return;

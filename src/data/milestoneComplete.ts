@@ -38,6 +38,28 @@ export function firstMilestoneStorageKey(kind: MilestoneKind, identity: string |
   return `first${kind}CompleteSeen:${version}${String(identity).trim().toLowerCase()}`;
 }
 
+export function resolveMilestoneIdentity(authUser: {
+  id?: number | string | null;
+  email?: string | null;
+  profile?: {
+    user?: { id?: number | string | null; email?: string | null } | null;
+    organisation?: { id?: number | string | null } | null;
+  } | null;
+} | null | undefined): string | null {
+  const id = authUser?.id ?? authUser?.profile?.user?.id;
+  if (id != null && String(id).trim()) return String(id).trim();
+
+  const email = authUser?.email ?? authUser?.profile?.user?.email;
+  if (email && String(email).trim()) return String(email).trim().toLowerCase();
+
+  const orgId = authUser?.profile?.organisation?.id;
+  if (orgId != null && String(orgId).trim()) return `org:${String(orgId).trim()}`;
+
+  return null;
+}
+
+const reservedKeys = new Set<string>();
+
 /** Returns true once, then marks the milestone as seen. */
 export async function consumeFirstMilestone(
   kind: MilestoneKind,
@@ -45,12 +67,15 @@ export async function consumeFirstMilestone(
 ): Promise<boolean> {
   if (identity == null || !String(identity).trim()) return false;
   const key = firstMilestoneStorageKey(kind, identity);
+  if (reservedKeys.has(key)) return false;
+  reservedKeys.add(key);
   try {
     const seen = await SecureStore.getItemAsync(key);
     if (seen) return false;
     await SecureStore.setItemAsync(key, 'true');
     return true;
   } catch {
+    reservedKeys.delete(key);
     return false;
   }
 }

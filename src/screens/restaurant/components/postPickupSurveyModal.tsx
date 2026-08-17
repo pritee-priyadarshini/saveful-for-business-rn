@@ -17,10 +17,7 @@ import { spacing } from '@/theme/spacing';
 import { normalize } from '@/utils/responsive';
 import { claimsService } from '@/services/claims.service';
 import { getUserFriendlyErrorMessage, showErrorAlert, showSuccessAlert } from '@/utils/apiError';
-import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
-import { consumeFirstMilestone } from '@/data/milestoneComplete';
-import { useAppContext } from '@/store/AppContext';
-import { useNavigation } from '@react-navigation/native';
+import { useMilestoneStore } from '@/store/milestoneStore';
 
 type Item = {
   id: string;
@@ -50,15 +47,12 @@ export function PostPickupSurveyModal({
   items = [],
   initialAnswer = null,
 }: Props) {
-  const navigation = useNavigation<any>();
-  const { authUser, selectedRole } = useAppContext();
   const [step, setStep] = useState(1);
   const [reason, setReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [showListingMilestone, setShowListingMilestone] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -100,13 +94,10 @@ export function PostPickupSurveyModal({
         ratingNote: comment.trim() || undefined,
       });
       onComplete?.(selectedId || String(claimId), 'completed');
-      const identity = authUser?.email || authUser?.profile?.organisation?.id;
-      const isFirst = await consumeFirstMilestone('listing', identity);
       reset();
       onClose();
-      if (isFirst) {
-        setShowListingMilestone(true);
-      } else {
+      const isFirst = await useMilestoneStore.getState().offer('listing');
+      if (!isFirst) {
         showSuccessAlert('Thanks — collection confirmed', 'Done');
       }
     } catch (error) {
@@ -277,20 +268,6 @@ export function PostPickupSurveyModal({
         </View>
       </View>
     </Modal>
-    <MilestoneCompleteModal
-      visible={showListingMilestone}
-      kind="listing"
-      onPrimary={() => {
-        setShowListingMilestone(false);
-        const screen =
-          selectedRole === 'farm_business' ? 'CreateFarmListing' : 'CreateListing';
-        navigation.getParent()?.navigate('Listings', { screen });
-      }}
-      onSecondary={() => {
-        setShowListingMilestone(false);
-        navigation.getParent()?.navigate('Insights');
-      }}
-    />
     </>
   );
 }

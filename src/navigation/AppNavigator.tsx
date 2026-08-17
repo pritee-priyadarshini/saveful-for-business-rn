@@ -17,8 +17,12 @@ import {
   showSubscriptionRequiredPrompt,
 } from '@/utils/subscriptionAccess';
 import { ReceiverWelcomeModal } from '@/components/ReceiverWelcomeModal';
+import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
 import { useReceiverWelcomeModal } from '@/hooks/useReceiverWelcomeModal';
 import { isReceiverWelcomeRole } from '@/data/receiverWelcome';
+import { useMilestoneStore } from '@/store/milestoneStore';
+import { useListingsStore } from '@/store/listingsStore';
+import { isListingCollected } from '@/utils/foodListing';
 
 import { CharityHistoryScreen } from '../screens/charity/CharityHistoryScreen';
 import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
@@ -136,6 +140,44 @@ export function AppNavigator() {
     dismiss: dismissWelcome,
     content: welcomeContent,
   } = useReceiverWelcomeModal(isAuthenticated ? welcomeVariant : null);
+  const milestoneKind = useMilestoneStore((s) => s.visibleKind);
+  const dismissMilestone = useMilestoneStore((s) => s.dismiss);
+
+  // Restaurant HQ/single: show "first listing complete" once a listing is collected,
+  // even if the user is on Home and never opens the Updates survey.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      useMilestoneStore.getState().dismiss();
+      return;
+    }
+
+    const isListingRole =
+      effectiveRole === 'restaurant_multi' ||
+      effectiveRole === 'restaurant_single' ||
+      effectiveRole === 'farm_business';
+    if (!isListingRole) return;
+
+    const checkCollectedListing = () => {
+      const { orgListings, siteListings } = useListingsStore.getState();
+      const listings =
+        effectiveRole === 'restaurant_multi'
+          ? orgListings
+          : siteListings.length > 0
+            ? siteListings
+            : orgListings;
+      if (!listings.some(isListingCollected)) return;
+      void useMilestoneStore.getState().offer('listing');
+    };
+
+    if (effectiveRole === 'restaurant_multi') {
+      void useListingsStore.getState().fetchOrgListings();
+    } else {
+      void useListingsStore.getState().fetchSiteListings();
+    }
+
+    checkCollectedListing();
+    return useListingsStore.subscribe(checkCollectedListing);
+  }, [isAuthenticated, effectiveRole]);
 
   // Always-current auth state readable inside stable callbacks without re-subscribing.
   const isAuthenticatedRef = useRef(isAuthenticated);
@@ -319,6 +361,54 @@ export function AppNavigator() {
               if (action === 'add_site') {
                 navigationRef.current.navigate('CreateSite');
               }
+            }}
+          />
+
+          <MilestoneCompleteModal
+            visible={Boolean(milestoneKind) && !welcomeVisible}
+            kind={milestoneKind ?? 'listing'}
+            onPrimary={() => {
+              const kind = milestoneKind;
+              dismissMilestone();
+              if (!kind || !navigationRef.current?.isReady()) return;
+              if (kind === 'listing') {
+                const screen =
+                  effectiveRole === 'farm_business' ? 'CreateFarmListing' : 'CreateListing';
+                navigationRef.current.dispatch(
+                  CommonActions.navigate({
+                    name: 'Tabs',
+                    params: {
+                      screen: 'Listings',
+                      params: { screen },
+                    },
+                  }),
+                );
+                return;
+              }
+              navigationRef.current.dispatch(
+                CommonActions.navigate({
+                  name: 'Tabs',
+                  params: {
+                    screen: 'Available',
+                    params: {
+                      screen: effectiveRole === 'farmer' ? 'FarmerMap' : 'CharityMap',
+                    },
+                  },
+                }),
+              );
+            }}
+            onSecondary={() => {
+              const kind = milestoneKind;
+              dismissMilestone();
+              if (!kind || !navigationRef.current?.isReady()) return;
+              navigationRef.current.dispatch(
+                CommonActions.navigate({
+                  name: 'Tabs',
+                  params: {
+                    screen: kind === 'listing' ? 'Insights' : 'Impact',
+                  },
+                }),
+              );
             }}
           />
         </>

@@ -18,9 +18,7 @@ import { spacing } from '@/theme/spacing';
 import { normalize, useResponsiveLayout } from '@/utils/responsive';
 import { claimsService } from '@/services/claims.service';
 import { getUserFriendlyErrorMessage, showErrorAlert, showSuccessAlert } from '@/utils/apiError';
-import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
-import { consumeFirstMilestone } from '@/data/milestoneComplete';
-import { useAppContext } from '@/store/AppContext';
+import { useMilestoneStore } from '@/store/milestoneStore';
 
 type Item = {
   id: string;
@@ -55,12 +53,10 @@ export function PostCollectSurveyModal({
   onSubmitted,
 }: Props) {
   const navigation = useNavigation<any>();
-  const { authUser } = useAppContext();
   const r = useResponsiveLayout();
   const [step, setStep] = useState(1);
   const [isPartial, setIsPartial] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [showFirstCollectionModal, setShowFirstCollectionModal] = useState(false);
 
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -120,8 +116,12 @@ export function PostCollectSurveyModal({
   };
 
   const handleClose = () => {
+    const shouldOfferCollection = initialAnswer === 'yes';
     reset();
     onClose();
+    if (shouldOfferCollection) {
+      void useMilestoneStore.getState().offer('collection');
+    }
   };
 
   const handleGoHome = () => {
@@ -130,26 +130,14 @@ export function PostCollectSurveyModal({
   };
 
   const presentCollectionSuccess = async (message: string, title: string) => {
-    const identity = authUser?.email || authUser?.profile?.organisation?.id;
-    const isFirst = await consumeFirstMilestone('collection', identity);
     onSubmitted?.();
+    const isFirst = await useMilestoneStore.getState().offer('collection');
     if (isFirst) {
       handleClose();
-      setShowFirstCollectionModal(true);
       return;
     }
     showSuccessAlert(message, title);
     setStep(5);
-  };
-
-  const handleClaimAnother = () => {
-    setShowFirstCollectionModal(false);
-    navigation.getParent()?.navigate('Available', { screen: 'CharityMap' });
-  };
-
-  const handleBrowseInsights = () => {
-    setShowFirstCollectionModal(false);
-    navigation.getParent()?.navigate('Impact');
   };
 
   const submitRating = async () => {
@@ -497,12 +485,6 @@ export function PostCollectSurveyModal({
         </View>
       </View>
     </Modal>
-    <MilestoneCompleteModal
-      visible={showFirstCollectionModal}
-      kind="collection"
-      onPrimary={handleClaimAnother}
-      onSecondary={handleBrowseInsights}
-    />
     </>
   );
 }
