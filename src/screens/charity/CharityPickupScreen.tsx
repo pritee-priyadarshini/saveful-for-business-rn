@@ -33,7 +33,7 @@ import type {
   ReceiverPickupCardStatus,
 } from '@/utils/receiverFeed';
 
-type StatusFilter = 'all' | 'completed' | 'cancelled';
+type StatusFilter = 'all' | 'claimed' | 'completed' | 'cancelled';
 
 type PickupCardStatus = ReceiverPickupCardStatus;
 type PickupItem = ReceiverPickup['items'][number];
@@ -70,6 +70,10 @@ const STATUS_LABELS: Record<PickupCardStatus, string> = {
   completed: 'COMPLETED',
   cancelled: 'CANCELLED',
 };
+
+function isClaimedStatus(status: PickupCardStatus) {
+  return status === 'claimed' || status === 'awaiting_driver' || status === 'enroute';
+}
 
 function isCompletedStatus(status: PickupCardStatus) {
   return status === 'completed';
@@ -131,6 +135,7 @@ export default function CharityPickupScreen({ navigation }: any) {
 
   const filteredPickups = useMemo(() => {
     return claimedPickups.filter((pickup) => {
+      if (statusFilter === 'claimed') return isClaimedStatus(pickup.cardStatus);
       if (statusFilter === 'completed') return isCompletedStatus(pickup.cardStatus);
       if (statusFilter === 'cancelled') return isCancelledStatus(pickup.cardStatus);
       return true;
@@ -474,6 +479,7 @@ export default function CharityPickupScreen({ navigation }: any) {
         <View style={[styles.sectionBlock, contentColumn, tabletInsetReset]}>
           <View style={styles.filterRow}>
             {renderStatusChip('all', 'All')}
+            {renderStatusChip('claimed', 'Claimed', 'bag-check-outline')}
             {renderStatusChip('completed', 'Completed', 'checkmark-circle-outline')}
             {renderStatusChip('cancelled', 'Cancelled', 'close-circle-outline')}
           </View>

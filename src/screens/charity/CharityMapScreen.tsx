@@ -7,8 +7,6 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
-  Image,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +16,7 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
+import { ListingPhotoGallery } from '../../components/ListingPhotoGallery';
 import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 import {
   ClaimConfirmModal,
@@ -689,21 +688,11 @@ export function CharityMapScreen({ navigation }: any) {
         </View>
 
         <View style={styles.section}>
-          {!!item.photoUrls?.length && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.listingPhotoRow}
-            >
-              {item.photoUrls.map((uri: string, index: number) => (
-                <Image
-                  key={`${item.id}-photo-${index}`}
-                  source={{ uri }}
-                  style={styles.listingPhoto}
-                />
-              ))}
-            </ScrollView>
-          )}
+          <ListingPhotoGallery
+            photos={item.photoUrls}
+            contentContainerStyle={styles.listingPhotoRow}
+            thumbnailStyle={styles.listingPhoto}
+          />
           <AppText variant="label" style={styles.sectionTitle}>
             Select quantity per item
           </AppText>

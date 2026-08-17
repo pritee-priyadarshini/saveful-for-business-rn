@@ -1,4 +1,5 @@
 import api from './api';
+import { postFormData } from './multipart';
 import type { FoodListingType, ListingStatus } from '../types';
 import { isAnimalListing, isPeopleListing } from '../utils/foodListing';
 import {
@@ -352,6 +353,12 @@ function isAvailableListingStatus(status: unknown) {
   return value === 'ACTIVE' || value === 'PARTIAL';
 }
 
+function toStringList(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const cleaned = value.map((entry) => String(entry).trim()).filter(Boolean);
+  return cleaned.length > 0 ? cleaned : null;
+}
+
 export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
   const statusUpper = String(item.status || '').toUpperCase();
   const totalQty =
@@ -406,6 +413,8 @@ export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
     pickupWindow,
     pickupWindowDate: formatListingDate(pickupFromTime || listedAt),
     storage: item.needsRefrigeration ? 'Keep refrigerated' : 'Room temperature',
+    // Same column carries allergens (people) and possible contaminants (animal feed).
+    allergens: toStringList((item as any).allergens) ?? toStringList((item as any).allergenList) ?? [],
     status:
       statusUpper === 'ACTIVE'
         ? 'Available'
@@ -437,6 +446,7 @@ export type NearbyListing = {
   pickupByTime: string | null;
   bestBefore: string;
   photoUrls: string[];
+  allergens?: string[];
   status: 'ACTIVE' | 'PARTIAL';
   foodItems: Array<{
     id: number;
@@ -498,6 +508,7 @@ function mapNearbyListingToFoodListing(item: NearbyListing): FoodListing {
     pickupFromTime: item.pickupFromTime ?? undefined,
     pickupByTime: item.pickupByTime ?? undefined,
     photoUrls: item.photoUrls ?? [],
+    allergens: item.allergens ?? [],
     foodItems: (item.foodItems ?? []).map((food) => ({
       id: food.id,
       name: food.name,
@@ -638,7 +649,7 @@ export const foodListingService = {
     const body = normalizeCreateListingPayload(payload);
     const hasLocalPhotos = (body.photos?.length ?? 0) > 0;
     if (hasLocalPhotos) {
-      return api.post('/food-listings', buildCreateListingFormData(body));
+      return postFormData('/food-listings', buildCreateListingFormData(body));
     }
     // No local files — keep JSON path (photoUrls may still include remote URLs).
     const { photos: _photos, ...jsonBody } = body;

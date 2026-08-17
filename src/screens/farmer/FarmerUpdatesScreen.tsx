@@ -128,6 +128,7 @@ export function FarmerUpdatesScreen() {
     { id: string; name: string; quantity: number }[]
   >([]);
   const [surveyCompletedIds, setSurveyCompletedIds] = useState<string[]>([]);
+  const [surveyStartsAtRating, setSurveyStartsAtRating] = useState(false);
   const [markingClaimId, setMarkingClaimId] = useState<number | null>(null);
 
   const filteredUpdates = useMemo(() => {
@@ -167,8 +168,13 @@ export function FarmerUpdatesScreen() {
     openItemsModal(item);
   };
 
-  const openSurveyForItem = (item: UpdateItem, answer: 'yes' | 'no' | null = 'yes') => {
+  const openSurveyForItem = (
+    item: UpdateItem,
+    answer: 'yes' | 'no' | null = 'yes',
+    startAtRating = false,
+  ) => {
     setInitialAnswer(answer);
+    setSurveyStartsAtRating(startAtRating);
     setSelectedUpdateId(item.id);
     setSelectedClaimId(item.claimId ?? null);
     setSelectedBusinessName(item.title);
@@ -425,20 +431,7 @@ export function FarmerUpdatesScreen() {
               <Pressable
                 disabled={completed}
                 style={[styles.feedbackYesBtn, { backgroundColor: theme.btn }, completed && styles.disabledBtn]}
-                onPress={() => {
-                  setInitialAnswer('yes');
-                  setSelectedUpdateId(item.id);
-                  setSelectedClaimId(item.claimId ?? null);
-                  setSelectedBusinessName(item.title);
-                  setSelectedSurveyItems(
-                    (item.items || []).map((food, index) => ({
-                      id: String(index),
-                      name: food.name,
-                      quantity: Number(food.claimed || food.available || 0),
-                    })),
-                  );
-                  setModalVisible(true);
-                }}
+                onPress={() => openSurveyForItem(item, 'yes', true)}
               >
                 <AppText variant="bodyBold" style={styles.feedbackYesText}>YES</AppText>
               </Pressable>
@@ -446,20 +439,7 @@ export function FarmerUpdatesScreen() {
               <Pressable
                 disabled={completed}
                 style={[styles.feedbackNoBtn, { borderColor: theme.btn }, completed && styles.disabledBtn]}
-                onPress={() => {
-                  setInitialAnswer('no');
-                  setSelectedUpdateId(item.id);
-                  setSelectedClaimId(item.claimId ?? null);
-                  setSelectedBusinessName(item.title);
-                  setSelectedSurveyItems(
-                    (item.items || []).map((food, index) => ({
-                      id: String(index),
-                      name: food.name,
-                      quantity: Number(food.claimed || food.available || 0),
-                    })),
-                  );
-                  setModalVisible(true);
-                }}
+                onPress={() => openSurveyForItem(item, 'no', true)}
               >
                 <AppText variant="bodyBold" style={[styles.feedbackNoText, { color: theme.btn }]}>NO</AppText>
               </Pressable>
@@ -680,6 +660,7 @@ export function FarmerUpdatesScreen() {
         claimId={selectedClaimId}
         businessName={selectedBusinessName}
         items={selectedSurveyItems}
+        startAtRating={surveyStartsAtRating}
         onSubmitted={() => {
           if (selectedUpdateId) {
             setSurveyCompletedIds((prev) => [...prev, selectedUpdateId]);
@@ -689,6 +670,7 @@ export function FarmerUpdatesScreen() {
         onClose={() => {
           setModalVisible(false);
           setInitialAnswer(null);
+          setSurveyStartsAtRating(false);
           setSelectedUpdateId(null);
           setSelectedClaimId(null);
           setSelectedBusinessName('');

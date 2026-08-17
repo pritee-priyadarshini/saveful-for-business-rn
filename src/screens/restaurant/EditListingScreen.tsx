@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { AppText } from '../../components/AppText';
+import { ListingPhotoGallery } from '../../components/ListingPhotoGallery';
 import { Screen } from '../../components/Screen';
 import { palette } from '../../theme/colors';
 import {
@@ -958,6 +959,17 @@ function EditPeopleListingForm({
               </AppText>
             </View>
 
+            {images.length > 0 ? (
+              <>
+                <AppText variant="h8" color={palette.black} style={peopleStyles.sectionTitle}>
+                  PHOTOS
+                </AppText>
+                <View style={peopleStyles.card}>
+                  <ListingPhotoGallery photos={images} />
+                </View>
+              </>
+            ) : null}
+
             <AppText variant="h8" color={palette.black} style={peopleStyles.sectionTitle}>
               COLLECTION SUMMARY
             </AppText>
@@ -1776,6 +1788,17 @@ function EditFarmListingForm({
                 Total Quantity: {Math.max(totalQuantity, 0)} kg
               </AppText>
             </View>
+
+            {images.length > 0 ? (
+              <>
+                <AppText variant="h8" color={palette.black} style={farmStyles.sectionTitle}>
+                  PHOTOS
+                </AppText>
+                <View style={farmStyles.card}>
+                  <ListingPhotoGallery photos={images} />
+                </View>
+              </>
+            ) : null}
 
             {/* Collection summary */}
             <AppText variant="h8" color={palette.black} style={farmStyles.sectionTitle}>

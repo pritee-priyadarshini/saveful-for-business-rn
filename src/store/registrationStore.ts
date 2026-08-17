@@ -61,6 +61,7 @@ const DEFAULT_FARMER_FORM: FarmerForm = {
   region: '',
   latitude: '',
   longitude: '',
+  pickupRadius: '50',
 };
 
 interface RegistrationState {

@@ -48,6 +48,7 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { StatusBar } from 'expo-status-bar';
 import {
   resolveProfileDisplayAddress,
+  resolveProfilePickupRadiusKm,
   DEFAULT_PICKUP_RADIUS_KM,
 } from '@/utils/authSession';
 import {
@@ -91,7 +92,7 @@ function buildProfileForm(
     registration: org?.registrationNumber || '',
     venueType: org?.venueType || '',
     branding: org?.brandName || '',
-    radius: String(DEFAULT_PICKUP_RADIUS_KM),
+    radius: resolveProfilePickupRadiusKm(authUser?.profile),
     latitude: coords?.lat ?? null,
     longitude: coords?.lng ?? null,
   };
@@ -331,6 +332,43 @@ export function ProfileScreen() {
     });
   };
 
+  const handleUpdateRadius = async () => {
+    if (submitting) return;
+    const radius = Number(formData.radius);
+
+    if (!formData.radius.trim() || !Number.isFinite(radius) || radius <= 0) {
+      showInfoAlert(
+        `Please enter a pickup radius between 1 and ${DEFAULT_PICKUP_RADIUS_KM} km.`,
+        'Pickup radius',
+      );
+      return;
+    }
+
+    if (radius > DEFAULT_PICKUP_RADIUS_KM) {
+      showInfoAlert(
+        `Please add a range up to ${DEFAULT_PICKUP_RADIUS_KM} km from your location.`,
+        'Pickup radius',
+      );
+      return;
+    }
+
+    await withLock(async () => {
+      try {
+        const siteId = authUser?.profile?.sites?.[0]?.id;
+        if (!siteId) {
+          showErrorAlert('Location not found', 'Error');
+          return;
+        }
+
+        await updateLocation(siteId, { radiusKm: radius });
+        await refreshProfile();
+        showSuccessAlert('Pickup radius updated');
+      } catch (err) {
+        showErrorAlert(err, 'Could not update pickup radius', 'Failed to update pickup radius');
+      }
+    });
+  };
+
   const handleUpdateExtra = async () => {
     if (submitting) return;
     await withLock(async () => {
@@ -491,8 +529,8 @@ export function ProfileScreen() {
           fields: [
             {
               label: 'Radius (km)',
-              value: String(DEFAULT_PICKUP_RADIUS_KM),
-              editable: false,
+              value: formData.radius,
+              editable: true,
             },
           ],
         },
@@ -805,17 +843,33 @@ export function ProfileScreen() {
                   )}
 
                   {section.key === 'pickup' && (
-                    <InputField
-                      label="Radius (km)"
-                      value={String(DEFAULT_PICKUP_RADIUS_KM)}
-                      editable={false}
-                    />
+                    <>
+                      <InputField
+                        label="Radius (km)"
+                        keyboardType="number-pad"
+                        value={formData.radius}
+                        onChangeText={(value: string) =>
+                          updateField('radius', value.replace(/\D/g, '').slice(0, 3))
+                        }
+                      />
+                      {Number(formData.radius) > DEFAULT_PICKUP_RADIUS_KM ? (
+                        <AppText variant="bodySmall" color={palette.validation}>
+                          Please add a range up to {DEFAULT_PICKUP_RADIUS_KM} km from your location.
+                        </AppText>
+                      ) : (
+                        <AppText variant="bodySmall" style={{ color: palette.textMuted }}>
+                          Choose a pickup range up to {DEFAULT_PICKUP_RADIUS_KM} km from your
+                          location.
+                        </AppText>
+                      )}
+                    </>
                   )}
 
                   {/* SAVE BUTTON */}
                   {section.key === 'personal' ||
                   section.key === 'business' ||
-                  section.key === 'extra' ? (
+                  section.key === 'extra' ||
+                  section.key === 'pickup' ? (
                     <Pressable
                       style={[styles.saveBtn, submitting && { opacity: 0.65 }]}
                       disabled={submitting}
@@ -830,6 +884,10 @@ export function ProfileScreen() {
 
                         if (section.key === 'extra') {
                           handleUpdateExtra();
+                        }
+
+                        if (section.key === 'pickup') {
+                          handleUpdateRadius();
                         }
                       }}
                     >

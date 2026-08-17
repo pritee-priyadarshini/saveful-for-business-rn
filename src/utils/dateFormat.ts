@@ -54,8 +54,8 @@ export function formatListingTimeRange(
 }
 
 /**
- * Pickup window with dates, e.g. "12/8 – 14/8 · 10:15 am – 10:00 am"
- * (same-day: "12/8 · 10:15 am – 2:00 pm").
+ * Pickup window pairs each date with its time, e.g.
+ * "12/8 · 10:15 am – 14/8 · 10:00 am".
  */
 export function formatListingPickupWindow(
   from?: string | null,
@@ -63,29 +63,20 @@ export function formatListingPickupWindow(
 ): string {
   if (!from && !to) return '—';
 
-  const fromDate = from ? new Date(from) : null;
-  const toDate = to ? new Date(to) : null;
-  const fromOk = fromDate && !Number.isNaN(fromDate.getTime());
-  const toOk = toDate && !Number.isNaN(toDate.getTime());
+  const formatEndpoint = (iso?: string | null) => {
+    if (!iso) return '';
+    const shortDate = formatListingShortDate(iso);
+    if (!shortDate) return '';
+    return `${shortDate} · ${formatListingTime(iso)}`;
+  };
 
-  const fromShort = formatListingShortDate(from);
-  const toShort = formatListingShortDate(to);
-  const times = formatListingTimeRange(from, to);
+  const fromLabel = formatEndpoint(from);
+  const toLabel = formatEndpoint(to);
 
-  if (fromOk && toOk) {
-    const sameDay =
-      fromDate!.getFullYear() === toDate!.getFullYear() &&
-      fromDate!.getMonth() === toDate!.getMonth() &&
-      fromDate!.getDate() === toDate!.getDate();
-    if (sameDay) {
-      return `${fromShort} · ${times}`;
-    }
-    return `${fromShort} – ${toShort} · ${times}`;
-  }
-
-  if (fromShort) return `${fromShort} · ${times}`;
-  if (toShort) return `${toShort} · ${times}`;
-  return times;
+  if (fromLabel && toLabel) return `${fromLabel} – ${toLabel}`;
+  if (fromLabel) return `From ${fromLabel}`;
+  if (toLabel) return `Until ${toLabel}`;
+  return '—';
 }
 
 export function formatListingDateTime(iso?: string | null): string {

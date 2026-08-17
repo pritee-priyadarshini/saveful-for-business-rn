@@ -7,8 +7,6 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
-  Image,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -18,10 +16,12 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
+import { ListingPhotoGallery } from '../../components/ListingPhotoGallery';
 import {
   ClaimConfirmModal,
   type ClaimLineItem,
 } from '../../components/ClaimConfirmModal';
+import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { SelfPickupClaimsSection } from '../../components/SelfPickupClaimsSection';
 import type { ClaimMode } from '../../services/claims.service';
@@ -145,6 +145,7 @@ export function FarmerMapScreen({ navigation }: any) {
   const [activeClaimItemByListing, setActiveClaimItemByListing] = useState<
     Record<string, number | null>
   >({});
+  const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
   const [pendingClaim, setPendingClaim] = useState<PendingClaim | null>(null);
   const pendingClaimRef = useRef<PendingClaim | null>(null);
   const fetchedListingIds = useRef(new Set<string>());
@@ -692,17 +693,8 @@ export function FarmerMapScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.storageRow}>
-          <Ionicons name="thermometer-outline" size={normalize(14)} color="#666" />
-          <AppText variant="caption" style={styles.storageText}>
-            {item.storage}
-          </AppText>
-          <Pressable
-            onPress={() =>
-              navigation.navigate('LivestockListingDetails', { listing: item })
-            }
-            hitSlop={8}
-          >
+        <View style={styles.detailsRow}>
+          <Pressable onPress={() => setSelectedListing(item)} hitSlop={8}>
             <AppText variant="caption" style={styles.detailsLink}>
               View details
             </AppText>
@@ -710,21 +702,11 @@ export function FarmerMapScreen({ navigation }: any) {
         </View>
 
         <View style={styles.section}>
-          {!!item.photoUrls?.length && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.listingPhotoRow}
-            >
-              {item.photoUrls.map((uri: string, index: number) => (
-                <Image
-                  key={`${item.id}-photo-${index}`}
-                  source={{ uri }}
-                  style={styles.listingPhoto}
-                />
-              ))}
-            </ScrollView>
-          )}
+          <ListingPhotoGallery
+            photos={item.photoUrls}
+            contentContainerStyle={styles.listingPhotoRow}
+            thumbnailStyle={styles.listingPhoto}
+          />
           <AppText variant="label" style={styles.sectionTitle}>
             Select quantity per item
           </AppText>
@@ -855,6 +837,18 @@ export function FarmerMapScreen({ navigation }: any) {
         }}
         confirming={saving}
         searchPlaceholder="Search farm address..."
+      />
+
+      <DiscoverListingDetailModal
+        visible={!!selectedListing}
+        listing={selectedListing}
+        itemsTitle="Feed items"
+        allergensTitle="Possible contaminants"
+        onClose={() => setSelectedListing(null)}
+        onClaim={() => {
+          // Already on Available — close the sheet so the claim controls on the list are usable.
+          setSelectedListing(null);
+        }}
       />
 
       <ClaimConfirmModal
@@ -1172,19 +1166,14 @@ const styles = StyleSheet.create({
     lineHeight: normalize(16),
   },
 
-  storageRow: {
+  detailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: wp(1),
+    justifyContent: 'flex-end',
     marginTop: hp(1.2),
     paddingTop: hp(1),
     borderTopWidth: 1,
     borderTopColor: '#F3F3F3',
-  },
-
-  storageText: {
-    color: '#666',
-    flex: 1,
   },
 
   detailsLink: {

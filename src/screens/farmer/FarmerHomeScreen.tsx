@@ -22,6 +22,7 @@ import { Skeleton } from '../../components/Skeleton';
 import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { AssignDriverModal } from '@/components/AssignDriverModal';
+import { DiscoverListingDetailModal } from '@/components/DiscoverListingDetailModal';
 
 import { useAppContext } from '../../store/AppContext';
 import { useAuthStore } from '../../store/authStore';
@@ -100,6 +101,7 @@ export function FarmerHomeScreen() {
   const [driversLoading, setDriversLoading] = useState(false);
   const [driversError, setDriversError] = useState<string | null>(null);
   const [assignDriver, setAssignDriver] = useState<SiteDriverRow | null>(null);
+  const [selectedListing, setSelectedListing] = useState<DiscoverListing | null>(null);
 
   const siteIds = useMemo(() => resolveFarmerSiteIds(authUser), [authUser]);
   const fetchUsers = useFarmerConsumerStore((s) => s.fetchUsers);
@@ -323,12 +325,7 @@ export function FarmerHomeScreen() {
           label="View Details"
           size="compact"
           style={styles.detailsBtn}
-          onPress={() =>
-            navigation.navigate('Available', {
-              screen: 'LivestockListingDetails',
-              params: { listing: item },
-            })
-          }
+          onPress={() => setSelectedListing(item)}
         />
       </View>
     </View>
@@ -663,6 +660,18 @@ export function FarmerHomeScreen() {
         onClose={() => setAssignDriver(null)}
         onAssigned={() => {
           void loadSiteDrivers();
+        }}
+      />
+
+      <DiscoverListingDetailModal
+        visible={!!selectedListing}
+        listing={selectedListing}
+        itemsTitle="Feed items"
+        allergensTitle="Possible contaminants"
+        onClose={() => setSelectedListing(null)}
+        onClaim={() => {
+          setSelectedListing(null);
+          navigation.navigate('Available');
         }}
       />
     </Screen>

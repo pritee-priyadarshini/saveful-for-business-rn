@@ -31,7 +31,11 @@ export const MILESTONE_COMPLETE_CONTENT: Record<MilestoneKind, MilestoneComplete
 };
 
 export function firstMilestoneStorageKey(kind: MilestoneKind, identity: string | number) {
-  return `first${kind}CompleteSeen:${String(identity).trim().toLowerCase()}`;
+  // Listing v2 moves this milestone from listing creation to confirmed collection.
+  // Keep a new key so users who saw the old, premature popup still receive the
+  // correctly timed completion popup once.
+  const version = kind === 'listing' ? 'v2:' : '';
+  return `first${kind}CompleteSeen:${version}${String(identity).trim().toLowerCase()}`;
 }
 
 /** Returns true once, then marks the milestone as seen. */

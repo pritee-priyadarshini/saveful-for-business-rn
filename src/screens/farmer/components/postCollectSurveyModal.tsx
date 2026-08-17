@@ -35,6 +35,11 @@ type Props = {
   claimId?: number | null;
   businessName?: string;
   items?: Item[];
+  /**
+   * The collection was already confirmed earlier, so "yes" jumps straight to
+   * the rating step instead of asking about it again.
+   */
+  startAtRating?: boolean;
   /** Called after a successful backend submit so the feed can refresh. */
   onSubmitted?: () => void;
 };
@@ -46,6 +51,7 @@ export function PostCollectSurveyModal({
   claimId,
   businessName,
   items: initialItems,
+  startAtRating = false,
   onSubmitted,
 }: Props) {
   const navigation = useNavigation<any>();
@@ -73,14 +79,14 @@ export function PostCollectSurveyModal({
 
   useEffect(() => {
     if (!visible) return;
-    if (initialAnswer === 'yes') setStep(2);
+    if (initialAnswer === 'yes') setStep(startAtRating ? 4 : 2);
     else if (initialAnswer === 'no') setStep(6);
     else setStep(1);
 
     if (initialItems?.length) {
       setItems(initialItems);
     }
-  }, [visible, initialAnswer, initialItems]);
+  }, [visible, initialAnswer, initialItems, startAtRating]);
 
   const totalKg = items.reduce((sum, i) => sum + i.quantity, 0);
 

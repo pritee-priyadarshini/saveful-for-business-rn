@@ -26,8 +26,7 @@ import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getFarmRelistFormValues } from '../../utils/listingRelist';
 import { showErrorAlert } from '../../utils/apiError';
-import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
-import { consumeFirstMilestone } from '@/data/milestoneComplete';
+import { ListingPhotoGallery } from '@/components/ListingPhotoGallery';
 import {
   getListingDateErrors,
   getListingFoodItemsError,
@@ -135,7 +134,6 @@ export function CreateFarmListingScreen({ navigation }: any) {
     authUser?.profile?.organisation?.name?.[0] ||
     'S';
 
-  const [showFirstListingModal, setShowFirstListingModal] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [items, setItems] = useState<FarmItem[]>(seedItems);
   const [customItem, setCustomItem] = useState('');
@@ -394,7 +392,6 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
     await withLock(async () => {
       try {
-        const hadListings = useListingsStore.getState().siteListings.length > 0;
         const payload = {
           siteId: resolvedSiteId,
           listingType: 'ANIMAL' as const,
@@ -423,12 +420,6 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
         await foodListingService.createListing(payload);
         useListingsStore.getState().invalidateSite();
-        const identity = authUser?.email || authUser?.profile?.organisation?.id;
-        const showMilestone = !hadListings && (await consumeFirstMilestone('listing', identity));
-        if (showMilestone) {
-          setShowFirstListingModal(true);
-          return;
-        }
         navigation.replace('RestaurantListings');
       } catch (error: any) {
         showErrorAlert(error, 'Could not create listing', 'Please try again.');
@@ -886,6 +877,17 @@ export function CreateFarmListingScreen({ navigation }: any) {
               </AppText>
             </View>
 
+            {images.length > 0 ? (
+              <>
+                <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
+                  PHOTOS
+                </AppText>
+                <View style={styles.card}>
+                  <ListingPhotoGallery photos={images} />
+                </View>
+              </>
+            ) : null}
+
             {/* Collection summary */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               COLLECTION SUMMARY
@@ -1055,19 +1057,6 @@ export function CreateFarmListingScreen({ navigation }: any) {
         />
       ) : null}
     </Screen>
-    <MilestoneCompleteModal
-      visible={showFirstListingModal}
-      kind="listing"
-      onPrimary={() => {
-        setShowFirstListingModal(false);
-        navigation.replace('CreateFarmListing');
-      }}
-      onSecondary={() => {
-        setShowFirstListingModal(false);
-        navigation.replace('RestaurantListings');
-        navigation.getParent()?.navigate('Insights');
-      }}
-    />
     </>
   );
 }

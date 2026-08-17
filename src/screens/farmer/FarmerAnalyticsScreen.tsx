@@ -47,21 +47,31 @@ import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles, dashboardChartWidth } from '@/utils/dashboardAdaptive';
 
 const ANALYTICS_ICONS = {
-  feedCollected: require('../../../assets/placeholder/storage_box_green.png'),
-  meals: require('../../../assets/placeholder/cow_front.png'),
+  feedCollected: require('../../../assets/placeholder/cow_front.png'),
   co2: require('../../../assets/placeholder/co2_green_icon.png'),
   collections: require('../../../assets/placeholder/truck_icon.png'),
   rating: require('../../../assets/placeholder/rating_icon.png'),
 };
 
+/** Collection sources are the businesses collected from — no storefront asset exists. */
+const COLLECTION_SOURCES_ICON = {
+  ionicon: 'storefront-outline' as keyof typeof Ionicons.glyphMap,
+  color: palette.orange,
+};
+
+type MetricIcon = ImageSourcePropType | typeof COLLECTION_SOURCES_ICON;
+
+function isIoniconIcon(icon: MetricIcon): icon is typeof COLLECTION_SOURCES_ICON {
+  return typeof icon === 'object' && icon !== null && 'ionicon' in icon;
+}
+
 const formatNumber = (value: number) => value.toLocaleString('en-US');
 
 type TimeRange = 'week' | 'month' | 'year';
-type ImpactMetric = 'feedCollected' | 'mealsCreated' | 'co2Avoided' | 'collectionsCompleted';
+type ImpactMetric = 'feedCollected' | 'co2Avoided' | 'collectionsCompleted';
 
 const METRIC_TO_CHART: Record<ImpactMetric, ChartMetricKey> = {
   feedCollected: 'food',
-  mealsCreated: 'meals',
   co2Avoided: 'co2',
   collectionsCompleted: 'collections',
 };
@@ -73,7 +83,7 @@ function formatRating(rating: number | null): string {
 function toFarmerStats(stats: ImpactDisplayStats) {
   return {
     feedCollectedKg: stats.redistributedKg,
-    mealsCreated: stats.mealsCreated,
+    collectionSources: stats.partnersSupported,
     co2AvoidedKg: stats.co2AvoidedKg,
     collectionsCompleted: stats.collectionsCompleted,
     rating: stats.rating,
@@ -88,7 +98,6 @@ const TIME_RANGES: { key: TimeRange; label: string }[] = [
 
 const IMPACT_METRICS: { key: ImpactMetric; label: string; suffix?: string }[] = [
   { key: 'feedCollected', label: 'Feed Collected', suffix: 'kg' },
-  { key: 'mealsCreated', label: 'Meals created' },
   { key: 'co2Avoided', label: 'CO2 Avoided', suffix: 'kg' },
   { key: 'collectionsCompleted', label: 'Collections Completed' },
 ];
@@ -159,14 +168,18 @@ export function FarmerAnalyticsScreen() {
       : sites.find((site) => site.id === selectedSiteId)?.name ?? null;
 
   const renderMetricCard = (
-    icon: ImageSourcePropType,
+    icon: MetricIcon,
     value: string,
     label: string,
     wrapperStyle?: ViewStyle,
   ) => (
     <View style={[styles.metricCard, adaptive.metricCard, wrapperStyle]}>
       <View style={styles.metricIconWrap}>
-        <Image source={icon} style={styles.metricIcon} resizeMode="contain" />
+        {isIoniconIcon(icon) ? (
+          <Ionicons name={icon.ionicon} size={normalize(26)} color={icon.color} />
+        ) : (
+          <Image source={icon} style={styles.metricIcon} resizeMode="contain" />
+        )}
       </View>
       <View style={styles.metricContent}>
         <AppText variant="h8" style={[styles.metricValue, adaptive.metricValue]} numberOfLines={1}>
@@ -195,12 +208,6 @@ export function FarmerAnalyticsScreen() {
               adaptive.metricGridItem,
             )}
             {renderMetricCard(
-              ANALYTICS_ICONS.meals,
-              formatNumber(stats.mealsCreated),
-              'Meals Collected',
-              adaptive.metricGridItem,
-            )}
-            {renderMetricCard(
               ANALYTICS_ICONS.co2,
               `${formatNumber(stats.co2AvoidedKg)} kg`,
               'Total CO2 avoided',
@@ -210,6 +217,12 @@ export function FarmerAnalyticsScreen() {
               ANALYTICS_ICONS.collections,
               formatNumber(stats.collectionsCompleted),
               'Collections completed',
+              adaptive.metricGridItem,
+            )}
+            {renderMetricCard(
+              COLLECTION_SOURCES_ICON,
+              formatNumber(stats.collectionSources),
+              'Collection Sources',
               adaptive.metricGridItem,
             )}
             {renderMetricCard(
@@ -228,22 +241,22 @@ export function FarmerAnalyticsScreen() {
                 'Feed Collected',
               )}
               {renderMetricCard(
-                ANALYTICS_ICONS.meals,
-                formatNumber(stats.mealsCreated),
-                'Meals Collected',
+                ANALYTICS_ICONS.co2,
+                `${formatNumber(stats.co2AvoidedKg)} kg`,
+                'Total CO2 avoided',
               )}
             </View>
 
             <View style={styles.metricsRow}>
               {renderMetricCard(
-                ANALYTICS_ICONS.co2,
-                `${formatNumber(stats.co2AvoidedKg)} kg`,
-                'Total CO2 avoided',
-              )}
-              {renderMetricCard(
                 ANALYTICS_ICONS.collections,
                 formatNumber(stats.collectionsCompleted),
                 'Collections completed',
+              )}
+              {renderMetricCard(
+                COLLECTION_SOURCES_ICON,
+                formatNumber(stats.collectionSources),
+                'Collection Sources',
               )}
             </View>
 
@@ -430,7 +443,7 @@ export function FarmerAnalyticsScreen() {
                 numberOfLines={1}
               >
                 {selectedSiteId == null && isMultiSite ? 'All sites · ' : ''}
-                {formatNumber(displayStats.mealsCreated)} meals ·{' '}
+                {formatNumber(displayStats.collectionSources)} collection sources ·{' '}
                 {formatNumber(displayStats.feedCollectedKg)} kg · {filterLabel}
               </AppText>
             </View>
@@ -508,7 +521,6 @@ export function FarmerAnalyticsScreen() {
                 chartConfig={{
                   ...chartConfig,
                   decimalPlaces:
-                    selectedMetric === 'mealsCreated' ||
                     selectedMetric === 'collectionsCompleted'
                       ? 1
                       : 0,

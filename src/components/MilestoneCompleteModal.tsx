@@ -80,6 +80,8 @@ const styles = StyleSheet.create({
     maxWidth: normalize(340),
     backgroundColor: palette.white,
     borderRadius: normalize(16),
+    borderWidth: 1,
+    borderColor: palette.kale,
     paddingHorizontal: wp(6),
     paddingTop: hp(3),
     paddingBottom: hp(2.4),

@@ -1,37 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
-
 import api from './api';
+import { patchFormData } from './multipart';
 
-const BASE_URL = 'https://s4b.saveful.app/api/v1';
-
-/**
- * Native fetch for multipart PATCH — axios can fail with ERR_NETWORK on RN
- * when uploading files (same issue as signup FormData).
- */
-export async function patchFormData(path: string, body: FormData) {
-  const url = `${BASE_URL}${path}`;
-  const token = await SecureStore.getItemAsync('accessToken');
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, {
-    method: 'PATCH',
-    body,
-    headers,
-  });
-
-  const json = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error: any = new Error(json?.message || `Request failed with status ${response.status}`);
-    error.response = { status: response.status, data: json };
-    throw error;
-  }
-
-  return { data: json };
-}
+export { patchFormData };
 
 export const organizationService = {
   updateCoordinates: (

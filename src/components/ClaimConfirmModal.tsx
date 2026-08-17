@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -12,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
 import { Button } from './Button';
+import { ListingPhotoGallery } from './ListingPhotoGallery';
 import { palette } from '../theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 import {
@@ -270,21 +270,11 @@ export function ClaimConfirmModal({
                   </View>
                 </View>
 
-                {!!listing.photoUrls?.length && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.photoRow}
-                  >
-                    {listing.photoUrls.map((uri: string, index: number) => (
-                      <Image
-                        key={`${uri}-${index}`}
-                        source={{ uri }}
-                        style={styles.photo}
-                      />
-                    ))}
-                  </ScrollView>
-                )}
+                <ListingPhotoGallery
+                  photos={listing.photoUrls}
+                  contentContainerStyle={styles.photoRow}
+                  thumbnailStyle={styles.photo}
+                />
 
                 <AppText variant="label" style={styles.sectionTitle}>
                   You are claiming

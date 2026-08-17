@@ -50,6 +50,9 @@ type MetaBoxLayout = 'half' | 'centered';
 type ListingFilter = 'all' | 'people' | 'animals';
 type StatusFilter = 'all' | 'active' | 'expired' | 'claimed' | 'collected' | 'cancelled';
 
+/** Claimed-but-not-collected blue, shared by the status chip and card banner. */
+const CLAIMED_ACCENT = '#2F6FED';
+
 const STATUS_FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'active', label: 'Active' },
   { key: 'all', label: 'All' },
@@ -429,11 +432,12 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const accentMap: Record<StatusFilter, string> = {
       active: palette.kale,
       all: palette.midgray,
+      claimed: CLAIMED_ACCENT,
       expired: palette.warning,
       collected: palette.eggplant,
       cancelled: palette.danger,
     };
-    const accent = accentMap[key];
+    const accent = accentMap[key] ?? palette.midgray;
     return (
       <Pressable
         key={key}
@@ -561,8 +565,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
           {claimed && (
             <View style={styles.notificationRow}>
-              <Ionicons name="time-outline" size={normalize(13)} color="#2F6FED" />
-              <AppText variant="caption" style={[styles.notificationText, { color: '#2F6FED' }]}>
+              <Ionicons name="time-outline" size={normalize(13)} color={CLAIMED_ACCENT} />
+              <AppText variant="caption" style={[styles.notificationText, { color: CLAIMED_ACCENT }]}>
                 Claimed — awaiting collection
               </AppText>
             </View>

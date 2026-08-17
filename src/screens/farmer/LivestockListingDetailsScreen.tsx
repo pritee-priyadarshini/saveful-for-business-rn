@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,11 +10,14 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { ClaimConfirmModal, type ClaimLineItem } from '@/components/ClaimConfirmModal';
+import { ListingPhotoGallery } from '@/components/ListingPhotoGallery';
 import { Screen } from '@/components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '@/theme/colors';
 import {
   fetchListingDetail,
+  invalidateListingDetail,
   mapDiscoverListing,
   type FoodItem,
 } from '@/services/foodListing.service';
@@ -62,6 +64,7 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
   const listingParam = (route?.params?.listing ?? null) as DiscoverListing | null;
   const [loading, setLoading] = useState(false);
   const [extra, setExtra] = useState<DiscoverListing | null>(null);
+  const [claimVisible, setClaimVisible] = useState(false);
 
   useEffect(() => {
     if (!listingParam?.listingId) {
@@ -102,12 +105,30 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
   const data = extra ?? listingParam;
   const photos = data?.photoUrls?.length ? data.photoUrls : listingParam?.photoUrls;
 
+  // Whole-listing claim: partial quantities stay on Available where the +/− controls live.
+  const claimItems = useMemo<ClaimLineItem[]>(() => {
+    const items = (data?.foodItems ?? []) as FoodItem[];
+    return items
+      .map((item, index) => ({
+        foodItemId: Number(item.id),
+        name: item.name || item.category || `Item ${index + 1}`,
+        qtyKg: item.remainingQtyKg ?? item.totalQtyKg ?? 0,
+      }))
+      .filter(
+        (item) =>
+          item.qtyKg > 0 && Number.isFinite(item.foodItemId) && item.foodItemId > 0,
+      );
+  }, [data?.foodItems]);
+
+  const canClaim =
+    (data?.statusRaw === 'ACTIVE' || data?.statusRaw === 'PARTIAL') && claimItems.length > 0;
+
   if (!listingParam) {
     return (
       <Screen backgroundColor={palette.creme} transparentTop>
         <StackHeroHeader
           title="Listing Details"
-          height={r.isTablet ? adaptive.heroHeight : hp(18)}
+          height={r.isTablet ? adaptive.heroHeight : hp(14)}
           style={r.isTablet ? adaptive.heroBleed : undefined}
         />
         <View style={[styles.emptyWrap, contentColumn]}>
@@ -129,9 +150,8 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
         <StackHeroHeader
           title="Livestock Feed"
           subtitle={data?.businessName}
-          height={r.isTablet ? adaptive.heroHeight : hp(18)}
+          height={r.isTablet ? adaptive.heroHeight : hp(14)}
           style={r.isTablet ? adaptive.heroBleed : undefined}
-          source={require('../../../assets/placeholder/livestock.png')}
         />
       </View>
 
@@ -164,13 +184,11 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
           </View>
         )}
 
-        {!!photos?.length && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
-            {photos.map((uri: string, index: number) => (
-              <Image key={`${uri}-${index}`} source={{ uri }} style={styles.photo} />
-            ))}
-          </ScrollView>
-        )}
+        <ListingPhotoGallery
+          photos={photos}
+          style={styles.photoRow}
+          thumbnailStyle={styles.photo}
+        />
 
         {!!data?.notificationBody && (
           <AppText variant="bodySmall" style={styles.bodyText}>
@@ -233,13 +251,35 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
           </View>
         )}
 
+        {canClaim ? (
+          <Button
+            label="Claim"
+            size="compact"
+            onPress={() => setClaimVisible(true)}
+            style={styles.claimBtn}
+          />
+        ) : null}
+
         <Button
           label="Close"
           size="compact"
+          variant={canClaim ? 'secondary' : 'primary'}
           onPress={() => navigation.goBack()}
-          style={styles.closeBtn}
+          style={canClaim ? undefined : styles.closeBtn}
         />
       </ScrollView>
+
+      <ClaimConfirmModal
+        visible={claimVisible}
+        listing={data}
+        claimMode="FULL"
+        items={claimItems}
+        onClose={() => setClaimVisible(false)}
+        onSuccess={() => {
+          if (listingParam.listingId) invalidateListingDetail(listingParam.listingId);
+          navigation.goBack();
+        }}
+      />
     </Screen>
   );
 }
@@ -336,6 +376,10 @@ const styles = StyleSheet.create({
   foodItemName: {
     flex: 1,
     flexShrink: 1,
+  },
+  claimBtn: {
+    marginTop: hp(1),
+    backgroundColor: palette.middlegreen,
   },
   closeBtn: {
     marginTop: hp(1),

@@ -671,7 +671,7 @@ export function AuthScreen() {
           } as any);
         }
 
-        // Farmer consumer DTO does not accept pickupRadiusKm.
+        // Farmer consumer DTO currently keeps its backend default of 50 km.
         await authService.registerFarmerConsumer(form);
 
       } else {
@@ -687,7 +687,7 @@ export function AuthScreen() {
         form.append('brandName', charityForm.branding);
         form.append('charityType', mapRole(selectedRole));
         form.append('pickupPostCode', charityForm.postcodes.trim());
-        form.append('pickupRadiusKm', String(DEFAULT_PICKUP_RADIUS_KM));
+        form.append('pickupRadiusKm', charityForm.pickupRadius);
         appendSignupRegionAndCoordinates(
           form,
           charityForm.region,
@@ -730,7 +730,8 @@ export function AuthScreen() {
     ? 'Organisation Details'
     : 'Charity Details';
 
-  const stepThreeTitle = isRestaurant || isFarmer ? 'Venue & Region' : 'Pickup & Region';
+  const stepThreeTitle =
+    isRestaurant || isFarmerProducer ? 'Venue & Region' : 'Pickup & Region';
 
   const venueOptions = [
     { label: 'Bakery', value: 'BAKERY' },
@@ -862,6 +863,19 @@ export function AuthScreen() {
 
   const validateStep3 = (): string | null => {
     if (!isChecked) return 'Please accept the Terms & Conditions to continue.';
+
+    if (isFarmerConsumer || (!isRestaurant && !isFarmerProducer)) {
+      const value = isFarmerConsumer
+        ? farmerForm.pickupRadius
+        : charityForm.pickupRadius;
+      const radius = Number(value);
+      if (!value.trim() || !Number.isFinite(radius) || radius <= 0) {
+        return 'Please enter a pickup radius between 1 and 50 km.';
+      }
+      if (radius > DEFAULT_PICKUP_RADIUS_KM) {
+        return 'Please add a range up to 50 km from your location.';
+      }
+    }
 
     if (!isSelectableRegion(getCurrentRegion())) {
       return 'Please select your operating region.';
@@ -1475,7 +1489,7 @@ export function AuthScreen() {
 
           {currentStep === 3 && (
             <View style={styles.formCard}>
-              {isRestaurant || isFarmerProducer || isFarmerConsumer ? (
+              {isRestaurant || isFarmerProducer ? (
                 <VenueTypeSelector
                   label={
                     isRestaurant
@@ -1495,15 +1509,46 @@ export function AuthScreen() {
                 />
               ) : (
                 <>
+                  {isFarmerConsumer ? (
+                    <VenueTypeSelector
+                      label="Please select Venue Type (optional)"
+                      value={farmerForm.venueType}
+                      options={farmerVenueOptions}
+                      optional
+                      onChange={(v) => updateFarmerField('venueType', v)}
+                    />
+                  ) : null}
                   <InputField
                     label="Pickup Radius (km)"
                     {...inputProps}
-                    value={String(DEFAULT_PICKUP_RADIUS_KM)}
-                    editable={false}
+                    keyboardType="number-pad"
+                    value={
+                      isFarmerConsumer
+                        ? farmerForm.pickupRadius
+                        : charityForm.pickupRadius
+                    }
+                    onChangeText={(value) => {
+                      const digits = value.replace(/\D/g, '').slice(0, 3);
+                      if (isFarmerConsumer) {
+                        updateFarmerField('pickupRadius', digits);
+                      } else {
+                        updateCharityField('pickupRadius', digits);
+                      }
+                    }}
                   />
-                  <AppText variant="bodySmall" style={styles.logoHint}>
-                    Fixed at {DEFAULT_PICKUP_RADIUS_KM} km for now for ease of operations.
-                  </AppText>
+                  {Number(
+                    isFarmerConsumer
+                      ? farmerForm.pickupRadius
+                      : charityForm.pickupRadius,
+                  ) > DEFAULT_PICKUP_RADIUS_KM ? (
+                    <AppText variant="bodySmall" color={palette.validation}>
+                      Please add a range up to 50 km from your location.
+                    </AppText>
+                  ) : (
+                    <AppText variant="bodySmall" style={styles.logoHint}>
+                      Choose a pickup range up to {DEFAULT_PICKUP_RADIUS_KM} km from your location.
+                    </AppText>
+                  )}
                 </>
               )}
 

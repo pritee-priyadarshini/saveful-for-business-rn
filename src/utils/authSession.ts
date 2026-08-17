@@ -161,10 +161,9 @@ export function resolveProfilePickupRadiusKm(profile: {
     site?.radiusKm ??
     profile?.organisation?.pickupRadiusKm;
 
-  const numeric = value == null || value === '' ? NaN : Number(value);
+  const numeric = value == null ? NaN : Number(value);
 
-  // Fall back to 50 when missing/invalid, or when the old signup default (5) was stored.
-  if (!Number.isFinite(numeric) || numeric <= 0 || numeric === 5) {
+  if (!Number.isFinite(numeric) || numeric <= 0) {
     return String(DEFAULT_PICKUP_RADIUS_KM);
   }
 

@@ -64,6 +64,7 @@ export interface FarmerForm {
   region: Region | '';
   latitude: string;
   longitude: string;
+  pickupRadius: string;
 }
 
 export type Subscription = {

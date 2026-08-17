@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -12,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
 import { Button } from './Button';
+import { ListingPhotoGallery } from './ListingPhotoGallery';
 import { palette } from '../theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 import {
@@ -33,6 +33,10 @@ type Props = {
   onClose: () => void;
   /** When set, shows a Claim action (e.g. navigate to Available to claim). */
   onClaim?: () => void;
+  /** Animal-feed listings call these "Feed items". */
+  itemsTitle?: string;
+  /** Animal-feed listings store possible contaminants in the same field. */
+  allergensTitle?: string;
 };
 
 function DetailRow({
@@ -59,7 +63,14 @@ function DetailRow({
   );
 }
 
-export function DiscoverListingDetailModal({ visible, listing, onClose, onClaim }: Props) {
+export function DiscoverListingDetailModal({
+  visible,
+  listing,
+  onClose,
+  onClaim,
+  itemsTitle = 'Food items',
+  allergensTitle = 'Allergens',
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [extra, setExtra] = useState<ReturnType<typeof mapDiscoverListing> | null>(null);
 
@@ -128,13 +139,11 @@ export function DiscoverListingDetailModal({ visible, listing, onClose, onClaim 
               </AppText>
             </View>
 
-            {!!photos?.length && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
-                {photos.map((uri: string, index: number) => (
-                  <Image key={`${uri}-${index}`} source={{ uri }} style={styles.photo} />
-                ))}
-              </ScrollView>
-            )}
+            <ListingPhotoGallery
+              photos={photos}
+              style={styles.photoRow}
+              thumbnailStyle={styles.photo}
+            />
 
             {!!data.notificationBody && (
               <AppText variant="bodySmall" style={styles.bodyText}>
@@ -174,11 +183,16 @@ export function DiscoverListingDetailModal({ visible, listing, onClose, onClaim 
               value={formatListingDate(data.listedAt)}
             />
             <DetailRow icon="thermometer-outline" label="Storage" value={data.storage} />
+            <DetailRow
+              icon="alert-circle-outline"
+              label={allergensTitle}
+              value={data.allergens?.length ? data.allergens.join(', ') : 'None listed'}
+            />
 
             {!!data.foodItems?.length && (
               <View style={styles.foodItemsSection}>
                 <AppText variant="bodyBold" style={styles.sectionTitle}>
-                  Food items
+                  {itemsTitle}
                 </AppText>
                 {data.foodItems.map((item: FoodItem, index: number) => (
                   <View key={`${item.name}-${index}`} style={styles.foodItemRow}>
