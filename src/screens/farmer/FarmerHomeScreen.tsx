@@ -390,7 +390,8 @@ export function FarmerHomeScreen() {
           label="Call"
           size="compact"
           variant="secondary"
-          style={styles.detailsBtn}
+          textColor={palette.kale}
+          style={styles.callBtn}
           disabled={!item.phone?.trim()}
           onPress={() => callDriver(item.phone)}
         />
@@ -1078,6 +1079,15 @@ const styles = StyleSheet.create({
     backgroundColor: palette.middlegreen,
     minWidth: wp(32),
     paddingHorizontal: wp(3),
+    borderWidth: 1,
+    borderColor: palette.middlegreen,
+  },
+  callBtn: {
+    minWidth: wp(32),
+    paddingHorizontal: wp(3),
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: palette.kale,
   },
 
   emptyContainer: {

@@ -1230,14 +1230,15 @@ export default function MultiCharityManageSitesScreen() {
                                     label="Call"
                                     size="compact"
                                     variant="secondary"
-                                    style={styles.driverActionBtn}
+                                    textColor={palette.kale}
+                                    style={styles.driverCallBtn}
                                     disabled={!driver.phone?.trim()}
                                     onPress={() => callDriver(driver.phone)}
                                 />
                                 <Button
                                     label="Assign"
                                     size="compact"
-                                    style={styles.driverActionBtn}
+                                    style={styles.driverAssignBtn}
                                     disabled={!driver.online}
                                     onPress={() => openAssign(driver)}
                                 />
@@ -1775,10 +1776,19 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#F3F3F3',
     },
-    driverActionBtn: {
+    driverCallBtn: {
+        minWidth: wp(28),
+        flexShrink: 1,
+        backgroundColor: palette.white,
+        borderWidth: 1,
+        borderColor: palette.kale,
+    },
+    driverAssignBtn: {
         minWidth: wp(28),
         flexShrink: 1,
         backgroundColor: palette.middlegreen,
+        borderWidth: 1,
+        borderColor: palette.middlegreen,
     },
     skeletonWrap: {
         paddingBottom: hp(4),

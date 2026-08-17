@@ -213,6 +213,8 @@ export function AppNavigator() {
       const state = useSubscriptionStore.getState();
       if (!selectNeedsPlan(state) || state.planGatePrompted) return;
       if (!navigationRef.current?.isReady()) return;
+      // Don't cover the one-time signup welcome with the trial prompt.
+      if (welcomeVisible) return;
 
       const route = getSubscriptionRoute(effectiveRoleRef.current);
       if (!route) return;
@@ -233,7 +235,7 @@ export function AppNavigator() {
 
     promptIfNeeded();
     return unsub;
-  }, [isAuthenticated, effectiveRole]);
+  }, [isAuthenticated, effectiveRole, welcomeVisible]);
 
   // Global 402 / subscription-required from write APIs → same prompt, then Plans.
   useEffect(() => {
@@ -299,10 +301,10 @@ export function AppNavigator() {
           <ReceiverWelcomeModal
             visible={welcomeVisible}
             content={welcomeContent}
-            onDismiss={() => {
-              const action = welcomeContent?.ctaAction;
+            onDismiss={(action) => {
               void dismissWelcome();
-              if (action === 'create_listing' && navigationRef.current?.isReady()) {
+              if (!action || !navigationRef.current?.isReady()) return;
+              if (action === 'create_listing') {
                 navigationRef.current.dispatch(
                   CommonActions.navigate({
                     name: 'Tabs',
@@ -312,6 +314,10 @@ export function AppNavigator() {
                     },
                   }),
                 );
+                return;
+              }
+              if (action === 'add_site') {
+                navigationRef.current.navigate('CreateSite');
               }
             }}
           />

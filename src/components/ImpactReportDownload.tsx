@@ -334,8 +334,29 @@ function buildRecipientsHtml(props: Props, recipients: RecipientRow[]) {
   `;
 }
 
+function isFarmerImpactReport() {
+  const role = useAuthStore.getState().selectedRole;
+  return role === 'farmer' || role === 'farm_business';
+}
+
+function reportHeadings() {
+  if (isFarmerImpactReport()) {
+    return {
+      brandSub: 'Impact Reporting',
+      lede:
+        'A summary of your food redistribution, social, environmental and operational impact for the selected reporting period.',
+    };
+  }
+  return {
+    brandSub: 'IMPACT & ESG SUMMARY',
+    lede:
+      'A management-ready snapshot of food redistribution impact for the selected period, including per-food-item savings.',
+  };
+}
+
 function buildPdfHtml(props: Props, data: ReportData, logoDataUri: string | null) {
   const meta = buildReportMeta(props);
+  const headings = reportHeadings();
   const rows = metricRows(props.stats)
     .map(
       (row) => `
@@ -526,7 +547,7 @@ function buildPdfHtml(props: Props, data: ReportData, logoDataUri: string | null
     <div class="brand">
       <div class="brand-left">
         <div class="brand-mark">Saveful for Business</div>
-        <div class="brand-sub">IMPACT &amp; ESG SUMMARY</div>
+        <div class="brand-sub">${escapeHtml(headings.brandSub)}</div>
       </div>
       ${brandLogo}
       <div class="brand-right">
@@ -536,8 +557,7 @@ function buildPdfHtml(props: Props, data: ReportData, logoDataUri: string | null
 
     <h1>${escapeHtml(meta.title)}</h1>
     <p class="lede">
-      A management-ready snapshot of food redistribution impact for the selected period,
-      including per-food-item savings.
+      ${escapeHtml(headings.lede)}
     </p>
 
     <div class="meta">

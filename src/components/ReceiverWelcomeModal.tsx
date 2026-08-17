@@ -8,14 +8,14 @@ import {
 } from 'react-native';
 
 import { AppText } from '@/components/AppText';
-import type { ReceiverWelcomeContent } from '@/data/receiverWelcome';
+import type { ReceiverWelcomeContent, ReceiverWelcomeCtaAction } from '@/data/receiverWelcome';
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 
 type Props = {
   visible: boolean;
   content: ReceiverWelcomeContent;
-  onDismiss: () => void;
+  onDismiss: (action?: ReceiverWelcomeCtaAction) => void;
 };
 
 export function ReceiverWelcomeModal({ visible, content, onDismiss }: Props) {
@@ -25,10 +25,10 @@ export function ReceiverWelcomeModal({ visible, content, onDismiss }: Props) {
       transparent
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={onDismiss}
+      onRequestClose={() => onDismiss()}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onDismiss} accessibilityRole="button" />
+        <Pressable style={styles.backdrop} onPress={() => onDismiss()} accessibilityRole="button" />
 
         <View style={styles.card}>
           <ScrollView
@@ -58,12 +58,22 @@ export function ReceiverWelcomeModal({ visible, content, onDismiss }: Props) {
 
           <Pressable
             style={styles.cta}
-            onPress={onDismiss}
+            onPress={() => onDismiss(content.ctaAction)}
             accessibilityRole="button"
             accessibilityLabel={content.cta}
           >
             <AppText style={styles.ctaText}>{content.cta}</AppText>
           </Pressable>
+          {content.secondaryCta ? (
+            <Pressable
+              style={styles.secondaryCta}
+              onPress={() => onDismiss(content.secondaryCtaAction)}
+              accessibilityRole="button"
+              accessibilityLabel={content.secondaryCta}
+            >
+              <AppText style={styles.secondaryCtaText}>{content.secondaryCta}</AppText>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -159,6 +169,25 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     color: palette.white,
+    textTransform: 'none',
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(16),
+  },
+  secondaryCta: {
+    marginTop: hp(1),
+    alignSelf: 'center',
+    minWidth: normalize(188),
+    minHeight: normalize(46),
+    borderRadius: normalize(999),
+    backgroundColor: palette.white,
+    borderWidth: 1.5,
+    borderColor: palette.kale,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(7),
+  },
+  secondaryCtaText: {
+    color: palette.kale,
     textTransform: 'none',
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(16),

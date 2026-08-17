@@ -4,8 +4,10 @@ import type { UserRole } from '@/types';
 
 export type ReceiverWelcomeVariant = Extract<
   UserRole,
-  'charity_single' | 'charity_multi' | 'farmer' | 'restaurant_single'
+  'charity_single' | 'charity_multi' | 'farmer' | 'restaurant_single' | 'restaurant_multi'
 >;
+
+export type ReceiverWelcomeCtaAction = 'create_listing' | 'add_site';
 
 export type ReceiverWelcomeContent = {
   emoji: string;
@@ -16,7 +18,9 @@ export type ReceiverWelcomeContent = {
   closing: string;
   cta: string;
   /** Optional post-dismiss navigation for producer onboarding. */
-  ctaAction?: 'create_listing';
+  ctaAction?: ReceiverWelcomeCtaAction;
+  secondaryCta?: string;
+  secondaryCtaAction?: ReceiverWelcomeCtaAction;
 };
 
 const SHARED_EMPTY_STATE =
@@ -82,6 +86,23 @@ export const RECEIVER_WELCOME_CONTENT: Record<ReceiverWelcomeVariant, ReceiverWe
     cta: 'Create your first listing',
     ctaAction: 'create_listing',
   },
+  restaurant_multi: {
+    emoji: '🎉',
+    titleLead: 'Welcome to',
+    titleBrand: 'Saveful for Business',
+    paragraphs: [
+      "You're now part of a growing network helping Good Food Go Further.",
+      'The best way to get started is to create your first surplus listing. Add what you have available, the quantity and collection details, and Saveful will help connect it with organisations that can put it to its highest-value use.',
+      'With multiple locations, you can manage them all in one place. Add your sites, invite your teams and give each location the ability to create and manage its own listings.',
+    ],
+    tip: "You'll have visibility across every location, with your organisation-wide impact and insights all in one place.",
+    closing:
+      'Checking back regularly and enabling notifications will help ensure you never miss an opportunity.',
+    cta: 'Create your first listing',
+    ctaAction: 'create_listing',
+    secondaryCta: 'Add site locations',
+    secondaryCtaAction: 'add_site',
+  },
 };
 
 export const PENDING_RECEIVER_WELCOME_KEY = 'pendingReceiverWelcome';
@@ -91,7 +112,8 @@ export function isReceiverWelcomeRole(role: UserRole | null | undefined): role i
     role === 'charity_single' ||
     role === 'charity_multi' ||
     role === 'farmer' ||
-    role === 'restaurant_single'
+    role === 'restaurant_single' ||
+    role === 'restaurant_multi'
   );
 }
 

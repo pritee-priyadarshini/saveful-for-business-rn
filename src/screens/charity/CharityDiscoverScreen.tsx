@@ -424,14 +424,15 @@ export function CharityDiscoverScreen() {
           label="Call"
           size="compact"
           variant="secondary"
-          style={styles.driverActionBtn}
+          textColor={palette.kale}
+          style={styles.driverCallBtn}
           disabled={!item.phone?.trim()}
           onPress={() => callDriver(item.phone)}
         />
         <Button
           label="Assign"
           size="compact"
-          style={styles.driverActionBtn}
+          style={styles.driverAssignBtn}
           disabled={!item.online}
           onPress={() => openAssign(item)}
         />
@@ -1051,10 +1052,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
   },
 
-  driverActionBtn: {
+  driverCallBtn: {
+    minWidth: wp(28),
+    flexShrink: 1,
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: palette.kale,
+  },
+  driverAssignBtn: {
     minWidth: wp(28),
     flexShrink: 1,
     backgroundColor: palette.middlegreen,
+    borderWidth: 1,
+    borderColor: palette.middlegreen,
   },
 
   emptyContainer: {
