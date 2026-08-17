@@ -177,8 +177,7 @@ export function AppNavigator() {
     }
   }
 
-  const initialRouteName: keyof RootStackParamList =
-    effectiveRole === 'restaurant_multi' ? 'ManageSites' : 'Tabs';
+  const initialRouteName: keyof RootStackParamList = 'Tabs';
 
   // Register notification-tap handlers once on mount.
   useEffect(() => {

@@ -28,12 +28,13 @@ import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import { DonationRecipients } from '@/components/DonationRecipients';
 import { ImpactReportDownload } from '@/components/ImpactReportDownload';
 import { useAppContext } from '../../store/AppContext';
-import { useSubscriptionStore } from '@/store/subscriptionStore';
+import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
 import {
   canDownloadImpactReports,
   canShowDonationRecipients,
   canShowSpecificFoodSavings,
 } from '@/utils/impactAccess';
+import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 import { useNavigation } from '@react-navigation/native';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
@@ -129,7 +130,7 @@ export function RestaurantAnalyticsScreen({
   const stackBottomPadding = useSafeBottomPadding(r.isTablet ? 32 : hp(4));
   const bottomPadding = variant === 'stack' ? stackBottomPadding : tabBottomPadding;
   const { width } = useWindowDimensions();
-  const { currentProfile } = useAppContext();
+  const { currentProfile, selectedRole } = useAppContext();
   const entitlements = useSubscriptionStore((s) => s.entitlements);
   const showFoodSavings = canShowSpecificFoodSavings(entitlements);
   const showRecipients = canShowDonationRecipients(entitlements);
@@ -570,6 +571,16 @@ export function RestaurantAnalyticsScreen({
                 pressed && styles.pressed,
               ]}
               onPress={() => {
+                if (selectedRole === 'restaurant_multi' && !entitlements?.entitled) {
+                  const route = getSubscriptionRoute('restaurant_multi');
+                  if (route) {
+                    showSubscriptionRequiredPrompt({
+                      canManageBilling: selectCanManageBilling(),
+                      onContinue: () => stackNavigation.navigate(route as never),
+                    });
+                    return;
+                  }
+                }
                 navigation?.navigate('Listings', { screen: 'CreateListing' });
               }}
             >

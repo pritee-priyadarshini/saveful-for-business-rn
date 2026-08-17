@@ -21,11 +21,15 @@ import { foodListingService } from '../../services/foodListing.service';
 import { useListingsStore } from '../../store/listingsStore';
 import { getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
+import { isBusinessMultiHeadOffice } from '../../utils/defaultHqSite';
 import { estimateCo2AvoidedKg, estimateMealsSaved, formatCo2AvoidedKg } from '../../utils/foodListing';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getFarmRelistFormValues } from '../../utils/listingRelist';
 import { showErrorAlert } from '../../utils/apiError';
+import { isSubscriptionGateError } from '../../utils/billingErrors';
+import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '../../utils/subscriptionAccess';
+import { selectCanManageBilling } from '../../store/subscriptionStore';
 import { ListingPhotoGallery } from '@/components/ListingPhotoGallery';
 import {
   getListingDateErrors,
@@ -359,7 +363,20 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
     const resolvedSiteId = await resolveListingSiteId(authUser);
     if (!resolvedSiteId) {
-      showErrorAlert('Please set up your business site first.', 'Site not found');
+      if (isBusinessMultiHeadOffice(authUser)) {
+        const route = getSubscriptionRoute('restaurant_multi');
+        if (route) {
+          showSubscriptionRequiredPrompt({
+            canManageBilling: selectCanManageBilling(),
+            onContinue: () => navigation.navigate(route),
+          });
+          return;
+        }
+      }
+      showErrorAlert(
+        'Please set up your business site first.',
+        'Site not found',
+      );
       return;
     }
 
@@ -422,6 +439,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
         useListingsStore.getState().invalidateSite();
         navigation.replace('RestaurantListings');
       } catch (error: any) {
+        if (isSubscriptionGateError(error)) return;
         showErrorAlert(error, 'Could not create listing', 'Please try again.');
       }
     });

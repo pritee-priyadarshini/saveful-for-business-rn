@@ -323,18 +323,26 @@ export async function fetchListingDetail(
   listingId: number,
   options?: { refresh?: boolean },
 ): Promise<ListingDetail> {
-  if (!options?.refresh && listingDetailCache.has(listingId)) {
-    return listingDetailCache.get(listingId)!;
+  const id = Number(listingId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Listing not found');
   }
 
-  const response = await api.get(`/food-listings/${listingId}`);
+  if (!options?.refresh && listingDetailCache.has(id)) {
+    return listingDetailCache.get(id)!;
+  }
+
+  const response = await api.get(`/food-listings/${id}`, {
+    skipBillingHandler: true,
+    skipUnauthorizedHandler: true,
+  });
   const listing = normalizeListingResponse(response);
 
   if (!listing) {
     throw new Error('Listing not found');
   }
 
-  listingDetailCache.set(listingId, listing);
+  listingDetailCache.set(id, listing);
   return listing;
 }
 
@@ -657,9 +665,17 @@ export const foodListingService = {
   },
 
   getOrgListings: (orgId: number, params?: GetListingsParams) =>
-    api.get(`/food-listings/org/${orgId}`, { params }),
+    api.get(`/food-listings/org/${orgId}`, {
+      params,
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
+    }),
 
-  getSiteListings: () => api.get('/food-listings/site'),
+  getSiteListings: () =>
+    api.get('/food-listings/site', {
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
+    }),
 
     getNotificationListings: (params?: Pick<GetListingsParams, 'page' | 'limit'>) =>
     api.get('/food-listings/notifications', { params }),

@@ -76,7 +76,16 @@ export function resolveUserRole(
   const siteRole = authUser.siteRole?.toUpperCase() ?? '';
 
   if (orgType === 'BUSINESS_MULTI') {
-    if (orgRole === 'SUPER_ADMIN') return 'restaurant_multi';
+    // Head-office org role wins even when they also have HQ siteAccess
+    // (needed so multi signup with a default site stays on multi tabs).
+    const headOfficeRoles = [
+      'SUPER_ADMIN',
+      'HEAD_OFFICE_ADMIN',
+      'HEAD_OFFICE',
+    ];
+    if (headOfficeRoles.includes(orgRole)) {
+      return 'restaurant_multi';
+    }
     if (siteRole === 'SITE_ADMIN' || siteRole === 'STAFF') return 'restaurant_single';
     return 'restaurant_multi';
   }

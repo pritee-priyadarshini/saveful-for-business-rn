@@ -108,6 +108,8 @@ export const impactService = {
   getSiteImpact(siteId: number, period: Exclude<ImpactPeriod, 'range'> = 'week') {
     return api.get<SiteImpactResponse>(`/impact/sites/${siteId}`, {
       params: { period },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 
@@ -118,6 +120,8 @@ export const impactService = {
         startDate: range.startDate,
         endDate: range.endDate,
       },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 
@@ -125,6 +129,8 @@ export const impactService = {
   getOrgImpact(orgId: number, period: Exclude<ImpactPeriod, 'range'> = 'week') {
     return api.get<SiteImpactResponse>(`/impact/organisations/${orgId}`, {
       params: { period },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 
@@ -134,6 +140,8 @@ export const impactService = {
         startDate: range.startDate,
         endDate: range.endDate,
       },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 
@@ -144,6 +152,8 @@ export const impactService = {
         startDate: range?.startDate,
         endDate: range?.endDate,
       },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 
@@ -154,6 +164,8 @@ export const impactService = {
         startDate: range?.startDate,
         endDate: range?.endDate,
       },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 
@@ -164,6 +176,8 @@ export const impactService = {
         startDate: range?.startDate,
         endDate: range?.endDate,
       },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 
@@ -174,6 +188,8 @@ export const impactService = {
         startDate: range?.startDate,
         endDate: range?.endDate,
       },
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
     });
   },
 };

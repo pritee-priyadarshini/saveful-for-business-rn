@@ -7,7 +7,9 @@ import {
   type ListingDetail,
 } from '../services/foodListing.service';
 import { useAuthStore } from './authStore';
+import { useSitesStore } from './sitesStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
+import { isSubscriptionGateError } from '../utils/billingErrors';
 import {
   isAnimalListing,
   isPeopleListing,
@@ -76,6 +78,9 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
         siteLastFetched: Date.now(),
       });
     } catch (error: unknown) {
+      if (isSubscriptionGateError(error)) {
+        return;
+      }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load listings');
       set({ error: message });
       throw new Error(message);
@@ -104,6 +109,9 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
       const { listings: all } = normalizeListingsResponse(res);
       set({ orgListings: sortListingsByNewest(all), orgLastFetched: Date.now() });
     } catch (error: unknown) {
+      if (isSubscriptionGateError(error)) {
+        return;
+      }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load listing history');
       set({ error: message });
       throw new Error(message);
@@ -114,16 +122,39 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
 
   cancelListing: async (id: number) => {
     await foodListingService.cancelListing(id);
-    set({ siteLastFetched: null });
-    await get().fetchSiteListings(true);
+    set({ siteLastFetched: null, orgLastFetched: null });
+    await Promise.all([
+      get().fetchSiteListings(true).catch(() => undefined),
+      get().fetchOrgListings(true).catch(() => undefined),
+    ]);
   },
 
   fetchLatestForRelist: async (audience) => {
-    await get().fetchSiteListings();
-    const { siteListings } = get();
+    const defaultId = useSitesStore.getState().defaultSiteId;
+    const hasRealSite = defaultId != null && defaultId > 0;
+
+    if (hasRealSite) {
+      try {
+        await get().fetchSiteListings();
+      } catch {
+        // Head-office accounts may not have a site-scoped listings feed.
+      }
+    }
+    let source = get().siteListings;
+
+    if (source.length === 0) {
+      try {
+        await get().fetchOrgListings();
+      } catch {
+        return null;
+      }
+      source = get().orgListings.filter((listing) =>
+        defaultId == null ? true : Number(listing.siteId) === defaultId,
+      );
+    }
 
     const matchesAudience = audience === 'animal' ? isAnimalListing : isPeopleListing;
-    const candidates = siteListings
+    const candidates = source
       .filter((listing) => {
         if (!matchesAudience(listing)) return false;
         const status = String(listing.status || '').toUpperCase();

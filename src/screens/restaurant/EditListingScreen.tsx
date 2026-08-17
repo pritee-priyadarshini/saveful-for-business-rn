@@ -1984,10 +1984,21 @@ export function EditListingScreen({ navigation, route }: any) {
         if (cancelled) return;
         setListing(data);
       } catch (error: unknown) {
-        if (!cancelled) {
-          showErrorAlert(error, 'Could not load listing', 'Failed to load listing details');
-          navigation.goBack();
+        if (cancelled) return;
+        const cached =
+          useListingsStore
+            .getState()
+            .orgListings.find((row) => Number(row.id) === Number(listingId)) ||
+          useListingsStore
+            .getState()
+            .siteListings.find((row) => Number(row.id) === Number(listingId)) ||
+          null;
+        if (cached) {
+          setListing(cached);
+          return;
         }
+        showErrorAlert(error, 'Could not load listing', 'Failed to load listing details');
+        navigation.goBack();
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -41,9 +41,13 @@ import {
 } from '../../utils/foodListing';
 import { formatListingPickupDateRange } from '../../utils/dateFormat';
 import { showErrorAlert } from '../../utils/apiError';
+import { isSubscriptionGateError } from '../../utils/billingErrors';
 import { showConfirmAlert } from '../../store/appAlertStore';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
+import { useSitesStore } from '../../store/sitesStore';
+import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
+import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 import { fetchListingDetail } from '../../services/foodListing.service';
 
 type MetaBoxLayout = 'half' | 'centered';
@@ -263,13 +267,55 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildDashboardShellStyles(r, { heroPhoneHp: 22 }), [r]);
   const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(2));
-  const { authUser, currentProfile } = useAppContext();
+  const { authUser, currentProfile, selectedRole } = useAppContext();
+  const isHqListings = selectedRole === 'restaurant_multi';
+  const entitled = useSubscriptionStore((s) => s.entitlements?.entitled === true);
+
+  const goToCreateListing = useCallback(() => {
+    if (isHqListings && !entitled) {
+      const route = getSubscriptionRoute('restaurant_multi');
+      if (route) {
+        showSubscriptionRequiredPrompt({
+          canManageBilling: selectCanManageBilling(),
+          onContinue: () => navigation.navigate(route),
+        });
+        return;
+      }
+    }
+    navigation.navigate('Surplus');
+  }, [isHqListings, entitled, navigation]);
+  const defaultSiteId = useSitesStore((s) => s.defaultSiteId);
+  const ensureDefaultHqSite = useSitesStore((s) => s.ensureDefaultHqSite);
   const {
-    siteListings: listings,
-    isFetchingSite: loading,
+    siteListings,
+    orgListings,
+    isFetchingSite,
+    isFetchingOrg,
     fetchSiteListings,
+    fetchOrgListings,
     cancelListing: storeCancelListing,
   } = useListingsStore();
+  const listings = useMemo(() => {
+    if (!isHqListings) return siteListings;
+    if (defaultSiteId == null) return orgListings;
+    return orgListings.filter((listing) => Number(listing.siteId) === defaultSiteId);
+  }, [isHqListings, siteListings, orgListings, defaultSiteId]);
+  const loading = isHqListings ? isFetchingOrg : isFetchingSite;
+
+  const loadListings = useCallback(
+    async (force = false) => {
+      if (isHqListings) {
+        const hqId = await ensureDefaultHqSite();
+        await fetchOrgListings(force);
+        if (hqId == null) {
+          await fetchOrgListings(true);
+        }
+        return;
+      }
+      await fetchSiteListings(force);
+    },
+    [isHqListings, ensureDefaultHqSite, fetchOrgListings, fetchSiteListings],
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -283,23 +329,26 @@ export function RestaurantListingsScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       if (!authUser?.accessToken) return;
-      fetchSiteListings(true).catch((e) =>
-        showErrorAlert(e, 'Could not load listings', 'Could not load listings'),
-      );
-    }, [authUser?.accessToken, fetchSiteListings]),
+      loadListings(true).catch((e) => {
+        if (isSubscriptionGateError(e)) return;
+        showErrorAlert(e, 'Could not load listings', 'Could not load listings');
+      });
+    }, [authUser?.accessToken, loadListings]),
   );
 
   const onRefresh = useCallback(async () => {
     if (!authUser?.accessToken) return;
     setRefreshing(true);
     try {
-      await fetchSiteListings(true);
+      await loadListings(true);
     } catch (e) {
-      showErrorAlert(e, 'Could not load listings', 'Could not load listings');
+      if (!isSubscriptionGateError(e)) {
+        showErrorAlert(e, 'Could not load listings', 'Could not load listings');
+      }
     } finally {
       setRefreshing(false);
     }
-  }, [authUser?.accessToken, fetchSiteListings]);
+  }, [authUser?.accessToken, loadListings]);
 
   const peopleCount = useMemo(
     () => listings.filter((l) => isPeopleListing(l)).length,
@@ -745,7 +794,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
           />
         }
       >
-        {loading && !refreshing ? (
+        {loading && !refreshing && listings.length === 0 && !currentProfile.organization ? (
           renderSkeleton()
         ) : (
           <>
@@ -826,7 +875,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                         adaptive.createBtn,
                         pressed && styles.pressed,
                       ]}
-                      onPress={() => navigation.navigate('Surplus')}
+                      onPress={goToCreateListing}
                     >
                       <View style={styles.createBtnLeft}>
                         <View style={[styles.createBtnIconWrap, adaptive.createBtnIconWrap]}>
@@ -873,7 +922,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
                       styles.createBtn,
                       pressed && styles.pressed,
                     ]}
-                    onPress={() => navigation.navigate('Surplus')}
+                    onPress={goToCreateListing}
                   >
                     <View style={styles.createBtnLeft}>
                       <View style={styles.createBtnIconWrap}>

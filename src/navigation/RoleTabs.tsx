@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CharityAnalyticsScreen } from '../screens/charity/CharityAnalyticsScreen';
 import { CharityDiscoverScreen } from '../screens/charity/CharityDiscoverScreen';
 import MultiCharityManageSitesScreen from '../screens/charity/MultiCharityManageSitesScreen';
+import ManageSitesScreen from '../screens/restaurant/ManageSitesScreen';
 import { RestaurantAnalyticsScreen } from '../screens/restaurant/RestaurantAnalyticsScreen';
 import { RestaurantHomeScreen } from '../screens/restaurant/RestaurantHomeScreen';
 import { CharityUpdatesScreen } from '../screens/charity/CharityUpdatesScreen';
@@ -154,6 +155,18 @@ export function RoleTabs() {
         <FarmerTab.Screen component={FarmerUpdatesScreen} name="Updates" />
         <FarmerTab.Screen component={ProfileScreen} name="Account" />
       </FarmerTab.Navigator>
+    );
+  }
+
+  if (selectedRole === 'restaurant_multi') {
+    return (
+      <RestaurantTab.Navigator screenOptions={screenOptions}>
+        <RestaurantTab.Screen component={ManageSitesScreen} name="Home" />
+        <RestaurantTab.Screen component={RestaurantStack} name="Listings" options={{ unmountOnBlur: true }} />
+        <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
+        <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
+        <RestaurantTab.Screen component={ProfileScreen} name="Account" />
+      </RestaurantTab.Navigator>
     );
   }
 

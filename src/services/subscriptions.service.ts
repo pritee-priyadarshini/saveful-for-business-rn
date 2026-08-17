@@ -90,7 +90,10 @@ export const subscriptionsService = {
   },
 
   async getEntitlements(): Promise<Entitlements> {
-    const res = await api.get('/subscriptions/me');
+    const res = await api.get('/subscriptions/me', {
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
+    });
     const data = unwrapData<Entitlements>(res.data);
     return {
       billingRequired: Boolean(data?.billingRequired),

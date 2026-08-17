@@ -1,7 +1,10 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
+import { useAuthStore } from '@/store/authStore';
+import { useSitesStore } from '@/store/sitesStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
+import { isBusinessMultiHeadOffice } from '@/utils/defaultHqSite';
 
 /**
  * Result of a Stripe-hosted session.
@@ -36,6 +39,27 @@ function waitForReturnToForeground(): Promise<void> {
 
     const timer = setTimeout(finish, MAX_SESSION_MS);
   });
+}
+
+/**
+ * After a plan is live, turn the HQ preview into a real billed site so
+ * listings, managers, and pickups use a valid site id.
+ */
+export async function materializeRestaurantHqAfterBilling(): Promise<void> {
+  const { authUser, selectedRole } = useAuthStore.getState();
+  if (
+    selectedRole !== 'restaurant_multi' &&
+    !isBusinessMultiHeadOffice(authUser)
+  ) {
+    return;
+  }
+
+  try {
+    await useAuthStore.getState().refreshProfile();
+    await useSitesStore.getState().ensureDefaultHqSite();
+  } catch {
+    // Home retries on focus if the first create is still propagating.
+  }
 }
 
 /**
@@ -87,6 +111,10 @@ export async function runCheckoutSession(
     isSatisfied: isPurchased,
   });
 
+  if (latest?.entitled) {
+    await materializeRestaurantHqAfterBilling();
+  }
+
   if (isPurchased(latest)) return 'activated';
   if (latest?.entitled && before?.entitled) return 'dismissed';
   return 'pending';
@@ -98,5 +126,8 @@ export async function runCheckoutSession(
  */
 export async function runPortalSession(url: string): Promise<void> {
   await openBillingSession(url);
-  await useSubscriptionStore.getState().fetchEntitlements(true);
+  const entitlements = await useSubscriptionStore.getState().fetchEntitlements(true);
+  if (entitlements?.entitled) {
+    await materializeRestaurantHqAfterBilling();
+  }
 }

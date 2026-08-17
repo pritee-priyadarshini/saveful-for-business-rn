@@ -102,7 +102,19 @@ export const useSubscriptionStore = create<SubscriptionStoreState & Subscription
 
     fetchEntitlements: async (force = false) => {
       if (!useAuthStore.getState().authUser?.accessToken) return null;
-      if (get().isFetchingEntitlements) return get().entitlements;
+      if (get().isFetchingEntitlements) {
+        return await new Promise<Entitlements | null>((resolve) => {
+          const unsub = useSubscriptionStore.subscribe((state) => {
+            if (state.isFetchingEntitlements) return;
+            unsub();
+            resolve(state.entitlements);
+          });
+          if (!get().isFetchingEntitlements) {
+            unsub();
+            resolve(get().entitlements);
+          }
+        });
+      }
       if (!force && !isStale(get().lastFetchedEntitlements, ENTITLEMENTS_TTL_MS)) {
         return get().entitlements;
       }

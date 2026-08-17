@@ -5,19 +5,19 @@ import {
   Pressable,
   StyleSheet,
   Image,
-  Linking,
   TextInput,
   RefreshControl,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, type CompositeNavigationProp } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import type { RestaurantTabsParamList } from '../../navigation/types';
 
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { AppText } from '../../components/AppText';
-import { Skeleton } from '../../components/Skeleton';
 import {
   LocationSetupModal,
   type SelectedLocation,
@@ -29,14 +29,20 @@ import { palette } from '@/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
+import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { organizationService } from '@/services/organization.service';
 import { useAuthStore } from '@/store/authStore';
+import { pickDefaultSiteId, getHqOwnerContact, isVirtualHqSiteId, buildVirtualHqSite, isBusinessMultiHeadOffice } from '@/utils/defaultHqSite';
+import { selectCanManageBilling, selectNeedsPlan, useSubscriptionStore } from '@/store/subscriptionStore';
+import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'ManageSites'>;
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<RestaurantTabsParamList, 'Home'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 type Site = {
   id: number;
@@ -51,21 +57,22 @@ type Site = {
   longitude?: number;
   logoUrl?: string | null;
   hasManager: boolean;
+  isDefault: boolean;
 };
 
 export default function ManageSitesScreen() {
   useTransparentStatusBar('light');
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
-  const safeBottomPadding = useSafeBottomPadding(r.isTablet ? 24 : hp(1.5));
+  const tabBottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(1.5));
   const navigation = useNavigation<NavigationProp>();
-  const { logout, currentProfile, authUser } = useAppContext();
+  const { currentProfile, authUser, selectedRole } = useAppContext();
   const {
     organisation,
     sites: rawSites,
     sitesWithManagers,
-    isFetchingManagers: loading,
     fetchSitesWithManagers,
+    ensureDefaultHqSite,
     updateSite,
     deleteSite,
     removeAccess,
@@ -108,50 +115,150 @@ export default function ManageSitesScreen() {
     null;
 
   const sites = useMemo<Site[]>(() => {
-    return sitesWithManagers.map((site) => {
-      const raw = rawSites.find((s: any) => s.id === site.id);
+    const byId = new Map<number, any>();
+
+    for (const site of rawSites ?? []) {
+      const id = Number(site?.id);
+      if (!Number.isFinite(id) || id === 0) continue;
+      byId.set(id, { ...site, id });
+    }
+
+    const profileSites = Array.isArray(authUser?.profile?.sites)
+      ? authUser.profile.sites
+      : [];
+    for (const site of profileSites) {
+      const id = Number(site?.id ?? site?.siteId);
+      if (!Number.isFinite(id) || id === 0) continue;
+      const existing = byId.get(id);
+      byId.set(id, {
+        ...site,
+        ...existing,
+        id,
+        siteName:
+          existing?.siteName ||
+          site?.siteName ||
+          site?.locationName ||
+          site?.name ||
+          existing?.name,
+        createdAt: existing?.createdAt || site?.createdAt,
+      });
+    }
+
+    const mergedRaw = [...byId.values()].sort((a, b) => {
+      return (
+        new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+      );
+    });
+    const merged =
+      mergedRaw.length > 0
+        ? mergedRaw
+        : isBusinessMultiHeadOffice(authUser) || selectedRole === 'restaurant_multi'
+          ? [buildVirtualHqSite(authUser, organisation)]
+          : [];
+    const defaultId = pickDefaultSiteId(merged) ?? merged[0]?.id;
+    const owner = getHqOwnerContact(authUser);
+
+    return merged.map((raw) => {
+      const managed = sitesWithManagers.find((site) => site.id === raw.id);
+      const isDefault = raw.id === defaultId || isVirtualHqSiteId(raw.id);
+      const assignedName = managed?.contactName || '';
+      const hasAssignedManager = !!managed?.managerId;
       return {
-        id: site.id,
-        tradingName: site.tradingName,
-        address: site.address,
-        postCode: site.postCode,
-        managerId: site.managerId,
-        contactName: site.contactName,
-        email: site.email,
-        mobile: site.mobile,
+        id: raw.id,
+        tradingName:
+          managed?.tradingName ||
+          raw.siteName ||
+          raw.locationName ||
+          raw.name ||
+          `Site ${raw.id}`,
+        address: managed?.address || raw.address || '',
+        postCode: managed?.postCode || raw.postcode || raw.postCode || '',
+        managerId: managed?.managerId ?? null,
+        contactName: hasAssignedManager
+          ? assignedName
+          : isDefault
+            ? owner.name || assignedName || 'Head office'
+            : assignedName || 'No manager assigned',
+        email: hasAssignedManager
+          ? managed?.email || '-'
+          : isDefault
+            ? owner.email || managed?.email || '-'
+            : managed?.email || raw.contactEmail || '-',
+        mobile: hasAssignedManager
+          ? managed?.mobile || '-'
+          : isDefault
+            ? owner.mobile || managed?.mobile || '-'
+            : managed?.mobile || raw.contactMobile || '-',
         latitude: raw?.latitude,
         longitude: raw?.longitude,
         logoUrl: businessLogo,
-        hasManager: !!site.managerId,
+        hasManager: hasAssignedManager || isDefault,
+        isDefault,
       };
     });
-  }, [sitesWithManagers, rawSites, businessLogo]);
+  }, [sitesWithManagers, rawSites, businessLogo, authUser, organisation, selectedRole]);
 
   const managedCount = useMemo(
     () => sites.filter((site) => site.hasManager).length,
     [sites],
   );
 
-  const actions = [
-    { label: 'Add Location', route: 'CreateSite', primary: true },
-    { label: 'View Analytics', route: 'SiteAnalytics' },
-    { label: 'Your Profile', route: 'Account' },
+  const actions: Array<{
+    label: string;
+    primary?: boolean;
+    tab?: keyof RestaurantTabsParamList;
+    screen?: string;
+    route?: keyof RootStackParamList;
+  }> = [
     {
-      label: 'Contact Saveful',
-      action: () => Linking.openURL('https://www.saveful.com/contact'),
+      label: 'Create listing',
+      tab: 'Listings' as const,
+      screen: 'CreateListing',
+      primary: true,
     },
+    { label: 'Add Location', route: 'CreateSite' },
+    { label: 'View Analytics', tab: 'Insights' },
+    { label: 'Your Profile', route: 'Account' },
   ];
 
+  const needsPlan = useSubscriptionStore(selectNeedsPlan);
+  const entitled = useSubscriptionStore((s) => s.entitlements?.entitled === true);
+  const billedLocked = selectedRole === 'restaurant_multi' ? !entitled : needsPlan;
+
+  const promptForPlan = useCallback(() => {
+    const route = getSubscriptionRoute('restaurant_multi');
+    if (!route) return;
+    showSubscriptionRequiredPrompt({
+      canManageBilling: selectCanManageBilling(),
+      onContinue: () => navigation.navigate(route),
+    });
+  }, [navigation]);
+
+  const goToCreateSite = useCallback(() => {
+    if (billedLocked) {
+      promptForPlan();
+      return;
+    }
+    navigation.navigate('CreateSite' as any);
+  }, [billedLocked, promptForPlan, navigation]);
+
   const loadData = async (force = false) => {
-    await fetchSitesWithManagers(force);
+    try {
+      await ensureDefaultHqSite();
+    } catch {
+      // HQ preview from the org profile is enough to render Home.
+    }
+    try {
+      await fetchSitesWithManagers(force);
+    } catch {
+      // Home should still show HQ if the org list is gated or empty.
+    }
   };
 
   const onRefresh = async () => {
     try {
       setRefreshing(true);
       await loadData(true);
-    } catch (e) {
-      showErrorAlert(e, 'Could not load sites', 'Could not load sites');
     } finally {
       setRefreshing(false);
     }
@@ -159,9 +266,7 @@ export default function ManageSitesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadData(true).catch((e) =>
-        showErrorAlert(e, 'Could not load sites', 'Could not load sites'),
-      );
+      void loadData(true);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
@@ -197,12 +302,14 @@ export default function ManageSitesScreen() {
       const longitude = Number(editForm.longitude);
       const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
 
-      await updateSite(editingSiteId, {
-        siteName: editForm.tradingName,
-        address: editForm.address,
-        postcode: editForm.postCode,
-        ...(hasCoordinates ? { latitude, longitude } : {}),
-      });
+      if (!isVirtualHqSiteId(editingSiteId)) {
+        await updateSite(editingSiteId, {
+          siteName: editForm.tradingName,
+          address: editForm.address,
+          postcode: editForm.postCode,
+          ...(hasCoordinates ? { latitude, longitude } : {}),
+        });
+      }
 
       const orgId = authUser?.profile?.organisation?.id;
       if (orgId && hasCoordinates) {
@@ -225,6 +332,17 @@ export default function ManageSitesScreen() {
   };
 
   const requestDeleteLocation = (siteId: number) => {
+    const target = sites.find((site) => site.id === siteId);
+    if (target?.isDefault) {
+      showAppAlert({
+        variant: 'info',
+        title: 'Default site',
+        message:
+          'Your default head-office site can’t be removed. Rename it if you want a different label.',
+      });
+      return;
+    }
+
     showConfirmAlert({
       title: 'Delete location?',
       message:
@@ -274,61 +392,6 @@ export default function ManageSitesScreen() {
     });
   };
 
-  const renderSkeleton = () => (
-    <View style={[styles.skeletonWrap, contentColumn]}>
-      <View style={styles.skeletonHero}>
-        <Skeleton width="100%" height="100%" borderRadius={0} />
-      </View>
-
-      <View style={styles.skeletonTitle}>
-        <Skeleton width={wp(50)} height={normalize(24)} />
-      </View>
-
-      <View style={[styles.actionGrid, tabletInsetReset]}>
-        {[1, 2, 3, 4].map((i) => (
-          <View key={i} style={[styles.actionCard, styles.skeletonActionCard]}>
-            <Skeleton width="60%" height={normalize(14)} />
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.skeletonTitle}>
-        <Skeleton width={wp(40)} height={normalize(24)} />
-      </View>
-
-      {[1, 2].map((i) => (
-        <View
-          key={i}
-          style={[styles.siteCard, styles.skeletonSiteCard, r.isTablet && { marginHorizontal: 0 }]}
-        >
-          <View style={styles.siteHeader}>
-            <View style={styles.siteLeft}>
-              <Skeleton
-                width={normalize(48)}
-                height={normalize(48)}
-                borderRadius={normalize(24)}
-              />
-              <View style={{ flex: 1, gap: normalize(6) }}>
-                <Skeleton width="70%" height={normalize(18)} />
-                <Skeleton width="90%" height={normalize(14)} />
-                <Skeleton width="40%" height={normalize(14)} />
-              </View>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-
-  if (loading && sites.length === 0) {
-    return (
-      <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
-        <StatusBar style="light" translucent backgroundColor="transparent" />
-        {renderSkeleton()}
-      </Screen>
-    );
-  }
-
   return (
     <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
       <StatusBar style="light" translucent backgroundColor="transparent" />
@@ -366,7 +429,7 @@ export default function ManageSitesScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           adaptive.scrollContent,
-          { paddingBottom: safeBottomPadding },
+          { paddingBottom: tabBottomPadding },
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
@@ -450,10 +513,15 @@ export default function ManageSitesScreen() {
                 item.primary && styles.actionCardPrimary,
               ]}
               onPress={() => {
-                if (item.route) {
+                const billedAction = item.tab === 'Listings' || item.route === 'CreateSite';
+                if (billedAction && billedLocked) {
+                  promptForPlan();
+                  return;
+                }
+                if (item.tab) {
+                  navigation.navigate(item.tab as any, item.screen ? { screen: item.screen } : undefined);
+                } else if (item.route) {
                   navigation.navigate(item.route as any);
-                } else if (item.action) {
-                  item.action();
                 }
               }}
             >
@@ -483,7 +551,7 @@ export default function ManageSitesScreen() {
           </View>
           <Pressable
             style={styles.addLink}
-            onPress={() => navigation.navigate('CreateSite' as any)}
+            onPress={goToCreateSite}
             hitSlop={8}
           >
             <Ionicons name="add" size={normalize(16)} color={palette.kale} />
@@ -502,11 +570,11 @@ export default function ManageSitesScreen() {
               No locations yet
             </AppText>
             <AppText variant="bodySmall" style={styles.emptyCopy}>
-              Add your first restaurant site so teams can list surplus food nearby.
+              Your head-office site is created automatically so you can list surplus from HQ. Add more locations for other teams.
             </AppText>
             <Pressable
               style={styles.emptyCta}
-              onPress={() => navigation.navigate('CreateSite' as any)}
+              onPress={goToCreateSite}
             >
               <AppText variant="bodyBold" style={styles.emptyCtaText}>
                 Add Location
@@ -544,8 +612,19 @@ export default function ManageSitesScreen() {
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.siteTitleRow}>
                       <AppText variant="bodySmall" style={styles.siteIndex}>
-                        Site {index + 1}
+                        {site.isDefault ? 'Default' : `Site ${index + 1}`}
                       </AppText>
+                      {site.isDefault ? (
+                        <View style={[styles.statusChip, styles.statusChipDefault]}>
+                          <AppText
+                            variant="bodySmall"
+                            style={[styles.statusChipText, styles.statusChipTextDefault]}
+                            numberOfLines={1}
+                          >
+                            HQ
+                          </AppText>
+                        </View>
+                      ) : null}
                       <View
                         style={[
                           styles.statusChip,
@@ -673,15 +752,21 @@ export default function ManageSitesScreen() {
                         </Pressable>
                       </View>
 
-                      <Pressable
-                        style={[styles.dangerOutlineBtn, actionLoading && styles.btnDisabled]}
-                        disabled={actionLoading}
-                        onPress={() => requestDeleteLocation(site.id)}
-                      >
-                        <AppText variant="bodyBold" style={styles.dangerOutlineText}>
-                          Delete location
+                      {site.isDefault ? (
+                        <AppText variant="caption" style={styles.helperText}>
+                          Default head-office site can’t be removed.
                         </AppText>
-                      </Pressable>
+                      ) : (
+                        <Pressable
+                          style={[styles.dangerOutlineBtn, actionLoading && styles.btnDisabled]}
+                          disabled={actionLoading}
+                          onPress={() => requestDeleteLocation(site.id)}
+                        >
+                          <AppText variant="bodyBold" style={styles.dangerOutlineText}>
+                            Delete location
+                          </AppText>
+                        </Pressable>
+                      )}
                     </>
                   ) : (
                     <>
@@ -724,22 +809,24 @@ export default function ManageSitesScreen() {
                           </AppText>
                         </Pressable>
 
-                        <Pressable
-                          style={styles.primaryBtn}
-                          onPress={() =>
-                            navigation.navigate('CreateSite', {
-                              mode: 'manager',
-                              siteId: site.id,
-                            })
-                          }
-                        >
-                          <AppText variant="bodyBold" style={styles.primaryBtnText}>
-                            {site.hasManager ? 'Update manager' : 'Assign manager'}
-                          </AppText>
-                        </Pressable>
+                        {!isVirtualHqSiteId(site.id) && !site.isDefault ? (
+                          <Pressable
+                            style={styles.primaryBtn}
+                            onPress={() =>
+                              navigation.navigate('CreateSite', {
+                                mode: 'manager',
+                                siteId: site.id,
+                              })
+                            }
+                          >
+                            <AppText variant="bodyBold" style={styles.primaryBtnText}>
+                              {site.hasManager ? 'Update manager' : 'Assign manager'}
+                            </AppText>
+                          </Pressable>
+                        ) : null}
                       </View>
 
-                      {site.hasManager ? (
+                      {site.hasManager && site.managerId && !site.isDefault ? (
                         <Pressable
                           style={styles.dangerOutlineBtn}
                           onPress={() => requestRemoveManager(site.id, site.managerId)}
@@ -748,6 +835,10 @@ export default function ManageSitesScreen() {
                             Remove manager
                           </AppText>
                         </Pressable>
+                      ) : site.isDefault ? (
+                        <AppText variant="caption" style={styles.helperText}>
+                          Head office operates this default site. Listing requires a plan.
+                        </AppText>
                       ) : null}
                     </>
                   )}
@@ -758,25 +849,6 @@ export default function ManageSitesScreen() {
         })}
         </View>
       </ScrollView>
-
-      <View
-        style={[
-          styles.stickyFooter,
-          { paddingBottom: safeBottomPadding },
-          r.isTablet && {
-            width: adaptive.columnWidth,
-            maxWidth: r.contentMaxWidth,
-            alignSelf: 'center' as const,
-            paddingHorizontal: r.pagePadH,
-          },
-        ]}
-      >
-        <Pressable style={styles.logoutBtn} onPress={logout}>
-          <AppText variant="bodyBold" style={styles.logoutText}>
-            Logout
-          </AppText>
-        </Pressable>
-      </View>
     </Screen>
   );
 }
@@ -997,25 +1069,6 @@ const styles = StyleSheet.create({
     color: palette.white,
     textTransform: 'none',
   },
-  stickyFooter: {
-    borderTopWidth: 1,
-    borderTopColor: palette.strokecream,
-    backgroundColor: palette.creme,
-    paddingTop: hp(1.2),
-    paddingHorizontal: wp(4),
-  },
-  logoutBtn: {
-    backgroundColor: palette.white,
-    paddingVertical: hp(1.5),
-    borderRadius: normalize(12),
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  logoutText: {
-    color: palette.black,
-    textTransform: 'none',
-  },
   siteCard: {
     backgroundColor: 'white',
     marginHorizontal: wp(4),
@@ -1081,6 +1134,9 @@ const styles = StyleSheet.create({
   statusChipWarn: {
     backgroundColor: '#FFF4E5',
   },
+  statusChipDefault: {
+    backgroundColor: '#EFEAFE',
+  },
   statusChipText: {
     fontSize: normalize(11),
     textTransform: 'none',
@@ -1091,6 +1147,9 @@ const styles = StyleSheet.create({
   },
   statusChipTextWarn: {
     color: '#B45309',
+  },
+  statusChipTextDefault: {
+    color: palette.primary,
   },
   siteName: {
     flexShrink: 1,
@@ -1212,26 +1271,5 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.65,
-  },
-  skeletonWrap: {
-    paddingBottom: hp(4),
-  },
-  skeletonHero: {
-    height: hp(18),
-    width: '100%',
-    marginBottom: hp(2.5),
-    overflow: 'hidden',
-  },
-  skeletonTitle: {
-    alignItems: 'center',
-    marginBottom: hp(2),
-  },
-  skeletonActionCard: {
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  skeletonSiteCard: {
-    elevation: 0,
-    shadowOpacity: 0,
   },
 });

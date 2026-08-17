@@ -21,6 +21,7 @@ import {
   resolveOrganisationAddress,
 } from '@/utils/authSession';
 import { resetAllDataStores } from './index';
+import { materializeRestaurantHqAfterBilling } from '@/utils/billingFlow';
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
@@ -81,6 +82,11 @@ export function AppProvider({ children }: PropsWithChildren) {
       useSubscriptionStore.getState().teardownBillingRefreshOnFocus();
     };
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !entitlements?.entitled) return;
+    void materializeRestaurantHqAfterBilling();
+  }, [isAuthenticated, entitlements?.entitled]);
 
   const resolvedRole = useMemo(
     () => resolveUserRole(authUser, selectedRole),

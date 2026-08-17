@@ -9,11 +9,66 @@ import {
 import { useAuthStore } from './authStore';
 import { useSubscriptionStore } from './subscriptionStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
+import { isSubscriptionGateError } from '../utils/billingErrors';
+import {
+  buildDefaultHqSitePayload,
+  buildVirtualHqSite,
+  extractCreatedSite,
+  extractCreatedSiteId,
+  getHqOwnerContact,
+  isBusinessMultiHeadOffice,
+  isVirtualHqSiteId,
+  pickDefaultSiteId,
+  sitesWithHqFallback,
+} from '../utils/defaultHqSite';
+
+let ensureDefaultHqSitePromise: Promise<number | null> | null = null;
 
 const STALE_TIME_MS = 5 * 60 * 1000;
 
-function isStale(lastFetched: number | null): boolean {
-  return !lastFetched || Date.now() - lastFetched > STALE_TIME_MS;
+function isStale(lastFetched: number | null) {
+  if (!lastFetched) return true;
+  return Date.now() - lastFetched > STALE_TIME_MS;
+}
+
+function isHqSession(authUser: any) {
+  return (
+    isBusinessMultiHeadOffice(authUser) ||
+    useAuthStore.getState().selectedRole === 'restaurant_multi'
+  );
+}
+
+function parseOrganisationResponse(data: any): {
+  organisation: any | null;
+  sites: any[];
+  subscription: any | null;
+} {
+  const nested =
+    data?.data &&
+    !Array.isArray(data?.data) &&
+    (Array.isArray(data.data.sites) || data.data.organisation)
+      ? data.data
+      : data;
+
+  const sites = Array.isArray(nested)
+    ? nested
+    : Array.isArray(nested?.sites)
+      ? nested.sites
+      : Array.isArray(nested?.data)
+        ? nested.data
+        : Array.isArray(data?.sites)
+          ? data.sites
+          : [];
+
+  const organisation = Array.isArray(nested)
+    ? data?.organisation ?? null
+    : nested?.organisation ?? data?.organisation ?? null;
+
+  const subscription = Array.isArray(nested)
+    ? data?.subscription ?? null
+    : nested?.subscription ?? data?.subscription ?? null;
+
+  return { organisation, sites, subscription };
 }
 
 function resolveSeatLimits(orgSubscription: any) {
@@ -66,18 +121,21 @@ function formatStaff(staffData: any[]): SiteStaffMember[] {
 function formatSiteWithManager(site: any, staff: any[]): SiteWithManager {
   const managerEntry = staff.find((u: any) => u.siteRole === 'SITE_ADMIN');
   const manager = managerEntry?.user;
+  const contactName = manager
+    ? `${manager.firstName} ${manager.lastName}`.trim()
+    : String(site.contactName || '').trim();
+  const email = manager?.email || site.contactEmail || site.email || '';
+  const mobile = manager?.phoneNumber || site.phoneNumber || site.contactMobile || site.mobile || '';
 
   return {
     id: site.id,
     tradingName: site.siteName,
     address: site.address,
-    postCode: site.postcode,
+    postCode: site.postcode || site.postCode || '',
     managerId: managerEntry?.userId ?? null,
-    contactName: manager
-      ? `${manager.firstName} ${manager.lastName}`
-      : 'Manager not yet assigned',
-    email: manager?.email || '-',
-    mobile: manager?.phoneNumber || '-',
+    contactName: contactName || 'Manager not yet assigned',
+    email: email || '-',
+    mobile: mobile || '-',
     logo: null,
   };
 }
@@ -89,6 +147,7 @@ interface SitesState {
   sitesWithManagers: SiteWithManager[];
   staffBySiteId: Record<number, SiteStaffMember[]>;
   firstSiteId: number | null;
+  defaultSiteId: number | null;
   maxUsersPerSite: number;
   maxSites: number;
   isFetching: boolean;
@@ -104,7 +163,8 @@ interface SitesActions {
   fetchStaff: (siteId: number, force?: boolean) => Promise<SiteStaffMember[]>;
   fetchFirstSiteTeam: (force?: boolean) => Promise<void>;
   getFirstSiteId: () => Promise<number | null>;
-  createSite: (data: CreateSitePayload) => Promise<any>;
+  ensureDefaultHqSite: () => Promise<number | null>;
+  createSite: (data: CreateSitePayload, options?: { skipBillingHandler?: boolean }) => Promise<any>;
   assignManager: (siteId: number, data: AssignManagerPayload) => Promise<any>;
   addStaff: (siteId: number, data: AddStaffPayload) => Promise<any>;
   updateSite: (siteId: number, data: UpdateSitePayload) => Promise<any>;
@@ -121,6 +181,7 @@ const INITIAL: SitesState = {
   sitesWithManagers: [],
   staffBySiteId: {},
   firstSiteId: null,
+  defaultSiteId: null,
   maxUsersPerSite: 0,
   maxSites: 0,
   isFetching: false,
@@ -135,7 +196,7 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
 
   fetchOrganisation: async (force = false) => {
     const { isFetching, lastFetched } = get();
-    if (isFetching || (!force && !isStale(lastFetched))) return;
+    if (!force && (isFetching || !isStale(lastFetched))) return;
 
     const { authUser } = useAuthStore.getState();
     if (!authUser?.accessToken) return;
@@ -143,23 +204,32 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
     set({ isFetching: true, error: null });
     try {
       const res = await sitesService.getOrganisation();
-      const data = res.data;
-      const sites: any[] = Array.isArray(data)
-        ? data
-        : (data?.sites ?? data?.data ?? []);
-      const subscription = data?.subscription ?? null;
-      const limits = resolveSeatLimits(subscription);
+      const parsed = parseOrganisationResponse(res.data);
+      const limits = resolveSeatLimits(parsed.subscription);
+      const organisation = parsed.organisation ?? get().organisation;
+      const subscription = parsed.subscription ?? get().subscription;
+      const displaySites = sitesWithHqFallback(
+        parsed.sites.length > 0 ? parsed.sites : get().sites,
+        authUser,
+        organisation,
+        isHqSession(authUser),
+      );
+      const defaultSiteId = pickDefaultSiteId(displaySites) ?? get().defaultSiteId;
 
       set({
-        organisation: data?.organisation ?? null,
+        organisation,
         subscription,
-        sites,
-        firstSiteId: sites[0]?.id ?? null,
+        sites: displaySites,
+        firstSiteId: defaultSiteId,
+        defaultSiteId,
         maxUsersPerSite: limits.maxUsersPerSite,
         maxSites: limits.maxSites,
         lastFetched: Date.now(),
       });
     } catch (error: unknown) {
+      if (isSubscriptionGateError(error)) {
+        return;
+      }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load sites');
       set({ error: message });
       throw new Error(message);
@@ -175,14 +245,27 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
     const { authUser } = useAuthStore.getState();
     if (!authUser?.accessToken) return;
 
-    set({ isFetchingManagers: true, error: null });
+    const alreadyHasSites =
+      get().sites.length > 0 || get().sitesWithManagers.length > 0;
+    set({ isFetchingManagers: !alreadyHasSites, error: null });
     try {
       const res = await sitesService.getOrganisation();
-      const data = res.data;
-      const rawSites: any[] = data?.sites || [];
+      const parsed = parseOrganisationResponse(res.data);
+      const organisation = parsed.organisation ?? get().organisation;
+      const subscription = parsed.subscription ?? get().subscription;
+      const displaySites = sitesWithHqFallback(
+        parsed.sites.length > 0 ? parsed.sites : get().sites,
+        authUser,
+        organisation,
+        isHqSession(authUser),
+      );
+      const liveSites = displaySites.filter((site) => !isVirtualHqSiteId(site?.id));
 
       const sitesWithManagers = await Promise.all(
-        rawSites.map(async (site) => {
+        displaySites.map(async (site) => {
+          if (isVirtualHqSiteId(site?.id)) {
+            return formatSiteWithManager(site, []);
+          }
           try {
             const staffRes = await sitesService.listStaff(site.id);
             const staff = staffRes.data || [];
@@ -195,7 +278,7 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
 
       const staffBySiteId: Record<number, SiteStaffMember[]> = {};
       await Promise.all(
-        rawSites.map(async (site) => {
+        liveSites.map(async (site) => {
           try {
             const staffRes = await sitesService.listStaff(site.id);
             staffBySiteId[site.id] = formatStaff(staffRes.data || []);
@@ -206,18 +289,22 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
       );
 
       set({
-        organisation: data?.organisation ?? null,
-        subscription: data?.subscription ?? null,
-        sites: rawSites,
+        organisation,
+        subscription,
+        sites: displaySites,
         sitesWithManagers,
         staffBySiteId,
-        firstSiteId: rawSites[0]?.id ?? null,
-        maxUsersPerSite: resolveSeatLimits(data?.subscription).maxUsersPerSite,
-        maxSites: resolveSeatLimits(data?.subscription).maxSites,
+        firstSiteId: pickDefaultSiteId(displaySites) ?? get().firstSiteId,
+        defaultSiteId: pickDefaultSiteId(displaySites) ?? get().defaultSiteId,
+        maxUsersPerSite: resolveSeatLimits(subscription).maxUsersPerSite,
+        maxSites: resolveSeatLimits(subscription).maxSites,
         lastFetched: Date.now(),
         managersLastFetched: Date.now(),
       });
     } catch (error: unknown) {
+      if (isSubscriptionGateError(error)) {
+        return;
+      }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load sites');
       set({ error: message });
       throw new Error(message);
@@ -227,6 +314,7 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
   },
 
   fetchStaff: async (siteId, force = false) => {
+    if (isVirtualHqSiteId(siteId)) return [];
     const cached = get().staffBySiteId[siteId];
     if (!force && cached && !isStale(get().managersLastFetched)) {
       return cached;
@@ -260,8 +348,161 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
     return get().firstSiteId;
   },
 
-  createSite: async (data) => {
-    const res = await sitesService.createSite(data);
+  ensureDefaultHqSite: async () => {
+    if (ensureDefaultHqSitePromise) return ensureDefaultHqSitePromise;
+
+    ensureDefaultHqSitePromise = (async () => {
+      const { authUser } = useAuthStore.getState();
+      if (!authUser?.accessToken) return get().defaultSiteId;
+      if (!isHqSession(authUser)) {
+        return pickDefaultSiteId(get().sites) ?? get().defaultSiteId;
+      }
+
+      const orgFromProfile =
+        get().organisation ??
+        authUser?.profile?.organisation ??
+        authUser?.profile?.organization ??
+        null;
+
+      const seedFromSite = (site: any, realId?: number | null) => {
+        const id = realId ?? site?.id;
+        const owner = getHqOwnerContact(authUser);
+        const withContact = {
+          ...site,
+          id,
+          contactName: site.contactName || owner.name,
+          contactEmail: site.contactEmail || owner.email,
+          phoneNumber: site.phoneNumber || owner.mobile,
+        };
+        set({
+          organisation: get().organisation ?? orgFromProfile,
+          sites: [withContact],
+          sitesWithManagers: [formatSiteWithManager(withContact, [])],
+          defaultSiteId: isVirtualHqSiteId(id) ? null : Number(id),
+          firstSiteId: isVirtualHqSiteId(id) ? null : Number(id),
+        });
+      };
+
+      // Paint HQ immediately from the org profile so Home never flashes empty.
+      if (pickDefaultSiteId(get().sites) == null) {
+        seedFromSite(buildVirtualHqSite(authUser, orgFromProfile));
+      }
+
+      try {
+        const entitlements = await useSubscriptionStore.getState().fetchEntitlements();
+        const canCreateSite = entitlements?.entitled === true;
+
+        const applyHqOwnerContact = async (siteId: number) => {
+          if (isVirtualHqSiteId(siteId) || !canCreateSite) return;
+          const owner = getHqOwnerContact(authUser);
+          try {
+            await sitesService.updateSite(siteId, {
+              contactName: owner.name,
+              contactEmail: owner.email || undefined,
+              phoneNumber: owner.mobile || undefined,
+            });
+          } catch {
+            // HQ still operates this site as org admin, like charity.
+          }
+        };
+
+        try {
+          await get().fetchOrganisation(true);
+        } catch {
+          // Continue — we can still seed a local HQ preview from the org profile.
+        }
+
+        const existing = pickDefaultSiteId(get().sites) ?? get().defaultSiteId;
+        if (existing && !isVirtualHqSiteId(existing)) {
+          await applyHqOwnerContact(existing);
+          set({ defaultSiteId: existing, firstSiteId: existing });
+          return existing;
+        }
+
+        const fromProfile = pickDefaultSiteId(authUser?.profile?.sites);
+        if (fromProfile) {
+          const profileSite = (authUser.profile?.sites ?? []).find(
+            (site: any) => Number(site?.id ?? site?.siteId) === fromProfile,
+          );
+          if (profileSite && get().sites.filter((site) => !isVirtualHqSiteId(site?.id)).length === 0) {
+            seedFromSite(profileSite, fromProfile);
+          } else {
+            set({ defaultSiteId: fromProfile, firstSiteId: fromProfile });
+          }
+          await applyHqOwnerContact(fromProfile);
+          return fromProfile;
+        }
+
+        if (!canCreateSite) {
+          if (pickDefaultSiteId(get().sites) == null) {
+            seedFromSite(buildVirtualHqSite(authUser, get().organisation ?? orgFromProfile));
+          }
+          return null;
+        }
+
+        const payload = await buildDefaultHqSitePayload(
+          authUser,
+          get().organisation ?? orgFromProfile,
+        );
+        if (payload) {
+          try {
+            const createRes = await get().createSite(
+              payload,
+              { skipBillingHandler: true },
+            );
+            const createdSite = extractCreatedSite(createRes);
+            const createdId = extractCreatedSiteId(createRes) ?? createdSite?.id ?? null;
+
+            if (createdId) {
+              seedFromSite(
+                {
+                  ...payload,
+                  ...(createdSite || {}),
+                  createdAt: new Date().toISOString(),
+                  isActive: true,
+                },
+                createdId,
+              );
+              await applyHqOwnerContact(createdId);
+              try {
+                await get().fetchOrganisation(true);
+                await useAuthStore.getState().refreshProfile();
+              } catch {
+                // Keep the seeded HQ site if refetch fails.
+              }
+              const created = pickDefaultSiteId(get().sites) ?? createdId;
+              if (created && !isVirtualHqSiteId(created)) {
+                set({ defaultSiteId: created, firstSiteId: created });
+                return created;
+              }
+            }
+          } catch {
+            if (pickDefaultSiteId(get().sites) == null) {
+              seedFromSite(buildVirtualHqSite(authUser, get().organisation ?? orgFromProfile));
+            }
+            return pickDefaultSiteId(get().sites);
+          }
+        }
+
+        if (pickDefaultSiteId(get().sites) == null) {
+          seedFromSite(buildVirtualHqSite(authUser, get().organisation ?? orgFromProfile));
+        }
+        return null;
+      } catch {
+        if (pickDefaultSiteId(get().sites) == null) {
+          seedFromSite(buildVirtualHqSite(authUser, get().organisation ?? orgFromProfile));
+        }
+        return pickDefaultSiteId(get().sites);
+      }
+    })().finally(() => {
+      ensureDefaultHqSitePromise = null;
+    });
+
+    return ensureDefaultHqSitePromise;
+  },
+
+  createSite: async (data, options) => {
+    const res = await sitesService.createSite(data, options);
     get().invalidate();
     return res;
   },

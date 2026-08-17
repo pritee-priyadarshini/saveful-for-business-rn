@@ -22,10 +22,14 @@ import { useListingsStore } from '../../store/listingsStore';
 import { estimateMealsSaved, estimateCo2AvoidedKg, formatCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import { getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
+import { isBusinessMultiHeadOffice } from '../../utils/defaultHqSite';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getPeopleRelistFormValues } from '../../utils/listingRelist';
 import { showErrorAlert } from '../../utils/apiError';
+import { isSubscriptionGateError } from '../../utils/billingErrors';
+import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '../../utils/subscriptionAccess';
+import { selectCanManageBilling } from '../../store/subscriptionStore';
 import { ListingPhotoGallery } from '@/components/ListingPhotoGallery';
 import {
   getListingDateErrors,
@@ -124,7 +128,7 @@ const hasExplicitBestBeforeTime = (date: Date | null) => {
 export function CreateListingScreen({ navigation }: any) {
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
-  const { currentProfile, authUser } = useAppContext();
+  const { currentProfile, authUser, selectedRole } = useAppContext();
   const { submitting, withLock } = useSubmitLock();
   const { hasPreviousListing, previousListing } = usePreviousListingRelist('people');
   const businessLogo =
@@ -413,7 +417,20 @@ export function CreateListingScreen({ navigation }: any) {
 
     const resolvedSiteId = await resolveListingSiteId(authUser);
     if (!resolvedSiteId) {
-      showErrorAlert('Please set up your business site first.', 'Site not found');
+      if (isBusinessMultiHeadOffice(authUser) || selectedRole === 'restaurant_multi') {
+        const route = getSubscriptionRoute('restaurant_multi');
+        if (route) {
+          showSubscriptionRequiredPrompt({
+            canManageBilling: selectCanManageBilling(),
+            onContinue: () => navigation.navigate(route),
+          });
+          return;
+        }
+      }
+      showErrorAlert(
+        'Please set up your business site first.',
+        'Site not found',
+      );
       return;
     }
 
@@ -487,6 +504,7 @@ export function CreateListingScreen({ navigation }: any) {
         useListingsStore.getState().invalidateSite();
         navigation.replace('RestaurantListings');
       } catch (error: any) {
+        if (isSubscriptionGateError(error)) return;
         showErrorAlert(error, 'Could not create listing', 'Please try again.');
       }
     });

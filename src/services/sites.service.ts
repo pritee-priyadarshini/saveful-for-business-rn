@@ -9,6 +9,16 @@ export type CreateSitePayload = {
   longitude: number;
 };
 
+function toCreateSiteBody(data: CreateSitePayload) {
+  return {
+    siteName: String(data.siteName ?? '').trim(),
+    address: String(data.address ?? '').trim(),
+    postcode: String(data.postcode ?? '').trim(),
+    latitude: Number(data.latitude),
+    longitude: Number(data.longitude),
+  };
+}
+
 export type AssignManagerPayload = {
   firstName: string;
   lastName: string;
@@ -38,11 +48,17 @@ export type UpdateSitePayload = {
 
 export const sitesService = {
   getOrganisation() {
-    return api.get('/sites/organisation');
+    return api.get('/sites/organisation', {
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
+    });
   },
 
-  createSite(data: CreateSitePayload) {
-    return api.post('/sites', data);
+  createSite(data: CreateSitePayload, options?: { skipBillingHandler?: boolean }) {
+    return api.post('/sites', toCreateSiteBody(data), {
+      skipBillingHandler: options?.skipBillingHandler,
+      skipUnauthorizedHandler: options?.skipBillingHandler,
+    });
   },
 
   assignManager(siteId: number, data: AssignManagerPayload) {
@@ -58,7 +74,10 @@ export const sitesService = {
   },
 
   listStaff(siteId: number) {
-    return api.get(`/sites/${siteId}/staff`);
+    return api.get(`/sites/${siteId}/staff`, {
+      skipBillingHandler: true,
+      skipUnauthorizedHandler: true,
+    });
   },
 
   removeAccess(siteId: number, userId: number) {
@@ -66,7 +85,26 @@ export const sitesService = {
   },
 
   updateSite(siteId: number | string, data: UpdateSitePayload) {
-    return api.patch(`/sites/${siteId}`, data);
+    const {
+      address,
+      siteName,
+      postcode,
+      contactName,
+      contactEmail,
+      phoneNumber,
+      latitude,
+      longitude,
+    } = data;
+    return api.patch(`/sites/${siteId}`, {
+      ...(address != null ? { address } : {}),
+      ...(siteName != null ? { siteName } : {}),
+      ...(postcode != null ? { postcode } : {}),
+      ...(contactName != null ? { contactName } : {}),
+      ...(contactEmail != null ? { contactEmail } : {}),
+      ...(phoneNumber != null ? { phoneNumber } : {}),
+      ...(latitude != null ? { latitude } : {}),
+      ...(longitude != null ? { longitude } : {}),
+    });
   },
 
   deleteSite(siteId: number | string) {

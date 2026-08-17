@@ -544,7 +544,7 @@ export function resolveNotificationTarget(
   }
 
   if (role === 'restaurant_multi') {
-    return { name: 'ManageSites' };
+    return { name: 'Tabs' };
   }
 
   return { name: 'Tabs' };

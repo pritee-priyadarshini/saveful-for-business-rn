@@ -1,6 +1,15 @@
 import axios, { InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** Skip the global 402 / plan-required prompt for this request. */
+    skipBillingHandler?: boolean;
+    /** Skip session teardown on 401 — used for explore/read calls that can 401 without a site or plan. */
+    skipUnauthorizedHandler?: boolean;
+  }
+}
+
 type UnauthorizedHandler = () => void | Promise<void>;
 type BillingRequiredHandler = (payload: {
   code?: string;
@@ -40,7 +49,14 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
 
-  if (isFormData(config.data)) {
+  const method = String(config.method || 'get').toLowerCase();
+  const isRead = method === 'get' || method === 'head';
+  if (isRead) {
+    // Nest whitelist DTOs treat a JSON body on GET as extra properties
+    // (e.g. leftover isDefault) and reject the request.
+    config.data = undefined;
+    config.headers.delete('Content-Type');
+  } else if (isFormData(config.data)) {
     config.headers.delete('Content-Type');
     config.transformRequest = [(data: any) => data];
   } else if (!config.headers.get('Content-Type')) {
@@ -68,7 +84,22 @@ api.interceptors.response.use(
   async error => {
     const config = error.config;
 
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const body = error.response?.data as
+      | { error?: string; message?: string }
+      | undefined;
+    const billingCode = typeof body?.error === 'string' ? body.error : undefined;
+    const billingMessage = typeof body?.message === 'string' ? body.message : '';
+    const isSubscriptionGate =
+      status === 402 ||
+      billingCode === 'SUBSCRIPTION_REQUIRED' ||
+      billingCode === 'SUBSCRIPTION_INACTIVE' ||
+      /subscription|choose a plan|free trial|billing required/i.test(
+        billingMessage,
+      );
+
+    // A missing plan can come back as 401. Never treat that as a signed-out session.
+    if (error.response?.status === 401 && !isSubscriptionGate && !config?.skipUnauthorizedHandler) {
       const path = config?.url ?? '';
       const hadSession = !!(await SecureStore.getItemAsync('accessToken'));
       await SecureStore.deleteItemAsync('accessToken');
@@ -79,21 +110,20 @@ api.interceptors.response.use(
       }
     }
 
-    const status = error.response?.status;
-    const body = error.response?.data as
-      | { error?: string; message?: string }
-      | undefined;
-    const billingCode = typeof body?.error === 'string' ? body.error : undefined;
-    const isSubscriptionGate =
-      status === 402 ||
-      billingCode === 'SUBSCRIPTION_REQUIRED' ||
-      billingCode === 'SUBSCRIPTION_INACTIVE';
-
-    if (isSubscriptionGate && billingRequiredHandler) {
+    const method = String(config?.method || 'get').toLowerCase();
+    const isReadRequest = method === 'get' || method === 'head';
+    // Reads (Home, listings, entitlements) must not force the plan modal —
+    // HQ can explore without a plan. Writes still prompt.
+    if (
+      isSubscriptionGate &&
+      billingRequiredHandler &&
+      !config?.skipBillingHandler &&
+      !isReadRequest
+    ) {
       void Promise.resolve(
         billingRequiredHandler({
           code: billingCode,
-          message: typeof body?.message === 'string' ? body.message : undefined,
+          message: billingMessage || undefined,
         }),
       ).catch(() => undefined);
     }

@@ -161,10 +161,12 @@ export type UserProfile = {
  *  - branch
  *  - parentId references multi account
  * Example:
- * charity_multi creates 3 sites
- * -> each site role = charity_single
- * -> each site siteType = branch
- * -> each site manages itself
+ * charity_multi / restaurant_multi signup creates a default HQ site
+ * from the organisation address. HQ collects (charity) or lists
+ * (restaurant) from that site; extra sites are branches.
+ * -> each extra site role = charity_single / restaurant_single
+ * -> each extra site siteType = branch
+ * -> each extra site manages itself
  */
 export type OrganizationSite = {
   id: string;

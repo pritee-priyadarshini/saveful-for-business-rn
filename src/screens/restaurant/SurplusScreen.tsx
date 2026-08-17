@@ -20,6 +20,9 @@ import {
 	wp,
 } from '@/utils/responsive';
 import { dashboardColumnWidth, buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
+import { useAppContext } from '@/store/AppContext';
+import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
+import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 
 const surplusCards = [
 	{
@@ -53,8 +56,20 @@ export function SurplusScreen({ navigation }: any) {
 	const r = useResponsiveLayout();
 	const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
 	const columnWidth = r.isTablet ? dashboardColumnWidth(r) : undefined;
+	const { selectedRole } = useAppContext();
+	const entitled = useSubscriptionStore((s) => s.entitlements?.entitled === true);
 
 	const handleListSurplus = (type: (typeof surplusCards)[number]['id']) => {
+		if (selectedRole === 'restaurant_multi' && !entitled) {
+			const route = getSubscriptionRoute('restaurant_multi');
+			if (route) {
+				showSubscriptionRequiredPrompt({
+					canManageBilling: selectCanManageBilling(),
+					onContinue: () => navigation.navigate(route),
+				});
+				return;
+			}
+		}
 		if (type === 'livestock') {
 			navigation.navigate('CreateFarmListing');
 			return;
