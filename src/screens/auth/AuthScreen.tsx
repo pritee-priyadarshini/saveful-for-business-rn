@@ -881,7 +881,8 @@ export function AuthScreen() {
       return 'Please select your operating region.';
     }
 
-    if (isRestaurant && !restaurantForm.venueType.trim()) {
+    if ((isRestaurant && !restaurantForm.venueType.trim()) ||
+        ((isFarmerProducer || isFarmerConsumer) && !farmerForm.venueType.trim())) {
       return 'Please select a venue type.';
     }
 
@@ -1491,16 +1492,11 @@ export function AuthScreen() {
             <View style={styles.formCard}>
               {isRestaurant || isFarmerProducer ? (
                 <VenueTypeSelector
-                  label={
-                    isRestaurant
-                      ? 'Please select Venue Type'
-                      : 'Please select Venue Type (optional)'
-                  }
+                  label="Please select Venue Type *"
                   value={
                     isRestaurant ? restaurantForm.venueType : farmerForm.venueType
                   }
                   options={isRestaurant ? venueOptions : farmerVenueOptions}
-                  optional={!isRestaurant}
                   onChange={(v) =>
                     isRestaurant
                       ? updateRestaurantField('venueType', v)
@@ -1511,10 +1507,9 @@ export function AuthScreen() {
                 <>
                   {isFarmerConsumer ? (
                     <VenueTypeSelector
-                      label="Please select Venue Type (optional)"
+                      label="Please select Venue Type *"
                       value={farmerForm.venueType}
                       options={farmerVenueOptions}
-                      optional
                       onChange={(v) => updateFarmerField('venueType', v)}
                     />
                   ) : null}

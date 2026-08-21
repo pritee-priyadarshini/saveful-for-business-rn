@@ -339,8 +339,13 @@ function isFarmerImpactReport() {
   return role === 'farmer' || role === 'farm_business';
 }
 
+function isCharityImpactReport() {
+  const role = useAuthStore.getState().selectedRole;
+  return role === 'charity_single' || role === 'charity_multi';
+}
+
 function reportHeadings() {
-  if (isFarmerImpactReport()) {
+  if (isFarmerImpactReport() || isCharityImpactReport()) {
     return {
       brandSub: 'Impact Reporting',
       lede:
@@ -681,7 +686,12 @@ async function createExcelReport(
   }
 
   summaryRows.push([]);
-  summaryRows.push(['Notes', 'Generated in Saveful for Business for management & ESG use.']);
+  summaryRows.push([
+    'Notes',
+    isFarmerImpactReport() || isCharityImpactReport()
+      ? 'Generated in Saveful for Business for the selected reporting period.'
+      : 'Generated in Saveful for Business for management & ESG use.',
+  ]);
 
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
   summarySheet['!cols'] = [{ wch: 28 }, { wch: 28 }];
@@ -925,8 +935,9 @@ export function ImpactReportDownload({
           Download report
         </AppText>
         <AppText variant="bodySmall" color={palette.midgray} style={styles.body}>
-          Export impact totals, who you donated to and per-food-item savings as PDF or Excel,
-          then save or share.
+          {stats.mode === 'RECEIVER'
+            ? 'Export impact totals, who you collected from and per-food-item savings as PDF or Excel, then save or share.'
+            : 'Export impact totals, who you donated to and per-food-item savings as PDF or Excel, then save or share.'}
         </AppText>
       </View>
 

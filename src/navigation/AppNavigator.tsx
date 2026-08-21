@@ -81,7 +81,7 @@ export type RootStackParamList = {
   //CharityManageAccess: undefined;
 
    ManageAccess: {
-    locationId: number;
+    locationId?: number;
     orgType: 'restaurant' | 'charity' | 'farmer';
   };
 
@@ -352,7 +352,7 @@ export function AppNavigator() {
                     name: 'Tabs',
                     params: {
                       screen: 'Listings',
-                      params: { screen: 'CreateListing' },
+                      params: { screen: 'Surplus' },
                     },
                   }),
                 );
@@ -372,14 +372,12 @@ export function AppNavigator() {
               dismissMilestone();
               if (!kind || !navigationRef.current?.isReady()) return;
               if (kind === 'listing') {
-                const screen =
-                  effectiveRole === 'farm_business' ? 'CreateFarmListing' : 'CreateListing';
                 navigationRef.current.dispatch(
                   CommonActions.navigate({
                     name: 'Tabs',
                     params: {
                       screen: 'Listings',
-                      params: { screen },
+                      params: { screen: 'Surplus' },
                     },
                   }),
                 );

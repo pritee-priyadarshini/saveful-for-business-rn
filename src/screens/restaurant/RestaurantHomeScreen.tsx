@@ -543,7 +543,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                 style={({ pressed }) => [styles.surplusCard, pressed && styles.pressed]}
                 onPress={() =>
                   navigation.navigate('Listings', {
-                    screen: 'RestaurantListings',
+                    screen: 'Surplus',
                   })
                 }
               >

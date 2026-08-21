@@ -24,6 +24,7 @@ import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
+import { ImpactReportDownload } from '@/components/ImpactReportDownload';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
@@ -122,6 +123,7 @@ export function CharityAnalyticsScreen({
     isMultiSite,
     reload,
     filterLabel,
+    selectedSiteLabel,
   } = useImpactAnalytics({ filter, chartPeriod: range, siteId: selectedSiteId });
 
   // Single-site charity: always scope Impact to that site (never org / All sites).
@@ -574,6 +576,15 @@ export function CharityAnalyticsScreen({
             peoplePercent={stats.peoplePercent}
             animalPercent={stats.animalPercent}
             refreshNonce={foodsRefreshNonce}
+          />
+
+          <ImpactReportDownload
+            stats={stats}
+            filter={filter}
+            filterLabel={filterLabel}
+            siteId={selectedSiteId}
+            siteLabel={selectedSiteLabel}
+            organisationName={organization}
           />
         </View>
       </ScrollView>

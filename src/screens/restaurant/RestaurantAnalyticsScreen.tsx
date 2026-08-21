@@ -581,7 +581,7 @@ export function RestaurantAnalyticsScreen({
                     return;
                   }
                 }
-                navigation?.navigate('Listings', { screen: 'CreateListing' });
+                navigation?.navigate('Listings', { screen: 'Surplus' });
               }}
             >
               <View style={styles.createBtnLeft}>

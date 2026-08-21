@@ -213,7 +213,7 @@ export default function ManageSitesScreen() {
     {
       label: 'Create listing',
       tab: 'Listings' as const,
-      screen: 'CreateListing',
+      screen: 'Surplus',
       primary: true,
     },
     { label: 'Add Location', route: 'CreateSite' },

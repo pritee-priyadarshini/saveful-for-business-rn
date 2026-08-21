@@ -27,7 +27,7 @@ const SHARED_EMPTY_STATE =
   "If there aren't any listings just yet, don't worry - we're welcoming new businesses every day, and new surplus is shared in real time.";
 
 const SHARED_TIP =
-  'Tip: You can update your pickup radius and availability anytime by going to Account ⟼ Pickup Preferences.';
+  'Tip: You can update your pickup range and availability anytime by going to Account ⟼ Pickup Preferences.';
 
 const SHARED_CLOSING =
   'Checking back regularly and enabling notifications will help ensure you never miss an opportunity.';
@@ -39,7 +39,7 @@ export const RECEIVER_WELCOME_CONTENT: Record<ReceiverWelcomeVariant, ReceiverWe
     titleBrand: 'Saveful for Business',
     paragraphs: [
       "You're now part of a growing network helping good food go further.",
-      "As you enter the app, you'll see surplus food listings from businesses within your pickup area as they become available.",
+      "As you enter the app, you'll see surplus food listings from businesses within your pickup range as they become available.",
       SHARED_EMPTY_STATE,
     ],
     tip: SHARED_TIP,
@@ -52,7 +52,7 @@ export const RECEIVER_WELCOME_CONTENT: Record<ReceiverWelcomeVariant, ReceiverWe
     titleBrand: 'Saveful for Business',
     paragraphs: [
       "You're now part of a growing network helping surplus food create value on farms.",
-      "As you enter the app, you'll see surplus food suitable for livestock feed within your selected collection area as it becomes available.",
+      "As you enter the app, you'll see surplus food suitable for livestock feed within your selected pickup range as it becomes available.",
       SHARED_EMPTY_STATE,
     ],
     tip: SHARED_TIP,
@@ -65,7 +65,7 @@ export const RECEIVER_WELCOME_CONTENT: Record<ReceiverWelcomeVariant, ReceiverWe
     titleBrand: 'Saveful for Business',
     paragraphs: [
       "You're now part of a growing network helping good food go further.",
-      "As you enter the app, you'll see surplus food listings from businesses within your pickup area as they become available.",
+      "As you enter the app, you'll see surplus food listings from businesses within your pickup range as they become available.",
       SHARED_EMPTY_STATE,
       'Managing multiple locations? Start by adding your collection sites so each location can manage its own pickup preferences and receive surplus listings relevant to its area.',
     ],

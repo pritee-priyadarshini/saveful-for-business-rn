@@ -964,7 +964,10 @@ export function ProfileScreen() {
                       ? 'FarmerManageAccess'
                       : 'ManageAccess',
                   {
-                    locationId: selectedSiteId ?? 0,
+                    locationId:
+                      selectedSiteId != null && Number(selectedSiteId) > 0
+                        ? Number(selectedSiteId)
+                        : undefined,
                     orgType: isCharity ? 'charity' : isFarmerConsumer ? 'farmer' : 'restaurant',
                   }
                 )

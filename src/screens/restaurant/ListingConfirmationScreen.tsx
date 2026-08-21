@@ -160,7 +160,7 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
           </Card>
 
           <View style={[styles.actions, tabletInsetReset]}>
-            <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('CreateListing')}>
+            <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate('Surplus')}>
               <AppText variant="caption" style={styles.primaryText}>
                 + List More Surplus
               </AppText>

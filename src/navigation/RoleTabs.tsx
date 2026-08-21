@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { NavigationHelpers, ParamListBase } from '@react-navigation/native';
 
 import { CharityAnalyticsScreen } from '../screens/charity/CharityAnalyticsScreen';
 import { CharityDiscoverScreen } from '../screens/charity/CharityDiscoverScreen';
@@ -55,6 +56,28 @@ function TabBarIcon({
       <Ionicons name={name} size={TAB_ICON_SIZE} color={color} />
     </View>
   );
+}
+
+/**
+ * Tab press should always show that tab's root screen, not a leftover nested
+ * page (e.g. Available → Pickups, Listings → Create listing).
+ */
+function resetNestedStackOnTabPress(tabName: string, rootScreen: string) {
+  return ({ navigation }: { navigation: NavigationHelpers<ParamListBase> }) => ({
+    tabPress: (e: { preventDefault: () => void }) => {
+      const state = navigation.getState();
+      const tabRoute = state.routes.find((route) => route.name === tabName);
+      const nested = tabRoute?.state as
+        | { index?: number; routes?: Array<{ name: string }> }
+        | undefined;
+      const nestedIndex = nested?.index ?? 0;
+      const nestedName = nested?.routes?.[nestedIndex]?.name;
+      if (!nestedName || nestedName === rootScreen) return;
+
+      e.preventDefault();
+      navigation.navigate(tabName, { screen: rootScreen });
+    },
+  });
 }
 
 function useTabScreenOptions(): ({ route }: { route: { name: string } }) => BottomTabNavigationOptions {
@@ -126,7 +149,11 @@ export function RoleTabs() {
     return (
       <CharityTab.Navigator screenOptions={screenOptions}>
         <CharityTab.Screen component={MultiCharityManageSitesScreen} name="Home" />
-        <CharityTab.Screen component={CharityStack} name="Available" />
+        <CharityTab.Screen
+          component={CharityStack}
+          name="Available"
+          listeners={resetNestedStackOnTabPress('Available', 'CharityMap')}
+        />
         <CharityTab.Screen component={CharityAnalyticsScreen} name="Impact" />
         <CharityTab.Screen component={CharityUpdatesScreen} name="Updates" />
         <CharityTab.Screen component={ProfileScreen} name="Account" />
@@ -138,7 +165,11 @@ export function RoleTabs() {
     return (
       <CharityTab.Navigator screenOptions={screenOptions}>
         <CharityTab.Screen component={CharityDiscoverScreen} name="Home" />
-        <CharityTab.Screen component={CharityStack} name="Available" />
+        <CharityTab.Screen
+          component={CharityStack}
+          name="Available"
+          listeners={resetNestedStackOnTabPress('Available', 'CharityMap')}
+        />
         <CharityTab.Screen component={CharityAnalyticsScreen} name="Impact" />
         <CharityTab.Screen component={CharityUpdatesScreen} name="Updates" />
         <CharityTab.Screen component={ProfileScreen} name="Account" />
@@ -150,7 +181,11 @@ export function RoleTabs() {
     return (
       <FarmerTab.Navigator screenOptions={screenOptions}>
         <FarmerTab.Screen component={FarmerHomeScreen} name="Home" />
-        <FarmerTab.Screen component={FarmerStack} name="Available" />
+        <FarmerTab.Screen
+          component={FarmerStack}
+          name="Available"
+          listeners={resetNestedStackOnTabPress('Available', 'FarmerMap')}
+        />
         <FarmerTab.Screen component={FarmerAnalyticsScreen} name="Impact" />
         <FarmerTab.Screen component={FarmerUpdatesScreen} name="Updates" />
         <FarmerTab.Screen component={ProfileScreen} name="Account" />
@@ -162,7 +197,12 @@ export function RoleTabs() {
     return (
       <RestaurantTab.Navigator screenOptions={screenOptions}>
         <RestaurantTab.Screen component={ManageSitesScreen} name="Home" />
-        <RestaurantTab.Screen component={RestaurantStack} name="Listings" options={{ unmountOnBlur: true }} />
+        <RestaurantTab.Screen
+          component={RestaurantStack}
+          name="Listings"
+          options={{ unmountOnBlur: true }}
+          listeners={resetNestedStackOnTabPress('Listings', 'RestaurantListings')}
+        />
         <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
         <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
         <RestaurantTab.Screen component={ProfileScreen} name="Account" />
@@ -174,7 +214,12 @@ export function RoleTabs() {
     return (
       <RestaurantTab.Navigator screenOptions={screenOptions}>
         <RestaurantTab.Screen component={RestaurantHomeScreen} name="Home" />
-        <RestaurantTab.Screen component={RestaurantStack} name="Listings" options={{ unmountOnBlur: true }} />
+        <RestaurantTab.Screen
+          component={RestaurantStack}
+          name="Listings"
+          options={{ unmountOnBlur: true }}
+          listeners={resetNestedStackOnTabPress('Listings', 'RestaurantListings')}
+        />
         <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
         <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
         <RestaurantTab.Screen component={ProfileScreen} name="Account" />
@@ -185,7 +230,12 @@ export function RoleTabs() {
   return (
     <RestaurantTab.Navigator screenOptions={screenOptions}>
       <RestaurantTab.Screen component={RestaurantHomeScreen} name="Home" />
-      <RestaurantTab.Screen component={RestaurantStack} name="Listings" options={{ unmountOnBlur: true }} />
+      <RestaurantTab.Screen
+        component={RestaurantStack}
+        name="Listings"
+        options={{ unmountOnBlur: true }}
+        listeners={resetNestedStackOnTabPress('Listings', 'RestaurantListings')}
+      />
       <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
       <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
       <RestaurantTab.Screen component={ProfileScreen} name="Account" />

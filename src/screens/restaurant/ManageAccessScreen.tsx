@@ -38,9 +38,10 @@ import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { getSubscriptionRoute } from '@/utils/subscriptionAccess';
+import { getSubscriptionRoute, showSubscriptionRequiredPrompt, canAccessSubscription } from '@/utils/subscriptionAccess';
 import { formatMobileForDisplay } from '@/data/countryCodes';
 import { useAppContext } from '@/store/AppContext';
+import { pickDefaultSiteId } from '@/utils/defaultHqSite';
 
 const RESTAURANT_ROLE_OPTIONS = [
   { label: 'Site Admin', value: 'SITE_ADMIN' },
@@ -155,10 +156,19 @@ export default function ManageAccessScreen() {
     assignManager,
     addStaff,
     removeAccess,
+    ensureDefaultHqSite,
+    sites,
   } = useSitesStore();
 
   const siteId =
-    routeLocationId != null && routeLocationId > 0 ? routeLocationId : storeSiteId;
+    routeLocationId != null && routeLocationId > 0
+      ? routeLocationId
+      : storeSiteId != null && storeSiteId > 0
+        ? storeSiteId
+        : pickDefaultSiteId(sites);
+
+  const needsPlan =
+    canAccessSubscription(selectedRole) && entitlements?.entitled !== true;
 
   const [form, setForm] = useState({
     firstName: '',
@@ -180,8 +190,28 @@ export default function ManageAccessScreen() {
     if (submitting) return;
 
     try {
-      if (!siteId) {
-        showErrorAlert('No site found', 'Error');
+      if (needsPlan) {
+        const route = getSubscriptionRoute(selectedRole);
+        if (route) {
+          showSubscriptionRequiredPrompt({
+            canManageBilling: selectCanManageBilling(),
+            onContinue: () => navigation.navigate(route),
+          });
+          return;
+        }
+      }
+
+      let resolvedSiteId = siteId != null && siteId > 0 ? siteId : null;
+      if (resolvedSiteId == null && selectedRole === 'restaurant_multi') {
+        resolvedSiteId = await ensureDefaultHqSite();
+      }
+      if (resolvedSiteId == null || resolvedSiteId <= 0) {
+        showErrorAlert(
+          selectedRole === 'restaurant_multi'
+            ? 'Add a site from Your sites first, then invite a site admin or staff to that location.'
+            : 'Your business site is not set up yet. Add a site first, then invite your team.',
+          'Site required',
+        );
         return;
       }
 
@@ -205,9 +235,9 @@ export default function ManageAccessScreen() {
 
       await withLock(async () => {
         if (form.role === 'SITE_ADMIN') {
-          await assignManager(siteId, payload);
+          await assignManager(resolvedSiteId, payload);
         } else {
-          await addStaff(siteId, payload);
+          await addStaff(resolvedSiteId, payload);
         }
 
         showSuccessAlert('User added');
