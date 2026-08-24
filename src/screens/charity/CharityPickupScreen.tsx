@@ -566,6 +566,7 @@ export default function CharityPickupScreen({ navigation }: any) {
       <PostCollectSurveyModal
         visible={surveyVisible}
         initialAnswer="yes"
+        startAtRating
         claimId={surveyClaimId}
         businessName={surveyBusinessName}
         items={surveyItems}

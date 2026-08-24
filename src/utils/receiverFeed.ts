@@ -10,6 +10,7 @@ import {
   formatListingPickupDateRange,
   formatListingPickupWindow,
 } from '@/utils/dateFormat';
+import { parseStarRating } from '@/utils/rating';
 
 export type ReceiverUpdateType = 'new_surplus' | 'pickup' | 'collected' | 'feedback';
 export type ReceiverUpdateSection = 'Today' | 'Previous';
@@ -29,6 +30,9 @@ export type ReceiverUpdateItem = {
   claimId?: number;
   listingId?: number;
   items?: ReceiverPickupItem[];
+  rating?: number | null;
+  ratingNote?: string | null;
+  partnerRating?: number | null;
 };
 
 export type ReceiverPickupCardStatus =
@@ -369,7 +373,10 @@ export function mapReceiverUpdates(params: {
     const city = cityFromAddress(address, listing?.pickupPostcode || listing?.site?.postcode);
     const timeLabel = formatTimeLabel(listing?.pickupFromTime, listing?.pickupByTime);
     const collected = isCollectedClaim(claim);
-    const needsFeedback = collected && claim?.rating == null;
+    const rating = parseStarRating(claim?.rating);
+    const partnerRating = parseStarRating(claim?.providerRating ?? claim?.provider_rating);
+    const ratingNote = (claim?.ratingNote ?? claim?.rating_note ?? null) as string | null;
+    const needsFeedback = collected && rating == null;
     const canMarkCollected =
       !collected &&
       (status === 'PENDING' || status === 'CONFIRMED') &&
@@ -391,6 +398,9 @@ export function mapReceiverUpdates(params: {
         claimId: Number(claim.id),
         listingId: Number(listing?.id || claim?.listingId),
         items: claimItemsToPickupItems(claim),
+        rating,
+        ratingNote,
+        partnerRating,
       });
     }
 
@@ -408,6 +418,9 @@ export function mapReceiverUpdates(params: {
       claimId: Number(claim.id),
       listingId: Number(listing?.id || claim?.listingId),
       items: claimItemsToPickupItems(claim),
+      rating,
+      ratingNote,
+      partnerRating,
     });
   }
 

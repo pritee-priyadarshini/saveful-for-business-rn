@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Modal,
   FlatList,
@@ -12,9 +12,11 @@ import {
   type TextStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
+import { RatingSummary } from '@/components/RatingSummary';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
@@ -169,9 +171,11 @@ export function RestaurantUpdatesScreen() {
     [fetchOrgListings],
   );
 
-  useEffect(() => {
-    void loadUpdates(true);
-  }, [loadUpdates]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadUpdates(true);
+    }, [loadUpdates]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -507,7 +511,7 @@ export function RestaurantUpdatesScreen() {
 
           {renderCardHeadline(
             item.claimerName,
-            'collected your listing — please confirm and rate',
+            'collected your listing — please rate this collection',
             {
               primary: adaptive.cardHeadlinePrimary,
               secondary: adaptive.cardHeadlineSecondary,
@@ -525,20 +529,7 @@ export function RestaurantUpdatesScreen() {
               onPress={() => openProviderSurvey(item, 'yes')}
             >
               <AppText variant="bodyBold" style={styles.feedbackYesText}>
-                YES, COLLECTED
-              </AppText>
-            </Pressable>
-            <Pressable
-              disabled={completed}
-              style={[
-                styles.feedbackNoBtn,
-                { borderColor: theme.accent },
-                completed && styles.disabledBtn,
-              ]}
-              onPress={() => openProviderSurvey(item, 'no')}
-            >
-              <AppText variant="bodyBold" style={[styles.feedbackNoText, { color: theme.accent }]}>
-                NO
+                RATE NOW
               </AppText>
             </Pressable>
           </View>
@@ -554,6 +545,10 @@ export function RestaurantUpdatesScreen() {
     const impactValue = item.audience === 'animals' ? `${co2} kg` : String(meals);
     const impactLabel = item.audience === 'animals' ? 'CO₂ AVOIDED' : 'MEALS CREATED';
     const impactIcon = item.audience === 'animals' ? DETAIL_ICONS.leaf : DETAIL_ICONS.meal;
+    const askForRating =
+      Boolean(item.needsProviderFeedback) &&
+      !surveyCompletedIds.includes(item.id) &&
+      !surveyCompletedIds.includes(`feedback-${item.claimId}`);
 
     return (
       <View
@@ -585,6 +580,23 @@ export function RestaurantUpdatesScreen() {
             primary: adaptive.cardHeadlinePrimary,
             secondary: adaptive.cardHeadlineSecondary,
           })}
+
+          {item.providerRating != null || item.claimantRating != null ? (
+            <View style={{ gap: 6 }}>
+              <RatingSummary
+                rating={item.providerRating}
+                variant="star"
+                label="Your rating"
+                note={item.ratingNote}
+                color={theme.accent}
+              />
+              <RatingSummary
+                rating={item.claimantRating}
+                variant="apple"
+                label="Partner rating"
+              />
+            </View>
+          ) : null}
 
           <View style={styles.hr} />
 
@@ -655,6 +667,17 @@ export function RestaurantUpdatesScreen() {
                 <AppText style={[styles.impactLabel, { color: theme.accent }]}>{impactLabel}</AppText>
               </View>
             </View>
+          ) : null}
+
+          {askForRating ? (
+            <Pressable
+              style={[styles.feedbackYesBtn, { backgroundColor: theme.accent }]}
+              onPress={() => openProviderSurvey(item, 'yes')}
+            >
+              <AppText variant="bodyBold" style={styles.feedbackYesText}>
+                Rate this collection
+              </AppText>
+            </Pressable>
           ) : null}
 
           <Pressable
@@ -953,6 +976,22 @@ export function RestaurantUpdatesScreen() {
                         : '—'}
                     </AppText>
                   </View>
+                  {selectedImpact.providerRating != null || selectedImpact.claimantRating != null ? (
+                    <View style={{ gap: 8 }}>
+                      <RatingSummary
+                        rating={selectedImpact.providerRating}
+                        variant="star"
+                        label="Your rating"
+                        note={selectedImpact.ratingNote}
+                        color={theme.accent}
+                      />
+                      <RatingSummary
+                        rating={selectedImpact.claimantRating}
+                        variant="apple"
+                        label="Partner rating"
+                      />
+                    </View>
+                  ) : null}
                   <View style={[styles.impactHighlightBox, { backgroundColor: theme.lightBg, borderColor: theme.accent + '40' }]}>
                     <AppText variant="h4" style={{ color: theme.accent, textTransform: 'none' }}>
                       {selectedImpact.audience === 'people' ? `${meals} meals` : `${co2} kg CO₂`}

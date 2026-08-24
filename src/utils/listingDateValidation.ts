@@ -4,6 +4,9 @@ export type ListingDateFieldErrors = {
   pickupTo?: string;
 };
 
+export const PAST_COLLECTION_WINDOW_MESSAGE =
+  "You can't set up a collection window in the past. Choose a pickup window that hasn't ended yet.";
+
 /** Strip time — best-before is a calendar date, pickup times include hours. */
 function calendarDayMs(date: Date): number {
   const copy = new Date(date);
@@ -26,6 +29,7 @@ export function getListingDateErrors(
   bestBefore: Date | null,
   pickupFrom: Date | null,
   pickupTo: Date | null,
+  now: Date = new Date(),
 ): ListingDateFieldErrors {
   const errors: ListingDateFieldErrors = {};
 
@@ -50,6 +54,10 @@ export function getListingDateErrors(
     if (pickupTo && !isOnOrBeforeBestBeforeDay(pickupTo, bestBefore)) {
       errors.pickupTo = 'Pickup end must be on or before the best before date.';
     }
+  }
+
+  if (pickupTo && pickupTo.getTime() <= now.getTime()) {
+    errors.pickupTo = PAST_COLLECTION_WINDOW_MESSAGE;
   }
 
   return errors;

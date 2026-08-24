@@ -739,7 +739,7 @@ export function CharityMapScreen({ navigation }: any) {
       </HeroHeader>
 
       <Pressable style={styles.pickupBtn} onPress={() => navigation.navigate('CharityPickup')}>
-        <Ionicons name="car-outline" size={normalize(18)} color={palette.white} />
+        <Ionicons name="car-outline" size={normalize(18)} color={palette.kale} />
         <AppText variant="label" style={styles.pickupBtnText}>
           View Your Pickups
         </AppText>
@@ -767,7 +767,7 @@ export function CharityMapScreen({ navigation }: any) {
       <View style={styles.activeRow}>
         <AppText variant="h7">Active Listings</AppText>
         <View style={styles.activeBadge}>
-          <AppText variant="h7" style={{ color: palette.white }}>
+          <AppText variant="h7" style={styles.activeBadgeText}>
             {listings.length}
           </AppText>
         </View>
@@ -986,13 +986,15 @@ const styles = StyleSheet.create({
     gap: wp(2),
     marginHorizontal: wp(4),
     marginTop: hp(2),
-    backgroundColor: palette.middlegreen,
+    backgroundColor: palette.white,
+    borderWidth: 1.5,
+    borderColor: palette.kale,
     paddingVertical: hp(1.2),
     borderRadius: normalize(12),
   },
 
   pickupBtnText: {
-    color: palette.white,
+    color: palette.kale,
   },
 
   activeRow: {
@@ -1004,13 +1006,19 @@ const styles = StyleSheet.create({
   },
 
   activeBadge: {
-    backgroundColor: palette.middlegreen,
+    backgroundColor: palette.white,
+    borderWidth: 1.5,
+    borderColor: palette.kale,
     minWidth: wp(12),
     height: hp(4),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: wp(3),
     borderRadius: normalize(12),
+  },
+
+  activeBadgeText: {
+    color: palette.kale,
   },
 
   filterRow: {
@@ -1025,8 +1033,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 44,
     backgroundColor: palette.white,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#D9D9D9',
+    borderWidth: 1.5,
+    borderColor: palette.kale,
     paddingVertical: hp(1.35),
     paddingHorizontal: wp(2),
     borderRadius: normalize(14),
@@ -1035,19 +1043,19 @@ const styles = StyleSheet.create({
   },
 
   filterText: {
-    color: palette.black,
+    color: palette.kale,
     fontSize: normalize(14),
     lineHeight: normalize(18),
     textTransform: 'none',
   },
 
   filterPillActive: {
-    backgroundColor: palette.middlegreen,
-    borderColor: palette.middlegreen,
+    backgroundColor: palette.white,
+    borderColor: palette.kale,
   },
 
   filterTextActive: {
-    color: palette.white,
+    color: palette.kale,
     fontSize: normalize(14),
     lineHeight: normalize(18),
     textTransform: 'none',

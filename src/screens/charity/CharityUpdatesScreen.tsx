@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
+import { RatingSummary } from '@/components/RatingSummary';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
@@ -96,7 +97,7 @@ const CARD_THEMES: Record<
     qtyBorder: '#FFD4A8',
     qtyBg: '#FFF8F0',
     btn: palette.orange,
-    badgeLabel: 'FEEDBACK REQUESTED',
+    badgeLabel: 'RATING REQUESTED',
   },
 };
 
@@ -199,7 +200,7 @@ export function CharityUpdatesScreen() {
         setMarkingClaimId(item.claimId!);
         try {
           await claimsService.markClaimCollected(item.claimId!);
-          openSurveyForItem(item, 'yes');
+          openSurveyForItem(item, 'yes', true);
           void reload();
         } catch (error) {
           showErrorAlert(
@@ -358,6 +359,17 @@ export function CharityUpdatesScreen() {
                   </AppText>
                 </View>
               ) : null}
+
+              {item.type === 'collected' ? (
+                <>
+                  <RatingSummary rating={item.rating} variant="apple" label="Your rating" />
+                  <RatingSummary
+                    rating={item.partnerRating}
+                    variant="star"
+                    label="Business rating"
+                  />
+                </>
+              ) : null}
             </View>
 
             <View style={styles.cardActions}>
@@ -420,7 +432,7 @@ export function CharityUpdatesScreen() {
 
           <View style={styles.feedbackContent}>
             <AppText variant="bodyBold" style={styles.feedbackQuestion}>
-              Did you collect from{' '}
+              How would you rate this surplus from{' '}
               <AppText variant="bodyBold" style={styles.feedbackBrand}>
                 {item.title}
               </AppText>
@@ -433,15 +445,7 @@ export function CharityUpdatesScreen() {
                 style={[styles.feedbackYesBtn, { backgroundColor: theme.btn }, completed && styles.disabledBtn]}
                 onPress={() => openSurveyForItem(item, 'yes', true)}
               >
-                <AppText variant="bodyBold" style={styles.feedbackYesText}>YES</AppText>
-              </Pressable>
-
-              <Pressable
-                disabled={completed}
-                style={[styles.feedbackNoBtn, { borderColor: theme.btn }, completed && styles.disabledBtn]}
-                onPress={() => openSurveyForItem(item, 'no', true)}
-              >
-                <AppText variant="bodyBold" style={[styles.feedbackNoText, { color: theme.btn }]}>NO</AppText>
+                <AppText variant="bodyBold" style={styles.feedbackYesText}>RATE NOW</AppText>
               </Pressable>
             </View>
           </View>
@@ -648,6 +652,22 @@ export function CharityUpdatesScreen() {
                 <AppText variant="bodyBold">
                   Total claimed: {detailsTotals.claimed || selectedDetails.quantityKg} kg
                 </AppText>
+
+                {selectedDetails.type === 'collected' ? (
+                  <View style={{ gap: 8, marginTop: 8 }}>
+                    <RatingSummary
+                      rating={selectedDetails.rating}
+                      variant="apple"
+                      label="Your rating"
+                      note={selectedDetails.ratingNote}
+                    />
+                    <RatingSummary
+                      rating={selectedDetails.partnerRating}
+                      variant="star"
+                      label="Business rating"
+                    />
+                  </View>
+                ) : null}
               </>
             ) : null}
           </View>

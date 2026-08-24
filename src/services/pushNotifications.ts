@@ -498,6 +498,26 @@ function normalizeNotificationValue(value: unknown): string {
   return String(value ?? '').trim().toLowerCase();
 }
 
+export function isCollectionNotification(payload: NotificationPayload): boolean {
+  const data = payload.data ?? {};
+  const type = normalizeNotificationValue(data.type ?? data.notificationType ?? data.event);
+  const deepLink = normalizeNotificationValue(data.deepLink ?? data.deep_link ?? data.link);
+  const screen = normalizeNotificationValue(data.screen ?? data.targetScreen);
+
+  if (
+    type.includes('collect') ||
+    type.includes('provider') ||
+    type.includes('feedback') ||
+    type.includes('rating')
+  ) {
+    return true;
+  }
+  if (deepLink.includes('updates') || screen === 'updates') {
+    return true;
+  }
+  return false;
+}
+
 export function isFoodListingNotification(payload: NotificationPayload): boolean {
   const data = payload.data ?? {};
   const type = normalizeNotificationValue(data.type ?? data.notificationType ?? data.event);
@@ -535,6 +555,10 @@ export function resolveNotificationTarget(
         source: data.source as 'restaurant' | 'charity' | 'farmer',
       },
     };
+  }
+
+  if (isCollectionNotification(payload)) {
+    return { name: 'Tabs', params: { screen: 'Updates' } };
   }
 
   if (isFoodListingNotification(payload)) {

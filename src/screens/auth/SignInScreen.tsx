@@ -47,6 +47,11 @@ import {
 } from '@/utils/authSession';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
+import {
+  clearRememberedCredentials,
+  loadRememberedCredentials,
+  saveRememberedCredentials,
+} from '@/utils/rememberedCredentials';
 
 type Mode = 'login' | 'forgot';
 
@@ -336,6 +341,7 @@ export function SignInScreen() {
   const [resetError, setResetError] = useState('');
   const [resetStep, setResetStep] = useState<1 | 2>(1);
   const [hasSignedInBefore, setHasSignedInBefore] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -362,6 +368,14 @@ export function SignInScreen() {
       .catch(() => {
         if (mounted) setHasSignedInBefore(false);
       });
+    loadRememberedCredentials()
+      .then((saved) => {
+        if (!mounted) return;
+        setRememberMe(saved.rememberMe);
+        if (saved.email) setEmail(saved.email);
+        if (saved.password) setPassword(saved.password);
+      })
+      .catch(() => undefined);
     return () => {
       mounted = false;
     };
@@ -375,6 +389,18 @@ export function SignInScreen() {
       // Ignore persistence failures; greeting still updates for this session.
     }
   }, []);
+
+  const persistRememberMe = useCallback(async () => {
+    try {
+      if (rememberMe) {
+        await saveRememberedCredentials(trimmedEmail, password);
+      } else {
+        await clearRememberedCredentials();
+      }
+    } catch {
+      // Sign-in should still continue if SecureStore write fails.
+    }
+  }, [password, rememberMe, trimmedEmail]);
 
   const scrollActiveFieldIntoView = useCallback(() => {
     const field = activeFieldRef.current;
@@ -469,6 +495,7 @@ export function SignInScreen() {
       password === '123456'
     ) {
       await markSignedInBefore();
+      await persistRememberMe();
       setAuthUser({
         id: 'demo-farmer',
         firstName: 'Demo',
@@ -523,6 +550,7 @@ export function SignInScreen() {
           data.siteAccess,
         );
         await markSignedInBefore();
+        await persistRememberMe();
         setRole(resolveUserRole(authUser));
         setAuthUser(authUser);
       } catch (profileError) {
@@ -830,15 +858,42 @@ export function SignInScreen() {
                       }}
                     />
 
-                    <Pressable
-                      onPress={() => switchMode('forgot')}
-                      style={styles.forgotLinkWrap}
-                      hitSlop={4}
-                    >
-                      <AppText variant="bodySmall" color={palette.primary} style={styles.forgotLink}>
-                        Forgot password?
-                      </AppText>
-                    </Pressable>
+                    <View style={styles.rememberRow}>
+                      <Pressable
+                        onPress={() => {
+                          setRememberMe((prev) => {
+                            const next = !prev;
+                            if (!next) {
+                              void clearRememberedCredentials();
+                            }
+                            return next;
+                          });
+                        }}
+                        style={styles.rememberMeBtn}
+                        hitSlop={6}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: rememberMe }}
+                        accessibilityLabel="Remember me"
+                      >
+                        <Ionicons
+                          name={rememberMe ? 'checkbox' : 'square-outline'}
+                          size={normalize(20)}
+                          color={rememberMe ? palette.primary : palette.stone}
+                        />
+                        <AppText variant="bodySmall" style={styles.rememberMeLabel}>
+                          Remember me
+                        </AppText>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => switchMode('forgot')}
+                        style={styles.forgotLinkWrap}
+                        hitSlop={4}
+                      >
+                        <AppText variant="bodySmall" color={palette.primary} style={styles.forgotLink}>
+                          Forgot password?
+                        </AppText>
+                      </Pressable>
+                    </View>
                   </>
                 ) : null}
 
@@ -1070,9 +1125,30 @@ const styles = StyleSheet.create({
     gap: hp(1.5),
   },
 
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(3),
+    marginTop: -hp(0.2),
+  },
+
+  rememberMeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.5),
+    flexShrink: 1,
+    minHeight: normalize(32),
+  },
+
+  rememberMeLabel: {
+    color: palette.black,
+    textTransform: 'none',
+    fontSize: normalize(13),
+  },
+
   forgotLinkWrap: {
-    alignSelf: 'flex-end',
-    marginTop: -hp(0.4),
+    flexShrink: 0,
   },
 
   forgotLink: {

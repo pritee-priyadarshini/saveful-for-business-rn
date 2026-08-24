@@ -3,6 +3,7 @@ import {
   estimateMealsSaved,
   getListingAudience,
 } from '@/utils/foodListing';
+import { parseStarRating } from '@/utils/rating';
 
 export type UpdateAudience = 'people' | 'animals';
 export type UpdateSection = 'TODAY' | 'YESTERDAY' | 'EARLIER';
@@ -34,9 +35,12 @@ export type RestaurantUpdate = {
   collectedDate: string | null;
   mealsCreated: number;
   co2Avoided: number;
-  /** Claimant already rated the restaurant — provider feedback still needed. */
+  /** Collection is done and the food business still needs to confirm/rate. */
   needsProviderFeedback?: boolean;
   providerConfirmed?: boolean;
+  providerRating?: number | null;
+  claimantRating?: number | null;
+  ratingNote?: string | null;
 };
 
 function startOfDay(d: Date) {
@@ -146,6 +150,26 @@ function isClaimCollected(claim: any): boolean {
   return pickupStatus === 'COLLECTED';
 }
 
+/** True only after the food business rated or explicitly confirmed — not when collect is stamped. */
+function isProviderFeedbackComplete(claim: any): boolean {
+  if (parseStarRating(claim?.providerRating ?? claim?.provider_rating) != null) return true;
+  if (typeof claim?.providerDidCollect === 'boolean') return true;
+  if (typeof claim?.didCollect === 'boolean') return true;
+  return false;
+}
+
+function claimRatings(claim: any) {
+  return {
+    providerRating: parseStarRating(claim?.providerRating ?? claim?.provider_rating),
+    claimantRating: parseStarRating(claim?.rating),
+    ratingNote:
+      (claim?.providerRatingNote ??
+        claim?.provider_rating_note ??
+        claim?.ratingNote ??
+        null) as string | null,
+  };
+}
+
 /**
  * Turns org listings (with foodClaims) into the cards the Updates screen renders.
  * One card per non-cancelled claim — collected claims become impact cards;
@@ -178,10 +202,8 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
       const siteContact = claim?.claimantSite?.contactName || null;
 
       const collected = isClaimCollected(claim);
-      const claimantRated = claim?.rating != null;
-      const providerDone =
-        claim?.providerConfirmedAt != null || claim?.providerRating != null;
-      const needsProviderFeedback = collected && claimantRated && !providerDone;
+      const providerDone = isProviderFeedbackComplete(claim);
+      const needsProviderFeedback = collected && !providerDone;
 
       const sectionDate = collected
         ? claim?.collectedAt || pickup?.collectedAt || claim?.updatedAt || claim?.createdAt
@@ -212,6 +234,7 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
           co2Avoided: estimateCo2AvoidedKg(quantityKg),
           needsProviderFeedback: true,
           providerConfirmed: false,
+          ...claimRatings(claim),
         });
       }
 
@@ -238,6 +261,7 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
         co2Avoided: estimateCo2AvoidedKg(quantityKg),
         needsProviderFeedback,
         providerConfirmed: providerDone,
+        ...claimRatings(claim),
       });
     }
   }

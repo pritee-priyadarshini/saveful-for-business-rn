@@ -566,6 +566,7 @@ export default function FarmerPickupScreen({ navigation }: any) {
       <PostCollectSurveyModal
         visible={surveyVisible}
         initialAnswer="yes"
+        startAtRating
         claimId={surveyClaimId}
         businessName={surveyBusinessName}
         items={surveyItems}
