@@ -6,9 +6,10 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+import {
+  AppDateTimePicker as DateTimePicker,
+  type DateTimePickerEvent,
+} from '@/components/AppDateTimePicker';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/AppText';

@@ -1,7 +1,9 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  InteractionManager,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -79,6 +81,34 @@ function escapeHtml(value: string) {
 
 function slugDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function waitForInteractions() {
+  return new Promise<void>((resolve) => {
+    InteractionManager.runAfterInteractions(() => resolve());
+  });
 }
 
 function foodLabel(food: TopFoodItem) {
@@ -398,7 +428,7 @@ function buildPdfHtml(props: Props, data: ReportData, logoDataUri: string | null
     }
     .page {
       padding: 24px 20px 28px;
-      background: linear-gradient(180deg, #FEFFED 0%, #FFFAF3 42%, #FFFCF9 100%);
+      background: #FEFFED;
     }
     .brand {
       display: flex;
@@ -470,14 +500,18 @@ function buildPdfHtml(props: Props, data: ReportData, logoDataUri: string | null
       color: #575757;
     }
     .meta {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 16px;
       margin-bottom: 20px;
-      padding: 14px;
+      padding: 14px 8px 4px;
       background: #FFFCF9;
       border: 1px solid #EEE4D7;
       border-radius: 14px;
+      overflow: hidden;
+    }
+    .meta-item {
+      display: inline-block;
+      width: 48%;
+      vertical-align: top;
+      padding: 0 8px 12px;
     }
     .meta-item label {
       display: block;
@@ -625,16 +659,28 @@ async function loadReportLogoDataUri(): Promise<string | null> {
   }
 }
 
+async function loadReportLogoDataUriSafe(): Promise<string | null> {
+  try {
+    return await withTimeout(loadReportLogoDataUri(), 4000, 'Logo load timed out');
+  } catch {
+    return null;
+  }
+}
+
 async function createPdfReport(
   props: Props,
   data: ReportData,
 ): Promise<{ uri: string; mimeType: string; uti: string; name: string }> {
   const meta = buildReportMeta(props);
-  const logoDataUri = await loadReportLogoDataUri();
-  const { uri } = await Print.printToFileAsync({
-    html: buildPdfHtml(props, data, logoDataUri),
-    base64: false,
-  });
+  const logoDataUri = await loadReportLogoDataUriSafe();
+  const { uri } = await withTimeout(
+    Print.printToFileAsync({
+      html: buildPdfHtml(props, data, logoDataUri),
+      base64: false,
+    }),
+    20000,
+    'PDF generation timed out. Please try Excel, or try again.',
+  );
 
   const dest = `${FileSystem.cacheDirectory}${meta.fileBase}.pdf`;
   try {
@@ -841,6 +887,26 @@ async function createExcelReport(
   };
 }
 
+async function prepareShareableFile(file: {
+  uri: string;
+  name: string;
+}): Promise<string> {
+  const dir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+  if (!dir) return file.uri;
+
+  const dest = `${dir}${file.name}`;
+  try {
+    const info = await FileSystem.getInfoAsync(dest);
+    if (info.exists) {
+      await FileSystem.deleteAsync(dest, { idempotent: true });
+    }
+    await FileSystem.copyAsync({ from: file.uri, to: dest });
+    return dest;
+  } catch {
+    return file.uri;
+  }
+}
+
 function isMissingNativeModule(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return /native module|ExpoPrint|ExpoSharing|ExponentFileSystem|Cannot find/i.test(message);
@@ -879,6 +945,13 @@ export function ImpactReportDownload({
       };
 
       try {
+        // iOS will not present the share sheet (and shareAsync never resolves)
+        // if the format modal is still dismissing. Wait it out first.
+        await waitForInteractions();
+        if (Platform.OS === 'ios') {
+          await wait(450);
+        }
+
         const available = await Sharing.isAvailableAsync();
         if (!available) {
           showInfoAlert(
@@ -907,10 +980,19 @@ export function ImpactReportDownload({
             ? await createPdfReport(reportProps, data)
             : await createExcelReport(reportProps, data);
 
-        await Sharing.shareAsync(file.uri, {
+        const shareUri = await prepareShareableFile(file);
+
+        // iOS shareAsync often never resolves after the sheet is shown/dismissed.
+        // The file is ready — drop the spinner before opening the share sheet.
+        setExporting(false);
+        await wait(Platform.OS === 'ios' ? 120 : 0);
+
+        void Sharing.shareAsync(shareUri, {
           mimeType: file.mimeType,
           UTI: file.uti,
           dialogTitle: `Save or share ${file.name}`,
+        }).catch((shareError) => {
+          showErrorAlert(shareError, 'Could not open the share sheet');
         });
       } catch (error) {
         if (isMissingNativeModule(error)) {

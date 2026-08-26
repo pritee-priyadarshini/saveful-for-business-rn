@@ -18,7 +18,6 @@ import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
-import { Skeleton } from '../../components/Skeleton';
 import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { AssignDriverModal } from '@/components/AssignDriverModal';
@@ -41,6 +40,9 @@ import { hp, normalize, wp } from '@/utils/responsive';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 type HomeTab = 'list' | 'drivers';
+
+const HERO_BG = require('../../../assets/placeholder/kale-header.png');
+const HEADING_BG = require('../../../assets/placeholder/Illustration.png');
 
 type SiteDriverRow = SiteDriver & { siteId: number };
 
@@ -232,35 +234,6 @@ export function FarmerHomeScreen() {
     void Linking.openURL(`tel:${cleaned.replace(/\s+/g, '')}`);
   };
 
-  const renderSkeleton = () => (
-    <View style={styles.skeletonWrap}>
-      <Skeleton width="100%" height={hp(18)} borderRadius={0} />
-      <Skeleton width={wp(55)} height={normalize(20)} style={styles.skeletonCenter} />
-      <View style={styles.skeletonToggleRow}>
-        <Skeleton width={wp(42)} height={normalize(40)} borderRadius={normalize(30)} />
-        <Skeleton width={wp(42)} height={normalize(40)} borderRadius={normalize(30)} />
-      </View>
-      {[1, 2].map((i) => (
-        <Skeleton
-          key={i}
-          width={wp(92)}
-          height={normalize(180)}
-          borderRadius={normalize(20)}
-          style={styles.skeletonCard}
-        />
-      ))}
-    </View>
-  );
-
-  if (loading && !refreshing && listings.length === 0 && viewMode === 'list') {
-    return (
-      <Screen backgroundColor={palette.creme} transparentTop>
-        <StatusBar style="light" translucent backgroundColor="transparent" />
-        {renderSkeleton()}
-      </Screen>
-    );
-  }
-
   const renderListing = ({ item }: { item: DiscoverListing }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -406,10 +379,10 @@ export function FarmerHomeScreen() {
     </View>
   );
 
-  const Header = () => (
+  const listHeader = (
     <View>
       <HeroHeader
-        source={require('../../../assets/placeholder/kale-header.png')}
+        source={HERO_BG}
         height={hp(15)}
       >
         <View style={styles.heroContent}>
@@ -488,8 +461,9 @@ export function FarmerHomeScreen() {
 
       <View style={styles.headingContainer}>
         <Image
-          source={require('../../../assets/placeholder/Illustration.png')}
+          source={HEADING_BG}
           style={styles.headingBg}
+          fadeDuration={0}
         />
         <AppText variant="heading" style={styles.headingText}>
           {viewMode === 'list' ? 'Livestock Feed Near You' : 'Your Drivers'}
@@ -569,7 +543,7 @@ export function FarmerHomeScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderListing}
           style={styles.list}
-          ListHeaderComponent={Header}
+          ListHeaderComponent={listHeader}
           contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
@@ -615,7 +589,7 @@ export function FarmerHomeScreen() {
           keyExtractor={(item) => String(item.id)}
           renderItem={renderDriver}
           style={styles.list}
-          ListHeaderComponent={Header}
+          ListHeaderComponent={listHeader}
           contentContainerStyle={[styles.listContent, { paddingBottom: bottomPadding }]}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
@@ -1108,24 +1082,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
     color: '#666',
-  },
-
-  skeletonWrap: {
-    gap: hp(1.6),
-  },
-
-  skeletonCenter: {
-    alignSelf: 'center',
-    marginTop: hp(1),
-  },
-
-  skeletonToggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: wp(4),
-  },
-
-  skeletonCard: {
-    alignSelf: 'center',
   },
 });

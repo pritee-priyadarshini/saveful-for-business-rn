@@ -36,7 +36,12 @@ export function HeroHeader({
         style,
       ]}
     >
-      <Image source={source} style={styles.bg} resizeMode="cover" />
+      <Image
+        source={source}
+        style={styles.bg}
+        resizeMode="cover"
+        fadeDuration={0}
+      />
       <View style={[styles.content, { paddingTop: insets.top }, contentStyle]}>
         {children}
       </View>

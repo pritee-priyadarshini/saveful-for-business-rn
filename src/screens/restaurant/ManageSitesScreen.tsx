@@ -529,8 +529,6 @@ export default function ManageSitesScreen() {
                 variant="bodyBold"
                 style={[styles.actionText, item.primary && styles.actionTextPrimary]}
                 numberOfLines={2}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 {item.label}
               </AppText>
@@ -981,7 +979,9 @@ const styles = StyleSheet.create({
   actionText: {
     textAlign: 'center',
     width: '100%',
-    flexShrink: 1,
+    fontSize: normalize(15),
+    lineHeight: normalize(20),
+    textTransform: 'none',
   },
   actionTextPrimary: {
     color: palette.white,
