@@ -157,6 +157,17 @@ export default {
       ],
       expoNotificationsPlugin,
       ...firebasePlugins,
+      // Firebase iOS (Swift) requires static frameworks or pod install fails:
+      // "FirebaseCoreInternal depends upon GoogleUtilities, which does not define modules."
+      [
+        'expo-build-properties',
+        {
+          ios: {
+            useFrameworks: 'static',
+            forceStaticLinking: ['RNFBApp', 'RNFBMessaging'],
+          },
+        },
+      ],
       [
         'expo-location',
         {
