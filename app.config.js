@@ -114,8 +114,14 @@ export default {
       },
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        NSCameraUsageDescription:
+          "Saveful uses the camera so you can take a photo of your organisation's logo or surplus food in the app. For example, you can photograph leftover sandwiches so collecting organisations can identify the food.",
         NSPhotoLibraryUsageDescription:
-          'Allow Saveful for Business to access your photo library to upload a logo.',
+          "Saveful uses the system photo picker so you can choose one photo of your organisation's logo or surplus food. The app does not need access to your whole library.",
+        NSPhotoLibraryAddUsageDescription:
+          "Saveful uses the system photo picker so you can choose one photo of your organisation's logo or surplus food. The app does not need access to your whole library.",
+        NSLocationWhenInUseUsageDescription:
+          'Saveful uses your location to set your collection address and connect surplus food with collecting organisations near you. For example, a cafe can pin its site so nearby charities can find listings in their area.',
         UISupportedInterfaceOrientations: ['UIInterfaceOrientationPortrait'],
         'UISupportedInterfaceOrientations~ipad': ['UIInterfaceOrientationPortrait'],
         UIBackgroundModes: ['remote-notification'],
@@ -169,10 +175,19 @@ export default {
         },
       ],
       [
+        'expo-image-picker',
+        {
+          cameraPermission:
+            "Saveful uses the camera so you can take a photo of your organisation's logo or surplus food in the app. For example, you can photograph leftover sandwiches so collecting organisations can identify the food.",
+          photosPermission:
+            "Saveful uses the system photo picker so you can choose one photo of your organisation's logo or surplus food. The app does not need access to your whole library.",
+        },
+      ],
+      [
         'expo-location',
         {
           locationWhenInUsePermission:
-            'Allow Saveful for Business to access your location.',
+            'Saveful uses your location to set your collection address and connect surplus food with collecting organisations near you. For example, a cafe can pin its site so nearby charities can find listings in their area.',
         },
       ],
       // Must be last — adds tools:replace after expo-notifications / firebase plugins.

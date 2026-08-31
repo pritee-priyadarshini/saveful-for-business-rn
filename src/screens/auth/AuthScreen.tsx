@@ -815,9 +815,10 @@ export function AuthScreen() {
     if (!form.lastName.trim()) return 'Please enter your last name.';
     if (!form.email.trim()) return 'Please enter your email address.';
     if (!EMAIL_REGEX.test(form.email.trim())) return 'Please enter a valid email address.';
-    if (!form.mobile.trim()) return 'Please enter your mobile number.';
-    const digits = form.mobile.replace(/\D/g, '');
-    if (digits.length < 8 || digits.length > 15) return 'Please enter a valid mobile number.';
+    if (form.mobile.trim()) {
+      const digits = form.mobile.replace(/\D/g, '');
+      if (digits.length < 8 || digits.length > 15) return 'Please enter a valid mobile number.';
+    }
     if (!form.password) return 'Please enter a password.';
     if (form.password.length < MIN_PASSWORD_LENGTH) {
       return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
@@ -1187,7 +1188,7 @@ export function AuthScreen() {
 
               <View ref={mobileFieldRef} style={styles.mobileFieldWrap}>
                 <AppText variant="label" color={palette.black} style={styles.mobileLabel}>
-                  Mobile
+                  Mobile number (optional)
                 </AppText>
 
                 <View style={[styles.mobileInputRow, mobileFocused && styles.mobileInputRowFocused]}>
@@ -1226,6 +1227,11 @@ export function AuthScreen() {
                     onBlur={() => setMobileFocused(false)}
                   />
                 </View>
+
+                <AppText variant="bodySmall" color={palette.stone} style={styles.mobileHint}>
+                  Add a mobile number if you'd like collecting organisations to be able to
+                  contact you about a collection.
+                </AppText>
 
                 {countryPickerOpen ? (
                   <View style={styles.countryListBox}>
@@ -1648,6 +1654,11 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     color: palette.black,
     fontSize: normalize(14),
+  },
+
+  mobileHint: {
+    fontSize: normalize(12),
+    lineHeight: normalize(16),
   },
 
   mobileInputRow: {

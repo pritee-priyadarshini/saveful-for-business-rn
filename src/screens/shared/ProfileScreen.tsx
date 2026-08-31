@@ -676,7 +676,7 @@ export function ProfileScreen() {
                         editable={false}
                       />
                       <InputField
-                        label="Mobile"
+                        label="Mobile number (optional)"
                         value={formData.mobile}
                         editable={true}
                         onChangeText={(v) => updateField('mobile', v)}

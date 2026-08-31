@@ -116,6 +116,8 @@ export function appendSignupMobileFields(
   fields: SignupMobileFields,
   mobileFieldName: 'mobile' | 'mobileNumber' = 'mobile',
 ) {
+  const digits = fields.mobile.replace(/\D/g, '');
+  if (!digits) return;
   form.append(
     mobileFieldName,
     formatMobileWithCountryCode(fields.mobileCountryCode, fields.mobile),

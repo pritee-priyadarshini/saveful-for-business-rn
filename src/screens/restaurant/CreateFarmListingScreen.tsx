@@ -12,6 +12,7 @@ import {
 import { AppDateTimePicker as DateTimePicker } from '@/components/AppDateTimePicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { takePhoto } from '@/utils/pickSquareImage';
 
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
@@ -235,10 +236,8 @@ export function CreateFarmListingScreen({ navigation }: any) {
   };
 
   const pickFromCamera = async () => {
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.75 });
-    if (!res.canceled) {
-      setImages((prev) => [...prev, res.assets[0].uri]);
-    }
+    const uri = await takePhoto(0.75);
+    if (uri) setImages((prev) => [...prev, uri]);
   };
 
   const removePhoto = (index: number) => {
