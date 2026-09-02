@@ -104,7 +104,7 @@ export default {
     assetBundlePatterns: ['**/*'],
 
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       requireFullScreen: true,
       icon: './assets/intro/Saveful-for-Business-logo.png',
       bundleIdentifier: 'com.saveful.business.app',
