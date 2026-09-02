@@ -13,7 +13,6 @@ import {
 } from '../store/subscriptionStore';
 import {
   canAccessSubscription,
-  getSubscriptionRoute,
   showSubscriptionRequiredPrompt,
 } from '@/utils/subscriptionAccess';
 import { ReceiverWelcomeModal } from '@/components/ReceiverWelcomeModal';
@@ -258,15 +257,9 @@ export function AppNavigator() {
       // Don't cover the one-time signup welcome with the trial prompt.
       if (welcomeVisible) return;
 
-      const route = getSubscriptionRoute(effectiveRoleRef.current);
-      if (!route) return;
-
       state.markPlanGatePrompted();
       showSubscriptionRequiredPrompt({
         canManageBilling: selectCanManageBilling(),
-        onContinue: () => {
-          navigationRef.current?.navigate(route);
-        },
       });
     };
 
@@ -279,19 +272,16 @@ export function AppNavigator() {
     return unsub;
   }, [isAuthenticated, effectiveRole, welcomeVisible]);
 
-  // Global 402 / subscription-required from write APIs → same prompt, then Plans.
+  // Global 402 / subscription-required from write APIs → website-plan prompt (no checkout).
   useEffect(() => {
     setBillingRequiredHandler(({ message }) => {
       if (!isAuthenticatedRef.current) return;
-      const route = getSubscriptionRoute(effectiveRoleRef.current);
-      if (!route || !navigationRef.current?.isReady()) return;
+      if (!canAccessSubscription(effectiveRoleRef.current)) return;
+      if (!navigationRef.current?.isReady()) return;
 
       showSubscriptionRequiredPrompt({
         canManageBilling: selectCanManageBilling(),
         messageOverride: message,
-        onContinue: () => {
-          navigationRef.current?.navigate(route);
-        },
       });
     });
     return () => setBillingRequiredHandler(null);

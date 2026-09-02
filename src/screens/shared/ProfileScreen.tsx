@@ -36,13 +36,6 @@ import { showConfirmAlert } from '@/store/appAlertStore';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
-import { useSubscriptionStore } from '@/store/subscriptionStore';
-import { runPortalSession } from '@/utils/billingFlow';
-import { getBillingErrorMessage, isNoBillingAccountError } from '@/utils/billingErrors';
-import {
-  canAccessSubscription,
-  getSubscriptionRoute,
-} from '@/utils/subscriptionAccess';
 import { sitesService } from '@/services/sites.service';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { StatusBar } from 'expo-status-bar';
@@ -905,7 +898,7 @@ export function ProfileScreen() {
             </View>
           ))}
 
-          {/* LINKS — Plans: restaurant (+ multi) and farmer producer only */}
+          {/* Plans / Manage billing — in-app checkout hidden; plans are on the website.
           {canAccessSubscription(selectedRole) && (
             <Pressable
               style={styles.linkRow}
@@ -929,8 +922,6 @@ export function ProfileScreen() {
                     const url = await useSubscriptionStore.getState().openPortal();
                     await runPortalSession(url);
                   } catch (error) {
-                    // No Stripe customer yet (trial-only org) — send them to plans
-                    // instead of showing an error they cannot act on.
                     const route = getSubscriptionRoute(selectedRole);
                     if (isNoBillingAccountError(error) && route) {
                       navigation.navigate(route);
@@ -952,6 +943,7 @@ export function ProfileScreen() {
               <Ionicons name="chevron-forward" size={18} />
             </Pressable>
           )}
+          */}
 
           {showManageAccess && (
             <Pressable

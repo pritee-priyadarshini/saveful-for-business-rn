@@ -29,7 +29,7 @@ import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getPeopleRelistFormValues } from '../../utils/listingRelist';
 import { showErrorAlert } from '../../utils/apiError';
 import { isSubscriptionGateError } from '../../utils/billingErrors';
-import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '../../utils/subscriptionAccess';
+import { showSubscriptionRequiredPrompt } from '../../utils/subscriptionAccess';
 import { selectCanManageBilling } from '../../store/subscriptionStore';
 import { ListingPhotoGallery } from '@/components/ListingPhotoGallery';
 import {
@@ -417,14 +417,10 @@ export function CreateListingScreen({ navigation }: any) {
     const resolvedSiteId = await resolveListingSiteId(authUser);
     if (!resolvedSiteId) {
       if (isBusinessMultiHeadOffice(authUser) || selectedRole === 'restaurant_multi') {
-        const route = getSubscriptionRoute('restaurant_multi');
-        if (route) {
-          showSubscriptionRequiredPrompt({
-            canManageBilling: selectCanManageBilling(),
-            onContinue: () => navigation.navigate(route),
-          });
-          return;
-        }
+        showSubscriptionRequiredPrompt({
+          canManageBilling: selectCanManageBilling(),
+        });
+        return;
       }
       showErrorAlert(
         'Please set up your business site first.',

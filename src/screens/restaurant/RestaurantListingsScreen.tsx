@@ -47,7 +47,7 @@ import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
 import { useSitesStore } from '../../store/sitesStore';
 import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
-import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
+import { showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 import { fetchListingDetail } from '../../services/foodListing.service';
 
 type MetaBoxLayout = 'half' | 'centered';
@@ -273,14 +273,10 @@ export function RestaurantListingsScreen({ navigation }: any) {
 
   const goToCreateListing = useCallback(() => {
     if (isHqListings && !entitled) {
-      const route = getSubscriptionRoute('restaurant_multi');
-      if (route) {
-        showSubscriptionRequiredPrompt({
-          canManageBilling: selectCanManageBilling(),
-          onContinue: () => navigation.navigate(route),
-        });
-        return;
-      }
+      showSubscriptionRequiredPrompt({
+        canManageBilling: selectCanManageBilling(),
+      });
+      return;
     }
     navigation.navigate('Surplus');
   }, [isHqListings, entitled, navigation]);

@@ -23,20 +23,22 @@ import { spacing } from '../../theme/spacing';
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelectionMain'>;
 
 const roleCards = [
-	{
-		id: 'restaurant_single' as const,
-		illustration: require('../../../assets/placeholder/site_icon.png'),
-		title: 'I HAVE SURPLUS FOOD',
-		subTitle: 'For Businesses, venues & farms',
-		description:
-			'List surplus edible food for charities to help communities in need. Or list non-edible to be recovered for livestock feed and circular solutions.',
-		borderColor: palette.kale,
-		titleColor: palette.kale,
-		buttonColor: palette.kale,
-		iconBgColor: palette.kale,
-		role: 'restaurant_single' as const,
-		roundIcon: require('../../../assets/placeholder/restaurant_icon.png'),
-	},
+	// Paying providers (restaurant / farm producer) sign up on the website.
+	// Keep this card commented so it can be restored; producers use Log in.
+	// {
+	// 	id: 'restaurant_single' as const,
+	// 	illustration: require('../../../assets/placeholder/site_icon.png'),
+	// 	title: 'I HAVE SURPLUS FOOD',
+	// 	subTitle: 'For Businesses, venues & farms',
+	// 	description:
+	// 		'List surplus edible food for charities to help communities in need. Or list non-edible to be recovered for livestock feed and circular solutions.',
+	// 	borderColor: palette.kale,
+	// 	titleColor: palette.kale,
+	// 	buttonColor: palette.kale,
+	// 	iconBgColor: palette.kale,
+	// 	role: 'restaurant_single' as const,
+	// 	roundIcon: require('../../../assets/placeholder/restaurant_icon.png'),
+	// },
 	{
 		id: 'charity_single' as const,
 		illustration: require('../../../assets/placeholder/truck.png'),

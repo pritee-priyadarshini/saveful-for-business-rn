@@ -34,7 +34,7 @@ import {
   canShowDonationRecipients,
   canShowSpecificFoodSavings,
 } from '@/utils/impactAccess';
-import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
+import { showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 import { useNavigation } from '@react-navigation/native';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
@@ -572,14 +572,10 @@ export function RestaurantAnalyticsScreen({
               ]}
               onPress={() => {
                 if (selectedRole === 'restaurant_multi' && !entitlements?.entitled) {
-                  const route = getSubscriptionRoute('restaurant_multi');
-                  if (route) {
-                    showSubscriptionRequiredPrompt({
-                      canManageBilling: selectCanManageBilling(),
-                      onContinue: () => stackNavigation.navigate(route as never),
-                    });
-                    return;
-                  }
+                  showSubscriptionRequiredPrompt({
+                    canManageBilling: selectCanManageBilling(),
+                  });
+                  return;
                 }
                 navigation?.navigate('Listings', { screen: 'Surplus' });
               }}

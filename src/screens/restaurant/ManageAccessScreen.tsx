@@ -26,19 +26,13 @@ import { useSitesStore } from '@/store/sitesStore';
 import { useSubscriptionStore, selectCanManageBilling } from '@/store/subscriptionStore';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
-import { runPortalSession } from '@/utils/billingFlow';
-import { getBillingErrorMessage, isNoBillingAccountError } from '@/utils/billingErrors';
 import { billingCycleLabel, formatBillingDate } from '@/utils/billingHelpers';
 import { usePlanCancellation } from '@/hooks/usePlanCancellation';
-import { PendingPlanChangeBanner } from '@/components/PendingPlanChangeBanner';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp, normalize } from '@/utils/responsive';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { getSubscriptionRoute, showSubscriptionRequiredPrompt, canAccessSubscription } from '@/utils/subscriptionAccess';
+import { showSubscriptionRequiredPrompt, canAccessSubscription } from '@/utils/subscriptionAccess';
 import { formatMobileForDisplay } from '@/data/countryCodes';
 import { useAppContext } from '@/store/AppContext';
 import { pickDefaultSiteId } from '@/utils/defaultHqSite';
@@ -54,12 +48,8 @@ const inputPropsBase = { compact: true as const, labelVariant: 'bodyBold' as con
 
 export default function ManageAccessScreen() {
   useTransparentStatusBar('light');
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { selectedRole } = useAppContext();
   const entitlements = useSubscriptionStore((s) => s.entitlements);
-  const openPortal = useSubscriptionStore((s) => s.openPortal);
-  const isMutating = useSubscriptionStore((s) => s.isMutating);
-  const canManageBilling = selectCanManageBilling();
 
   const planLabel =
     entitlements?.planDisplayName ||
@@ -74,10 +64,9 @@ export default function ManageAccessScreen() {
     ? entitlements.status === 'TRIALING' && entitlements.trialEndsAt
       ? `Trial ends ${new Date(entitlements.trialEndsAt).toLocaleDateString()}`
       : planStatus
-    : 'Choose a plan to unlock write access';
+    : 'This organisation needs activation';
 
-  const { cancelPlan, resumePlan, canCancel, canResume, accessUntilLabel } =
-    usePlanCancellation();
+  const { accessUntilLabel } = usePlanCancellation();
 
   // Billing cycle and billed site count only became visible with the plan-change API.
   const billingSummary = React.useMemo(() => {
@@ -191,14 +180,10 @@ export default function ManageAccessScreen() {
 
     try {
       if (needsPlan) {
-        const route = getSubscriptionRoute(selectedRole);
-        if (route) {
-          showSubscriptionRequiredPrompt({
-            canManageBilling: selectCanManageBilling(),
-            onContinue: () => navigation.navigate(route),
-          });
-          return;
-        }
+        showSubscriptionRequiredPrompt({
+          canManageBilling: selectCanManageBilling(),
+        });
+        return;
       }
 
       let resolvedSiteId = siteId != null && siteId > 0 ? siteId : null;
@@ -410,6 +395,7 @@ export default function ManageAccessScreen() {
             </AppText>
           ) : null}
 
+          {/* In-app plan commerce hidden — plans are managed on the website.
           {entitlements?.pendingPlanId ? (
             <View style={{ marginTop: spacing.sm }}>
               <PendingPlanChangeBanner canManageBilling={canManageBilling} />
@@ -482,6 +468,7 @@ export default function ManageAccessScreen() {
               </AppText>
             </Pressable>
           ) : null}
+          */}
         </View>
 
         {/* FORM CARD */}

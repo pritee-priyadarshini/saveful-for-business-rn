@@ -37,7 +37,7 @@ import { organizationService } from '@/services/organization.service';
 import { useAuthStore } from '@/store/authStore';
 import { pickDefaultSiteId, getHqOwnerContact, isVirtualHqSiteId, buildVirtualHqSite, isBusinessMultiHeadOffice } from '@/utils/defaultHqSite';
 import { selectCanManageBilling, selectNeedsPlan, useSubscriptionStore } from '@/store/subscriptionStore';
-import { getSubscriptionRoute, showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
+import { showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<RestaurantTabsParamList, 'Home'>,
@@ -226,13 +226,10 @@ export default function ManageSitesScreen() {
   const billedLocked = selectedRole === 'restaurant_multi' ? !entitled : needsPlan;
 
   const promptForPlan = useCallback(() => {
-    const route = getSubscriptionRoute('restaurant_multi');
-    if (!route) return;
     showSubscriptionRequiredPrompt({
       canManageBilling: selectCanManageBilling(),
-      onContinue: () => navigation.navigate(route),
     });
-  }, [navigation]);
+  }, []);
 
   const goToCreateSite = useCallback(() => {
     if (billedLocked) {

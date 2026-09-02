@@ -35,32 +35,31 @@ export function getSubscriptionRoute(
   return null;
 }
 
-export const SUBSCRIPTION_REQUIRED_TITLE = 'Start your 30-day free trial';
+export const SUBSCRIPTION_REQUIRED_TITLE = 'Organisation plan';
 
 export function getSubscriptionRequiredMessage(canManageBilling: boolean): string {
   if (canManageBilling) {
     return (
-      'Start your free trial to create listings, invite your team, and begin tracking your impact.'
+      'Plans are managed on the Saveful website. Log in to your organisation account there to activate or update the plan.'
     );
   }
   return (
-    'Your organisation does not have an active plan yet. ' +
-    'Ask your organisation admin to activate a plan so you can keep working without interruption.'
+    'This organisation needs activation. Ask your organisation admin to update the plan on the Saveful website.'
   );
 }
 
-/** Professional prompt used on app open and when write APIs return 402. */
+/** Dismiss-only prompt when a billable org is not entitled. No checkout navigation. */
 export function showSubscriptionRequiredPrompt(options: {
   canManageBilling: boolean;
-  onContinue: () => void;
+  /** Ignored — plans are not sold in the app. Kept so existing call sites still type-check. */
+  onContinue?: () => void;
   messageOverride?: string;
 }) {
   showConfirmAlert({
     title: SUBSCRIPTION_REQUIRED_TITLE,
     message: options.messageOverride?.trim() || getSubscriptionRequiredMessage(options.canManageBilling),
-    confirmLabel: 'Start your free trial',
-    // Single primary CTA — no "Not now" (matches trial popup design).
+    confirmLabel: 'OK',
     cancelLabel: '',
-    onConfirm: options.onContinue,
+    onConfirm: () => undefined,
   });
 }
