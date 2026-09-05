@@ -3,6 +3,10 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { useAvailableFoodMode } from '@/hooks/useAvailableFoodMode';
 import type { DiscoverAudience } from '@/services/foodListing.service';
+import {
+  isCollectionNotification,
+  subscribeNotificationReceived,
+} from '@/services/pushNotifications';
 import { useAppContext } from '@/store/AppContext';
 import { getUserFriendlyErrorMessage } from '@/utils/apiError';
 import {
@@ -98,6 +102,15 @@ export function useReceiverFeed(audience: DiscoverAudience) {
       void load(true);
     }, [authUser?.accessToken, load]),
   );
+
+  // When a driver completes delivery, reload Updates/Pickups immediately.
+  useEffect(() => {
+    if (!authUser?.accessToken) return;
+    return subscribeNotificationReceived((payload) => {
+      if (!isCollectionNotification(payload)) return;
+      void load(true);
+    });
+  }, [authUser?.accessToken, load]);
 
   const counts = useMemo(
     () => ({

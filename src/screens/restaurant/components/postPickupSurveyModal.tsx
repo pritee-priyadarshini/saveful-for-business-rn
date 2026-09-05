@@ -35,6 +35,11 @@ type Props = {
   items?: Item[];
   /** When opening from YES/NO on the feedback card. */
   initialAnswer?: 'yes' | 'no' | null;
+  /** When a driver completed delivery, also collect a driver rating. */
+  canRateDriver?: boolean;
+  driverName?: string;
+  /** False when partner feedback was already submitted and only the driver remains. */
+  needsPartnerRating?: boolean;
 };
 
 export function PostPickupSurveyModal({
@@ -46,23 +51,36 @@ export function PostPickupSurveyModal({
   partnerName = 'your partner',
   items = [],
   initialAnswer = null,
+  canRateDriver = false,
+  driverName = 'the driver',
+  needsPartnerRating = true,
 }: Props) {
   const [step, setStep] = useState(1);
   const [reason, setReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
   const [rating, setRating] = useState(0);
+  const [driverRating, setDriverRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [driverComment, setDriverComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const goToYesRating = () => {
+    if (needsPartnerRating) setStep(2);
+    else if (canRateDriver) setStep(3);
+    else setStep(2);
+  };
 
   useEffect(() => {
     if (!visible) return;
-    if (initialAnswer === 'yes') setStep(2);
+    if (initialAnswer === 'yes') goToYesRating();
     else if (initialAnswer === 'no') setStep(5);
     else setStep(1);
     setReason('');
     setOtherReason('');
     setRating(0);
+    setDriverRating(0);
     setComment('');
+    setDriverComment('');
   }, [visible, initialAnswer, claimId]);
 
   const totalKg = items.reduce((sum, i) => sum + Number(i.quantity || 0), 0);
@@ -73,7 +91,9 @@ export function PostPickupSurveyModal({
     setReason('');
     setOtherReason('');
     setRating(0);
+    setDriverRating(0);
     setComment('');
+    setDriverComment('');
   };
 
   const handleClose = () => {
@@ -82,17 +102,30 @@ export function PostPickupSurveyModal({
   };
 
   const submitYes = async () => {
-    if (!claimId || rating < 1) {
+    if (!claimId) return;
+    if (needsPartnerRating && rating < 1) {
       showErrorAlert(null, 'Rating required', 'Please rate your collection partner.');
+      return;
+    }
+    if (canRateDriver && driverRating < 1) {
+      showErrorAlert(null, 'Driver rating required', 'Please rate the driver.');
       return;
     }
     setSubmitting(true);
     try {
-      await claimsService.submitProviderFeedback(claimId, {
-        didCollect: true,
-        rating,
-        ratingNote: comment.trim() || undefined,
-      });
+      if (needsPartnerRating) {
+        await claimsService.submitProviderFeedback(claimId, {
+          didCollect: true,
+          rating,
+          ratingNote: comment.trim() || undefined,
+        });
+      }
+      if (canRateDriver && driverRating >= 1) {
+        await claimsService.rateDriver(claimId, {
+          rating: driverRating,
+          ratingNote: driverComment.trim() || undefined,
+        });
+      }
       onComplete?.(selectedId || String(claimId), 'completed');
       reset();
       onClose();
@@ -163,7 +196,7 @@ export function PostPickupSurveyModal({
                   Did {partnerName} collect from you?
                 </AppText>
                 <View style={styles.row}>
-                  <Pressable style={styles.primaryBtn} onPress={() => setStep(2)}>
+                  <Pressable style={styles.primaryBtn} onPress={goToYesRating}>
                     <AppText style={styles.primaryText}>Yes</AppText>
                   </Pressable>
                   <Pressable style={styles.secondaryBtn} onPress={() => setStep(5)}>
@@ -173,7 +206,7 @@ export function PostPickupSurveyModal({
               </>
             )}
 
-            {step === 2 && (
+            {step === 2 && needsPartnerRating && (
               <>
                 <Image
                   source={require('../../../../assets/placeholder/bowl.png')}
@@ -200,15 +233,70 @@ export function PostPickupSurveyModal({
                 </View>
                 <TextInput
                   style={styles.input}
-                  placeholder="Add a note (optional)"
+                  placeholder="Add a note about the charity (optional)"
                   placeholderTextColor="#999"
                   value={comment}
                   onChangeText={setComment}
                   multiline
                 />
                 <Pressable
-                  style={[styles.primaryBtn, (submitting || rating < 1) && styles.disabled]}
-                  disabled={submitting || rating < 1}
+                  style={[styles.primaryBtn, rating < 1 && styles.disabled]}
+                  disabled={rating < 1 || (submitting && !canRateDriver)}
+                  onPress={() => {
+                    if (canRateDriver) {
+                      setStep(3);
+                      return;
+                    }
+                    void submitYes();
+                  }}
+                >
+                  {submitting && !canRateDriver ? (
+                    <ActivityIndicator color={palette.white} />
+                  ) : (
+                    <AppText style={styles.primaryText}>
+                      {canRateDriver ? 'Continue' : 'Submit'}
+                    </AppText>
+                  )}
+                </Pressable>
+              </>
+            )}
+
+            {step === 3 && canRateDriver && (
+              <>
+                <Image
+                  source={require('../../../../assets/placeholder/bowl.png')}
+                  style={styles.icon}
+                />
+                <AppText style={styles.title}>How was the driver?</AppText>
+                <AppText style={styles.subtitle}>Rate {driverName}</AppText>
+                <View style={styles.ratingRow}>
+                  {[1, 2, 3, 4, 5].map((num) => {
+                    const selected = driverRating >= num;
+                    return (
+                      <Pressable key={`driver-${num}`} onPress={() => setDriverRating(num)} hitSlop={6}>
+                        <Ionicons
+                          name={selected ? 'star' : 'star-outline'}
+                          size={normalize(32)}
+                          color={selected ? palette.orange : '#C9C9C9'}
+                        />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Add a note about the driver (optional)"
+                  placeholderTextColor="#999"
+                  value={driverComment}
+                  onChangeText={setDriverComment}
+                  multiline
+                />
+                <Pressable
+                  style={[
+                    styles.primaryBtn,
+                    (submitting || driverRating < 1) && styles.disabled,
+                  ]}
+                  disabled={submitting || driverRating < 1}
                   onPress={() => void submitYes()}
                 >
                   {submitting ? (

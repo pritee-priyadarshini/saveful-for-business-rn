@@ -154,6 +154,9 @@ export function RestaurantUpdatesScreen() {
   const [initialAnswer, setInitialAnswer] = useState<'yes' | 'no' | null>(null);
   const [surveyCompletedIds, setSurveyCompletedIds] = useState<string[]>([]);
   const [pickupStatus, setPickupStatus] = useState<Record<string, 'completed' | 'cancelled'>>({});
+  const [canRateDriver, setCanRateDriver] = useState(false);
+  const [needsPartnerRating, setNeedsPartnerRating] = useState(true);
+  const [surveyDriverName, setSurveyDriverName] = useState('the driver');
 
   const loadUpdates = useCallback(
     async (force = false) => {
@@ -467,6 +470,9 @@ export function RestaurantUpdatesScreen() {
     setSelectedId(item.id);
     setSelectedClaimId(item.claimId);
     setSelectedPartnerName(item.claimerName || 'your partner');
+    setCanRateDriver(Boolean(item.canRateDriver));
+    setNeedsPartnerRating(Boolean(item.needsProviderFeedback));
+    setSurveyDriverName(item.driverName?.trim() || 'the driver');
     setSelectedSurveyItems(
       (item.items || []).map((food, index) => ({
         id: String(index),
@@ -546,7 +552,7 @@ export function RestaurantUpdatesScreen() {
     const impactLabel = item.audience === 'animals' ? 'CO₂ AVOIDED' : 'MEALS CREATED';
     const impactIcon = item.audience === 'animals' ? DETAIL_ICONS.leaf : DETAIL_ICONS.meal;
     const askForRating =
-      Boolean(item.needsProviderFeedback) &&
+      Boolean(item.needsProviderFeedback || item.canRateDriver) &&
       !surveyCompletedIds.includes(item.id) &&
       !surveyCompletedIds.includes(`feedback-${item.claimId}`);
 
@@ -888,12 +894,18 @@ export function RestaurantUpdatesScreen() {
         onClose={() => {
           setModalVisible(false);
           setInitialAnswer(null);
+          setCanRateDriver(false);
+          setNeedsPartnerRating(true);
+          setSurveyDriverName('the driver');
         }}
         selectedId={selectedId}
         claimId={selectedClaimId}
         partnerName={selectedPartnerName}
         items={selectedSurveyItems}
         initialAnswer={initialAnswer}
+        canRateDriver={canRateDriver}
+        driverName={surveyDriverName}
+        needsPartnerRating={needsPartnerRating}
         onComplete={(id, status) => {
           setPickupStatus((prev) => ({ ...prev, [id]: status }));
           setSurveyCompletedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));

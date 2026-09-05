@@ -130,6 +130,9 @@ export function FarmerUpdatesScreen() {
   >([]);
   const [surveyCompletedIds, setSurveyCompletedIds] = useState<string[]>([]);
   const [surveyStartsAtRating, setSurveyStartsAtRating] = useState(false);
+  const [canRateDriver, setCanRateDriver] = useState(false);
+  const [needsPartnerRating, setNeedsPartnerRating] = useState(true);
+  const [surveyDriverName, setSurveyDriverName] = useState('your driver');
   const [markingClaimId, setMarkingClaimId] = useState<number | null>(null);
 
   const filteredUpdates = useMemo(() => {
@@ -179,6 +182,9 @@ export function FarmerUpdatesScreen() {
     setSelectedUpdateId(item.id);
     setSelectedClaimId(item.claimId ?? null);
     setSelectedBusinessName(item.title);
+    setCanRateDriver(Boolean(item.canRateDriver));
+    setNeedsPartnerRating(item.rating == null);
+    setSurveyDriverName(item.driverName?.trim() || 'your driver');
     setSelectedSurveyItems(
       (item.items || []).map((food, index) => ({
         id: String(index),
@@ -681,6 +687,9 @@ export function FarmerUpdatesScreen() {
         businessName={selectedBusinessName}
         items={selectedSurveyItems}
         startAtRating={surveyStartsAtRating}
+        canRateDriver={canRateDriver}
+        driverName={surveyDriverName}
+        needsPartnerRating={needsPartnerRating}
         onSubmitted={() => {
           if (selectedUpdateId) {
             setSurveyCompletedIds((prev) => [...prev, selectedUpdateId]);
@@ -691,6 +700,9 @@ export function FarmerUpdatesScreen() {
           setModalVisible(false);
           setInitialAnswer(null);
           setSurveyStartsAtRating(false);
+          setCanRateDriver(false);
+          setNeedsPartnerRating(true);
+          setSurveyDriverName('your driver');
           setSelectedUpdateId(null);
           setSelectedClaimId(null);
           setSelectedBusinessName('');

@@ -33,6 +33,10 @@ export type ReceiverUpdateItem = {
   rating?: number | null;
   ratingNote?: string | null;
   partnerRating?: number | null;
+  /** Completed driver delivery exists for this claim. */
+  canRateDriver?: boolean;
+  /** Claimant already rated the driver. */
+  driverRated?: boolean;
 };
 
 export type ReceiverPickupCardStatus =
@@ -221,6 +225,13 @@ function hasActiveDriverPickup(claim: any): boolean {
   return ACTIVE_DRIVER_PICKUP_STATUSES.has(String(pickup.status || '').toUpperCase());
 }
 
+function completedDriverPickup(claim: any): any | null {
+  const pickup = pickDriverPickup(claim);
+  if (!pickup?.driver) return null;
+  if (String(pickup.status || '').toUpperCase() !== 'COLLECTED') return null;
+  return pickup;
+}
+
 function driverName(claim: any): string | null {
   const pickup = pickDriverPickup(claim);
   const driver = pickup?.driver;
@@ -376,7 +387,16 @@ export function mapReceiverUpdates(params: {
     const rating = parseStarRating(claim?.rating);
     const partnerRating = parseStarRating(claim?.providerRating ?? claim?.provider_rating);
     const ratingNote = (claim?.ratingNote ?? claim?.rating_note ?? null) as string | null;
-    const needsFeedback = collected && rating == null;
+    const completedDriver = completedDriverPickup(claim);
+    const canRateDriver = Boolean(completedDriver) && parseStarRating(completedDriver?.charityDriverRating) == null;
+    const driverLabel = completedDriver
+      ? [completedDriver?.driver?.firstName, completedDriver?.driver?.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim() || 'your driver'
+      : null;
+    const needsPartnerRating = collected && rating == null;
+    const needsFeedback = needsPartnerRating || canRateDriver;
     const canMarkCollected =
       !collected &&
       (status === 'PENDING' || status === 'CONFIRMED') &&
@@ -401,6 +421,9 @@ export function mapReceiverUpdates(params: {
         rating,
         ratingNote,
         partnerRating,
+        canRateDriver,
+        driverRated: !canRateDriver && Boolean(completedDriver),
+        driverName: driverLabel,
       });
     }
 
@@ -417,6 +440,8 @@ export function mapReceiverUpdates(params: {
       canMarkCollected,
       claimId: Number(claim.id),
       listingId: Number(listing?.id || claim?.listingId),
+      canRateDriver,
+      driverRated: Boolean(completedDriver) && !canRateDriver,
       items: claimItemsToPickupItems(claim),
       rating,
       ratingNote,

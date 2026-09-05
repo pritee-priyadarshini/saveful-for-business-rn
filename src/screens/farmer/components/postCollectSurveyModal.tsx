@@ -40,6 +40,11 @@ type Props = {
   startAtRating?: boolean;
   /** Called after a successful backend submit so the feed can refresh. */
   onSubmitted?: () => void;
+  /** When a driver completed delivery, also collect a driver rating. */
+  canRateDriver?: boolean;
+  driverName?: string;
+  /** False when the surplus/partner was already rated and only the driver remains. */
+  needsPartnerRating?: boolean;
 };
 
 export function PostCollectSurveyModal({
@@ -51,6 +56,9 @@ export function PostCollectSurveyModal({
   items: initialItems,
   startAtRating = false,
   onSubmitted,
+  canRateDriver = false,
+  driverName = 'your driver',
+  needsPartnerRating = true,
 }: Props) {
   const navigation = useNavigation<any>();
   const r = useResponsiveLayout();
@@ -59,6 +67,7 @@ export function PostCollectSurveyModal({
   const [submitting, setSubmitting] = useState(false);
 
   const [rating, setRating] = useState(0);
+  const [driverRating, setDriverRating] = useState(0);
   const [comment, setComment] = useState('');
 
   const [reason, setReason] = useState('');
@@ -75,14 +84,18 @@ export function PostCollectSurveyModal({
 
   useEffect(() => {
     if (!visible) return;
-    if (initialAnswer === 'yes') setStep(startAtRating ? 4 : 2);
+    if (initialAnswer === 'yes') setStep(startAtRating || !needsPartnerRating ? 4 : 2);
     else if (initialAnswer === 'no') setStep(6);
     else setStep(1);
+
+    setRating(0);
+    setDriverRating(0);
+    setComment('');
 
     if (initialItems?.length) {
       setItems(initialItems);
     }
-  }, [visible, initialAnswer, initialItems, startAtRating]);
+  }, [visible, initialAnswer, initialItems, startAtRating, needsPartnerRating]);
 
   const totalKg = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -108,6 +121,7 @@ export function PostCollectSurveyModal({
   const reset = () => {
     setStep(1);
     setRating(0);
+    setDriverRating(0);
     setComment('');
     setReason('');
     setOtherReason('');
@@ -141,8 +155,17 @@ export function PostCollectSurveyModal({
   };
 
   const submitRating = async () => {
-    if (!claimId || rating < 1) {
+    if (!claimId) {
       setStep(5);
+      return;
+    }
+
+    if (needsPartnerRating && rating < 1) {
+      showErrorAlert(null, 'Rating required', 'Please rate this surplus.');
+      return;
+    }
+    if (canRateDriver && driverRating < 1) {
+      showErrorAlert(null, 'Driver rating required', 'Please rate your driver.');
       return;
     }
 
@@ -154,36 +177,61 @@ export function PostCollectSurveyModal({
       ].filter(Boolean);
       const ratingNote = noteParts.length ? noteParts.join(' · ') : undefined;
 
-      // Self-pickup may still be PENDING — mark collected first (with rating).
-      // If already COLLECTED, markCollected is a no-op for rating; rate next.
-      const collected = await claimsService.markClaimCollected(claimId, {
-        rating,
-        ratingNote,
-      });
-
-      if (collected?.message === 'Already marked as collected') {
-        await claimsService.rateClaim(claimId, { rating, ratingNote });
-        await presentCollectionSuccess('Thanks for your feedback', 'Feedback sent');
-      } else {
-        await presentCollectionSuccess(
-          'Collection confirmed. Thanks for your feedback.',
-          'Done',
-        );
-      }
-    } catch (error) {
-      try {
-        await claimsService.rateClaim(claimId, {
+      if (needsPartnerRating) {
+        // Self-pickup may still be PENDING — mark collected first (with rating).
+        // If already COLLECTED, markCollected is a no-op for rating; rate next.
+        const collected = await claimsService.markClaimCollected(claimId, {
           rating,
+          ratingNote,
+        });
+
+        if (collected?.message === 'Already marked as collected') {
+          await claimsService.rateClaim(claimId, { rating, ratingNote });
+        }
+      }
+
+      if (canRateDriver && driverRating >= 1) {
+        await claimsService.rateDriver(claimId, {
+          rating: driverRating,
           ratingNote: comment.trim() || undefined,
         });
-        await presentCollectionSuccess('Thanks for your feedback', 'Feedback sent');
-      } catch (inner) {
-        showErrorAlert(
-          inner,
-          'Could not submit feedback',
-          getUserFriendlyErrorMessage(inner, 'Could not submit feedback. Please try again.'),
-        );
       }
+
+      await presentCollectionSuccess(
+        needsPartnerRating
+          ? 'Collection confirmed. Thanks for your feedback.'
+          : 'Thanks for rating your driver.',
+        'Done',
+      );
+    } catch (error) {
+      if (needsPartnerRating) {
+        try {
+          await claimsService.rateClaim(claimId, {
+            rating,
+            ratingNote: comment.trim() || undefined,
+          });
+          if (canRateDriver && driverRating >= 1) {
+            await claimsService.rateDriver(claimId, {
+              rating: driverRating,
+              ratingNote: comment.trim() || undefined,
+            });
+          }
+          await presentCollectionSuccess('Thanks for your feedback', 'Feedback sent');
+          return;
+        } catch (inner) {
+          showErrorAlert(
+            inner,
+            'Could not submit feedback',
+            getUserFriendlyErrorMessage(inner, 'Could not submit feedback. Please try again.'),
+          );
+          return;
+        }
+      }
+      showErrorAlert(
+        error,
+        'Could not submit feedback',
+        getUserFriendlyErrorMessage(error, 'Could not submit feedback. Please try again.'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -234,7 +282,8 @@ export function PostCollectSurveyModal({
     'Other',
   ];
 
-  const canSubmitRating = rating > 0;
+  const canSubmitRating =
+    (!needsPartnerRating || rating > 0) && (!canRateDriver || driverRating > 0);
 
   const questionIcon = (
     <Image
@@ -350,27 +399,59 @@ export function PostCollectSurveyModal({
             {step === 4 && (
               <>
                 {questionIcon}
-                <AppText variant="subheading" style={styles.title}>
-                  How would you rate this surplus?
-                </AppText>
+                {needsPartnerRating ? (
+                  <>
+                    <AppText variant="subheading" style={styles.title}>
+                      How would you rate this surplus?
+                    </AppText>
 
-                <View style={styles.ratingRow}>
-                  {[1, 2, 3, 4, 5].map((num) => {
-                    const selected = rating >= num;
+                    <View style={styles.ratingRow}>
+                      {[1, 2, 3, 4, 5].map((num) => {
+                        const selected = rating >= num;
 
-                    return (
-                      <Pressable key={num} onPress={() => setRating(num)}>
-                        <View style={styles.appleWrapper}>
-                          <AppText
-                            style={[styles.apple, selected && styles.appleSelected]}
-                          >
-                            🍎
-                          </AppText>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                        return (
+                          <Pressable key={num} onPress={() => setRating(num)}>
+                            <View style={styles.appleWrapper}>
+                              <AppText
+                                style={[styles.apple, selected && styles.appleSelected]}
+                              >
+                                🍎
+                              </AppText>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
+
+                {canRateDriver ? (
+                  <>
+                    <AppText
+                      variant="subheading"
+                      style={[styles.title, needsPartnerRating && { marginTop: spacing.md }]}
+                    >
+                      How was {driverName}?
+                    </AppText>
+                    <AppText variant="bodySmall" color={palette.stone} style={{ textAlign: 'center' }}>
+                      Rate your driver
+                    </AppText>
+                    <View style={styles.ratingRow}>
+                      {[1, 2, 3, 4, 5].map((num) => {
+                        const selected = driverRating >= num;
+                        return (
+                          <Pressable key={`driver-${num}`} onPress={() => setDriverRating(num)}>
+                            <Ionicons
+                              name={selected ? 'star' : 'star-outline'}
+                              size={normalize(32)}
+                              color={selected ? palette.orange : '#C9C9C9'}
+                            />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
 
                 <TextInput
                   placeholder="Add comments (optional)"

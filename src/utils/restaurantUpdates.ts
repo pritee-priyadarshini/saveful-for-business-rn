@@ -41,6 +41,9 @@ export type RestaurantUpdate = {
   providerRating?: number | null;
   claimantRating?: number | null;
   ratingNote?: string | null;
+  /** Completed driver delivery — restaurant can rate the driver. */
+  canRateDriver?: boolean;
+  driverName?: string | null;
 };
 
 function startOfDay(d: Date) {
@@ -204,13 +207,29 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
       const collected = isClaimCollected(claim);
       const providerDone = isProviderFeedbackComplete(claim);
       const needsProviderFeedback = collected && !providerDone;
+      const completedDriver =
+        pickup &&
+        String(pickup?.status || '').toUpperCase() === 'COLLECTED' &&
+        pickup?.driver
+          ? pickup
+          : null;
+      const canRateDriver =
+        Boolean(completedDriver) &&
+        parseStarRating(completedDriver?.restaurantDriverRating) == null;
+      const needsFeedback = needsProviderFeedback || canRateDriver;
+      const driverLabel = completedDriver
+        ? [completedDriver?.driver?.firstName, completedDriver?.driver?.lastName]
+            .filter(Boolean)
+            .join(' ')
+            .trim() || null
+        : null;
 
       const sectionDate = collected
         ? claim?.collectedAt || pickup?.collectedAt || claim?.updatedAt || claim?.createdAt
         : claim?.createdAt || claim?.confirmedAt;
 
-      // Pending restaurant confirm/rate gets its own feedback card.
-      if (needsProviderFeedback) {
+      // Pending restaurant confirm/rate (and/or driver rating) gets its own feedback card.
+      if (needsFeedback) {
         updates.push({
           id: `feedback-${claim.id}`,
           claimId: Number(claim.id),
@@ -232,8 +251,10 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
           collectedDate: claim?.collectedAt || pickup?.collectedAt || null,
           mealsCreated: estimateMealsSaved(quantityKg),
           co2Avoided: estimateCo2AvoidedKg(quantityKg),
-          needsProviderFeedback: true,
-          providerConfirmed: false,
+          needsProviderFeedback,
+          providerConfirmed: providerDone,
+          canRateDriver,
+          driverName: driverLabel,
           ...claimRatings(claim),
         });
       }
@@ -261,6 +282,8 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
         co2Avoided: estimateCo2AvoidedKg(quantityKg),
         needsProviderFeedback,
         providerConfirmed: providerDone,
+        canRateDriver,
+        driverName: driverLabel,
         ...claimRatings(claim),
       });
     }
