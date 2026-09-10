@@ -91,7 +91,7 @@ export default {
   expo: {
     name: 'Saveful For Business',
     slug: 'saveful-business',
-    version: '1.0.0',
+    version: '1.0.1',
     orientation: 'portrait',
     userInterfaceStyle: 'light',
     icon: './assets/intro/Saveful-for-Business-logo.png',
