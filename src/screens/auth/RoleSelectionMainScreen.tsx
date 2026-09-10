@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import {
 	Image,
+	Linking,
 	Pressable,
 	StyleSheet,
 	View,
@@ -22,23 +23,9 @@ import { spacing } from '../../theme/spacing';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'RoleSelectionMain'>;
 
+const SURPLUS_PORTAL_URL = 'https://enterprise.saveful.app/';
+
 const roleCards = [
-	// Paying providers (restaurant / farm producer) sign up on the website.
-	// Keep this card commented so it can be restored; producers use Log in.
-	// {
-	// 	id: 'restaurant_single' as const,
-	// 	illustration: require('../../../assets/placeholder/site_icon.png'),
-	// 	title: 'I HAVE SURPLUS FOOD',
-	// 	subTitle: 'For Businesses, venues & farms',
-	// 	description:
-	// 		'List surplus edible food for charities to help communities in need. Or list non-edible to be recovered for livestock feed and circular solutions.',
-	// 	borderColor: palette.kale,
-	// 	titleColor: palette.kale,
-	// 	buttonColor: palette.kale,
-	// 	iconBgColor: palette.kale,
-	// 	role: 'restaurant_single' as const,
-	// 	roundIcon: require('../../../assets/placeholder/restaurant_icon.png'),
-	// },
 	{
 		id: 'charity_single' as const,
 		illustration: require('../../../assets/placeholder/truck.png'),
@@ -51,7 +38,24 @@ const roleCards = [
 		buttonColor: palette.eggplant,
 		iconBgColor: palette.eggplant,
 		role: 'charity_single' as const,
+		action: 'signup' as const,
 		roundIcon: require('../../../assets/placeholder/charity_icon.png'),
+	},
+	{
+		id: 'restaurant_single' as const,
+		illustration: require('../../../assets/placeholder/site_icon.png'),
+		title: 'I HAVE SURPLUS FOOD',
+		subTitle: 'For Businesses, venues & farms',
+		description:
+			'List surplus edible food for charities to help communities in need. Or list non-edible to be recovered for livestock feed and circular solutions.',
+		portalNote: 'Log in to set up account via secure online portal',
+		borderColor: palette.kale,
+		titleColor: palette.kale,
+		buttonColor: palette.kale,
+		iconBgColor: palette.kale,
+		role: 'restaurant_single' as const,
+		action: 'portal' as const,
+		roundIcon: require('../../../assets/placeholder/restaurant_icon.png'),
 	},
 ];
 
@@ -61,9 +65,13 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 	const r = useResponsiveLayout();
 	useTransparentStatusBar('light');
 
-	const onContinue = (role: (typeof roleCards)[number]['role']) => {
-		setRoleFlow(role === 'charity_single' ? 'consumer' : 'producer');
-		setRole(role);
+	const onContinue = (card: (typeof roleCards)[number]) => {
+		if (card.action === 'portal') {
+			void Linking.openURL(SURPLUS_PORTAL_URL);
+			return;
+		}
+		setRoleFlow('consumer');
+		setRole(card.role);
 		navigation.navigate('RoleSelection');
 	};
 
@@ -71,19 +79,20 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 		if (!r.isTablet) return null;
 		return {
 			screenContent: {
-				paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm,
-				justifyContent: 'flex-start' as const,
+				flexGrow: 1,
+				paddingBottom: Math.max(insets.bottom, spacing.sm),
 			},
-			heroHeight: Math.min(r.height * (r.isLandscape ? 0.16 : 0.14), r.isLandscape ? 120 : 150),
+			heroHeight: Math.min(r.height * (r.isLandscape ? 0.16 : 0.14), r.isLandscape ? 130 : 150),
 			headerText: {
 				maxWidth: r.contentMaxWidth,
-				fontSize: r.font(20, 24, 26),
-				lineHeight: r.font(26, 30, 32),
+				fontSize: r.font(18, 20, 22),
+				lineHeight: r.font(22, 26, 28),
 			},
 			content: {
 				paddingHorizontal: r.pagePadH,
-				paddingTop: r.space(12, 16, 18),
-				gap: r.space(14, 16, 18),
+				paddingTop: r.space(12, 14, 16),
+				gap: r.space(12, 14, 16),
+				flex: 1,
 				width: '100%' as const,
 				maxWidth: r.contentMaxWidth,
 				alignSelf: 'center' as const,
@@ -97,6 +106,7 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 				paddingVertical: r.space(14, 16, 18),
 				paddingHorizontal: r.space(16, 18, 20),
 				borderRadius: 18,
+				flex: 1,
 			},
 			roundIconWrap: {
 				width: 56,
@@ -108,8 +118,8 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 				height: 56,
 			},
 			illustration: {
-				width: 130,
-				height: 88,
+				width: 120,
+				height: 80,
 			},
 			cardTitle: {
 				fontSize: r.font(16, 18, 19),
@@ -123,7 +133,7 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 				minHeight: 48,
 				paddingVertical: 12,
 				borderRadius: 12,
-				marginTop: spacing.md,
+				marginTop: 'auto' as const,
 			},
 		};
 	}, [r, insets.bottom]);
@@ -142,14 +152,31 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 					padContentRight={false}
 					contentStyle={styles.headerContent}
 				>
-					<AppText variant="h5" color={palette.white} style={[styles.headerText, tablet?.headerText]}>
-						{`HOW WILL YOU USE\nSAVEFUL FOR BUSINESS?`}
-					</AppText>
+					<View style={styles.headerTextBlock}>
+						<AppText
+							variant="h5"
+							color={palette.white}
+							numberOfLines={1}
+							adjustsFontSizeToFit
+							minimumFontScale={0.7}
+							style={[styles.headerText, styles.headerLead, tablet?.headerText]}
+						>
+							GOOD FOOD SHOULD GO FURTHER
+						</AppText>
+						<AppText
+							variant="h5"
+							color={palette.white}
+							style={[styles.headerText, tablet?.headerText]}
+						>
+							{`SAVEFUL FOR BUSINESS\nMAKES IT EASIER`}
+						</AppText>
+					</View>
 				</HeroHeader>
 
 				<View style={[styles.content, tablet?.content]}>
 					<AppText variant="bodyBold" color={palette.primary} style={[styles.subtitle, tablet?.subtitle]}>
-						This helps us personalise your experience and connect you with the right community
+						Please choose from the options below to help us personalise your experience and connect you
+						with the right community
 					</AppText>
 
 					{roleCards.map((card) => (
@@ -196,8 +223,14 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 								{card.description}
 							</AppText>
 
+							{card.portalNote ? (
+								<AppText variant="bodyBold" color={palette.kale} style={styles.portalNote}>
+									{card.portalNote}
+								</AppText>
+							) : null}
+
 							<Pressable
-								onPress={() => onContinue(card.role)}
+								onPress={() => onContinue(card)}
 								style={[
 									styles.continueButton,
 									{ backgroundColor: card.buttonColor },
@@ -213,6 +246,20 @@ export function RoleSelectionMainScreen({ navigation }: Props) {
 							</Pressable>
 						</View>
 					))}
+
+					<View style={styles.loginRow}>
+						<AppText variant="bodySmall" color={palette.textMuted} style={styles.loginPrompt}>
+							Already have an account?
+						</AppText>
+						<Pressable
+							onPress={() => navigation.navigate('SignIn')}
+							hitSlop={8}
+						>
+							<AppText variant="bodyBold" color={palette.primary} style={styles.loginLink}>
+								Log in
+							</AppText>
+						</Pressable>
+					</View>
 				</View>
 			</ScrollView>
 		</Screen>
@@ -223,7 +270,7 @@ const styles = StyleSheet.create({
 	screenContent: {
 		flexGrow: 1,
 		backgroundColor: palette.creme,
-		paddingBottom: hp(2.5),
+		paddingBottom: hp(1.5),
 	},
 
 	headerContent: {
@@ -231,14 +278,25 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		paddingHorizontal: wp(6),
 	},
+	headerTextBlock: {
+		width: '100%',
+		alignItems: 'center',
+	},
 	headerText: {
-		maxWidth: wp(88),
+		width: '100%',
+		maxWidth: wp(92),
 		textAlign: 'center',
 	},
+	headerLead: {
+		fontSize: normalize(15),
+		lineHeight: normalize(18),
+		letterSpacing: 0,
+	},
 	content: {
+		flex: 1,
 		paddingHorizontal: wp(4.5),
-		paddingTop: hp(1.5),
-		gap: hp(1.7),
+		paddingTop: hp(1.2),
+		gap: hp(1.3),
 	},
 
 	subtitle: {
@@ -246,12 +304,14 @@ const styles = StyleSheet.create({
 		paddingHorizontal: wp(4),
 	},
 	card: {
+		flex: 1,
 		borderWidth: normalize(2),
 		borderRadius: normalize(16),
 		backgroundColor: '#F3F3EC',
-		paddingVertical: hp(1.5),
+		paddingVertical: hp(1.4),
 		paddingHorizontal: wp(3.4),
 		width: '100%',
+		justifyContent: 'space-between',
 	},
 	cardTopRow: {
 		flexDirection: 'row',
@@ -270,22 +330,41 @@ const styles = StyleSheet.create({
 		height: 56,
 	},
 	illustration: {
-		width: 120,
-		height: 88,
+		width: 110,
+		height: 76,
 		marginLeft: 'auto',
 	},
 	cardSubTitle: {
-		marginTop: hp(0.9),
+		marginTop: hp(0.6),
 		lineHeight: normalize(20),
 	},
 	cardTitle: {
-		marginTop: hp(0.4),
+		marginTop: hp(0.3),
 	},
 	cardDescription: {
-		marginTop: hp(0.5),
+		marginTop: hp(0.4),
+	},
+	portalNote: {
+		marginTop: hp(0.7),
+		textAlign: 'center',
+	},
+	loginRow: {
+		flexDirection: 'row',
+		justifyContent: 'center',
+		alignItems: 'center',
+		gap: wp(1.5),
+		marginTop: hp(0.2),
+		paddingBottom: hp(0.6),
+	},
+	loginPrompt: {
+		textTransform: 'none',
+	},
+	loginLink: {
+		textTransform: 'none',
+		textDecorationLine: 'underline',
 	},
 	continueButton: {
-		marginTop: hp(1.3),
+		marginTop: hp(1),
 		borderRadius: normalize(10),
 		minHeight: 48,
 		paddingVertical: 12,

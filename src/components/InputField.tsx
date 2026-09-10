@@ -8,6 +8,7 @@ import {
   FocusEvent,
   TextInputProps,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -16,6 +17,10 @@ import { palette } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { scaleFont } from '../theme/fontScale';
+import {
+  FORM_KEYBOARD_ACCESSORY_ID,
+  KeyboardSubmitAccessory,
+} from './KeyboardSubmitAccessory';
 
 type LabelVariant = keyof typeof typography;
 
@@ -38,6 +43,8 @@ type InputFieldProps = {
   textContentType?: TextInputProps['textContentType'];
   autoComplete?: TextInputProps['autoComplete'];
   passwordRules?: TextInputProps['passwordRules'];
+  returnKeyType?: TextInputProps['returnKeyType'];
+  onSubmitEditing?: TextInputProps['onSubmitEditing'];
 };
 
 export function InputField({
@@ -59,6 +66,8 @@ export function InputField({
   textContentType,
   autoComplete,
   passwordRules,
+  returnKeyType,
+  onSubmitEditing,
 }: InputFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<View>(null);
@@ -113,14 +122,37 @@ export function InputField({
           onChangeText={onChangeText}
           onFocus={handleFocus}
           onBlur={() => setIsFocused(false)}
-          keyboardType={keyboardType}
+          keyboardType={
+            Platform.OS === 'android' && keyboardType === 'number-pad'
+              ? 'numeric'
+              : keyboardType
+          }
           autoCapitalize={autoCapitalize ?? (isPassword ? 'none' : undefined)}
           autoCorrect={autoCorrect ?? (isPassword ? false : undefined)}
           textContentType={resolvedTextContentType}
           autoComplete={resolvedAutoComplete}
           passwordRules={passwordRules}
           importantForAutofill={isPassword ? 'yes' : 'auto'}
+          returnKeyType={returnKeyType ?? (multiline ? undefined : 'done')}
+          blurOnSubmit={!multiline}
+          onSubmitEditing={onSubmitEditing}
+          enablesReturnKeyAutomatically
+          inputAccessoryViewID={
+            Platform.OS === 'ios' &&
+            (keyboardType === 'number-pad' || keyboardType === 'phone-pad')
+              ? FORM_KEYBOARD_ACCESSORY_ID
+              : undefined
+          }
         />
+
+        {Platform.OS === 'ios' &&
+        (keyboardType === 'number-pad' || keyboardType === 'phone-pad') ? (
+          <KeyboardSubmitAccessory
+            nativeID={FORM_KEYBOARD_ACCESSORY_ID}
+            label="Done"
+            onSubmit={() => Keyboard.dismiss()}
+          />
+        ) : null}
 
         {isPassword && (
           <Pressable

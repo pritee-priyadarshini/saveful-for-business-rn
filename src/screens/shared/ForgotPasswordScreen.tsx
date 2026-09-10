@@ -5,6 +5,7 @@ import {
     TextInput,
     View,
     KeyboardAvoidingView,
+    Keyboard,
     Platform,
     ScrollView,
 } from 'react-native';
@@ -37,6 +38,10 @@ import {
 } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { hp } from '@/utils/responsive';
+import {
+    KeyboardSubmitAccessory,
+    otpInputKeyboardProps,
+} from '@/components/KeyboardSubmitAccessory';
 
 export default function ForgotPasswordScreen() {
     useTransparentStatusBar('light');
@@ -293,10 +298,11 @@ export default function ForgotPasswordScreen() {
                                             inputs.current[index] = ref;
                                         }}
                                         style={styles.otpInput}
-                                        keyboardType="number-pad"
+                                        {...otpInputKeyboardProps('saveful-forgot-otp-submit')}
                                         maxLength={1}
                                         value={digit}
                                         onChangeText={(t) => handleChange(t, index)}
+                                        onSubmitEditing={() => Keyboard.dismiss()}
                                         onKeyPress={({ nativeEvent }) => {
                                             if (nativeEvent.key === 'Backspace') {
                                                 handleBackspace(digit, index);
@@ -355,6 +361,13 @@ export default function ForgotPasswordScreen() {
                 </View>
                 </ScrollView>
             </Screen>
+            {codeSent ? (
+                <KeyboardSubmitAccessory
+                    nativeID="saveful-forgot-otp-submit"
+                    label="Done"
+                    onSubmit={() => Keyboard.dismiss()}
+                />
+            ) : null}
         </KeyboardAvoidingView>
     );
 }

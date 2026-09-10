@@ -5,6 +5,9 @@ import {
   TextInput,
   Pressable,
   Modal,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +29,11 @@ import {
   resolveUserRole,
 } from '@/utils/authSession';
 import { markPendingReceiverWelcome, isReceiverWelcomeRole } from '@/data/receiverWelcome';
+import {
+  KeyboardSubmitAccessory,
+  OTP_KEYBOARD_ACCESSORY_ID,
+  otpInputKeyboardProps,
+} from '@/components/KeyboardSubmitAccessory';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
@@ -194,8 +202,12 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
   }, [navigation]);
 
   return (
-    <>
-      <Screen scrollable={false} backgroundColor={palette.creme} transparentTop contentStyle={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <Screen scrollable backgroundColor={palette.creme} transparentTop contentStyle={styles.container}>
         <StatusBar style="light" translucent backgroundColor="transparent" />
 
         <StackHeroHeader
@@ -260,10 +272,16 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
                   otp[index] ? styles.otpFilled : null,
                   r.isTablet && { width: 56, height: 64 },
                 ]}
-                keyboardType="number-pad"
+                {...otpInputKeyboardProps(OTP_KEYBOARD_ACCESSORY_ID)}
                 maxLength={1}
                 value={digit}
                 onChangeText={(text) => handleChange(text, index)}
+                onSubmitEditing={() => {
+                  if (otp.join('').length === 6 && !loading) {
+                    Keyboard.dismiss();
+                    void handleVerify();
+                  }
+                }}
                 onKeyPress={({ nativeEvent }) => {
                   if (nativeEvent.key === 'Backspace') {
                     handleBackspace(digit, index);
@@ -305,6 +323,15 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
         </View>
 
       </Screen>
+
+      <KeyboardSubmitAccessory
+        nativeID={OTP_KEYBOARD_ACCESSORY_ID}
+        label={loading ? 'Verifying...' : 'Continue'}
+        disabled={loading || otp.join('').length !== 6}
+        onSubmit={() => {
+          void handleVerify();
+        }}
+      />
 
       <Modal visible={showSuccess} animationType="slide" transparent>
         <View style={[styles.modalOverlay, r.isTablet && { paddingHorizontal: r.pagePadH }]}>
@@ -363,11 +390,14 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
-    </>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
   },
 

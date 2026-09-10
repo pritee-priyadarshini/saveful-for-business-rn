@@ -52,6 +52,10 @@ import {
   loadRememberedCredentials,
   saveRememberedCredentials,
 } from '@/utils/rememberedCredentials';
+import {
+  KeyboardSubmitAccessory,
+  otpInputKeyboardProps,
+} from '@/components/KeyboardSubmitAccessory';
 
 type Mode = 'login' | 'forgot';
 
@@ -131,6 +135,8 @@ function PrimaryButton({
     </Pressable>
   );
 }
+
+const SIGNIN_OTP_ACCESSORY_ID = 'saveful-signin-otp-submit';
 
 type ResetPasswordModalFieldsProps = {
   step: 1 | 2;
@@ -237,9 +243,10 @@ function ResetPasswordModalFields({
                   }}
                   style={[styles.otpInput, digit ? styles.otpInputFilled : null]}
                   maxLength={1}
-                  keyboardType="number-pad"
+                  {...otpInputKeyboardProps(SIGNIN_OTP_ACCESSORY_ID)}
                   value={digit}
                   onChangeText={(t) => handleOtpInput(t, index)}
+                  onSubmitEditing={handleContinueFromOtp}
                   onKeyPress={({ nativeEvent }) => {
                     if (nativeEvent.key === 'Backspace') {
                       onOtpBackspace(digit, index);
@@ -987,6 +994,22 @@ export function SignInScreen() {
           onClearError={() => setResetError('')}
         />
       </SavefulModal>
+      {resetModalVisible && resetStep === 1 ? (
+        <KeyboardSubmitAccessory
+          nativeID={SIGNIN_OTP_ACCESSORY_ID}
+          label="Continue"
+          disabled={otp.join('').length !== 6}
+          onSubmit={() => {
+            if (otp.join('').length !== 6) {
+              setResetError('Please enter the 6-digit verification code.');
+              return;
+            }
+            setResetError('');
+            Keyboard.dismiss();
+            setResetStep(2);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }
