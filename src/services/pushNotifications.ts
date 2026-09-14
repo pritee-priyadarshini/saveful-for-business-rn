@@ -508,11 +508,14 @@ export function isCollectionNotification(payload: NotificationPayload): boolean 
     type.includes('collect') ||
     type.includes('provider') ||
     type.includes('feedback') ||
-    type.includes('rating')
+    type.includes('rating') ||
+    type.includes('driver_rejected') ||
+    type.includes('driver_declined') ||
+    type.includes('driver_accepted')
   ) {
     return true;
   }
-  if (deepLink.includes('updates') || screen === 'updates') {
+  if (deepLink.includes('updates') || deepLink.includes('available') || screen === 'updates') {
     return true;
   }
   return false;
@@ -555,6 +558,20 @@ export function resolveNotificationTarget(
         source: data.source as 'restaurant' | 'charity' | 'farmer',
       },
     };
+  }
+
+  const type = normalizeNotificationValue(data.type ?? data.notificationType ?? data.event);
+  const deepLink = normalizeNotificationValue(data.deepLink ?? data.deep_link ?? data.link);
+
+  // Driver declined — charity should re-assign or self-collect from Available.
+  if (
+    type.includes('driver_rejected') ||
+    type.includes('driver_declined') ||
+    deepLink === 'available'
+  ) {
+    if (role === 'charity_single' || role === 'charity_multi' || role === 'farmer') {
+      return { name: 'Tabs', params: { screen: 'Available' } };
+    }
   }
 
   if (isCollectionNotification(payload)) {

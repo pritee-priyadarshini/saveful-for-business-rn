@@ -84,9 +84,18 @@ export function PostCollectSurveyModal({
 
   useEffect(() => {
     if (!visible) return;
-    if (initialAnswer === 'yes') setStep(startAtRating || !needsPartnerRating ? 4 : 2);
-    else if (initialAnswer === 'no') setStep(6);
-    else setStep(1);
+    if (initialAnswer === 'yes') {
+      if (startAtRating || !needsPartnerRating) {
+        // Jump to rating: partner first when needed, otherwise driver-only.
+        setStep(needsPartnerRating ? 4 : canRateDriver ? 8 : 4);
+      } else {
+        setStep(2);
+      }
+    } else if (initialAnswer === 'no') {
+      setStep(6);
+    } else {
+      setStep(1);
+    }
 
     setRating(0);
     setDriverRating(0);
@@ -95,7 +104,14 @@ export function PostCollectSurveyModal({
     if (initialItems?.length) {
       setItems(initialItems);
     }
-  }, [visible, initialAnswer, initialItems, startAtRating, needsPartnerRating]);
+  }, [
+    visible,
+    initialAnswer,
+    initialItems,
+    startAtRating,
+    needsPartnerRating,
+    canRateDriver,
+  ]);
 
   const totalKg = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -422,19 +438,45 @@ export function PostCollectSurveyModal({
                         );
                       })}
                     </View>
-                  </>
-                ) : null}
 
-                {canRateDriver ? (
-                  <>
-                    <AppText
-                      variant="subheading"
-                      style={[styles.title, needsPartnerRating && { marginTop: spacing.md }]}
+                    <TextInput
+                      placeholder="Add comments (optional)"
+                      value={comment}
+                      onChangeText={setComment}
+                      style={styles.input}
+                    />
+
+                    <Pressable
+                      style={[
+                        styles.primaryBtn,
+                        (rating < 1 || (submitting && !canRateDriver)) && { opacity: 0.5 },
+                      ]}
+                      disabled={rating < 1 || (submitting && !canRateDriver)}
+                      onPress={() => {
+                        if (canRateDriver) {
+                          setStep(8);
+                          return;
+                        }
+                        void submitRating();
+                      }}
                     >
+                      {submitting && !canRateDriver ? (
+                        <ActivityIndicator color={palette.white} />
+                      ) : (
+                        <AppText variant="label" style={styles.primaryText}>
+                          {canRateDriver ? 'Continue' : 'Submit'}
+                        </AppText>
+                      )}
+                    </Pressable>
+                  </>
+                ) : canRateDriver ? (
+                  // Partner already rated — jump UI should have used step 8; keep a fallback.
+                  <>
+                    <AppText variant="subheading" style={styles.title}>
                       How was {driverName}?
                     </AppText>
                     <AppText variant="bodySmall" color={palette.stone} style={{ textAlign: 'center' }}>
-                      Rate your driver
+                      Rate your driver so they can see your feedback
                     </AppText>
                     <View style={styles.ratingRow}>
                       {[1, 2, 3, 4, 5].map((num) => {
@@ -450,19 +492,62 @@ export function PostCollectSurveyModal({
                         );
                       })}
                     </View>
+                    <TextInput
+                      placeholder="Add a note about the driver (optional)"
+                      value={comment}
+                      onChangeText={setComment}
+                      style={styles.input}
+                    />
+                    <Pressable
+                      style={[styles.primaryBtn, (!canSubmitRating || submitting) && { opacity: 0.5 }]}
+                      disabled={!canSubmitRating || submitting}
+                      onPress={() => void submitRating()}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color={palette.white} />
+                      ) : (
+                        <AppText variant="label" style={styles.primaryText}>
+                          Submit
+                        </AppText>
+                      )}
+                    </Pressable>
                   </>
                 ) : null}
+              </>
+            )}
 
+            {step === 8 && canRateDriver && (
+              <>
+                {questionIcon}
+                <AppText variant="subheading" style={styles.title}>
+                  How was {driverName}?
+                </AppText>
+                <AppText variant="bodySmall" color={palette.stone} style={{ textAlign: 'center' }}>
+                  Rate your driver so they can see your feedback in their app
+                </AppText>
+                <View style={styles.ratingRow}>
+                  {[1, 2, 3, 4, 5].map((num) => {
+                    const selected = driverRating >= num;
+                    return (
+                      <Pressable key={`driver-step-${num}`} onPress={() => setDriverRating(num)}>
+                        <Ionicons
+                          name={selected ? 'star' : 'star-outline'}
+                          size={normalize(32)}
+                          color={selected ? palette.orange : '#C9C9C9'}
+                        />
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <TextInput
-                  placeholder="Add comments (optional)"
+                  placeholder="Add a note about the driver (optional)"
                   value={comment}
                   onChangeText={setComment}
                   style={styles.input}
                 />
-
                 <Pressable
-                  style={[styles.primaryBtn, (!canSubmitRating || submitting) && { opacity: 0.5 }]}
-                  disabled={!canSubmitRating || submitting}
+                  style={[styles.primaryBtn, (driverRating < 1 || submitting) && { opacity: 0.5 }]}
+                  disabled={driverRating < 1 || submitting}
                   onPress={() => void submitRating()}
                 >
                   {submitting ? (

@@ -374,6 +374,23 @@ export function CharityUpdatesScreen() {
                     variant="star"
                     label="Business rating"
                   />
+                  {item.driverRated && item.driverRating != null ? (
+                    <RatingSummary
+                      rating={item.driverRating}
+                      variant="star"
+                      label="Driver rating"
+                    />
+                  ) : null}
+                  {item.canRateDriver ? (
+                    <Pressable
+                      onPress={() => openSurveyForItem(item, 'yes', true)}
+                      style={{ marginTop: normalize(4) }}
+                    >
+                      <AppText variant="bodyBold" style={{ color: theme.badgeText }}>
+                        Rate your driver →
+                      </AppText>
+                    </Pressable>
+                  ) : null}
                 </>
               ) : null}
             </View>
@@ -420,6 +437,35 @@ export function CharityUpdatesScreen() {
   const renderFeedbackCard = (item: UpdateItem) => {
     const theme = CARD_THEMES.feedback;
     const completed = surveyCompletedIds.includes(item.id);
+    const question = item.canRateDriver && item.rating != null
+      ? (
+        <>
+          How was your driver{' '}
+          <AppText variant="bodyBold" style={styles.feedbackBrand}>
+            {item.driverName || 'on this collection'}
+          </AppText>
+          ?
+        </>
+      )
+      : item.canRateDriver
+        ? (
+          <>
+            Rate this surplus from{' '}
+            <AppText variant="bodyBold" style={styles.feedbackBrand}>
+              {item.title}
+            </AppText>
+            {' '}and your driver
+          </>
+        )
+        : (
+          <>
+            How would you rate this surplus from{' '}
+            <AppText variant="bodyBold" style={styles.feedbackBrand}>
+              {item.title}
+            </AppText>
+            ?
+          </>
+        );
 
     return (
       <View style={[styles.updateCard, adaptive.updateCard]}>
@@ -438,11 +484,7 @@ export function CharityUpdatesScreen() {
 
           <View style={styles.feedbackContent}>
             <AppText variant="bodyBold" style={styles.feedbackQuestion}>
-              How would you rate this surplus from{' '}
-              <AppText variant="bodyBold" style={styles.feedbackBrand}>
-                {item.title}
-              </AppText>
-              ?
+              {question}
             </AppText>
 
             <View style={styles.feedbackActions}>

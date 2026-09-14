@@ -87,11 +87,17 @@ export function isListingTimeWindowClosed(listing: any): boolean {
   return false;
 }
 
-/** True when at least one non-cancelled claim on the listing is COLLECTED. */
+/** True when at least one claim is collected (claim row or driver pickup). */
 export function listingHasCollectedClaim(listing: any): boolean {
   const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
   if (
-    claims.some((claim: any) => String(claim?.status || '').toUpperCase() === 'COLLECTED')
+    claims.some((claim: any) => {
+      const status = String(claim?.status || '').toUpperCase();
+      if (status === 'COLLECTED' || status === 'COMPLETED') return true;
+      if (claim?.collectedAt) return true;
+      const pickups = Array.isArray(claim?.driverPickups) ? claim.driverPickups : [];
+      return pickups.some((p: any) => String(p?.status || '').toUpperCase() === 'COLLECTED');
+    })
   ) {
     return true;
   }
@@ -103,6 +109,8 @@ export function listingHasCollectedClaim(listing: any): boolean {
 export function resolveListingStatus(listing: any): ListingStatus {
   const status = String(listing?.status || '').toUpperCase();
   const claimStatus = String(listing?.claimStatus || '').toLowerCase();
+  const hasCollected = listingHasCollectedClaim(listing);
+  const remaining = Number(listing?.remainingQtyKg);
 
   let resolved: ListingStatus = 'ACTIVE';
   if (status === 'ACTIVE' || status === 'AVAILABLE') resolved = 'ACTIVE';
@@ -113,11 +121,35 @@ export function resolveListingStatus(listing: any): ListingStatus {
     resolved = 'COLLECTED';
   } else if (status === 'CLAIMED') {
     // DB only has CLAIMED after full claim — collected is claim-level.
-    resolved = listingHasCollectedClaim(listing) ? 'COLLECTED' : 'CLAIMED';
+    resolved = hasCollected ? 'COLLECTED' : 'CLAIMED';
   } else if (['collected', 'completed', 'verified'].includes(claimStatus)) {
     resolved = 'COLLECTED';
   } else if (['pending', 'confirmed', 'claimed'].includes(claimStatus)) {
     resolved = 'CLAIMED';
+  }
+
+  // Driver/charity collected the claim(s) but listing row still ACTIVE/PARTIAL/CLAIMED.
+  if (hasCollected) {
+    if (resolved === 'CLAIMED') return 'COLLECTED';
+    if (resolved === 'ACTIVE' || resolved === 'PARTIAL') {
+      if (!Number.isFinite(remaining) || remaining <= 0) {
+        return 'COLLECTED';
+      }
+      // Leftover kg remains — keep partial, not "fresh active".
+      resolved = 'PARTIAL';
+    }
+  }
+
+  // Open claims exist but listing row still ACTIVE (stale status).
+  if (resolved === 'ACTIVE') {
+    const claims = Array.isArray(listing?.foodClaims) ? listing.foodClaims : [];
+    const hasOpenClaim = claims.some((claim: any) => {
+      const s = String(claim?.status || '').toUpperCase();
+      return Boolean(s) && s !== 'CANCELLED';
+    });
+    if (hasOpenClaim) {
+      resolved = !Number.isFinite(remaining) || remaining <= 0 ? 'CLAIMED' : 'PARTIAL';
+    }
   }
 
   // Past pickup / best-before should display and filter as expired even before the worker flips DB status.

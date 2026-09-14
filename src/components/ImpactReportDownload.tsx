@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   InteractionManager,
   Modal,
   Platform,
@@ -66,8 +67,47 @@ function formatNumber(value: number) {
   return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
+function formatMoney(value: number) {
+  return `$${value.toLocaleString('en-AU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatKg(value: number) {
+  return `${formatNumber(value)} kg`;
+}
+
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+type CategoryInsight = {
+  name: string;
+  collectedKg: number;
+  percent: number;
+  value: number;
+};
+
+function aggregateFoodsByCategory(foods: FoodReportRow[]): CategoryInsight[] {
+  const map = new Map<string, { collectedKg: number; value: number }>();
+  for (const food of foods) {
+    const name = food.category && food.category !== '—' ? food.category : food.name;
+    const prev = map.get(name) ?? { collectedKg: 0, value: 0 };
+    map.set(name, {
+      collectedKg: round2(prev.collectedKg + food.totalKg),
+      value: round2(prev.value + food.savedUsd),
+    });
+  }
+  const total = [...map.values()].reduce((sum, row) => sum + row.collectedKg, 0);
+  return [...map.entries()]
+    .map(([name, row]) => ({
+      name,
+      collectedKg: row.collectedKg,
+      value: row.value,
+      percent: total > 0 ? round2((row.collectedKg / total) * 100) : 0,
+    }))
+    .sort((a, b) => b.collectedKg - a.collectedKg);
 }
 
 function escapeHtml(value: string) {
@@ -193,13 +233,23 @@ function toFoodReportRows(
   });
 }
 
-function buildReportMeta(props: Props) {
-  const generatedAt = new Date().toLocaleString('en-AU', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+function formatGeneratedAt(date = new Date()) {
+  const day = date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
+  const time = date
+    .toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
+    .replace(/\s/g, '')
+    .toLowerCase();
+  return `${day} at ${time}`;
+}
+
+function buildReportMeta(props: Props) {
+  const generatedAt = formatGeneratedAt();
   return {
-    title: 'Impact Report',
+    title: 'Food Surplus Impact & Insights Report',
     organisation: props.organisationName?.trim() || 'Organisation',
     site: props.siteLabel?.trim() || null,
     period: props.filterLabel,
@@ -244,124 +294,8 @@ async function fetchFoodSavings(
   return toFoodReportRows(foods, props.stats);
 }
 
-function buildFoodItemsHtml(foods: FoodReportRow[]) {
-  if (!foods.length) {
-    return `
-      <h2>Food redistribution by category</h2>
-      <p class="empty">No per-food-item savings for this period.</p>
-    `;
-  }
-
-  const rows = foods
-    .map(
-      (food) => `
-      <tr>
-        <td class="rank">${food.rank}</td>
-        <td>
-          <div class="food-name">${escapeHtml(food.name)}</div>
-          <div class="food-cat">${escapeHtml(food.category)}</div>
-        </td>
-        <td class="value">${escapeHtml(formatNumber(food.totalKg))} kg</td>
-        <td class="value">${escapeHtml(formatNumber(food.peopleKg))} kg</td>
-        <td class="value">${escapeHtml(formatNumber(food.animalKg))} kg</td>
-        <td class="value">${escapeHtml(formatNumber(food.mealsCreated))}</td>
-        <td class="value">${escapeHtml(formatNumber(food.co2AvoidedKg))} kg</td>
-        <td class="value">$${escapeHtml(formatNumber(food.savedUsd))}</td>
-      </tr>`,
-    )
-    .join('');
-
-  return `
-    <h2>Food redistribution by category</h2>
-    <p class="section-note">
-      Breakdown by food item for this period. These amounts make up the totals above — they are not extra.
-    </p>
-    <table class="foods">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Food item</th>
-          <th style="text-align:right">Total</th>
-          <th style="text-align:right">People</th>
-          <th style="text-align:right">Animals</th>
-          <th style="text-align:right">Meals</th>
-          <th style="text-align:right">CO₂</th>
-          <th style="text-align:right">Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `;
-}
-
 function partnerHeading(props: Props) {
   return props.stats.mode === 'RECEIVER' ? 'Collected from' : 'Recipient Organisations';
-}
-
-function buildRecipientsHtml(props: Props, recipients: RecipientRow[]) {
-  const heading = partnerHeading(props);
-
-  if (!recipients.length) {
-    return `
-      <h2>${escapeHtml(heading)}</h2>
-      <p class="empty">No partner organisations for this period.</p>
-    `;
-  }
-
-  const rows = recipients
-    .map((recipient) => {
-      const foods = recipient.foods.length
-        ? recipient.foods
-            .slice(0, 6)
-            .map((food) => `${escapeHtml(food.name)} (${escapeHtml(formatNumber(food.totalKg))} kg)`)
-            .join(', ')
-        : '—';
-      const last = formatCollectionDate(recipient.lastCollectionAt);
-
-      return `
-      <tr>
-        <td class="rank">${recipient.rank}</td>
-        <td>
-          <div class="food-name">${escapeHtml(recipient.name)}</div>
-          <div class="food-cat">${last ? `Last collection ${escapeHtml(last)}` : 'Collection dates unavailable'}</div>
-        </td>
-        <td class="value">${escapeHtml(formatNumber(recipient.collections))}</td>
-        <td class="value">${escapeHtml(formatNumber(recipient.totalKg))} kg</td>
-        <td class="value">${escapeHtml(formatNumber(recipient.sharePercent))}%</td>
-        <td class="value">${escapeHtml(formatNumber(recipient.mealsCreated))}</td>
-        <td class="value">${escapeHtml(formatNumber(recipient.co2AvoidedKg))} kg</td>
-        <td class="foods-cell">${foods}</td>
-      </tr>`;
-    })
-    .join('');
-
-  const verb = props.stats.mode === 'RECEIVER' ? 'collected from' : 'donated to';
-
-  return `
-    <h2>${escapeHtml(heading)}</h2>
-    <p class="section-note">
-      Every organisation you ${escapeHtml(verb)} in this period, how many times, how much food and what kind.
-    </p>
-    <table class="foods">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Organisation</th>
-          <th style="text-align:right">Times</th>
-          <th style="text-align:right">Food</th>
-          <th style="text-align:right">Share</th>
-          <th style="text-align:right">Meals</th>
-          <th style="text-align:right">CO₂</th>
-          <th>Food types</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `;
 }
 
 function isFarmerImpactReport() {
@@ -374,289 +308,680 @@ function isCharityImpactReport() {
   return role === 'charity_single' || role === 'charity_multi';
 }
 
-function reportHeadings() {
-  if (isFarmerImpactReport() || isCharityImpactReport()) {
-    return {
-      brandSub: 'Impact Reporting',
-      lede:
-        'A summary of your food redistribution, social, environmental and operational impact for the selected reporting period.',
-    };
-  }
+function reportCopy(mode: ImpactDisplayStats['mode']) {
+  const isReceiver = mode === 'RECEIVER';
   return {
-    brandSub: 'IMPACT & ESG SUMMARY',
-    lede:
-      'A management-ready snapshot of food redistribution impact for the selected period, including per-food-item savings.',
+    lede: isReceiver
+      ? 'A clear snapshot of the food you collected, the impact created and where it came from.'
+      : 'A clear snapshot of your surplus food, the impact created and where your food went.',
+    impactTitle: 'Your Impact',
+    impactLede: isReceiver
+      ? 'The impact created from the food you collected during this period.'
+      : 'The impact created from your surplus food during this period.',
+    redistributedLabel: isReceiver ? 'Food received' : 'Food redistributed',
+    valueLabel: isReceiver
+      ? 'Estimated food value received'
+      : 'Estimated food value redistributed',
+    partnersLabel: isReceiver
+      ? 'Organisations collected from'
+      : 'Community partners supported',
+    destinationTitle: isReceiver ? 'Where food came from' : 'Where your food went',
+    insightsTitle: isReceiver ? 'Your Collection Insights' : 'Your Surplus Insights',
+    insightsLede: isReceiver
+      ? 'See how much food you collected and which food categories contributed most.'
+      : 'See how much surplus food you listed, how much was collected and which food categories contributed most.',
+    destinationsTitle: isReceiver ? 'Where Your Food Came From' : 'Where Your Food Went',
+    destinationsLede: isReceiver
+      ? 'See the organisations you collected from and what you received.'
+      : 'See the organisations your surplus food supported and what they received.',
+    partnerKgLabel: isReceiver ? 'Food collected' : 'Food received',
+    partnerFoodsLabel: isReceiver ? 'Food collected' : 'Food received',
   };
 }
 
-function buildPdfHtml(props: Props, data: ReportData, logoDataUri: string | null) {
-  const meta = buildReportMeta(props);
-  const headings = reportHeadings();
-  const rows = metricRows(props.stats)
-    .map(
-      (row) => `
-      <tr>
-        <td>${escapeHtml(row.label)}</td>
-        <td class="value">${escapeHtml(row.value)}</td>
-      </tr>`,
-    )
+type IconKind =
+  | 'weight'
+  | 'meals'
+  | 'co2'
+  | 'value'
+  | 'truck'
+  | 'people'
+  | 'person'
+  | 'paw'
+  | 'leaf'
+  | 'clip'
+  | 'gauge'
+  | 'heart'
+  | 'star'
+  | 'bulb'
+  | 'bag';
+
+type IconTint = 'green' | 'peach' | 'cream' | 'lilac';
+
+function iconDisc(kind: IconKind, tint: IconTint = 'green') {
+  const paths: Record<IconKind, string> = {
+    weight:
+      '<path d="M7 10h10M8 10l2-5h4l2 5M6 10h12v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-7z"/>',
+    meals:
+      '<path d="M6 5v10M6 8h2.2c.8 0 1.3-.6 1.3-1.3S9 5.4 8.2 5.4H6M14.5 5v5.5c0 1.4.8 2 2 2V5M17.2 5v13"/>',
+    co2:
+      '<path d="M8 15.5a3.2 3.2 0 1 1 1.2-6.2 3.8 3.8 0 0 1 7.3 1.1 2.6 2.6 0 1 1-.3 5.1H8z"/>',
+    value:
+      '<path d="M12 6v12M9.2 8.6c.6-.8 1.6-1.3 2.8-1.3 1.7 0 3 1 3 2.4 0 3.3-6 1.5-6 4.4 0 1.4 1.3 2.4 3 2.4 1.2 0 2.2-.5 2.8-1.3"/>',
+    truck:
+      '<path d="M4 8h9v7H4zM13 11h3.2L18 13.4V15h-5M6.4 16.6a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zm8.7 0a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6z"/>',
+    people:
+      '<path d="M9 10a2 2 0 1 0-4 0 2 2 0 0 0 4 0zm10 0a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM3.5 17c0-2 1.6-3.2 3.5-3.2S10.5 15 10.5 17M13.5 17c0-2 1.6-3.2 3.5-3.2s3.5 1.2 3.5 3.2"/>',
+    person:
+      '<path d="M12 11a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8zM7.2 18c.4-2.3 2.3-3.6 4.8-3.6s4.4 1.3 4.8 3.6"/>',
+    paw:
+      '<path d="M8 9.2a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zm8 0a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zM6.8 13a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zm10.4 0a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM12 17.6c-2.2 0-3.6-1.5-3.6-3.1 0-1.2 1.3-2 3.6-2s3.6.8 3.6 2c0 1.6-1.4 3.1-3.6 3.1z"/>',
+    leaf:
+      '<path d="M6 16.5c6-1 10.2-5.4 11.2-11.2C11.4 6.3 7 10.5 6 16.5zm0 0c2.4-2.4 5.4-3.6 8.8-4"/>',
+    clip:
+      '<path d="M8 7.2h8v11.2H8zM10 5.6h4v2.2h-4zM10 11h4M10 13.6h4"/>',
+    gauge:
+      '<path d="M6.2 16.2a7 7 0 1 1 11.6 0M12 13.2l3.2-3.2M12 16.4a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"/>',
+    heart:
+      '<path d="M12 17.4s-6-3.7-6-7.2A3.1 3.1 0 0 1 12 8.4a3.1 3.1 0 0 1 6 1.8c0 3.5-6 7.2-6 7.2z"/>',
+    star:
+      '<path d="M12 5.4l1.6 3.6 4 .4-3 2.7.9 3.9L12 13.8 8.5 16l.9-3.9-3-2.7 4-.4z"/>',
+    bulb:
+      '<path d="M12 5.4a4.2 4.2 0 0 0-2.4 7.6V15h4.8v-2A4.2 4.2 0 0 0 12 5.4zM10.4 16.4h3.2M10.8 18h2.4"/>',
+    bag:
+      '<path d="M8 9h8l.8 9.2H7.2L8 9zm2 0V7.8A2 2 0 0 1 12 5.8a2 2 0 0 1 2 2V9"/>',
+  };
+  return `<span class="icon-disc tint-${tint}"><svg viewBox="0 0 24 24" fill="none" stroke="#2F6B47" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths[kind]}</svg></span>`;
+}
+
+function metricTile(icon: IconKind, tint: IconTint, value: string, label: string) {
+  return `
+    <td class="metric-cell">
+      <div class="tile">
+        ${iconDisc(icon, tint)}
+        <div class="metric-value">${escapeHtml(value)}</div>
+        <div class="metric-label">${escapeHtml(label)}</div>
+      </div>
+    </td>`;
+}
+
+function destinationTile(icon: IconKind, value: string, label: string) {
+  return `
+    <td class="dest-cell">
+      ${iconDisc(icon)}
+      <div class="dest-text">
+        <div class="dest-value">${escapeHtml(value)}</div>
+        <div class="dest-label">${escapeHtml(label)}</div>
+      </div>
+    </td>`;
+}
+
+function buildImpactSectionHtml(props: Props) {
+  const copy = reportCopy(props.stats.mode);
+  const { stats } = props;
+  return `
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-num-col"><span class="panel-num">1</span></div>
+        <div>
+          <h2>${escapeHtml(copy.impactTitle)}</h2>
+          <p class="panel-note">${escapeHtml(copy.impactLede)}</p>
+        </div>
+      </div>
+      <table class="metrics">
+        <tr>
+          ${metricTile('leaf', 'green', formatKg(stats.redistributedKg), copy.redistributedLabel)}
+          ${metricTile('meals', 'peach', formatNumber(stats.mealsCreated), 'Meals created')}
+          ${metricTile('co2', 'green', formatKg(stats.co2AvoidedKg), 'CO₂e avoided')}
+          ${metricTile('value', 'cream', formatMoney(stats.foodSavedMoney), copy.valueLabel)}
+          ${metricTile('truck', 'lilac', formatNumber(stats.collectionsCompleted), 'Collections completed')}
+          ${metricTile('people', 'green', formatNumber(stats.partnersSupported), copy.partnersLabel)}
+        </tr>
+      </table>
+      <div class="inset">
+        <div class="inset-title">${escapeHtml(copy.destinationTitle)}</div>
+        <table class="destinations">
+          <tr>
+            ${destinationTile(
+              'person',
+              `${formatKg(stats.peopleKg)} · ${formatNumber(stats.peoplePercent)}%`,
+              'People',
+            )}
+            ${destinationTile(
+              'paw',
+              `${formatKg(stats.animalKg)} · ${formatNumber(stats.animalPercent)}%`,
+              'Animals',
+            )}
+            <td class="dest-cell dest-divider">
+              ${iconDisc('leaf')}
+              <div class="dest-text">
+                <div class="dest-tagline">Good food</div>
+                <div class="dest-label">Stronger communities<br/>A healthier planet</div>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </section>`;
+}
+
+function buildInsightsSectionHtml(props: Props, foods: FoodReportRow[]) {
+  const copy = reportCopy(props.stats.mode);
+  const categories = aggregateFoodsByCategory(foods);
+  const collectedKg = props.stats.redistributedKg;
+  const top = categories[0];
+  const insight = top
+    ? `${top.name} ${/s$/i.test(top.name) ? 'were' : 'was'} your largest source of surplus this period, accounting for ${formatNumber(top.percent)}% of food collected.`
+    : 'No food-category breakdown is available for this period.';
+
+  const rows = categories.length
+    ? categories
+        .slice(0, 4)
+        .map(
+          (row) => `
+        <tr>
+          <td>${escapeHtml(row.name)}</td>
+          <td class="num">—</td>
+          <td class="num">${escapeHtml(formatKg(row.collectedKg))}</td>
+          <td class="num">${escapeHtml(formatNumber(row.percent))}%</td>
+          <td class="num">${escapeHtml(formatMoney(row.value))}</td>
+        </tr>`,
+        )
+        .join('')
+    : `<tr><td colspan="5" class="empty-cell">No food collected in this reporting period.</td></tr>`;
+
+  return `
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-num-col"><span class="panel-num">2</span></div>
+        <div>
+          <h2>${escapeHtml(copy.insightsTitle)}</h2>
+          <p class="panel-note">${escapeHtml(copy.insightsLede)}</p>
+        </div>
+      </div>
+      <table class="metrics insights-metrics">
+        <tr>
+          ${metricTile('clip', 'green', '—', 'Food listed')}
+          ${metricTile('truck', 'lilac', formatKg(collectedKg), 'Food collected')}
+          ${metricTile('gauge', 'cream', '—', 'Collection rate')}
+        </tr>
+      </table>
+      <div class="table-title">Your surplus by category</div>
+      <table class="insights-split">
+        <tr>
+          <td class="insights-table-wrap">
+            <table class="category-table">
+              <thead>
+                <tr>
+                  <th>Food category</th>
+                  <th class="num">Listed</th>
+                  <th class="num">Collected</th>
+                  <th class="num">% of surplus</th>
+                  <th class="num">Est. value</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </td>
+          <td class="insight-card">
+            ${iconDisc('bulb')}
+            <div class="insight-kicker">Key insight</div>
+            <p>${escapeHtml(insight)}</p>
+          </td>
+        </tr>
+      </table>
+    </section>`;
+}
+
+function partnerKindLine(kind: RecipientRow['kind']) {
+  if (kind === 'animals') return 'Good food. Stronger animals.';
+  if (kind === 'people') return 'Good food. Stronger people.';
+  return 'Good food. Stronger communities.';
+}
+
+function buildDestinationsSectionHtml(props: Props, recipients: RecipientRow[]) {
+  const copy = reportCopy(props.stats.mode);
+  const head = `
+      <div class="panel-head">
+        <div class="panel-num-col"><span class="panel-num">3</span></div>
+        <div>
+          <h2>${escapeHtml(copy.destinationsTitle)}</h2>
+          <p class="panel-note">${escapeHtml(copy.destinationsLede)}</p>
+        </div>
+      </div>`;
+
+  if (!recipients.length) {
+    return `
+      <section class="panel">
+        ${head}
+        <div class="tile empty-tile"><span>No partner organisations in this reporting period.</span></div>
+      </section>`;
+  }
+
+  const ratingText =
+    props.stats.rating != null
+      ? `${formatNumber(props.stats.rating)} / 5 · ${formatNumber(props.stats.ratingCount)} ${
+          props.stats.ratingCount === 1 ? 'review' : 'reviews'
+        }`
+      : null;
+
+  const cards = recipients
+    .slice(0, 2)
+    .map((recipient, index) => {
+      const last = formatCollectionDate(recipient.lastCollectionAt);
+      const foods = recipient.foods.length
+        ? [...new Set(recipient.foods.map((food) => food.category?.trim() || food.name))]
+            .filter(Boolean)
+            .slice(0, 5)
+            .join(' · ')
+        : '—';
+      const showRating = ratingText && index === 0;
+
+      return `
+        <div class="tile partner-tile">
+          <table class="partner-grid">
+            <tr>
+              <td class="partner-col">
+                ${iconDisc('heart', 'peach')}
+                <div class="partner-value">${escapeHtml(recipient.name)}</div>
+                <div class="partner-label">${escapeHtml(partnerKindLine(recipient.kind))}</div>
+              </td>
+              <td class="partner-col">
+                ${iconDisc('bag')}
+                <div class="partner-value">${escapeHtml(formatKg(recipient.totalKg))}</div>
+                <div class="partner-label">${escapeHtml(copy.partnerKgLabel)}</div>
+              </td>
+              <td class="partner-col">
+                ${iconDisc('truck', 'lilac')}
+                <div class="partner-value">${escapeHtml(formatNumber(recipient.collections))}</div>
+                <div class="partner-label">Collections</div>
+              </td>
+              <td class="partner-col">
+                ${iconDisc('people')}
+                <div class="partner-value">${escapeHtml(formatNumber(recipient.mealsCreated))}</div>
+                <div class="partner-label">Meals created</div>
+              </td>
+            </tr>
+          </table>
+          <table class="partner-meta">
+            <tr>
+              <td>
+                <div class="meta-kicker">Last collection</div>
+                <div class="meta-value">${escapeHtml(last || '—')}</div>
+              </td>
+              <td>
+                ${
+                  showRating
+                    ? `<div class="meta-kicker">Partner rating</div>
+                       <div class="meta-value">${escapeHtml(ratingText)}</div>`
+                    : ''
+                }
+              </td>
+              <td>
+                <div class="meta-kicker">${escapeHtml(copy.partnerFoodsLabel)}</div>
+                <div class="meta-value">${escapeHtml(foods)}</div>
+              </td>
+            </tr>
+          </table>
+        </div>`;
+    })
     .join('');
 
-  const ratingHtml =
-    props.stats.rating != null
-      ? `<div class="rating">Partner rating: <strong>${escapeHtml(
-          formatNumber(props.stats.rating),
-        )}</strong> / 5 · ${escapeHtml(formatNumber(props.stats.ratingCount))} reviews</div>`
-      : '';
+  return `
+    <section class="panel">
+      ${head}
+      ${cards}
+    </section>`;
+}
 
+/**
+ * Layout is authored in mm/pt so the sheet is true A4. iOS lays the page out in
+ * points (595 wide), so the mm-based page is zoomed to fit; Android prints at
+ * 96dpi where the mm sizes already match A4.
+ */
+function buildPdfHtml(props: Props, data: ReportData, logoDataUri: string | null) {
+  const meta = buildReportMeta(props);
+  const copy = reportCopy(props.stats.mode);
+  const zoom = Platform.OS === 'ios' ? 0.75 : 1;
   const brandLogo = logoDataUri
-    ? `<div class="brand-center"><img class="brand-logo" src="${logoDataUri}" alt="Saveful for Business" /></div>`
-    : `<div class="brand-center"></div>`;
+    ? `<img class="brand-logo" src="${logoDataUri}" alt="Saveful for Business" />`
+    : '';
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <style>
-    @page { margin: 24px; }
+    @page { size: A4; margin: 0; }
     * { box-sizing: border-box; }
+    html {
+      background: #F4F6F2;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      color: #1A1A1B;
-      background: #FFFAF3;
+      padding: 0;
+      zoom: ${zoom};
+      background: #F4F6F2;
+      color: #16211A;
+      font-family: Helvetica, Arial, sans-serif;
     }
     .page {
-      padding: 24px 20px 28px;
-      background: #FEFFED;
-    }
-    .brand {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 22px;
-      padding-bottom: 14px;
-      border-bottom: 2px solid #3A7E52;
-    }
-    .brand-left {
-      flex: 1;
-      min-width: 0;
-    }
-    .brand-center {
-      flex: 0 0 auto;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    .brand-right {
-      flex: 1;
-      display: flex;
-      justify-content: flex-end;
-      align-items: flex-start;
-    }
-    .brand-logo {
-      height: 52px;
-      width: auto;
-      max-width: 180px;
-      object-fit: contain;
-      display: block;
-    }
-    .brand-mark {
-      font-size: 20px;
-      font-weight: 800;
-      color: #4B2176;
-    }
-    .brand-sub {
-      margin-top: 4px;
-      font-size: 11px;
-      color: #575757;
-      text-transform: uppercase;
-      letter-spacing: 1.1px;
-    }
-    .chip {
-      background: #96F0B6;
-      color: #1A1A1B;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 8px 12px;
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 26px;
-      line-height: 1.15;
-    }
-    h2 {
-      margin: 28px 0 8px;
-      font-size: 18px;
-      color: #4B2176;
-    }
-    .lede, .section-note, .empty {
-      margin: 0 0 18px;
-      font-size: 13px;
-      line-height: 1.45;
-      color: #575757;
-    }
-    .meta {
-      margin-bottom: 20px;
-      padding: 14px 8px 4px;
-      background: #FFFCF9;
-      border: 1px solid #EEE4D7;
-      border-radius: 14px;
+      width: 210mm;
+      height: 297mm;
       overflow: hidden;
+      padding: 9mm 11mm 8mm;
+      background: #F4F6F2;
     }
-    .meta-item {
-      display: inline-block;
-      width: 48%;
-      vertical-align: top;
-      padding: 0 8px 12px;
-    }
-    .meta-item label {
-      display: block;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #6D6D72;
-      margin-bottom: 4px;
-    }
-    .meta-item div {
-      font-size: 13px;
-      font-weight: 650;
-    }
-    table {
+    .page-frame {
       width: 100%;
-      border-collapse: collapse;
-      background: #FFFCF9;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 1px solid #EEE4D7;
+      height: 100%;
     }
-    th {
-      text-align: left;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.7px;
-      color: #FEFFED;
-      background: #3A7E52;
-      padding: 10px 10px;
-    }
-    td {
-      padding: 11px 10px;
-      border-top: 1px solid #EEE4D7;
-      font-size: 12px;
+    .page-frame > tbody > tr.page-main > td { height: 100%; vertical-align: top; padding: 0; }
+    .page-frame > tbody > tr.page-foot > td { height: 1px; vertical-align: bottom; padding: 4mm 0 0; }
+    table { border-collapse: collapse; border: 0; width: 100%; }
+    td, th { border: 0; background: transparent; }
+
+    .header { margin-bottom: 4mm; }
+    .header td { vertical-align: top; padding: 0; }
+    .brand-logo { height: 11mm; width: auto; max-width: 48mm; display: block; }
+    .meta-block { width: 46%; }
+    .meta-table { width: auto; margin-left: auto; }
+    .meta-table td {
+      padding: 0 0 0.6mm 0;
+      font-size: 7pt;
+      line-height: 1.3;
       vertical-align: top;
     }
-    tr:nth-child(even) td { background: #FEFFED; }
-    td.value {
+    .meta-table .meta-label {
+      padding-right: 3.5mm;
       text-align: right;
-      font-weight: 700;
-      color: #4B2176;
+      font-size: 5.5pt;
+      letter-spacing: 0.15mm;
+      text-transform: uppercase;
+      color: #8A938B;
       white-space: nowrap;
     }
-    td.rank {
-      width: 28px;
+    .meta-table .meta-data { text-align: left; white-space: nowrap; }
+
+    .title-row { margin-bottom: 4mm; }
+    .title-row td { vertical-align: top; padding: 0; }
+    h1 { margin: 0 0 1mm; font-size: 16pt; line-height: 1.15; font-weight: 700; }
+    .lede { margin: 0; max-width: 118mm; font-size: 8pt; line-height: 1.35; color: #67706A; }
+    .tagline {
+      width: 40mm;
+      text-align: right;
+      font-size: 9pt;
+      line-height: 1.25;
+      font-style: italic;
+      color: #2F6B47;
+    }
+
+    .panel {
+      margin: 0 0 3.5mm;
+      padding: 4mm 4.5mm;
+      background: #EAEFE7;
+      border-radius: 2.4mm;
+    }
+    .panel:last-child { margin-bottom: 0; }
+    .panel-head { display: table; width: 100%; margin-bottom: 2.2mm; }
+    .panel-head > * { display: table-cell; vertical-align: top; }
+    .panel-num-col { width: 8mm; }
+    .panel-num {
+      display: block;
+      width: 5.8mm;
+      height: 5.8mm;
+      border-radius: 50%;
+      background: #2F6B47;
+      color: #FFFFFF;
+      font-size: 8pt;
       font-weight: 700;
-      color: #3A7E52;
+      line-height: 5.8mm;
+      text-align: center;
     }
-    .food-name { font-weight: 700; color: #1A1A1B; }
-    .food-cat { margin-top: 2px; font-size: 11px; color: #6D6D72; }
-    table.foods th, table.foods td { font-size: 11px; padding: 9px 8px; }
-    td.foods-cell { font-size: 10px; color: #575757; line-height: 1.4; }
-    .rating {
-      margin-top: 16px;
-      padding: 11px 12px;
-      background: #FFCDF5;
-      border-radius: 12px;
-      font-size: 12px;
+    h2 { margin: 0 0 0.4mm; font-size: 12pt; font-weight: 700; }
+    .panel-note { margin: 0; font-size: 7.5pt; line-height: 1.3; color: #67706A; }
+
+    .tile {
+      background: #FFFFFF;
+      border: 0.2mm solid #DFE6DC;
+      border-radius: 2mm;
+      padding: 3mm 1.6mm 3.2mm;
+      text-align: center;
     }
-    .footer {
-      margin-top: 24px;
-      padding-top: 12px;
-      border-top: 1px solid #EEE4D7;
-      font-size: 10px;
-      color: #6D6D72;
-      line-height: 1.5;
+    .empty-tile {
+      padding: 6mm 3mm;
+      font-size: 8pt;
+      color: #67706A;
     }
+    .empty-tile span { display: inline; }
+    .metrics { table-layout: fixed; }
+    .metric-cell { width: 16.66%; padding: 0 0.8mm; vertical-align: top; }
+    .insights-metrics .metric-cell { width: 33.33%; }
+    .icon-disc {
+      display: inline-block;
+      width: 7mm;
+      height: 7mm;
+      line-height: 7mm;
+      text-align: center;
+      border-radius: 50%;
+      background: #E2EDE4;
+    }
+    .icon-disc svg { width: 3.6mm; height: 3.6mm; vertical-align: middle; }
+    .tint-peach { background: #FBE5D8; }
+    .tint-cream { background: #FAEFCF; }
+    .tint-lilac { background: #E6E3F2; }
+    .metric-value { margin-top: 1.6mm; font-size: 11.5pt; font-weight: 700; }
+    .metric-label { margin-top: 0.6mm; font-size: 6.5pt; line-height: 1.25; color: #67706A; }
+
+    .inset {
+      margin-top: 3mm;
+      padding: 3mm 3.5mm;
+      background: #DFE8DA;
+      border-radius: 2mm;
+    }
+    .inset-title { margin-bottom: 1.8mm; font-size: 7.5pt; font-weight: 700; }
+    .destinations { table-layout: fixed; }
+    .dest-cell { width: 33.33%; padding: 0 2.5mm 0 0; vertical-align: top; }
+    .dest-cell .icon-disc { float: left; margin-right: 2mm; background: #CFDECA; }
+    .dest-divider { padding-left: 3mm; padding-right: 0; border-left: 0.2mm solid #C6D3C1; }
+    .dest-text { overflow: hidden; }
+    .dest-value { font-size: 10pt; font-weight: 700; }
+    .dest-tagline { font-size: 8pt; font-weight: 700; color: #2F6B47; }
+    .dest-label { margin-top: 0.4mm; font-size: 7pt; line-height: 1.25; color: #67706A; }
+
+    .table-title { margin: 2.6mm 0 1.8mm; font-size: 7.5pt; font-weight: 700; }
+    .insights-split td { vertical-align: top; }
+    .insights-table-wrap { width: 62%; padding-right: 3mm; }
+    .category-table {
+      background: #FFFFFF;
+      border: 0.2mm solid #DFE6DC;
+      border-radius: 2mm;
+      overflow: hidden;
+    }
+    .category-table th {
+      text-align: left;
+      font-size: 5.5pt;
+      letter-spacing: 0.12mm;
+      text-transform: uppercase;
+      color: #7C857D;
+      background: #EDF1EA;
+      padding: 1.4mm 2.4mm;
+    }
+    .category-table td {
+      padding: 1.4mm 2.4mm;
+      font-size: 8pt;
+      border-top: 0.2mm solid #E9EEE6;
+    }
+    .category-table tr:first-child td { border-top: 0; }
+    .category-table .num, .category-table th.num { text-align: right; white-space: nowrap; }
+    .empty-cell { color: #8A938B; text-align: center; }
+    .insight-card {
+      width: 38%;
+      padding: 3mm;
+      background: #D8E6D9;
+      border-radius: 2mm;
+      vertical-align: top;
+    }
+    .insight-card .icon-disc { background: #FFFFFF; }
+    .insight-kicker {
+      margin: 1.4mm 0 1.2mm;
+      font-size: 6pt;
+      letter-spacing: 0.16mm;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #2F6B47;
+    }
+    .insight-card p { margin: 0; font-size: 8.5pt; line-height: 1.35; }
+
+    .partner-tile { padding: 3.2mm 3mm; margin-bottom: 2mm; }
+    .partner-tile:last-child { margin-bottom: 0; }
+    .partner-grid { table-layout: fixed; }
+    .partner-col {
+      width: 25%;
+      padding: 0 1.5mm;
+      vertical-align: top;
+      text-align: center;
+    }
+    .partner-value {
+      margin-top: 1.6mm;
+      font-size: 10pt;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .partner-label {
+      margin-top: 0.5mm;
+      font-size: 6.5pt;
+      line-height: 1.25;
+      color: #67706A;
+    }
+    .partner-meta {
+      table-layout: fixed;
+      margin-top: 2.4mm;
+      padding-top: 2.2mm;
+      border-top: 0.2mm solid #E4EAE1;
+    }
+    .partner-meta td {
+      width: 33.33%;
+      padding: 0 2.4mm;
+      text-align: left;
+      vertical-align: top;
+    }
+    .partner-meta td:first-child { padding-left: 1mm; }
+    .partner-meta td:last-child { padding-right: 1mm; }
+    .meta-kicker {
+      font-size: 5.5pt;
+      letter-spacing: 0.15mm;
+      text-transform: uppercase;
+      color: #8A938B;
+    }
+    .meta-value { margin-top: 0.6mm; font-size: 7.5pt; line-height: 1.3; }
+
+    .footer { table-layout: fixed; margin: 0; padding-top: 2mm; border-top: 0.2mm solid #D9E0D6; }
+    .footer td { vertical-align: middle; padding: 0; }
+    .footer-brand { width: 32%; }
+    .footer-brand img { height: 8mm; width: auto; max-width: 38mm; }
+    .footer-tag { font-size: 8pt; font-weight: 700; line-height: 1.3; }
+    .footer-thanks {
+      text-align: right;
+      font-size: 7pt;
+      line-height: 1.3;
+      font-style: italic;
+      color: #2F6B47;
+    }
+    .footer-notes { margin-top: 1.6mm; font-size: 5.5pt; line-height: 1.3; color: #969E96; }
   </style>
 </head>
 <body>
   <div class="page">
-    <div class="brand">
-      <div class="brand-left">
-        <div class="brand-mark">Saveful for Business</div>
-        <div class="brand-sub">${escapeHtml(headings.brandSub)}</div>
-      </div>
-      ${brandLogo}
-      <div class="brand-right">
-        <div class="chip">Confidential</div>
-      </div>
-    </div>
-
-    <h1>${escapeHtml(meta.title)}</h1>
-    <p class="lede">
-      ${escapeHtml(headings.lede)}
-    </p>
-
-    <div class="meta">
-      <div class="meta-item">
-        <label>PREPARED FOR</label>
-        <div>${escapeHtml(meta.organisation)}</div>
-      </div>
-      <div class="meta-item">
-        <label>REPORTING PERIOD</label>
-        <div>${escapeHtml(meta.period)}</div>
-      </div>
-      ${
-        meta.site
-          ? `<div class="meta-item"><label>Site</label><div>${escapeHtml(meta.site)}</div></div>`
-          : ''
-      }
-      <div class="meta-item">
-        <label>GENERATED ON</label>
-        <div>${escapeHtml(meta.generatedAt)}</div>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Metric</th>
-          <th style="text-align:right">Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
+    <table class="page-frame">
+      <tr class="page-main">
+        <td>
+          <table class="header">
+            <tr>
+              <td>${brandLogo}</td>
+              <td class="meta-block">
+                <table class="meta-table">
+                  <tr><td class="meta-label">Prepared for</td><td class="meta-data">${escapeHtml(meta.organisation)}</td></tr>
+                  ${
+                    meta.site
+                      ? `<tr><td class="meta-label">Site</td><td class="meta-data">${escapeHtml(meta.site)}</td></tr>`
+                      : ''
+                  }
+                  <tr><td class="meta-label">Reporting period</td><td class="meta-data">${escapeHtml(meta.period)}</td></tr>
+                  <tr><td class="meta-label">Generated on</td><td class="meta-data">${escapeHtml(meta.generatedAt)}</td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+          <table class="title-row">
+            <tr>
+              <td>
+                <h1>${escapeHtml(meta.title)}</h1>
+                <p class="lede">${escapeHtml(copy.lede)}</p>
+              </td>
+              <td class="tagline">Good food today<br/>brighter tomorrow</td>
+            </tr>
+          </table>
+          ${buildImpactSectionHtml(props)}
+          ${buildInsightsSectionHtml(props, data.foods)}
+          ${buildDestinationsSectionHtml(props, data.recipients)}
+        </td>
+      </tr>
+      <tr class="page-foot">
+        <td>
+          <table class="footer">
+            <tr>
+              <td class="footer-brand">${brandLogo}</td>
+              <td class="footer-tag">Less food waste.<br/>More good.</td>
+              <td class="footer-thanks">Thank you for being part of a more sustainable,<br/>more equitable food system.</td>
+            </tr>
+          </table>
+          <div class="footer-notes">
+            Report notes · Generated by Saveful for Business.
+            Figures reflect completed collections during the selected reporting period.
+            Impact estimates are calculated using standard conversion factors.
+          </div>
+        </td>
+      </tr>
     </table>
-
-    ${ratingHtml}
-    ${buildRecipientsHtml(props, data.recipients)}
-    ${buildFoodItemsHtml(data.foods)}
-
-    <div class="footer">
-      Generated by Saveful for Business · Figures reflect completed collections during the selected period.
-      Impact estimates are calculated using standard conversion factors.
-    </div>
   </div>
 </body>
 </html>`;
 }
 
-async function loadReportLogoDataUri(): Promise<string | null> {
+async function readAssetAsDataUri(moduleId: number): Promise<string | null> {
   try {
-    const asset = Asset.fromModule(require('../../assets/intro/logo.png'));
+    const asset = Asset.fromModule(moduleId);
     await asset.downloadAsync();
     const uri = asset.localUri ?? asset.uri;
-    if (!uri) return null;
-    const base64 = await FileSystem.readAsStringAsync(uri, {
+    if (uri) {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return `data:image/png;base64,${base64}`;
+    }
+  } catch {
+    // Fall through to the resolved asset URI.
+  }
+
+  try {
+    const resolved = Image.resolveAssetSource(moduleId);
+    if (!resolved?.uri) return null;
+    const base64 = await FileSystem.readAsStringAsync(resolved.uri, {
       encoding: FileSystem.EncodingType.Base64,
     });
     return `data:image/png;base64,${base64}`;
   } catch {
     return null;
   }
+}
+
+async function loadReportLogoDataUri(): Promise<string | null> {
+  const wordmark = await readAssetAsDataUri(require('../../assets/intro/logo.png'));
+  if (wordmark) return wordmark;
+  return readAssetAsDataUri(require('../../assets/intro/Saveful-for-Business-logo.png'));
 }
 
 async function loadReportLogoDataUriSafe(): Promise<string | null> {
@@ -676,6 +1001,14 @@ async function createPdfReport(
   const { uri } = await withTimeout(
     Print.printToFileAsync({
       html: buildPdfHtml(props, data, logoDataUri),
+      width: 595,
+      height: 842,
+      margins: {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+      },
       base64: false,
     }),
     20000,
@@ -837,7 +1170,7 @@ async function createExcelReport(
       'Animals kg',
       'Meals created',
       'CO₂ avoided kg',
-      'Value USD',
+      'Value AUD',
     ],
     ...(foods.length
       ? foods.map((food) => [

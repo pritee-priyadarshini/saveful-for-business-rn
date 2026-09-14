@@ -10,8 +10,8 @@ import {
 } from '@/utils/receiverFeed';
 
 /**
- * Claims that are still undriven (PENDING/CONFIRMED, no active DriverPickup).
- * Used on Available / Map so self-pickup stays available until a driver is assigned.
+ * Claims still open for self-collection (PENDING/CONFIRMED, no driver trip).
+ * Used on Available / Map — hidden once a driver is assigned or has collected.
  */
 export function useSelfPickupClaims() {
   const { authUser } = useAppContext();

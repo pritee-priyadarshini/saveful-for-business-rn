@@ -150,7 +150,7 @@ export function ClaimConfirmModal({
       }
       finish();
     } catch (err: unknown) {
-      // Keep the sheet open so Continue can be retried — do not silently dismiss.
+      // Keep the sheet open so nominating a driver can be retried — do not silently dismiss.
       setError(getUserFriendlyErrorMessage(err, 'Could not notify online drivers'));
     } finally {
       setRequestingDriver(false);
@@ -205,8 +205,9 @@ export function ClaimConfirmModal({
                   <Ionicons name="checkmark-circle" size={normalize(48)} color={palette.middlegreen} />
                 </View>
                 <AppText variant="bodySmall" style={styles.successText}>
-                  Tap Continue to notify online drivers for this site. I’ll pick this up myself
-                  skips driver notifications — you can collect anytime from Available.
+                  Choose how you’ll collect this food. “I’ll pick it up myself” skips driver
+                  notifications — you can collect anytime from Available. Or nominate a driver
+                  to notify online drivers for this site.
                 </AppText>
                 {!!error && (
                   <AppText variant="caption" style={styles.errorText}>
@@ -217,18 +218,22 @@ export function ClaimConfirmModal({
 
               <View style={styles.actionsColumn}>
                 <Button
-                  label={requestingDriver ? 'Notifying drivers…' : 'Continue'}
+                  label="I'll pick it up myself"
                   size="compact"
-                  onPress={handleContinueForDriver}
-                  loading={requestingDriver}
+                  onPress={handleSelfPickup}
                   disabled={requestingDriver}
                   style={styles.successPrimaryBtn}
                 />
                 <Button
-                  label="I'll pick this up myself"
+                  label={
+                    requestingDriver
+                      ? 'Notifying drivers…'
+                      : "I'll nominate a driver to pick up"
+                  }
                   size="compact"
                   variant="secondary"
-                  onPress={handleSelfPickup}
+                  onPress={handleContinueForDriver}
+                  loading={requestingDriver}
                   disabled={requestingDriver}
                   style={styles.successSecondaryBtn}
                 />

@@ -37,6 +37,8 @@ export type ReceiverUpdateItem = {
   canRateDriver?: boolean;
   /** Claimant already rated the driver. */
   driverRated?: boolean;
+  /** Charity/farmer star rating of the driver (when already submitted). */
+  driverRating?: number | null;
 };
 
 export type ReceiverPickupCardStatus =
@@ -226,10 +228,27 @@ function hasActiveDriverPickup(claim: any): boolean {
 }
 
 function completedDriverPickup(claim: any): any | null {
-  const pickup = pickDriverPickup(claim);
-  if (!pickup?.driver) return null;
-  if (String(pickup.status || '').toUpperCase() !== 'COLLECTED') return null;
-  return pickup;
+  const pickups = Array.isArray(claim?.driverPickups) ? claim.driverPickups : [];
+  if (pickups.length === 0) return null;
+
+  // Prefer the newest COLLECTED pickup. Nested `driver` can be missing on stale
+  // or partial payloads — a COLLECTED DriverPickup still means a driver delivered.
+  const collected = [...pickups]
+    .filter((p) => String(p?.status || '').toUpperCase() === 'COLLECTED')
+    .sort(
+      (a, b) =>
+        new Date(b?.collectedAt || b?.createdAt || 0).getTime() -
+        new Date(a?.collectedAt || a?.createdAt || 0).getTime(),
+    );
+
+  return collected[0] || null;
+}
+
+function driverDisplayName(pickup: any): string | null {
+  const driver = pickup?.driver;
+  if (!driver) return null;
+  const name = [driver.firstName, driver.lastName].filter(Boolean).join(' ').trim();
+  return name || null;
 }
 
 function driverName(claim: any): string | null {
@@ -388,12 +407,10 @@ export function mapReceiverUpdates(params: {
     const partnerRating = parseStarRating(claim?.providerRating ?? claim?.provider_rating);
     const ratingNote = (claim?.ratingNote ?? claim?.rating_note ?? null) as string | null;
     const completedDriver = completedDriverPickup(claim);
-    const canRateDriver = Boolean(completedDriver) && parseStarRating(completedDriver?.charityDriverRating) == null;
+    const existingDriverRating = parseStarRating(completedDriver?.charityDriverRating);
+    const canRateDriver = Boolean(completedDriver) && existingDriverRating == null;
     const driverLabel = completedDriver
-      ? [completedDriver?.driver?.firstName, completedDriver?.driver?.lastName]
-          .filter(Boolean)
-          .join(' ')
-          .trim() || 'your driver'
+      ? driverDisplayName(completedDriver) || 'your driver'
       : null;
     const needsPartnerRating = collected && rating == null;
     const needsFeedback = needsPartnerRating || canRateDriver;
@@ -423,6 +440,7 @@ export function mapReceiverUpdates(params: {
         partnerRating,
         canRateDriver,
         driverRated: !canRateDriver && Boolean(completedDriver),
+        driverRating: existingDriverRating,
         driverName: driverLabel,
       });
     }
@@ -436,12 +454,17 @@ export function mapReceiverUpdates(params: {
       distance,
       city,
       timeLabel,
-      driverName: hasActiveDriverPickup(claim) ? driverName(claim) : null,
+      driverName: hasActiveDriverPickup(claim)
+        ? driverName(claim)
+        : completedDriver
+          ? driverLabel
+          : null,
       canMarkCollected,
       claimId: Number(claim.id),
       listingId: Number(listing?.id || claim?.listingId),
       canRateDriver,
       driverRated: Boolean(completedDriver) && !canRateDriver,
+      driverRating: existingDriverRating,
       items: claimItemsToPickupItems(claim),
       rating,
       ratingNote,
@@ -584,6 +607,15 @@ export async function fetchAvailableListingsForAudience(
   }
 }
 
+/** True when a driver is/was assigned (not cancelled) — blocks self-pickup UI. */
+function hasDriverAssignment(claim: any): boolean {
+  const pickups = Array.isArray(claim?.driverPickups) ? claim.driverPickups : [];
+  return pickups.some((p) => {
+    const s = String(p?.status || '').toUpperCase();
+    return Boolean(s) && s !== 'CANCELLED';
+  });
+}
+
 /** Claimed by us, not collected, and no driver assigned — self-pickup ready. */
 export type SelfPickupClaim = {
   claimId: number;
@@ -604,7 +636,8 @@ export function mapSelfPickupClaims(
       const status = String(claim?.status || '').toUpperCase();
       if (status !== 'PENDING' && status !== 'CONFIRMED') return false;
       if (isCollectedClaim(claim)) return false;
-      if (hasActiveDriverPickup(claim)) return false;
+      // Any live or completed driver trip means this is not a self-pickup.
+      if (hasActiveDriverPickup(claim) || hasDriverAssignment(claim)) return false;
       return claimBelongsToViewerSite(claim, viewerSiteId);
     })
     .map((claim) => {
