@@ -12,6 +12,7 @@ const STATUS_MESSAGES: Record<number, string> = {
   403: "You don't have permission to do that.",
   404: "We couldn't find what you're looking for.",
   409: 'This already exists. Please try something different.',
+  413: 'Those photos are too large. Try fewer photos, or take them again in the app.',
   422: 'Some information looks incorrect. Please review and try again.',
   429: 'Too many attempts. Please wait a moment and try again.',
   500: 'Something went wrong on our end. Please try again later.',
@@ -125,9 +126,9 @@ export function getUserFriendlyErrorMessage(
     if (errorWithResponse.response?.data) {
       const apiMessage = extractApiMessage(errorWithResponse.response.data);
       if (apiMessage) return apiMessage;
-      const status = errorWithResponse.response.status;
-      if (status && STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
     }
+    const status = errorWithResponse.response?.status;
+    if (status && STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
 
     const friendly = humanizeRawMessage(error.message);
     if (friendly && !isAxiosError(error)) return friendly;

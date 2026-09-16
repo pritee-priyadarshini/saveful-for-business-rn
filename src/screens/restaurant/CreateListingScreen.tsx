@@ -228,8 +228,9 @@ export function CreateListingScreen({ navigation }: any) {
   const pickFromGallery = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.75,
+      quality: 1,
       allowsMultipleSelection: true,
+      selectionLimit: 5,
     });
 
     if (!res.canceled) {
@@ -238,7 +239,7 @@ export function CreateListingScreen({ navigation }: any) {
   };
 
   const pickFromCamera = async () => {
-    const uri = await takePhoto(0.75);
+    const uri = await takePhoto(1);
     if (uri) setImages((prev) => [...prev, uri]);
   };
 

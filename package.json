@@ -12,6 +12,7 @@
     "verify:firebase": "npx expo config --type public"
   },
   "dependencies": {
+    "@aws-sdk/s3-request-presigner": "^3.1133.0",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-community/datetimepicker": "^8.4.4",
     "@react-native-firebase/app": "^25.1.0",

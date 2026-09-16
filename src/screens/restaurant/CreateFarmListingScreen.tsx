@@ -227,8 +227,9 @@ export function CreateFarmListingScreen({ navigation }: any) {
   const pickFromGallery = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.75,
+      quality: 1,
       allowsMultipleSelection: true,
+      selectionLimit: 5,
     });
     if (!res.canceled) {
       setImages((prev) => [...prev, ...res.assets.map((a) => a.uri)]);
@@ -236,7 +237,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
   };
 
   const pickFromCamera = async () => {
-    const uri = await takePhoto(0.75);
+    const uri = await takePhoto(1);
     if (uri) setImages((prev) => [...prev, uri]);
   };
 

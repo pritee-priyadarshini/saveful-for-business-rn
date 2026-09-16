@@ -1,3 +1,5 @@
+import * as FileSystem from 'expo-file-system/legacy';
+
 import api from './api';
 import { postFormData } from './multipart';
 import type { FoodListingType, ListingStatus } from '../types';
@@ -6,7 +8,6 @@ import {
   formatListingDate,
   formatListingPickupWindow,
 } from '../utils/dateFormat';
-
 export type FoodItem = {
   id?: number;
   name?: string;
@@ -315,6 +316,69 @@ function buildCreateListingFormData(body: CreateListingPayload): FormData {
   });
 
   return form;
+}
+
+function readPresignResponse(data: unknown): { uploadUrl: string; url: string } {
+  const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+  const nested = record.data && typeof record.data === 'object'
+    ? (record.data as Record<string, unknown>)
+    : {};
+  const uploadUrl = String(record.uploadUrl ?? nested.uploadUrl ?? '').trim();
+  const url = String(record.url ?? nested.url ?? '').trim();
+  return { uploadUrl, url };
+}
+
+async function putPhotoOnS3(uploadUrl: string, uri: string, contentType: string) {
+  if (typeof FileSystem.uploadAsync === 'function') {
+    const result = await FileSystem.uploadAsync(uploadUrl, uri, {
+      httpMethod: 'PUT',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: { 'Content-Type': contentType },
+    });
+    if (result.status < 200 || result.status >= 300) {
+      const error: Error & { response?: { status: number } } = new Error(
+        `Request failed with status ${result.status}`,
+      );
+      error.response = { status: result.status };
+      throw error;
+    }
+    return;
+  }
+
+  const fileRes = await fetch(uri);
+  const blob = await fileRes.blob();
+  const put = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: blob,
+  });
+  if (!put.ok) {
+    const error: Error & { response?: { status: number } } = new Error(
+      `Request failed with status ${put.status}`,
+    );
+    error.response = { status: put.status };
+    throw error;
+  }
+}
+
+async function uploadListingPhoto(uri: string): Promise<string> {
+  const source = String(uri || '').trim();
+  const contentType = guessImageMime(source) === 'image/jpg' ? 'image/jpeg' : guessImageMime(source);
+  const res = await api.post('/food-listings/photos', { contentType });
+  const { uploadUrl, url } = readPresignResponse(res.data);
+  if (!uploadUrl || !url) {
+    throw new Error('Photo upload did not return a URL');
+  }
+  await putPhotoOnS3(uploadUrl, source, contentType);
+  return url;
+}
+
+async function uploadListingPhotos(uris: string[]): Promise<string[]> {
+  const urls: string[] = [];
+  for (const uri of uris.slice(0, 5)) {
+    urls.push(await uploadListingPhoto(uri));
+  }
+  return urls;
 }
 
 const listingDetailCache = new Map<number, ListingDetail>();
@@ -653,13 +717,20 @@ export async function fetchDiscoverListings(
 }
 
 export const foodListingService = {
-  createListing: (payload: CreateListingPayload) => {
+  createListing: async (payload: CreateListingPayload) => {
     const body = normalizeCreateListingPayload(payload);
+    const localPhotos = body.photos ?? [];
+
+    if (localPhotos.length > 0) {
+      const uploadedUrls = await uploadListingPhotos(localPhotos);
+      body.photoUrls = [...(body.photoUrls ?? []), ...uploadedUrls];
+      body.photos = [];
+    }
+
     const hasLocalPhotos = (body.photos?.length ?? 0) > 0;
     if (hasLocalPhotos) {
       return postFormData('/food-listings', buildCreateListingFormData(body));
     }
-    // No local files — keep JSON path (photoUrls may still include remote URLs).
     const { photos: _photos, ...jsonBody } = body;
     return api.post('/food-listings', jsonBody);
   },
