@@ -945,6 +945,18 @@ export function ProfileScreen() {
           )}
           */}
 
+          {(isRestaurant || isCharity) && (
+            <Pressable
+              style={styles.linkRow}
+              onPress={() =>
+                navigation.navigate(isCharity ? 'CharityConnections' : 'Connections')
+              }
+            >
+              <AppText variant="body">Connections</AppText>
+              <Ionicons name="people-circle-outline" size={18} />
+            </Pressable>
+          )}
+
           {showManageAccess && (
             <Pressable
               style={styles.linkRow}

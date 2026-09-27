@@ -17,6 +17,7 @@ import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { ListingPhotoGallery } from '../../components/ListingPhotoGallery';
+import { CollectionNotesCard } from '../../components/CollectionNotesCard';
 import {
   ClaimConfirmModal,
   type ClaimLineItem,
@@ -701,6 +702,8 @@ export function FarmerMapScreen({ navigation }: any) {
           </Pressable>
         </View>
 
+        <CollectionNotesCard notes={item.collectionNotes} style={styles.collectionNotes} />
+
         <View style={styles.section}>
           <ListingPhotoGallery
             photos={item.photoUrls}
@@ -1172,6 +1175,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: normalize(12),
     lineHeight: normalize(16),
+  },
+
+  collectionNotes: {
+    marginTop: hp(1.2),
   },
 
   detailsRow: {

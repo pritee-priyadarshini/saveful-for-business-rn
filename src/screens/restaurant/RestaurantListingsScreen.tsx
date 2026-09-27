@@ -40,7 +40,7 @@ import {
   resolveListingStatus,
 } from '../../utils/foodListing';
 import { formatListingPickupDateRange } from '../../utils/dateFormat';
-import { showErrorAlert } from '../../utils/apiError';
+import { showErrorAlert, showSuccessAlert } from '../../utils/apiError';
 import { isSubscriptionGateError } from '../../utils/billingErrors';
 import { showConfirmAlert } from '../../store/appAlertStore';
 import { useAppContext } from '../../store/AppContext';
@@ -49,6 +49,19 @@ import { useSitesStore } from '../../store/sitesStore';
 import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
 import { showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 import { fetchListingDetail } from '../../services/foodListing.service';
+import { OfferToConnectionModal } from '@/components/OfferToConnectionModal';
+import { ReleaseDestinationModal } from '@/components/ReleaseDestinationModal';
+import { ReleaseToNetworkModal, type ReleaseWindowChoice } from '@/components/ReleaseToNetworkModal';
+import { useSubmitLock } from '@/hooks/useSubmitLock';
+import { connectionsService, type ConnectionToday } from '@/services/connections.service';
+import {
+  isReservedListing,
+  isReservedPublished,
+  matchReservedDay,
+  otherOpenConnections,
+} from '@/utils/connections';
+import { isVirtualHqSiteId } from '@/utils/defaultHqSite';
+import { resolveListingSiteId } from '@/utils/listingSite';
 
 type MetaBoxLayout = 'half' | 'centered';
 type ListingFilter = 'all' | 'people' | 'animals';
@@ -321,22 +334,211 @@ export function RestaurantListingsScreen({ navigation }: any) {
   const [listingFilter, setListingFilter] = useState<ListingFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [refreshing, setRefreshing] = useState(false);
+  const { submitting, withLock } = useSubmitLock();
+  const [today, setToday] = useState<ConnectionToday[]>([]);
+  const [releaseTarget, setReleaseTarget] = useState<ConnectionToday | null>(null);
+  const [releaseChooser, setReleaseChooser] = useState<ConnectionToday | null>(null);
+  const [offerTarget, setOfferTarget] = useState<{
+    from: ConnectionToday;
+    to: ConnectionToday;
+  } | null>(null);
+
+  const reservedDayFor = (listing: any) => matchReservedDay(listing, today);
+
+  const loadToday = useCallback(async () => {
+    try {
+      const { siteListings: latestSite, orgListings: latestOrg } = useListingsStore.getState();
+      const sites = useSitesStore.getState().sites;
+      const fromSites = (sites ?? [])
+        .map((site: any) => Number(site?.id))
+        .filter((id: number) => Number.isFinite(id) && id > 0 && !isVirtualHqSiteId(id));
+      const fromListings = [...latestSite, ...latestOrg]
+        .map((listing) => Number(listing?.siteId))
+        .filter((id) => Number.isFinite(id) && id > 0 && !isVirtualHqSiteId(id));
+      const fallback = await resolveListingSiteId(authUser);
+      const ids = [...new Set([...fromSites, ...fromListings, fallback].filter(
+        (id): id is number => Number.isFinite(id) && (id as number) > 0,
+      ))];
+      if (!ids.length) {
+        setToday([]);
+        return [];
+      }
+      const rows = (
+        await Promise.all(
+          ids.map((id) => connectionsService.listTodayForSite(id).catch(() => [])),
+        )
+      ).flat();
+      setToday(rows);
+      return rows;
+    } catch {
+      setToday([]);
+      return [];
+    }
+  }, [authUser]);
+
+  const hydrateReservedListings = useCallback(async (todayRows: ConnectionToday[]) => {
+    const source = isHqListings
+      ? useListingsStore.getState().orgListings
+      : useListingsStore.getState().siteListings;
+    const actives = source.filter((listing) => isListingActive(listing));
+    const missing = actives.filter(
+      (listing) => !isReservedListing(listing) && !matchReservedDay(listing, todayRows),
+    );
+    if (!missing.length) return;
+
+    const details = await Promise.all(
+      missing.map((listing) =>
+        fetchListingDetail(Number(listing.id), { refresh: true }).catch(() => null),
+      ),
+    );
+    const reservedDetails = details.filter((detail) => isReservedListing(detail));
+    if (!reservedDetails.length) return;
+
+    const extraDays = (
+      await Promise.all(
+        reservedDetails.map((detail) =>
+          connectionsService
+            .findReservedDayForListing({
+              id: Number(detail?.id),
+              siteId: Number(detail?.siteId),
+              connectionId: detail?.connectionId,
+            })
+            .catch(() => null),
+        ),
+      )
+    ).filter((row): row is ConnectionToday => Boolean(row?.dayId));
+
+    if (extraDays.length) {
+      setToday((current) => {
+        const next = [...current];
+        for (const row of extraDays) {
+          if (!next.some((existing) => existing.dayId === row.dayId)) next.push(row);
+        }
+        return next;
+      });
+    }
+
+    useListingsStore.setState((state) => {
+      const stamp = (listing: (typeof state.siteListings)[number]) => {
+        const detail = reservedDetails.find((entry) => Number(entry?.id) === Number(listing.id));
+        if (!detail) return listing;
+        return {
+          ...listing,
+          exclusiveToOrgId: detail.exclusiveToOrgId ?? listing.exclusiveToOrgId,
+          connectionId: detail.connectionId ?? listing.connectionId,
+          releasedAt: detail.releasedAt ?? listing.releasedAt,
+          reserved: true,
+        };
+      };
+      return {
+        siteListings: state.siteListings.map(stamp),
+        orgListings: state.orgListings.map(stamp),
+      };
+    });
+  }, [isHqListings]);
 
   useFocusEffect(
     useCallback(() => {
       if (!authUser?.accessToken) return;
-      loadListings(true).catch((e) => {
-        if (isSubscriptionGateError(e)) return;
-        showErrorAlert(e, 'Could not load listings', 'Could not load listings');
-      });
-    }, [authUser?.accessToken, loadListings]),
+      void (async () => {
+        try {
+          await loadListings(true);
+        } catch (e) {
+          if (!isSubscriptionGateError(e)) {
+            showErrorAlert(e, 'Could not load listings', 'Could not load listings');
+          }
+        }
+        const todayRows = await loadToday();
+        await hydrateReservedListings(todayRows);
+      })();
+    }, [authUser?.accessToken, hydrateReservedListings, loadListings, loadToday]),
   );
+
+  const startRelease = (row: ConnectionToday) => {
+    const others = otherOpenConnections(today, row.connectionId);
+    if (others.length) {
+      setReleaseChooser(row);
+      return;
+    }
+    setReleaseTarget(row);
+  };
+
+  const startReleaseForListing = (listing: any) => {
+    const matched = reservedDayFor(listing);
+    if (matched?.dayId) {
+      startRelease(matched);
+      return;
+    }
+    void withLock(async () => {
+      try {
+        const found = await connectionsService.findReservedDayForListing({
+          id: Number(listing.id),
+          siteId: Number(listing.siteId),
+          connectionId: listing.connectionId,
+        });
+        if (!found?.dayId) {
+          showErrorAlert('This reserved listing is not ready to release yet.');
+          return;
+        }
+        setToday((current) => {
+          if (current.some((row) => row.dayId === found.dayId)) return current;
+          return [...current, found];
+        });
+        startRelease(found);
+      } catch (error) {
+        showErrorAlert(error, 'Could not release listing');
+      }
+    });
+  };
+
+  const confirmRelease = (window: ReleaseWindowChoice) => {
+    const row = releaseTarget;
+    if (!row?.dayId) return;
+    void withLock(async () => {
+      try {
+        const result = await connectionsService.releaseToNetwork(row.dayId!, {
+          listingId: row.listingId,
+          pickupFromTime: window?.pickupFromTime,
+          pickupByTime: window?.pickupByTime,
+          bestBefore: window?.bestBefore,
+        });
+        setReleaseTarget(null);
+        useListingsStore.getState().invalidateSite();
+        showSuccessAlert(result.message || 'Released to nearby charities.');
+        await loadListings(true);
+        const todayRows = await loadToday();
+        await hydrateReservedListings(todayRows);
+      } catch (error) {
+        showErrorAlert(error, 'Could not release listing');
+      }
+    });
+  };
+
+  const confirmOffer = () => {
+    if (!offerTarget?.from.dayId) return;
+    const { from, to } = offerTarget;
+    void withLock(async () => {
+      try {
+        const result = await connectionsService.reassignToConnection(from.dayId!, to.connectionId);
+        setOfferTarget(null);
+        useListingsStore.getState().invalidateSite();
+        showSuccessAlert(result.message || `Reserved for ${to.charityName || 'that charity'}.`);
+        await loadListings(true);
+        const todayRows = await loadToday();
+        await hydrateReservedListings(todayRows);
+      } catch (error) {
+        showErrorAlert(error, 'Could not move this listing');
+      }
+    });
+  };
 
   const onRefresh = useCallback(async () => {
     if (!authUser?.accessToken) return;
     setRefreshing(true);
     try {
       await loadListings(true);
+      const todayRows = await loadToday();
+      await hydrateReservedListings(todayRows);
     } catch (e) {
       if (!isSubscriptionGateError(e)) {
         showErrorAlert(e, 'Could not load listings', 'Could not load listings');
@@ -344,7 +546,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
     } finally {
       setRefreshing(false);
     }
-  }, [authUser?.accessToken, loadListings]);
+  }, [authUser?.accessToken, hydrateReservedListings, loadListings, loadToday]);
 
   const peopleCount = useMemo(
     () => listings.filter((l) => isPeopleListing(l)).length,
@@ -546,6 +748,15 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const active = isListingActive(item);
     const partial = isListingPartial(item);
     const statusLabel = getListingStatusLabel(item);
+    const publishedToday = today.filter((row) => isReservedPublished(row));
+    const reservedRow =
+      reservedDayFor(item) ??
+      (active &&
+      listings.filter((listing) => isListingActive(listing)).length === 1 &&
+      publishedToday.length === 1
+        ? publishedToday[0]
+        : undefined);
+    const reserved = isReservedListing(item) || Boolean(reservedRow);
 
     const statusConfig = expired
       ? { bg: '#FFF1D6', color: palette.warning }
@@ -601,9 +812,15 @@ export function RestaurantListingsScreen({ navigation }: any) {
           {/* Notification / status message */}
           {active && (
             <View style={styles.notificationRow}>
-              <Ionicons name="location" size={normalize(13)} color={theme.accent} />
+              <Ionicons
+                name={reserved ? 'people-outline' : 'location'}
+                size={normalize(13)}
+                color={theme.accent}
+              />
               <AppText variant="caption" style={[styles.notificationText, { color: theme.accent }]}>
-                {theme.notification}
+                {reserved
+                  ? `Reserved for ${reservedRow?.charityName || 'preferred charity'} — they can claim first`
+                  : theme.notification}
               </AppText>
             </View>
           )}
@@ -693,6 +910,17 @@ export function RestaurantListingsScreen({ navigation }: any) {
           )}
 
           {/* Action buttons */}
+          {active && reserved ? (
+            <Pressable
+              style={[styles.releaseBtn, submitting && { opacity: 0.6 }]}
+              disabled={submitting}
+              onPress={() => startReleaseForListing(item)}
+            >
+              <AppText variant="bodyBold" color={palette.white}>
+                Release
+              </AppText>
+            </Pressable>
+          ) : null}
           {active && (
             <View style={styles.actionRow}>
               <Pressable
@@ -1140,6 +1368,49 @@ export function RestaurantListingsScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      <ReleaseDestinationModal
+        visible={Boolean(releaseChooser)}
+        currentCharity={releaseChooser?.charityName}
+        others={releaseChooser ? otherOpenConnections(today, releaseChooser.connectionId) : []}
+        onClose={() => setReleaseChooser(null)}
+        onOpenNetwork={() => {
+          if (!releaseChooser) return;
+          setReleaseTarget(releaseChooser);
+          setReleaseChooser(null);
+        }}
+        onOfferTo={(other) => {
+          if (!releaseChooser) return;
+          setOfferTarget({ from: releaseChooser, to: other as ConnectionToday });
+          setReleaseChooser(null);
+        }}
+      />
+      <OfferToConnectionModal
+        visible={Boolean(offerTarget)}
+        fromCharity={offerTarget?.from.charityName}
+        toCharity={offerTarget?.to.charityName}
+        windowStartAt={offerTarget?.to.windowStartAt}
+        windowEndAt={offerTarget?.to.windowEndAt}
+        submitting={submitting}
+        onClose={() => setOfferTarget(null)}
+        onConfirm={confirmOffer}
+      />
+      <ReleaseToNetworkModal
+        target={
+          releaseTarget?.dayId
+            ? {
+                dayId: releaseTarget.dayId,
+                listingId: releaseTarget.listingId,
+                charityName: releaseTarget.charityName,
+                windowStartAt: releaseTarget.windowStartAt,
+                windowEndAt: releaseTarget.windowEndAt,
+              }
+            : null
+        }
+        submitting={submitting}
+        onClose={() => setReleaseTarget(null)}
+        onConfirm={confirmRelease}
+      />
     </Screen>
   );
 }
@@ -1587,6 +1858,15 @@ const styles = StyleSheet.create({
     fontSize: normalize(14),
     textTransform: 'none',
     lineHeight: normalize(19),
+  },
+
+  releaseBtn: {
+    marginTop: hp(0.6),
+    minHeight: normalize(42),
+    borderRadius: normalize(12),
+    backgroundColor: palette.kale,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   actionRow: {

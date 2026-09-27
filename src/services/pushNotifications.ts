@@ -542,7 +542,10 @@ export function isFoodListingNotification(payload: NotificationPayload): boolean
 export type NotificationNavigationTarget =
   | { name: 'DriverTracking'; params: { trackingId: string; source: 'restaurant' | 'charity' | 'farmer' } }
   | { name: 'Tabs'; params?: { screen: string; params?: Record<string, unknown> } }
-  | { name: 'ManageSites'; params?: undefined };
+  | { name: 'ManageSites'; params?: undefined }
+  | { name: 'Connections'; params?: { siteId?: number } }
+  | { name: 'CharityConnections' }
+  | { name: 'AddDailySurplus'; params: { dayId: number; charityName?: string } };
 
 export function resolveNotificationTarget(
   payload: NotificationPayload,
@@ -562,6 +565,43 @@ export function resolveNotificationTarget(
 
   const type = normalizeNotificationValue(data.type ?? data.notificationType ?? data.event);
   const deepLink = normalizeNotificationValue(data.deepLink ?? data.deep_link ?? data.link);
+  const rawType = String(data.type ?? data.notificationType ?? data.event ?? '').toUpperCase();
+
+  if (
+    rawType === 'CONNECTION_DAILY_PROMPT' ||
+    rawType === 'CONNECTION_CUTOFF'
+  ) {
+    const dayId = Number(data.connectionDayId);
+    if (Number.isFinite(dayId) && dayId > 0 && rawType === 'CONNECTION_DAILY_PROMPT') {
+      return {
+        name: 'AddDailySurplus',
+        params: {
+          dayId,
+          charityName: data.charityName ? String(data.charityName) : undefined,
+        },
+      };
+    }
+    return { name: 'Tabs', params: { screen: 'Listings', params: { screen: 'Surplus' } } };
+  }
+
+  if (
+    rawType === 'CONNECTION_INVITATION' ||
+    rawType === 'CONNECTION_COLLECTION_READY' ||
+    rawType === 'CONNECTION_NO_SURPLUS'
+  ) {
+    if (rawType === 'CONNECTION_COLLECTION_READY') {
+      return { name: 'Tabs', params: { screen: 'Available' } };
+    }
+    return { name: 'CharityConnections' };
+  }
+
+  if (
+    rawType === 'CONNECTION_ACCEPTED' ||
+    rawType === 'CONNECTION_DECLINED' ||
+    rawType === 'CONNECTION_RELEASED'
+  ) {
+    return { name: 'Connections' };
+  }
 
   // Driver declined — charity should re-assign or self-collect from Available.
   if (

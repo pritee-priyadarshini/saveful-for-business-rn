@@ -6,6 +6,7 @@ import { EditListingScreen } from '@/screens/restaurant/EditListingScreen';
 import { ListingConfirmationScreen } from '@/screens/restaurant/ListingConfirmationScreen';
 import CollectionHistoryScreen from '@/screens/restaurant/CollectionHistoryScreen';
 import{ SurplusScreen } from '@/screens/restaurant/SurplusScreen';
+import { AddDailySurplusScreen } from '@/screens/restaurant/AddDailySurplusScreen';
 import { palette } from '@/theme/colors';
 
 
@@ -18,6 +19,15 @@ type RestaurantStackParamList = {
   ListingConfirmation: { listing: any };
   CollectionHistory: undefined;
   Surplus: undefined;
+  AddDailySurplus: {
+    dayId: number;
+    connectionId?: number;
+    charityName?: string;
+    schedule?: string;
+    windowStartAt?: string;
+    windowEndAt?: string;
+    siteName?: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RestaurantStackParamList>();
@@ -36,6 +46,7 @@ export function RestaurantStack() {
       <Stack.Screen name="CreateListing" component={CreateListingScreen} />
       <Stack.Screen name="CreateFarmListing" component={CreateFarmListingScreen} />
       <Stack.Screen name="Surplus" component={SurplusScreen} />
+      <Stack.Screen name="AddDailySurplus" component={AddDailySurplusScreen} />
       <Stack.Screen name="EditListing" component={EditListingScreen} />
       <Stack.Screen name="ListingConfirmation" component={ListingConfirmationScreen} />
       <Stack.Screen name="FarmListingConfirmation" component={ListingConfirmationScreen} />

@@ -21,6 +21,10 @@ export type FoodListing = {
   id: number;
   siteId: number;
   organisationId: number;
+  connectionId?: number | null;
+  exclusiveToOrgId?: number | null;
+  releasedAt?: string | null;
+  reserved?: boolean;
   listingType: FoodListingType;
   status: ListingStatus;
   totalQtyKg?: number;
@@ -39,6 +43,7 @@ export type FoodListing = {
   needsReheating?: boolean;
   isSafeForDonation?: boolean;
   allergens?: string[];
+  collectionNotes?: string | null;
   photoUrls?: string[];
   foodItems?: FoodItem[];
   createdAt?: string;
@@ -71,6 +76,7 @@ export type CreateListingPayload = {
   needsReheating?: boolean;
   isSafeForDonation?: boolean;
   allergens?: string[];
+  collectionNotes?: string;
   /** Already-hosted http(s) photo URLs. */
   photoUrls?: string[];
   /** Local ImagePicker / camera URIs to upload as multipart `photos`. */
@@ -92,6 +98,8 @@ export type UpdateListingPayload = {
   isGlutenFree?: boolean;
   isSafeForDonation?: boolean;
   allergens?: string[];
+  collectionNotes?: string;
+  photoUrls?: string[];
 };
 
 export type RelistPayload = {
@@ -134,27 +142,47 @@ export type ListingDetail = FoodListing & {
 };
 
 export function normalizeListingResponse(response: any): ListingDetail | null {
-  const raw = response?.data;
-  if (!raw) return null;
+  const raw = response?.data ?? response;
+  if (!raw || typeof raw !== 'object') return null;
 
-  if (raw.id != null || raw.foodItems != null || raw.pickupAddress != null) {
-    return raw as ListingDetail;
-  }
+  const listing =
+    raw.id != null || raw.foodItems != null || raw.pickupAddress != null
+      ? raw
+      : raw.listing ?? raw.response ?? raw.data ?? null;
 
-  const nested = raw.listing ?? raw.data;
-  if (nested && typeof nested === 'object') {
-    return nested as ListingDetail;
-  }
+  if (!listing || typeof listing !== 'object') return null;
+  return stampListingReservation(listing) as ListingDetail;
+}
 
-  return raw as ListingDetail;
+function stampListingReservation<T extends Record<string, any>>(listing: T): T {
+  const exclusive = listing.exclusiveToOrgId ?? listing.exclusive_to_org_id ?? null;
+  const connectionId = listing.connectionId ?? listing.connection_id ?? null;
+  const releasedAt = listing.releasedAt ?? listing.released_at ?? null;
+  return {
+    ...listing,
+    exclusiveToOrgId: exclusive,
+    connectionId,
+    releasedAt,
+    reserved: Boolean((exclusive || connectionId) && !releasedAt),
+  };
 }
 
 export function normalizeListingsResponse(response: any): PaginatedListingsResponse {
-  const raw = response?.data;
+  if (Array.isArray(response)) {
+    return {
+      listings: response.map(stampListingReservation),
+      total: response.length,
+      page: 1,
+      limit: response.length,
+      totalPages: 1,
+    };
+  }
+
+  const raw = response?.data ?? response;
 
   if (Array.isArray(raw)) {
     return {
-      listings: raw,
+      listings: raw.map(stampListingReservation),
       total: raw.length,
       page: 1,
       limit: raw.length,
@@ -184,7 +212,8 @@ export function normalizeListingsResponse(response: any): PaginatedListingsRespo
           };
         },
       )
-      .filter(Boolean) as FoodListing[];
+      .filter(Boolean)
+      .map(stampListingReservation) as FoodListing[];
 
     return {
       listings,
@@ -197,7 +226,7 @@ export function normalizeListingsResponse(response: any): PaginatedListingsRespo
 
   if (Array.isArray(raw?.listings)) {
     return {
-      listings: raw.listings,
+      listings: raw.listings.map(stampListingReservation),
       total: raw.total ?? raw.listings.length,
       page: raw.page ?? 1,
       limit: raw.limit ?? raw.listings.length,
@@ -207,7 +236,7 @@ export function normalizeListingsResponse(response: any): PaginatedListingsRespo
 
   if (Array.isArray(raw?.response)) {
     return {
-      listings: raw.response,
+      listings: raw.response.map(stampListingReservation),
       total: raw.response.length,
       page: 1,
       limit: raw.response.length,
@@ -272,6 +301,7 @@ function normalizeCreateListingPayload(payload: CreateListingPayload): CreateLis
     needsReheating: Boolean(payload.needsReheating),
     isSafeForDonation: payload.isSafeForDonation ?? true,
     allergens: Array.isArray(payload.allergens) ? payload.allergens : [],
+    collectionNotes: payload.collectionNotes?.trim() || undefined,
     photoUrls: allUris.filter(isRemotePhotoUrl),
     photos: allUris.filter((uri) => !isRemotePhotoUrl(uri)),
     foodItems,
@@ -302,6 +332,7 @@ function buildCreateListingFormData(body: CreateListingPayload): FormData {
   appendBoolean(form, 'needsReheating', body.needsReheating);
   appendBoolean(form, 'isSafeForDonation', body.isSafeForDonation);
   form.append('allergens', JSON.stringify(body.allergens ?? []));
+  if (body.collectionNotes) form.append('collectionNotes', body.collectionNotes);
   form.append('photoUrls', JSON.stringify(body.photoUrls ?? []));
   form.append('foodItems', JSON.stringify(body.foodItems));
 
@@ -487,6 +518,10 @@ export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
     storage: item.needsRefrigeration ? 'Keep refrigerated' : 'Room temperature',
     // Same column carries allergens (people) and possible contaminants (animal feed).
     allergens: toStringList((item as any).allergens) ?? toStringList((item as any).allergenList) ?? [],
+    collectionNotes:
+      typeof (item as any).collectionNotes === 'string'
+        ? String((item as any).collectionNotes).trim()
+        : '',
     status:
       statusUpper === 'ACTIVE'
         ? 'Available'
@@ -505,6 +540,12 @@ export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
       ((item as any).distanceKm != null && Number.isFinite(Number((item as any).distanceKm))
         ? `${Number((item as any).distanceKm).toFixed(1)} km`
         : '—'),
+    reserved: Boolean(
+      ((item as any).exclusiveToOrgId || (item as any).connectionId) &&
+        !(item as any).releasedAt,
+    ),
+    connectionId: (item as any).connectionId ?? null,
+    exclusiveUntil: (item as any).exclusiveUntil ?? null,
   };
 }
 
@@ -519,6 +560,7 @@ export type NearbyListing = {
   bestBefore: string;
   photoUrls: string[];
   allergens?: string[];
+  collectionNotes?: string | null;
   status: 'ACTIVE' | 'PARTIAL';
   foodItems: Array<{
     id: number;
@@ -581,6 +623,7 @@ function mapNearbyListingToFoodListing(item: NearbyListing): FoodListing {
     pickupByTime: item.pickupByTime ?? undefined,
     photoUrls: item.photoUrls ?? [],
     allergens: item.allergens ?? [],
+    collectionNotes: item.collectionNotes ?? null,
     foodItems: (item.foodItems ?? []).map((food) => ({
       id: food.id,
       name: food.name,
@@ -717,6 +760,8 @@ export async function fetchDiscoverListings(
 }
 
 export const foodListingService = {
+  uploadPhotos: (uris: string[]) => uploadListingPhotos(uris),
+
   createListing: async (payload: CreateListingPayload) => {
     const body = normalizeCreateListingPayload(payload);
     const localPhotos = body.photos ?? [];

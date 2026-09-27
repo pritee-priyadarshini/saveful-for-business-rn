@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from './AppText';
 import { Button } from './Button';
 import { ListingPhotoGallery } from './ListingPhotoGallery';
+import { CollectionNotesCard } from './CollectionNotesCard';
 import { palette } from '../theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 import {
@@ -24,6 +26,7 @@ import {
   formatListingDateTime,
   formatListingPickupWindow,
 } from '../utils/dateFormat';
+import { resolveFoodIconFromLabel } from '../utils/foodListing';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
 
@@ -37,6 +40,8 @@ type Props = {
   itemsTitle?: string;
   /** Animal-feed listings store possible contaminants in the same field. */
   allergensTitle?: string;
+  reserved?: boolean;
+  onCannotCollect?: () => void;
 };
 
 function DetailRow({
@@ -70,6 +75,8 @@ export function DiscoverListingDetailModal({
   onClaim,
   itemsTitle = 'Food items',
   allergensTitle = 'Allergens',
+  reserved = false,
+  onCannotCollect,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [extra, setExtra] = useState<ReturnType<typeof mapDiscoverListing> | null>(null);
@@ -138,6 +145,11 @@ export function DiscoverListingDetailModal({
                 {data.status}
               </AppText>
             </View>
+            {reserved ? (
+              <AppText variant="caption" style={{ color: palette.kale }}>
+                Reserved for your charity — confirm as a normal claim
+              </AppText>
+            ) : null}
 
             <ListingPhotoGallery
               photos={photos}
@@ -189,6 +201,8 @@ export function DiscoverListingDetailModal({
               value={data.allergens?.length ? data.allergens.join(', ') : 'None listed'}
             />
 
+            <CollectionNotesCard notes={data.collectionNotes} />
+
             {!!data.foodItems?.length && (
               <View style={styles.foodItemsSection}>
                 <AppText variant="bodyBold" style={styles.sectionTitle}>
@@ -196,6 +210,10 @@ export function DiscoverListingDetailModal({
                 </AppText>
                 {data.foodItems.map((item: FoodItem, index: number) => (
                   <View key={`${item.name}-${index}`} style={styles.foodItemRow}>
+                    <Image
+                      source={resolveFoodIconFromLabel(item.name, item.category)}
+                      style={styles.foodIcon}
+                    />
                     <AppText variant="bodySmall" style={styles.foodItemName}>
                       {item.name || `Item ${index + 1}`}
                     </AppText>
@@ -209,6 +227,14 @@ export function DiscoverListingDetailModal({
           </ScrollView>
 
           <View style={styles.actions}>
+            {onCannotCollect ? (
+              <Button
+                label="Can’t collect"
+                size="compact"
+                variant="secondary"
+                onPress={onCannotCollect}
+              />
+            ) : null}
             {onClaim ? (
               <Button label="Claim" size="compact" onPress={onClaim} style={styles.claimBtn} />
             ) : null}
@@ -325,6 +351,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: hp(0.3),
+  },
+  foodIcon: {
+    width: normalize(24),
+    height: normalize(24),
   },
   foodItemRow: {
     flexDirection: 'row',

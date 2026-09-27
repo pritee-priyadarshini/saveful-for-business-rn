@@ -270,13 +270,17 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
           authUser?.profile?.organization?.organizationType ??
           '',
       ).toUpperCase();
-      // Org-wide "All sites" only for multi-site orgs. Single-site charity must
-      // always hit the site endpoint so Impact stays scoped to that charity.
+      // When no site is selected, use the org endpoint so All-time totals match
+      // Donated to + Specific food (those always query by organisation).
+      // A chosen site still hits the site endpoint. Single-site charity stays
+      // on the site endpoint so a location admin does not mix sibling sites.
       const preferOrgScope =
-        orgType === 'CHARITY_MULTI' ||
-        orgType === 'FARMER_CONSUMER' ||
-        orgType === 'BUSINESS_MULTI' ||
-        orgType === 'FARMER_PRODUCER';
+        siteId == null &&
+        (orgType === 'CHARITY_MULTI' ||
+          orgType === 'FARMER_CONSUMER' ||
+          orgType === 'BUSINESS_MULTI' ||
+          orgType === 'BUSINESS_SINGLE' ||
+          orgType === 'FARMER_PRODUCER');
 
       const impact =
         filter.mode === 'all_time'
@@ -365,10 +369,12 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
           '',
       ).toUpperCase();
       const preferOrgScope =
-        orgType === 'CHARITY_MULTI' ||
-        orgType === 'FARMER_CONSUMER' ||
-        orgType === 'BUSINESS_MULTI' ||
-        orgType === 'FARMER_PRODUCER';
+        siteId == null &&
+        (orgType === 'CHARITY_MULTI' ||
+          orgType === 'FARMER_CONSUMER' ||
+          orgType === 'BUSINESS_MULTI' ||
+          orgType === 'BUSINESS_SINGLE' ||
+          orgType === 'FARMER_PRODUCER');
 
       const periodImpact = await fetchAggregatedSiteImpact(siteIds, period, {
         orgId: orgId != null ? Number(orgId) : null,

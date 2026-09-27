@@ -76,6 +76,8 @@ const seedItems: FoodItem[] = [
   { name: 'Fresh fruit & veg', qty: 0, iconKey: 'fruitVeg' },
   { name: 'Meat', qty: 0, iconKey: 'meat' },
   { name: 'Dairy', qty: 0, iconKey: 'dairy' },
+  { name: 'Sandwiches', qty: 0, iconKey: 'sandwiches' },
+  { name: 'Salads', qty: 0, iconKey: 'salads' },
 ];
 
 const ALLERGEN_OPTIONS = [
@@ -227,6 +229,7 @@ function EditPeopleListingForm({
   const [storage, setStorage] = useState<'Fridge' | 'Freezer' | 'Ambient' | 'Hot'>('Freezer');
   const [reheating, setReheating] = useState<'Yes' | 'No' | 'Not sure'>('No');
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
+  const [collectionNotes, setCollectionNotes] = useState('');
   const [confirmedSafe, setConfirmedSafe] = useState(false);
 
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -252,6 +255,7 @@ function EditPeopleListingForm({
     setStorage(inferPeopleStorage(data));
     setReheating(inferReheating(data));
     setSelectedAllergens(inferPeopleAllergens(data));
+    setCollectionNotes(String(data.collectionNotes ?? '').trim());
     setImages(extractListingImages(data));
   }, [initialListing]);
 
@@ -496,6 +500,7 @@ function EditPeopleListingForm({
           needsReheating: reheating === 'Yes',
           containsAllergens: hasSelectedAllergens,
           allergens: selectedAllergens,
+          collectionNotes: collectionNotes.trim() || undefined,
           isSafeForDonation: true,
         });
         invalidateListingDetail(listingId);
@@ -813,6 +818,28 @@ function EditPeopleListingForm({
             </View>
 
             <AppText variant="h8" color={palette.black} style={peopleStyles.fieldLabel}>
+              COLLECTION NOTES (OPTIONAL)
+            </AppText>
+            <AppText variant="caption" color={palette.stone} style={peopleStyles.notesHint}>
+              Add anything the collector should know about collection
+            </AppText>
+            <View style={peopleStyles.notesCard}>
+              <TextInput
+                value={collectionNotes}
+                onChangeText={(value) => setCollectionNotes(value.slice(0, 300))}
+                placeholder="e.g. Enter via loading dock, ask for kitchen manager, bring crates."
+                placeholderTextColor={palette.stone}
+                style={peopleStyles.notesInput}
+                multiline
+                textAlignVertical="top"
+                maxLength={300}
+              />
+              <AppText variant="caption" color={palette.stone} style={peopleStyles.notesCount}>
+                {collectionNotes.length}/300
+              </AppText>
+            </View>
+
+            <AppText variant="h8" color={palette.black} style={peopleStyles.fieldLabel}>
               STORAGE REQUIREMENTS
             </AppText>
             <View style={peopleStyles.chipRow}>
@@ -1014,6 +1041,16 @@ function EditPeopleListingForm({
                   Allergens - {hasSelectedAllergens ? selectedAllergens.join(', ') : 'None selected'}
                 </AppText>
               </View>
+
+              {collectionNotes.trim() ? (
+                <View style={peopleStyles.summaryInfoRow}>
+                  <Ionicons name="document-text-outline" size={normalize(18)} color={palette.kale} />
+                  <AppText variant="bodyBold" color={palette.midgray} style={peopleStyles.summaryInfoText}>
+                    Collection notes{'\n'}
+                    {collectionNotes.trim()}
+                  </AppText>
+                </View>
+              ) : null}
             </View>
 
             <Pressable style={peopleStyles.confirmWrap} onPress={() => setConfirmedSafe((prev) => !prev)}>
@@ -1155,6 +1192,7 @@ function EditFarmListingForm({
 
   const [selectedStorage, setSelectedStorage] = useState<string[]>([]);
   const [selectedContaminants, setSelectedContaminants] = useState<string[]>([]);
+  const [collectionNotes, setCollectionNotes] = useState('');
   const [confirmedSafe, setConfirmedSafe] = useState(false);
 
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -1176,6 +1214,7 @@ function EditFarmListingForm({
     setPickupToDate(parseListingDate(getListingPickupTo(data)));
     setSelectedStorage(inferFarmStorage(data));
     setSelectedContaminants(inferContaminants(data));
+    setCollectionNotes(String(data.collectionNotes ?? '').trim());
     setImages(extractListingImages(data));
   }, [initialListing]);
 
@@ -1388,6 +1427,7 @@ function EditFarmListingForm({
             selectedStorage.includes('Dry storage'),
           containsAllergens: selectedContaminants.length > 0,
           allergens: selectedContaminants,
+          collectionNotes: collectionNotes.trim() || undefined,
           isSafeForDonation: false,
         });
         invalidateListingDetail(listingId);
@@ -1641,6 +1681,28 @@ function EditFarmListingForm({
               </Pressable>
             </View>
 
+            <AppText variant="h8" color={palette.black} style={farmStyles.fieldLabel}>
+              COLLECTION NOTES (OPTIONAL)
+            </AppText>
+            <AppText variant="caption" color={palette.stone} style={farmStyles.notesHint}>
+              Add anything the collector should know about collection
+            </AppText>
+            <View style={farmStyles.notesCard}>
+              <TextInput
+                value={collectionNotes}
+                onChangeText={(value) => setCollectionNotes(value.slice(0, 300))}
+                placeholder="e.g. Loading access, forklift available, bring bins, loose product, contact on arrival."
+                placeholderTextColor={palette.stone}
+                style={farmStyles.notesInput}
+                multiline
+                textAlignVertical="top"
+                maxLength={300}
+              />
+              <AppText variant="caption" color={palette.stone} style={farmStyles.notesCount}>
+                {collectionNotes.length}/300
+              </AppText>
+            </View>
+
             {/* Storage / Handling – multi-select */}
             <AppText variant="h8" color={palette.black} style={farmStyles.fieldLabel}>
               STORAGE / HANDLING
@@ -1840,6 +1902,16 @@ function EditFarmListingForm({
                   <Ionicons name="alert-circle-outline" size={normalize(18)} color={FARM_ACCENT} />
                   <AppText variant="bodyBold" color={palette.midgray} style={farmStyles.summaryInfoText}>
                     {selectedContaminants.join(', ')}
+                  </AppText>
+                </View>
+              ) : null}
+
+              {collectionNotes.trim() ? (
+                <View style={farmStyles.summaryInfoRow}>
+                  <Ionicons name="document-text-outline" size={normalize(18)} color={FARM_ACCENT} />
+                  <AppText variant="bodyBold" color={palette.midgray} style={farmStyles.summaryInfoText}>
+                    Collection notes{'\n'}
+                    {collectionNotes.trim()}
                   </AppText>
                 </View>
               ) : null}
@@ -2316,6 +2388,30 @@ const peopleStyles = StyleSheet.create({
     marginTop: hp(0.5),
     textTransform: 'none',
   },
+  notesHint: {
+    marginTop: hp(0.4),
+  },
+  notesCard: {
+    borderRadius: normalize(12),
+    borderWidth: normalize(1),
+    borderColor: '#D9D9D9',
+    backgroundColor: palette.white,
+    paddingHorizontal: wp(3),
+    paddingTop: hp(1),
+    paddingBottom: hp(0.8),
+    minHeight: hp(12),
+  },
+  notesInput: {
+    minHeight: hp(8),
+    color: palette.midgray,
+    fontSize: normalize(14),
+    fontFamily: 'Saveful-Regular',
+    lineHeight: normalize(20),
+  },
+  notesCount: {
+    alignSelf: 'flex-end',
+    marginTop: hp(0.4),
+  },
   locationBox: {
     borderRadius: normalize(12),
     borderWidth: normalize(1),
@@ -2683,6 +2779,30 @@ const farmStyles = StyleSheet.create({
   fieldLabel: {
     marginTop: hp(0.4),
     textTransform: 'none',
+  },
+  notesHint: {
+    marginTop: hp(0.4),
+  },
+  notesCard: {
+    borderRadius: normalize(12),
+    borderWidth: normalize(1),
+    borderColor: '#D9D9D9',
+    backgroundColor: palette.white,
+    paddingHorizontal: wp(3),
+    paddingTop: hp(1),
+    paddingBottom: hp(0.8),
+    minHeight: hp(12),
+  },
+  notesInput: {
+    minHeight: hp(8),
+    color: palette.midgray,
+    fontSize: normalize(14),
+    fontFamily: 'Saveful-Regular',
+    lineHeight: normalize(20),
+  },
+  notesCount: {
+    alignSelf: 'flex-end',
+    marginTop: hp(0.4),
   },
   fieldSubLabel: {
     marginTop: -hp(0.4),

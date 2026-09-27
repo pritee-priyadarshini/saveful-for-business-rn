@@ -7,6 +7,8 @@ export type FoodIconKey =
   | 'fruitVeg'
   | 'meat'
   | 'dairy'
+  | 'sandwiches'
+  | 'salads'
   | 'defaultMeal';
 
 const FOOD_ICON_SOURCES: Record<FoodIconKey, any> = {
@@ -16,6 +18,8 @@ const FOOD_ICON_SOURCES: Record<FoodIconKey, any> = {
   fruitVeg: require('../../assets/placeholder/fruit_veg_icon.png'),
   meat: require('../../assets/placeholder/meat_icon.png'),
   dairy: require('../../assets/placeholder/milk_icon.png'),
+  sandwiches: require('../../assets/placeholder/sandwich_icon.png'),
+  salads: require('../../assets/placeholder/bowl.png'),
   defaultMeal: require('../../assets/placeholder/meal_icon.png'),
 };
 
@@ -31,6 +35,34 @@ export const resolveFoodIconSource = (iconKey?: FoodIconKey | null) => {
   if (!iconKey) return FOOD_ICON_SOURCES.defaultMeal;
   return FOOD_ICON_SOURCES[iconKey] || FOOD_ICON_SOURCES.defaultMeal;
 };
+
+/** Resolve an icon from a listing food name/category when the API has no iconKey. */
+export function resolveFoodIconFromLabel(
+  ...labels: Array<string | FoodIconKey | null | undefined>
+) {
+  for (const label of labels) {
+    if (!label) continue;
+    if (label in FOOD_ICON_SOURCES) {
+      return FOOD_ICON_SOURCES[label as FoodIconKey];
+    }
+  }
+
+  const text = labels
+    .filter((label): label is string => typeof label === 'string' && label.trim().length > 0)
+    .join(' ')
+    .toLowerCase();
+
+  if (text.includes('sandwich')) return FOOD_ICON_SOURCES.sandwiches;
+  if (text.includes('salad')) return FOOD_ICON_SOURCES.salads;
+  if (text.includes('baked')) return FOOD_ICON_SOURCES.bakedGoods;
+  if (text.includes('bread')) return FOOD_ICON_SOURCES.bread;
+  if (text.includes('fruit') || text.includes('veg')) return FOOD_ICON_SOURCES.fruitVeg;
+  if (text.includes('dairy') || text.includes('milk')) return FOOD_ICON_SOURCES.dairy;
+  if (text.includes('scrap') && text.includes('meat')) return FOOD_ICON_SOURCES.meat;
+  if (text.includes('meat')) return FOOD_ICON_SOURCES.meat;
+  if (text.includes('prepared') || text.includes('meal')) return FOOD_ICON_SOURCES.preparedMeals;
+  return FOOD_ICON_SOURCES.defaultMeal;
+}
 
 export const estimateMealsSaved = (totalKg: number) => {
   const safeKg = Math.max(0, totalKg || 0);

@@ -113,6 +113,18 @@ function mergeTotals(acc: ImpactTotals, next: ImpactTotals): ImpactTotals {
   };
 }
 
+function unwrapSiteImpact(payload: unknown): SiteImpactResponse | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const root = payload as { totals?: unknown; data?: { totals?: unknown } };
+  if (root.totals && typeof root.totals === 'object') {
+    return payload as SiteImpactResponse;
+  }
+  if (root.data?.totals && typeof root.data.totals === 'object') {
+    return root.data as SiteImpactResponse;
+  }
+  return null;
+}
+
 function emptyTotals(): ImpactTotals {
   return {
     redistributedKg: 0,
@@ -178,10 +190,11 @@ export async function fetchAggregatedSiteImpact(
 ): Promise<SiteImpactResponse | null> {
   const orgId = options?.orgId ?? null;
 
-  // Charity/farmer "All sites": one org-wide request (includes untagged legacy claims).
-  if (options?.preferOrgScope && orgId != null && siteIds.length !== 1) {
+  // Default / All-sites view: org endpoint so totals match Donated to + Specific food
+  // (those sections also query by organisation, including listings not tagged to a site).
+  if (options?.preferOrgScope && orgId != null) {
     const res = await impactService.getOrgImpact(orgId, period);
-    return res.data ?? null;
+    return unwrapSiteImpact(res.data) ?? res.data ?? null;
   }
 
   if (siteIds.length === 0) {
@@ -238,9 +251,9 @@ export async function fetchAggregatedSiteImpactByRange(
 ): Promise<SiteImpactResponse | null> {
   const orgId = options?.orgId ?? null;
 
-  if (options?.preferOrgScope && orgId != null && siteIds.length !== 1) {
+  if (options?.preferOrgScope && orgId != null) {
     const res = await impactService.getOrgImpactByRange(orgId, range);
-    return res.data ?? null;
+    return unwrapSiteImpact(res.data) ?? res.data ?? null;
   }
 
   if (siteIds.length === 0) {
@@ -292,23 +305,25 @@ export async function fetchAggregatedSiteImpactByRange(
 export function mapImpactToDisplayStats(
   impact: SiteImpactResponse | null,
 ): ImpactDisplayStats {
-  if (!impact) return EMPTY_IMPACT_STATS;
+  const resolved = unwrapSiteImpact(impact) ?? impact;
+  const totals = resolved?.totals;
+  if (!resolved || !totals) return EMPTY_IMPACT_STATS;
 
-  const { totals, mode } = impact;
+  const redistributedKg = Number(totals.redistributedKg) || 0;
   return {
-    redistributedKg: totals.redistributedKg,
-    mealsCreated: totals.mealsCreated,
-    co2AvoidedKg: totals.co2AvoidedKg,
-    foodSavedMoney: foodSavedUsdFromKg(totals.redistributedKg),
-    collectionsCompleted: totals.collectionsCompleted,
-    partnersSupported: totals.partnersSupported,
-    peopleKg: totals.forPeople.kg,
-    animalKg: totals.forAnimal.kg,
-    peoplePercent: totals.forPeople.percent,
-    animalPercent: totals.forAnimal.percent,
-    rating: totals.ratingAvg,
-    ratingCount: totals.ratingCount,
-    mode,
+    redistributedKg,
+    mealsCreated: Number(totals.mealsCreated) || 0,
+    co2AvoidedKg: Number(totals.co2AvoidedKg) || 0,
+    foodSavedMoney: foodSavedUsdFromKg(redistributedKg),
+    collectionsCompleted: Number(totals.collectionsCompleted) || 0,
+    partnersSupported: Number(totals.partnersSupported) || 0,
+    peopleKg: Number(totals.forPeople?.kg) || 0,
+    animalKg: Number(totals.forAnimal?.kg) || 0,
+    peoplePercent: Number(totals.forPeople?.percent) || 0,
+    animalPercent: Number(totals.forAnimal?.percent) || 0,
+    rating: totals.ratingAvg ?? null,
+    ratingCount: Number(totals.ratingCount) || 0,
+    mode: resolved.mode === 'RECEIVER' ? 'RECEIVER' : 'DONOR',
   };
 }
 

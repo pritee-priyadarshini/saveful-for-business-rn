@@ -37,6 +37,12 @@ import { EnterpriseThanksScreen } from '@/screens/subscription/EnterpriseThanksS
 import { RestaurantPlanRouter } from '@/screens/subscription/RestaurantPlanRouter';
 import ManageAccessScreen from '@/screens/restaurant/ManageAccessScreen';
 import ManageSitesScreen from '@/screens/restaurant/ManageSitesScreen';
+import { ConnectionsScreen } from '@/screens/restaurant/ConnectionsScreen';
+import { CreateConnectionScreen } from '@/screens/restaurant/CreateConnectionScreen';
+import { ConnectionDetailScreen } from '@/screens/restaurant/ConnectionDetailScreen';
+import { AddDailySurplusScreen } from '@/screens/restaurant/AddDailySurplusScreen';
+import { CharityConnectionsScreen } from '@/screens/charity/CharityConnectionsScreen';
+import { CharityConnectionDetailScreen } from '@/screens/charity/CharityConnectionDetailScreen';
 import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
 import SiteAnalyticsScreen from '@/screens/restaurant/SiteAnalyticsScreen';
 import { ProfileScreen } from '@/screens/shared/ProfileScreen';
@@ -71,6 +77,20 @@ export type RootStackParamList = {
   EnterpriseThanks: undefined;
   //ManageAccess: undefined;
   ManageSites: undefined;
+  Connections: { siteId?: number } | undefined;
+  CreateConnection: { siteId?: number } | undefined;
+  ConnectionDetail: { connectionId: number; siteId?: number };
+  AddDailySurplus: {
+    dayId: number;
+    connectionId?: number;
+    charityName?: string;
+    schedule?: string;
+    windowStartAt?: string;
+    windowEndAt?: string;
+    siteName?: string;
+  };
+  CharityConnections: undefined;
+  CharityConnectionDetail: { connectionId: number };
   //CreateSite: undefined;
   CreateSite: { mode?: 'site' | 'manager'; siteId?: number };
   SiteAnalytics: undefined;
@@ -318,6 +338,12 @@ export function AppNavigator() {
             <RootStack.Screen name="RestaurantPlan" component={RestaurantPlanRouter} />
             <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
             <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
+            <RootStack.Screen name="Connections" component={ConnectionsScreen} />
+            <RootStack.Screen name="CreateConnection" component={CreateConnectionScreen} />
+            <RootStack.Screen name="ConnectionDetail" component={ConnectionDetailScreen} />
+            <RootStack.Screen name="AddDailySurplus" component={AddDailySurplusScreen} />
+            <RootStack.Screen name="CharityConnections" component={CharityConnectionsScreen} />
+            <RootStack.Screen name="CharityConnectionDetail" component={CharityConnectionDetailScreen} />
             <RootStack.Screen name="SiteAnalytics" component={SiteAnalyticsScreen} />
             <RootStack.Screen name="Account" component={ProfileScreen} />
             <RootStack.Screen name="Calculation" component={CalculationScreen} />

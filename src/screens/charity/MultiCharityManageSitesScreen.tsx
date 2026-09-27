@@ -761,6 +761,16 @@ export default function MultiCharityManageSitesScreen() {
                             </AppText>
                         </View>
                     </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Pressable
+                        style={styles.addLink}
+                        onPress={() => navigation.navigate('CharityConnections')}
+                        hitSlop={8}
+                    >
+                        <AppText variant="bodyBold" style={styles.addLinkText}>
+                            Connections
+                        </AppText>
+                    </Pressable>
                     <Pressable
                         style={styles.addLink}
                         onPress={() => navigation.navigate('CreateCharitySite' as any)}
@@ -771,6 +781,7 @@ export default function MultiCharityManageSitesScreen() {
                             Add
                         </AppText>
                     </Pressable>
+                    </View>
                 </View>
 
                 {sites.length === 0 ? (

@@ -135,6 +135,13 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
                 {allergens.length > 0 ? allergens.join(', ') : 'None selected'}
               </AppText>
             </View>
+
+            {String(listing?.collectionNotes ?? '').trim() ? (
+              <View style={styles.section}>
+                <AppText variant="bodyBold">Collection notes</AppText>
+                <AppText variant="body">{String(listing.collectionNotes).trim()}</AppText>
+              </View>
+            ) : null}
           </Card>
 
           <Card style={[styles.impactCard, tabletInsetReset]}>

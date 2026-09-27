@@ -59,8 +59,29 @@ export const useDashboardStore = create<DashboardState & DashboardActions>((set,
         return;
       }
 
-      // Same impact API + aggregation as the Insights screen — lifetime = "so far"
-      const impact = await fetchAggregatedSiteImpact(siteIds, 'lifetime');
+      const orgId =
+        authUser?.profile?.organisation?.id ??
+        authUser?.profile?.organization?.id ??
+        authUser?.orgId ??
+        null;
+      const orgType = String(
+        authUser?.orgType ??
+          authUser?.profile?.organisation?.organizationType ??
+          authUser?.profile?.organization?.organizationType ??
+          '',
+      ).toUpperCase();
+      // Same org-wide lifetime totals as Insights default / Donated to / Specific food.
+      const preferOrgScope =
+        orgType === 'CHARITY_MULTI' ||
+        orgType === 'FARMER_CONSUMER' ||
+        orgType === 'BUSINESS_MULTI' ||
+        orgType === 'BUSINESS_SINGLE' ||
+        orgType === 'FARMER_PRODUCER';
+
+      const impact = await fetchAggregatedSiteImpact(siteIds, 'lifetime', {
+        orgId: orgId != null ? Number(orgId) : null,
+        preferOrgScope,
+      });
       const stats = mapImpactToDisplayStats(impact);
 
       set({

@@ -217,6 +217,7 @@ export default function ManageSitesScreen() {
       primary: true,
     },
     { label: 'Add Location', route: 'CreateSite' },
+    { label: 'Connections', route: 'Connections' },
     { label: 'View Analytics', tab: 'Insights' },
     { label: 'Your Profile', route: 'Account' },
   ];

@@ -41,6 +41,7 @@ export function getPeopleRelistFormValues(
     storage: inferPeopleStorage(data),
     reheating: inferReheating(data),
     selectedAllergens: inferPeopleAllergens(data),
+    collectionNotes: String(data.collectionNotes ?? '').trim(),
     images: extractListingImages(data),
     confirmedSafe: false,
   };
@@ -63,6 +64,7 @@ export function getFarmRelistFormValues(
     pickupToDate: parseListingDate(getListingPickupTo(data)),
     selectedStorage: inferFarmStorage(data),
     selectedContaminants: contaminants,
+    collectionNotes: String(data.collectionNotes ?? '').trim(),
     images: extractListingImages(data),
     confirmedSafe: false,
   };

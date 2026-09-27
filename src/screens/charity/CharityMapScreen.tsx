@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   FlatList,
+  Image,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -17,6 +18,7 @@ import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
 import { Skeleton } from '../../components/Skeleton';
 import { ListingPhotoGallery } from '../../components/ListingPhotoGallery';
+import { CollectionNotesCard } from '../../components/CollectionNotesCard';
 import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 import {
   ClaimConfirmModal,
@@ -26,12 +28,13 @@ import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { SelfPickupClaimsSection } from '../../components/SelfPickupClaimsSection';
 import type { ClaimMode } from '../../services/claims.service';
 import { palette } from '../../theme/colors';
-import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
+import { showErrorAlert, showInfoAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
 import { useSelfPickupClaims } from '@/hooks/useSelfPickupClaims';
 import { useOrganizationLocation } from '@/hooks/useOrganizationLocation';
 import { fetchListingDetail, mapDiscoverListing, type FoodItem, invalidateListingDetail } from '../../services/foodListing.service';
+import { resolveFoodIconFromLabel } from '../../utils/foodListing';
 import {
   haversineDistanceKm,
   normalizeAuthProfile,
@@ -39,6 +42,9 @@ import {
   resolveProfileCoordinates,
 } from '@/utils/coordinates';
 import { hp, normalize, wp } from '@/utils/responsive';
+import { useFocusEffect } from '@react-navigation/native';
+import { connectionsService, type ConnectionToday } from '@/services/connections.service';
+import { showConfirmAlert } from '@/store/appAlertStore';
 import { useAppContext } from '../../store/AppContext';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
@@ -122,6 +128,7 @@ export function CharityMapScreen({ navigation }: any) {
   } = useOrganizationLocation();
 
   const [claimState, setClaimState] = useState<ClaimState>({});
+  const [reservedDays, setReservedDays] = useState<ConnectionToday[]>([]);
   const [foodItemsByListing, setFoodItemsByListing] = useState<Record<string, ClaimFoodItem[]>>({});
   const [loadingFoodItems, setLoadingFoodItems] = useState<Record<string, boolean>>({});
   const [sortByDistance, setSortByDistance] = useState(true);
@@ -163,6 +170,43 @@ export function CharityMapScreen({ navigation }: any) {
   useEffect(() => {
     pendingClaimRef.current = pendingClaim;
   }, [pendingClaim]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void connectionsService.listTodayForCharity()
+        .then(setReservedDays)
+        .catch(() => setReservedDays([]));
+    }, []),
+  );
+
+  const reservedByListingId = useMemo(() => {
+    const map = new Map<number, ConnectionToday>();
+    for (const row of reservedDays) {
+      if (row.listingId && row.outcome === 'PUBLISHED') {
+        map.set(Number(row.listingId), row);
+      }
+    }
+    return map;
+  }, [reservedDays]);
+
+  const releaseReserved = useCallback((day: ConnectionToday) => {
+    showConfirmAlert({
+      title: 'Can’t collect today?',
+      message: 'This listing will be offered to nearby charities immediately.',
+      confirmLabel: 'Release to network',
+      onConfirm: async () => {
+        if (!day.dayId) return;
+        try {
+          const result = await connectionsService.cannotCollect(day.dayId);
+          showSuccessAlert(result.message || 'Released to nearby charities.');
+          setReservedDays((current) => current.filter((row) => row.dayId !== day.dayId));
+          await reload();
+        } catch (error) {
+          showErrorAlert(error, 'Could not release listing');
+        }
+      },
+    });
+  }, [reload]);
 
   const applyFoodItems = useCallback((listingId: string, items: ClaimFoodItem[]) => {
     setFoodItemsByListing((prev) => ({ ...prev, [listingId]: items }));
@@ -543,12 +587,18 @@ export function CharityMapScreen({ navigation }: any) {
       return (
         <View style={styles.singleItemPanel}>
           <View style={styles.itemHeaderRow}>
-            <AppText variant="label" style={styles.itemName} numberOfLines={2}>
-              {onlyItem.name}
-            </AppText>
-            <AppText variant="caption" style={styles.itemAvail}>
-              {formatKg(onlyItem.quantityKg)} kg avail.
-            </AppText>
+            <Image
+              source={resolveFoodIconFromLabel(onlyItem.name, onlyItem.category)}
+              style={styles.foodIcon}
+            />
+            <View style={styles.itemHeaderText}>
+              <AppText variant="label" style={styles.itemName} numberOfLines={2}>
+                {onlyItem.name}
+              </AppText>
+              <AppText variant="caption" style={styles.itemAvail}>
+                {formatKg(onlyItem.quantityKg)} kg avail.
+              </AppText>
+            </View>
           </View>
           {renderQtyStepper(listing, onlyItem)}
         </View>
@@ -594,6 +644,10 @@ export function CharityMapScreen({ navigation }: any) {
                     style={[styles.claimItemRow, isActive && styles.claimItemRowActive]}
                     onPress={() => toggleActiveClaimItem(listing.id, claimItem.foodItemId)}
                   >
+                    <Image
+                      source={resolveFoodIconFromLabel(claimItem.name, claimItem.category)}
+                      style={styles.foodIcon}
+                    />
                     <View style={styles.claimItemMeta}>
                       <AppText variant="label" numberOfLines={1} style={styles.itemName}>
                         {claimItem.name}
@@ -626,9 +680,17 @@ export function CharityMapScreen({ navigation }: any) {
     const totalSelected = getTotalSelected(item.id);
     const hasSelection = totalSelected > 0;
     const availableKg = getAvailableKg(item, claimItems);
+    const reserved = reservedByListingId.get(item.listingId);
 
     return (
       <View style={styles.card}>
+        {reserved ? (
+          <View style={styles.reservedBanner}>
+            <AppText variant="caption" style={styles.reservedBannerText}>
+              RESERVED FOR YOU — confirm as a normal claim, or release if you can’t collect
+            </AppText>
+          </View>
+        ) : null}
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleWrap}>
             <AppText variant="bodyBold" numberOfLines={2}>
@@ -687,6 +749,8 @@ export function CharityMapScreen({ navigation }: any) {
           </Pressable>
         </View>
 
+        <CollectionNotesCard notes={item.collectionNotes} style={styles.collectionNotes} />
+
         <View style={styles.section}>
           <ListingPhotoGallery
             photos={item.photoUrls}
@@ -718,6 +782,11 @@ export function CharityMapScreen({ navigation }: any) {
             onPress={() => openFullClaim(item, claimItems)}
           />
         </View>
+        {reserved?.dayId ? (
+          <Pressable style={styles.cannotCollectBtn} onPress={() => releaseReserved(reserved)}>
+            <AppText variant="bodyBold" color={palette.primary}>Can’t collect</AppText>
+          </Pressable>
+        ) : null}
       </View>
     );
   };
@@ -822,6 +891,18 @@ export function CharityMapScreen({ navigation }: any) {
       <DiscoverListingDetailModal
         visible={!!selectedListing}
         listing={selectedListing}
+        reserved={
+          !!selectedListing && reservedByListingId.has(selectedListing.listingId)
+        }
+        onCannotCollect={
+          selectedListing && reservedByListingId.get(selectedListing.listingId)?.dayId
+            ? () => {
+                const day = reservedByListingId.get(selectedListing.listingId);
+                setSelectedListing(null);
+                if (day) releaseReserved(day);
+              }
+            : undefined
+        }
         onClose={() => setSelectedListing(null)}
         onClaim={() => {
           // Already on Available — close the sheet so the claim controls on the list are usable.
@@ -1151,6 +1232,10 @@ const styles = StyleSheet.create({
     lineHeight: normalize(16),
   },
 
+  collectionNotes: {
+    marginTop: hp(1.2),
+  },
+
   detailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1251,7 +1336,19 @@ const styles = StyleSheet.create({
   },
 
   itemHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.5),
+  },
+
+  itemHeaderText: {
+    flex: 1,
     gap: hp(0.3),
+  },
+
+  foodIcon: {
+    width: normalize(28),
+    height: normalize(28),
   },
 
   itemName: {
@@ -1324,6 +1421,25 @@ const styles = StyleSheet.create({
     marginTop: hp(0.1),
   },
 
+  reservedBanner: {
+    backgroundColor: '#EEF0E6',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: hp(1),
+  },
+  reservedBannerText: {
+    color: palette.kale,
+  },
+  cannotCollectBtn: {
+    marginTop: hp(1),
+    minHeight: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ctaRow: {
     flexDirection: 'row',
     gap: wp(2),

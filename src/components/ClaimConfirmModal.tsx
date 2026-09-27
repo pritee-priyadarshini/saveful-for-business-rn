@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from './AppText';
 import { Button } from './Button';
 import { ListingPhotoGallery } from './ListingPhotoGallery';
+import { CollectionNotesCard } from './CollectionNotesCard';
 import { palette } from '../theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 import {
@@ -20,6 +22,7 @@ import {
   type ClaimMode,
 } from '../services/claims.service';
 import { getUserFriendlyErrorMessage, showInfoAlert } from '@/utils/apiError';
+import { resolveFoodIconFromLabel } from '../utils/foodListing';
 import type { mapDiscoverListing } from '../services/foodListing.service';
 
 type DiscoverListing = ReturnType<typeof mapDiscoverListing>;
@@ -281,12 +284,15 @@ export function ClaimConfirmModal({
                   thumbnailStyle={styles.photo}
                 />
 
+                <CollectionNotesCard notes={listing.collectionNotes} />
+
                 <AppText variant="label" style={styles.sectionTitle}>
                   You are claiming
                 </AppText>
 
                 {items.map((item) => (
                   <View key={item.foodItemId} style={styles.itemRow}>
+                    <Image source={resolveFoodIconFromLabel(item.name)} style={styles.foodIcon} />
                     <AppText variant="bodySmall" style={styles.itemName}>
                       {item.name}
                     </AppText>
@@ -434,6 +440,10 @@ const styles = StyleSheet.create({
     height: wp(22),
     borderRadius: normalize(10),
     backgroundColor: '#EEE',
+  },
+  foodIcon: {
+    width: normalize(24),
+    height: normalize(24),
   },
   itemName: {
     flex: 1,

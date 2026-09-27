@@ -12,6 +12,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { ClaimConfirmModal, type ClaimLineItem } from '@/components/ClaimConfirmModal';
 import { ListingPhotoGallery } from '@/components/ListingPhotoGallery';
+import { CollectionNotesCard } from '@/components/CollectionNotesCard';
 import { Screen } from '@/components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '@/theme/colors';
@@ -232,6 +233,7 @@ export function LivestockListingDetailsScreen({ route, navigation }: any) {
           value={formatListingDate(data?.listedAt)}
         />
         <DetailRow icon="thermometer-outline" label="Storage" value={data?.storage || '—'} />
+        <CollectionNotesCard notes={data?.collectionNotes} />
 
         {!!data?.foodItems?.length && (
           <View style={styles.foodItemsSection}>

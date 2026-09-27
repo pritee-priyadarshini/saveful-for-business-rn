@@ -23,6 +23,10 @@ import { Skeleton } from '../../components/Skeleton';
 import { LocationRequiredBanner } from '../../components/LocationRequiredBanner';
 import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { useAppContext } from '../../store/AppContext';
+import { useSitesStore } from '@/store/sitesStore';
+import { connectionsService } from '@/services/connections.service';
+import { isVirtualHqSiteId } from '@/utils/defaultHqSite';
+import { resolveListingSiteId } from '@/utils/listingSite';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { showErrorAlert } from '@/utils/apiError';
@@ -299,7 +303,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildAdaptiveStyles(r), [r]);
   const bottomPadding = useBottomTabPadding(r.isTablet ? 24 : hp(2));
-  const { currentProfile } = useAppContext();
+  const { currentProfile, selectedRole, authUser } = useAppContext();
+  const rawSites = useSitesStore((s) => s.sites);
   const {
     showBanner,
     setBannerClosed,
@@ -383,23 +388,47 @@ export function RestaurantHomeScreen({ navigation }: any) {
     loadImpact();
   }, [loadImpact]);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const [connectionSummary, setConnectionSummary] = useState({ pending: 0, active: 0 });
+
+  const loadConnections = useCallback(async () => {
+    try {
+      const siteIds = (rawSites ?? [])
+        .map((site: any) => Number(site?.id))
+        .filter((id: number) => Number.isFinite(id) && id > 0 && !isVirtualHqSiteId(id));
+      const fallback = await resolveListingSiteId(authUser);
+      const ids = siteIds.length ? siteIds : fallback ? [fallback] : [];
+      if (!ids.length) {
+        setConnectionSummary({ pending: 0, active: 0 });
+        return;
+      }
+      const rows = (await Promise.all(ids.map((id) => connectionsService.listForSite(id).catch(() => [])))).flat();
+      setConnectionSummary({
+        pending: rows.filter((row) => row.status === 'PENDING').length,
+        active: rows.filter((row) => row.status === 'ACTIVE').length,
+      });
+    } catch {
+      setConnectionSummary({ pending: 0, active: 0 });
+    }
+  }, [authUser, rawSites]);
+
   useFocusEffect(
     useCallback(() => {
       fetchBusinessImpact(true).catch(() => undefined);
-    }, [fetchBusinessImpact]),
+      void loadConnections();
+    }, [fetchBusinessImpact, loadConnections]),
   );
 
-  const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await fetchBusinessImpact(true);
+      await Promise.all([fetchBusinessImpact(true), loadConnections()]);
     } catch (e) {
       showErrorAlert(e, 'Could not load dashboard', 'Could not load dashboard data');
     } finally {
       setRefreshing(false);
     }
-  }, [fetchBusinessImpact]);
+  }, [fetchBusinessImpact, loadConnections]);
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
@@ -631,6 +660,39 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   </View>
                 </View>
               </Pressable>
+
+              {selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi' ? (
+                <Pressable
+                  onPress={() => navigation.navigate('Connections')}
+                  style={({ pressed }) => [styles.connectionsCard, pressed && styles.pressed]}
+                >
+                  <View style={styles.connectionsIcon}>
+                    <Ionicons name="people-outline" size={normalize(20)} color={palette.kale} />
+                  </View>
+                  <View style={styles.connectionsCopy}>
+                    <AppText variant="bodyBold">Preferred collections</AppText>
+                    <AppText variant="caption" color={palette.stone} numberOfLines={1}>
+                      {connectionSummary.pending
+                        ? connectionSummary.pending === 1
+                          ? '1 invitation awaiting the charity'
+                          : `${connectionSummary.pending} invitations awaiting`
+                        : connectionSummary.active
+                          ? connectionSummary.active === 1
+                            ? '1 preferred charity'
+                            : `${connectionSummary.active} preferred charities`
+                          : 'Offer surplus to a charity first'}
+                    </AppText>
+                  </View>
+                  {connectionSummary.pending ? (
+                    <View style={styles.connectionsBadge}>
+                      <AppText variant="caption" style={styles.connectionsBadgeText}>
+                        {connectionSummary.pending}
+                      </AppText>
+                    </View>
+                  ) : null}
+                  <Ionicons name="chevron-forward" size={normalize(16)} color={palette.primary} />
+                </Pressable>
+              ) : null}
 
               <View style={styles.impactSection}>
                 <View style={[styles.sectionHeading, adaptive.sectionHeading]}>
@@ -1190,6 +1252,48 @@ const styles = StyleSheet.create({
     textTransform: 'none',
   },
 
+  connectionsCard: {
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3.4),
+    borderRadius: normalize(18),
+    backgroundColor: palette.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.6),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  connectionsIcon: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    backgroundColor: '#E8F3EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  connectionsCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  connectionsBadge: {
+    minWidth: normalize(18),
+    height: normalize(18),
+    borderRadius: normalize(9),
+    backgroundColor: palette.kale,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  connectionsBadgeText: {
+    color: palette.white,
+    fontWeight: '700',
+  },
   pressed: {
     opacity: 0.85,
   },

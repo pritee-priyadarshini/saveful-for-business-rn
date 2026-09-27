@@ -152,6 +152,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
   const [selectedStorage, setSelectedStorage] = useState<string[]>([]);
   const [selectedContaminants, setSelectedContaminants] = useState<string[]>([]);
+  const [collectionNotes, setCollectionNotes] = useState('');
   const [confirmedSafe, setConfirmedSafe] = useState(false);
   const [relistApplied, setRelistApplied] = useState(false);
 
@@ -187,6 +188,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
     setPickupToDate(values.pickupToDate);
     setSelectedStorage(values.selectedStorage);
     setSelectedContaminants(values.selectedContaminants);
+    setCollectionNotes(values.collectionNotes);
     setImages(values.images);
     setConfirmedSafe(false);
     setRelistApplied(true);
@@ -428,6 +430,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
             selectedStorage.includes('Dry storage'),
           isSafeForDonation: false,
           allergens: selectedContaminants,
+          collectionNotes: collectionNotes.trim() || undefined,
           photos: images,
         };
 
@@ -744,6 +747,28 @@ export function CreateFarmListingScreen({ navigation }: any) {
               </AppText>
             ) : null}
 
+            <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
+              COLLECTION NOTES (OPTIONAL)
+            </AppText>
+            <AppText variant="caption" color={palette.stone} style={styles.notesHint}>
+              Add anything the collector should know about collection
+            </AppText>
+            <View style={styles.notesCard}>
+              <TextInput
+                value={collectionNotes}
+                onChangeText={(value) => setCollectionNotes(value.slice(0, 300))}
+                placeholder="e.g. Loading access, forklift available, bring bins, loose product, contact on arrival."
+                placeholderTextColor={palette.stone}
+                style={styles.notesInput}
+                multiline
+                textAlignVertical="top"
+                maxLength={300}
+              />
+              <AppText variant="caption" color={palette.stone} style={styles.notesCount}>
+                {collectionNotes.length}/300
+              </AppText>
+            </View>
+
             {/* Storage / Handling – multi-select */}
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               STORAGE / HANDLING
@@ -945,6 +970,16 @@ export function CreateFarmListingScreen({ navigation }: any) {
                   <Ionicons name="alert-circle-outline" size={normalize(18)} color={FARM_ACCENT} />
                   <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
                     {selectedContaminants.join(', ')}
+                  </AppText>
+                </View>
+              ) : null}
+
+              {collectionNotes.trim() ? (
+                <View style={styles.summaryInfoRow}>
+                  <Ionicons name="document-text-outline" size={normalize(18)} color={FARM_ACCENT} />
+                  <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
+                    Collection notes{'\n'}
+                    {collectionNotes.trim()}
                   </AppText>
                 </View>
               ) : null}
@@ -1194,6 +1229,30 @@ const styles = StyleSheet.create({
   fieldLabel: {
     marginTop: hp(0.4),
     textTransform: 'none',
+  },
+  notesHint: {
+    marginTop: hp(0.4),
+  },
+  notesCard: {
+    borderRadius: normalize(12),
+    borderWidth: normalize(1),
+    borderColor: '#D9D9D9',
+    backgroundColor: palette.white,
+    paddingHorizontal: wp(3),
+    paddingTop: hp(1),
+    paddingBottom: hp(0.8),
+    minHeight: hp(12),
+  },
+  notesInput: {
+    minHeight: hp(8),
+    color: palette.midgray,
+    fontSize: normalize(14),
+    fontFamily: 'Saveful-Regular',
+    lineHeight: normalize(20),
+  },
+  notesCount: {
+    alignSelf: 'flex-end',
+    marginTop: hp(0.4),
   },
   fieldSubLabel: {
     marginTop: -hp(0.4),

@@ -21,6 +21,7 @@ import { LocationRequiredBanner } from '../../components/LocationRequiredBanner'
 import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { DiscoverListingDetailModal } from '../../components/DiscoverListingDetailModal';
 import { AssignDriverModal } from '@/components/AssignDriverModal';
+import { connectionsService } from '@/services/connections.service';
 
 import { useAppContext } from '../../store/AppContext';
 import { useAuthStore } from '../../store/authStore';
@@ -30,7 +31,6 @@ import { showErrorAlert, showInfoAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
 import { useAvailableFoodFeed } from '@/hooks/useAvailableFoodFeed';
-import { HeaderAddressRow } from '@/components/HeaderAddressRow';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { mapDiscoverListing } from '../../services/foodListing.service';
 import { driversService, type SiteDriver } from '@/services/drivers.service';
@@ -122,6 +122,7 @@ export function CharityDiscoverScreen() {
   const [driversLoading, setDriversLoading] = useState(false);
   const [driversError, setDriversError] = useState<string | null>(null);
   const [assignDriver, setAssignDriver] = useState<SiteDriverRow | null>(null);
+  const [inviteCount, setInviteCount] = useState(0);
 
   const siteIds = useMemo(
     () => resolveCharitySiteIds(authUser, locations),
@@ -233,6 +234,21 @@ export function CharityDiscoverScreen() {
     }, [viewMode]),
   );
 
+  const loadInvites = useCallback(async () => {
+    try {
+      const rows = await connectionsService.listForCharity();
+      setInviteCount(rows.filter((row) => row.status === 'PENDING').length);
+    } catch {
+      setInviteCount(0);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadInvites();
+    }, [loadInvites]),
+  );
+
   const openAddDriver = useCallback(() => {
     navigation.navigate('CharityManageAccess', {
       locationId: resolvePrimaryLocationId(),
@@ -247,7 +263,7 @@ export function CharityDiscoverScreen() {
       if (viewMode === 'drivers') {
         await loadSiteDrivers();
       } else {
-        await reload();
+        await Promise.all([reload(), loadInvites()]);
       }
     } catch (e) {
       if (viewMode === 'list') {
@@ -304,6 +320,13 @@ export function CharityDiscoverScreen() {
 
   const renderListing = ({ item }: { item: DiscoverListing }) => (
     <View style={styles.card}>
+      {item.reserved ? (
+        <View style={styles.reservedBanner}>
+          <AppText variant="caption" style={styles.reservedBannerText}>
+            Reserved for your charity — not on the open network
+          </AppText>
+        </View>
+      ) : null}
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleWrap}>
           <AppText variant="bodyBold" numberOfLines={2}>
@@ -442,45 +465,70 @@ export function CharityDiscoverScreen() {
 
   const Header = () => (
     <View>
-      <HeroHeader source={require('../../../assets/placeholder/kale-header.png')}>
-        <View style={[styles.topBar, { paddingTop: hp(2) }]}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <AppText variant="h6" style={styles.whiteText}>
-              {currentProfile.organization || 'Your Organisation'}
-            </AppText>
-
-            <HeaderAddressRow
-              address={currentProfile.address || capturedAddress || 'No address available'}
-              style={styles.locationHeaderRow}
-              textStyle={styles.headerLocation}
-            />
-          </View>
-
-          <Pressable
-            style={styles.logoCircle}
-            onPress={() => navigation.navigate('Account')}
-            accessibilityRole="button"
-            accessibilityLabel="Open account profile"
-          >
-            {currentProfile.logo ? (
-              <Image source={{ uri: currentProfile.logo }} style={styles.logoImage} />
-            ) : (
-              <AppText style={styles.logoFallback}>
-                {currentProfile.organization?.[0] || 'S'}
+      <HeroHeader source={require('../../../assets/placeholder/kale-header.png')} height={hp(14)}>
+        <View style={styles.heroInner}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroCopy}>
+              <AppText variant="caption" style={styles.heroGreeting}>
+                {greeting}
               </AppText>
-            )}
-          </Pressable>
+              <AppText variant="h6" style={styles.heroName} numberOfLines={1}>
+                {firstName}
+              </AppText>
+              <AppText variant="bodySmall" style={styles.heroOrg} numberOfLines={1}>
+                {currentProfile.organization || 'Your organisation'}
+              </AppText>
+            </View>
+            <Pressable
+              style={styles.logoCircle}
+              onPress={() => navigation.navigate('Account')}
+              accessibilityRole="button"
+              accessibilityLabel="Open account profile"
+            >
+              {currentProfile.logo ? (
+                <Image source={{ uri: currentProfile.logo }} style={styles.logoImage} />
+              ) : (
+                <AppText style={styles.logoFallback}>
+                  {currentProfile.organization?.[0] || 'S'}
+                </AppText>
+              )}
+            </Pressable>
+          </View>
+          <View style={styles.locationPill}>
+            <Ionicons name="location-outline" size={normalize(14)} color={palette.white} />
+            <AppText variant="caption" style={styles.locationPillText} numberOfLines={1}>
+              {currentProfile.address || capturedAddress || 'Add your collection address'}
+            </AppText>
+          </View>
         </View>
       </HeroHeader>
 
-      <View style={styles.welcomeSection}>
-        <AppText variant="h5">
-          {greeting}, {firstName}
-        </AppText>
-        <AppText variant="bodyLarge" style={styles.welcomeSub}>
-          We are helping good food go further, together
-        </AppText>
-      </View>
+      <Pressable
+        onPress={() => navigation.navigate('CharityConnections')}
+        style={({ pressed }) => [styles.connectionsCard, pressed && { opacity: 0.92 }]}
+      >
+        <View style={styles.connectionsIcon}>
+          <Ionicons name="people-outline" size={normalize(20)} color={palette.kale} />
+        </View>
+        <View style={styles.connectionsCopy}>
+          <AppText variant="bodyBold">Preferred collections</AppText>
+          <AppText variant="caption" color={palette.stone} numberOfLines={1}>
+            {inviteCount
+              ? inviteCount === 1
+                ? '1 invitation waiting'
+                : `${inviteCount} invitations waiting`
+              : 'Regular pickups offered to you first'}
+          </AppText>
+        </View>
+        {inviteCount ? (
+          <View style={styles.inviteCount}>
+            <AppText variant="caption" style={styles.inviteCountText}>
+              {inviteCount}
+            </AppText>
+          </View>
+        ) : null}
+        <Ionicons name="chevron-forward" size={normalize(16)} color={palette.primary} />
+      </Pressable>
 
       {showBanner && (
         <LocationRequiredBanner
@@ -580,6 +628,7 @@ export function CharityDiscoverScreen() {
       <DiscoverListingDetailModal
         visible={!!selectedListing}
         listing={selectedListing}
+        reserved={!!selectedListing?.reserved}
         onClose={() => setSelectedListing(null)}
         onClaim={() => {
           setSelectedListing(null);
@@ -701,36 +750,96 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  heroInner: {
+    flex: 1,
     paddingHorizontal: wp(4),
+    paddingBottom: hp(1.2),
+    justifyContent: 'flex-end',
+    gap: hp(1),
   },
 
-  whiteText: {
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+
+  heroGreeting: {
+    color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 0.3,
+  },
+
+  heroName: {
     color: palette.white,
-    fontSize: normalize(20),
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    fontSize: normalize(24),
+    lineHeight: normalize(28),
   },
 
-  locationHeaderRow: {
-    marginTop: hp(0.8),
+  heroOrg: {
+    color: 'rgba(255,255,255,0.9)',
   },
 
-  headerLocation: {
+  locationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: wp(2.8),
+    paddingVertical: hp(0.55),
+    borderRadius: normalize(20),
+  },
+
+  locationPillText: {
     color: palette.white,
-    opacity: 0.85,
-    fontSize: normalize(15),
-    lineHeight: normalize(20),
+    flexShrink: 1,
+  },
+
+  connectionsCard: {
+    marginTop: hp(1.4),
+    marginHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3.4),
+    borderRadius: normalize(18),
+    backgroundColor: palette.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.6),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+
+  connectionsIcon: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    backgroundColor: '#E8F3EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  connectionsCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
 
   logoCircle: {
     width: normalize(50),
     height: normalize(50),
     borderRadius: normalize(25),
-    marginLeft: wp(3),
     backgroundColor: palette.white,
     justifyContent: 'center',
     alignItems: 'center',
@@ -748,18 +857,19 @@ const styles = StyleSheet.create({
     fontSize: normalize(18),
   },
 
-  welcomeSection: {
-    paddingHorizontal: wp(4),
-    paddingTop: hp(2),
-    gap: hp(0.6),
+  inviteCount: {
+    minWidth: normalize(18),
+    height: normalize(18),
+    borderRadius: normalize(9),
+    backgroundColor: palette.kale,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
   },
 
-  welcomeSub: {
-    color: '#666',
-    fontSize: normalize(15),
-    lineHeight: normalize(20),
-    textAlign: 'center',
+  inviteCountText: {
+    color: palette.white,
+    fontWeight: '700',
   },
 
   locationCapturedPill: {
@@ -773,8 +883,8 @@ const styles = StyleSheet.create({
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(3),
-    marginBottom: hp(2.5),
+    marginTop: hp(2.2),
+    marginBottom: hp(1.8),
     paddingHorizontal: wp(5),
   },
 
@@ -877,6 +987,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+  },
+
+  reservedBanner: {
+    backgroundColor: '#EEF0E6',
+    borderRadius: normalize(10),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.8),
+    marginBottom: hp(1),
+  },
+
+  reservedBannerText: {
+    color: palette.kale,
   },
 
   cardHeader: {
