@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { ModalArt } from '@/components/ModalArt';
 import type { ReceiverWelcomeContent, ReceiverWelcomeCtaAction } from '@/data/receiverWelcome';
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
@@ -36,9 +37,12 @@ export function ReceiverWelcomeModal({ visible, content, onDismiss }: Props) {
             bounces={false}
             contentContainerStyle={styles.scrollContent}
           >
+            <View style={styles.art}>
+              <ModalArt kind="notice" />
+            </View>
             <View style={styles.titleBlock}>
               <AppText style={styles.titleLead}>
-                {content.emoji} {content.titleLead}
+                {content.titleLead}
               </AppText>
               <AppText style={styles.titleBrand}>{content.titleBrand}</AppText>
             </View>
@@ -110,6 +114,10 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: hp(1.4),
+  },
+  art: {
+    alignItems: 'center',
+    marginBottom: hp(1.4),
   },
   titleBlock: {
     alignItems: 'center',

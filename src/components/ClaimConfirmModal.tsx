@@ -204,9 +204,11 @@ export function ClaimConfirmModal({
               </View>
 
               <View style={styles.successBody}>
-                <View style={styles.successIconWrap}>
-                  <Ionicons name="checkmark-circle" size={normalize(48)} color={palette.middlegreen} />
-                </View>
+                <Image
+                  source={require('../../assets/placeholder/modal_success.png')}
+                  style={styles.successArt}
+                  resizeMode="cover"
+                />
                 <AppText variant="bodySmall" style={styles.successText}>
                   Choose how you’ll collect this food. “I’ll pick it up myself” skips driver
                   notifications — you can collect anytime from Available. Or nominate a driver
@@ -489,8 +491,11 @@ const styles = StyleSheet.create({
     paddingVertical: hp(2),
     gap: hp(1.5),
   },
-  successIconWrap: {
-    marginBottom: hp(0.5),
+  successArt: {
+    width: normalize(128),
+    height: normalize(128),
+    borderRadius: normalize(28),
+    backgroundColor: palette.creme,
   },
   successText: {
     textAlign: 'center',

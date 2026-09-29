@@ -84,14 +84,45 @@ export function CreateConnectionScreen({ route }: any) {
           showErrorAlert('This site needs a map location before we can find nearby charities.');
           return;
         }
-        const rows = await connectionsService.nearbyCharities({
-          lat: coords.lat,
-          lng: coords.lng,
-          radiusKm: 25,
-          region: String(region).toUpperCase(),
-        });
+        const [rows, existing] = await Promise.all([
+          connectionsService.nearbyCharities({
+            lat: coords.lat,
+            lng: coords.lng,
+            radiusKm: 25,
+            region: String(region).toUpperCase(),
+          }),
+          connectionsService.listForSite(resolved).catch(() => []),
+        ]);
+        const live = existing.filter((connection) =>
+          ['PENDING', 'ACTIVE', 'PAUSED'].includes(String(connection.status || '').toUpperCase()),
+        );
+        const connectedSiteIds = new Set(
+          live
+            .map((connection) => Number(connection.receiverSite?.id))
+            .filter((id) => Number.isFinite(id) && id > 0),
+        );
+        const connectedOrgIds = new Set(
+          live
+            .map((connection) => Number(connection.receiverOrg?.id))
+            .filter((id) => Number.isFinite(id) && id > 0),
+        );
         if (!cancelled) {
-          setCharities(rows.filter((row) => Number(row.siteId) > 0));
+          setCharities(
+            rows.filter((row) => {
+              const site = Number(row.siteId);
+              const org = Number(row.orgId);
+              if (!(site > 0)) return false;
+              if (connectedSiteIds.has(site)) return false;
+              if (org > 0 && connectedOrgIds.has(org)) return false;
+              return true;
+            }),
+          );
+          setSelected((current) => {
+            if (!current) return current;
+            if (connectedSiteIds.has(Number(current.siteId))) return null;
+            if (connectedOrgIds.has(Number(current.orgId))) return null;
+            return current;
+          });
         }
       } catch (error) {
         showErrorAlert(error, 'Could not load nearby charities');

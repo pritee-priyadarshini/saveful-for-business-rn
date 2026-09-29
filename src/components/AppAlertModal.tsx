@@ -6,9 +6,9 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from './AppText';
+import { ModalArt, type ModalArtKind } from './ModalArt';
 import { palette } from '../theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
 import {
@@ -16,37 +16,17 @@ import {
   type AppAlertVariant,
 } from '@/store/appAlertStore';
 
-const ICON_SIZE = normalize(72);
-
-const TONE: Record<
-  AppAlertVariant,
-  {
-    icon: keyof typeof Ionicons.glyphMap;
-    accent: string;
-    iconBg: string;
-  }
-> = {
-  success: {
-    icon: 'checkmark',
-    accent: palette.middlegreen,
-    iconBg: palette.middlegreen,
-  },
-  error: {
-    icon: 'close',
-    accent: palette.danger,
-    iconBg: palette.danger,
-  },
-  info: {
-    icon: 'information',
-    accent: palette.blueberry,
-    iconBg: palette.blueberry,
-  },
-  confirm: {
-    icon: 'help',
-    accent: palette.middlegreen,
-    iconBg: palette.middlegreen,
-  },
+const TONE: Record<AppAlertVariant, { accent: string; art: ModalArtKind }> = {
+  success: { accent: palette.kale, art: 'success' },
+  error: { accent: palette.danger, art: 'caution' },
+  info: { accent: palette.kale, art: 'notice' },
+  confirm: { accent: palette.kale, art: 'notice' },
 };
+
+function artFor(variant: AppAlertVariant, destructive?: boolean): ModalArtKind {
+  if (destructive) return 'caution';
+  return TONE[variant].art;
+}
 
 export function AppAlertHost() {
   const visible = useAppAlertStore((s) => s.visible);
@@ -65,9 +45,6 @@ export function AppAlertHost() {
   const isConfirm = variant === 'confirm';
   const showCancel = isConfirm && Boolean(cancelLabel?.trim());
   const accent = destructive ? palette.danger : TONE[variant].accent;
-  const iconBg = destructive ? palette.danger : TONE[variant].iconBg;
-  const iconName =
-    destructive && isConfirm ? 'warning' : TONE[variant].icon;
 
   const handleDismiss = () => {
     if (loading) return;
@@ -120,60 +97,48 @@ export function AppAlertHost() {
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={handleDismiss} />
+        <View style={styles.card}>
+          <ModalArt kind={artFor(variant, destructive)} />
 
-        <View style={styles.sheet}>
-          <View style={[styles.badge, { backgroundColor: iconBg }, styles.badgeShadow]}>
-            <Ionicons name={iconName} size={normalize(34)} color={palette.white} />
-          </View>
+          {!!title ? (
+            <AppText variant="h6" style={styles.title}>
+              {title}
+            </AppText>
+          ) : null}
 
-          <View style={styles.card}>
-            {!!title ? (
-              <AppText variant="h6" style={styles.title}>
-                {title}
+          {!!message ? (
+            <AppText variant="body" style={styles.message}>
+              {message}
+            </AppText>
+          ) : null}
+
+          <View style={styles.actions}>
+            <Pressable
+              style={[
+                styles.btn,
+                styles.btnSolid,
+                { backgroundColor: accent },
+                loading && styles.btnDisabled,
+              ]}
+              disabled={loading}
+              onPress={handlePrimary}
+            >
+              <AppText variant="bodyBold" style={styles.btnSolidText}>
+                {loading ? 'Please wait…' : confirmLabel}
               </AppText>
-            ) : null}
+            </Pressable>
 
-            {!!message ? (
-              <AppText variant="body" style={styles.message}>
-                {message}
-              </AppText>
-            ) : null}
-
-            <View style={[styles.actions, showCancel && styles.actionsRow]}>
-              {showCancel ? (
-                <Pressable
-                  style={[styles.btn, styles.btnGhost, loading && styles.btnDisabled]}
-                  disabled={loading}
-                  onPress={handleCancel}
-                >
-                  <AppText variant="bodyBold" style={styles.btnGhostText}>
-                    {cancelLabel}
-                  </AppText>
-                </Pressable>
-              ) : null}
-
+            {showCancel ? (
               <Pressable
-                style={[
-                  styles.btn,
-                  showCancel ? styles.btnOutline : styles.btnSolid,
-                  showCancel ? { borderColor: accent } : { backgroundColor: accent, borderColor: accent },
-                  showCancel && styles.btnFlex,
-                  loading && styles.btnDisabled,
-                ]}
+                style={[styles.btn, styles.btnGhost, loading && styles.btnDisabled]}
                 disabled={loading}
-                onPress={handlePrimary}
+                onPress={handleCancel}
               >
-                <AppText
-                  variant="bodyBold"
-                  style={[
-                    showCancel ? styles.btnOutlineText : styles.btnSolidText,
-                    showCancel ? { color: accent } : null,
-                  ]}
-                >
-                  {loading ? 'Please wait…' : confirmLabel}
+                <AppText variant="bodyBold" style={styles.btnGhostText}>
+                  {cancelLabel}
                 </AppText>
               </Pressable>
-            </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -203,53 +168,44 @@ export function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const accent = destructive ? palette.danger : palette.middlegreen;
+  const accent = destructive ? palette.danger : palette.kale;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={loading ? undefined : onCancel} />
-        <View style={styles.sheet}>
-          <View style={[styles.badge, { backgroundColor: accent }, styles.badgeShadow]}>
-            <Ionicons
-              name={destructive ? 'warning' : 'help'}
-              size={normalize(34)}
-              color={palette.white}
-            />
-          </View>
-          <View style={styles.card}>
-            <AppText variant="h6" style={styles.title}>
-              {title}
-            </AppText>
-            <AppText variant="body" style={styles.message}>
-              {message}
-            </AppText>
-            <View style={[styles.actions, styles.actionsRow]}>
-              <Pressable
-                style={[styles.btn, styles.btnGhost, loading && styles.btnDisabled]}
-                disabled={loading}
-                onPress={onCancel}
-              >
-                <AppText variant="bodyBold" style={styles.btnGhostText}>
-                  {cancelLabel}
-                </AppText>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.btn,
-                  styles.btnOutline,
-                  styles.btnFlex,
-                  { borderColor: accent },
-                  loading && styles.btnDisabled,
-                ]}
-                disabled={loading}
-                onPress={onConfirm}
-              >
-                <AppText variant="bodyBold" style={[styles.btnOutlineText, { color: accent }]}>
-                  {loading ? 'Please wait…' : confirmLabel}
-                </AppText>
-              </Pressable>
-            </View>
+        <View style={styles.card}>
+          <ModalArt kind={destructive ? 'caution' : 'notice'} />
+          <AppText variant="h6" style={styles.title}>
+            {title}
+          </AppText>
+          <AppText variant="body" style={styles.message}>
+            {message}
+          </AppText>
+          <View style={styles.actions}>
+            <Pressable
+              style={[
+                styles.btn,
+                styles.btnSolid,
+                { backgroundColor: accent },
+                loading && styles.btnDisabled,
+              ]}
+              disabled={loading}
+              onPress={onConfirm}
+            >
+              <AppText variant="bodyBold" style={styles.btnSolidText}>
+                {loading ? 'Please wait…' : confirmLabel}
+              </AppText>
+            </Pressable>
+            <Pressable
+              style={[styles.btn, styles.btnGhost, loading && styles.btnDisabled]}
+              disabled={loading}
+              onPress={onCancel}
+            >
+              <AppText variant="bodyBold" style={styles.btnGhostText}>
+                {cancelLabel}
+              </AppText>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -262,56 +218,31 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: wp(8),
+    paddingHorizontal: wp(7),
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(26, 26, 27, 0.42)',
-  },
-  sheet: {
-    width: '100%',
-    maxWidth: normalize(340),
-    alignItems: 'center',
-  },
-  badge: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-    borderRadius: ICON_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-    marginBottom: -ICON_SIZE / 2,
-  },
-  badgeShadow: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    backgroundColor: 'rgba(26, 26, 27, 0.48)',
   },
   card: {
     width: '100%',
+    maxWidth: normalize(360),
     backgroundColor: palette.white,
-    borderRadius: normalize(16),
-    paddingTop: ICON_SIZE / 2 + hp(2.2),
-    paddingBottom: hp(2.4),
-    paddingHorizontal: wp(6),
+    borderRadius: normalize(22),
+    paddingTop: hp(2.4),
+    paddingBottom: hp(2.2),
+    paddingHorizontal: wp(5.5),
     alignItems: 'center',
+    gap: hp(0.4),
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.12,
-        shadowRadius: 24,
+        shadowColor: '#1A1A1B',
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.16,
+        shadowRadius: 28,
       },
       android: {
-        elevation: 10,
+        elevation: 14,
       },
     }),
   },
@@ -321,61 +252,43 @@ const styles = StyleSheet.create({
     color: palette.black,
     fontSize: normalize(22),
     lineHeight: normalize(28),
-    marginBottom: hp(1),
+    marginTop: hp(1.6),
   },
   message: {
     textAlign: 'center',
     textTransform: 'none',
-    color: palette.midgray,
+    color: palette.stone,
     fontSize: normalize(15),
     lineHeight: normalize(22),
-    marginBottom: hp(2.4),
+    marginTop: hp(0.8),
+    marginBottom: hp(1.6),
     paddingHorizontal: wp(1),
   },
   actions: {
     width: '100%',
     gap: hp(1),
   },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: wp(2.5),
-  },
   btn: {
-    minHeight: normalize(48),
-    borderRadius: normalize(10),
+    width: '100%',
+    minHeight: normalize(50),
+    borderRadius: normalize(14),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: wp(4),
   },
-  btnFlex: {
-    flex: 1,
-  },
-  btnOutline: {
-    width: '100%',
-    backgroundColor: palette.white,
-    borderWidth: 1.5,
-  },
-  btnOutlineText: {
-    textTransform: 'none',
-    fontSize: normalize(16),
-  },
-  btnSolid: {
-    width: '100%',
-    borderWidth: 1.5,
-  },
+  btnSolid: {},
   btnSolidText: {
     color: palette.white,
     textTransform: 'none',
     fontSize: normalize(16),
   },
   btnGhost: {
-    flex: 1,
-    backgroundColor: palette.white,
+    backgroundColor: palette.creme,
     borderWidth: 1.5,
-    borderColor: '#D8D8D8',
+    borderColor: '#E2DDD2',
   },
   btnGhostText: {
-    color: palette.midgray,
+    color: palette.primary,
     textTransform: 'none',
     fontSize: normalize(16),
   },

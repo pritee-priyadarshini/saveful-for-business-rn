@@ -146,7 +146,20 @@ export function outcomeNeedsSurplus(outcome?: string | null): boolean {
   return value === 'PROMPTED' || value === '';
 }
 
-/** Active Connection, scheduled day, food not listed yet — use preferred listing. */
+export function isConnectionWindowEnded(windowEndAt?: string | null): boolean {
+  if (!windowEndAt) return false;
+  const end = new Date(windowEndAt).getTime();
+  return Number.isFinite(end) && Date.now() > end;
+}
+
+/** Add-by reminder time has passed — listing is still allowed until pickup ends. */
+export function isConnectionListByDue(windowStartAt?: string | null): boolean {
+  if (!windowStartAt) return false;
+  const listBy = new Date(windowStartAt).getTime() - CONNECTION_LIST_BY_MINUTES * 60_000;
+  return Number.isFinite(listBy) && Date.now() >= listBy;
+}
+
+/** Active Connection, scheduled day, food not listed yet — until pickup ends. */
 export function canListPreferredSurplus(row?: {
   dayId?: number | null;
   outcome?: string | null;
@@ -154,16 +167,9 @@ export function canListPreferredSurplus(row?: {
   windowEndAt?: string | null;
 } | null): boolean {
   if (!row?.dayId) return false;
-  if (!outcomeNeedsSurplus(row.outcome)) return false;
-  if (row.windowStartAt) {
-    const listBy = new Date(row.windowStartAt).getTime() - CONNECTION_LIST_BY_MINUTES * 60_000;
-    if (Number.isFinite(listBy) && Date.now() >= listBy) return false;
-  }
-  if (row.windowEndAt) {
-    const end = new Date(row.windowEndAt).getTime();
-    if (Number.isFinite(end) && Date.now() > end) return false;
-  }
-  return true;
+  const outcome = String(row.outcome || 'PROMPTED').toUpperCase();
+  if (outcome !== 'PROMPTED' && outcome !== 'NO_RESPONSE' && outcome !== '') return false;
+  return !isConnectionWindowEnded(row.windowEndAt);
 }
 
 export function isReservedPublished(row?: {

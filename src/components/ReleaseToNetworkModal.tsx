@@ -3,6 +3,7 @@ import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppDateTimePicker } from '@/components/AppDateTimePicker';
 import { AppText } from '@/components/AppText';
+import { ModalArt } from '@/components/ModalArt';
 import { palette } from '@/theme/colors';
 import {
   PAST_COLLECTION_WINDOW_MESSAGE,
@@ -221,7 +222,10 @@ export function ReleaseToNetworkModal({ target, submitting, onClose, onConfirm }
           <Pressable style={styles.card} onPress={() => undefined}>
             {step === 'ask' ? (
               <>
-                <AppText variant="h6">Change the pickup window?</AppText>
+                <View style={styles.art}>
+                  <ModalArt kind="notice" />
+                </View>
+                <AppText variant="h6" style={styles.title}>Change the pickup window?</AppText>
                 <AppText variant="bodySmall" color={palette.stone} style={styles.copy}>
                   Nearby charities will see this listing. Keep the current window, or set a new one
                   and a best before so it does not expire too soon.
@@ -363,12 +367,20 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: palette.white,
-    borderRadius: 16,
+    borderRadius: 22,
     padding: 20,
+  },
+  art: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  title: {
+    textAlign: 'center',
   },
   copy: {
     marginTop: 6,
     marginBottom: 14,
+    textAlign: 'center',
   },
   fieldLabel: {
     marginBottom: hp(0.6),

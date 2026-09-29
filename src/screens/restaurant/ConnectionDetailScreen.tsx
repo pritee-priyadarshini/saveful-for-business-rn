@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Dimensions, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -25,6 +26,7 @@ import {
   ISO_WEEKDAYS,
   canListPreferredSurplus,
   connectionPartyName,
+  isConnectionListByDue,
   isReservedPublished,
   otherOpenConnections,
   formatHhMm,
@@ -41,6 +43,13 @@ export function ConnectionDetailScreen({ route }: any) {
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildDashboardShellStyles(r, { stackHero: true }), [r]);
   const heroHeight = r.isTablet ? adaptive.heroHeight : 96;
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const surplusRef = useRef<View>(null);
+  const quantityRef = useRef<View>(null);
+  const notesRef = useRef<View>(null);
+  const scrollY = useRef(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const connectionId = Number(route?.params?.connectionId);
   const { submitting, withLock } = useSubmitLock();
   const [connection, setConnection] = useState<Connection | null>(null);
@@ -142,6 +151,36 @@ export function ConnectionDetailScreen({ route }: any) {
     setPickerTarget(null);
   }, [connectionId]);
 
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => setKeyboardHeight(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  const scrollFieldIntoView = (target: React.RefObject<View | null>) => {
+    setTimeout(() => {
+      target.current?.measureInWindow((_x, y, _w, height) => {
+        const visibleBottom =
+          Dimensions.get('window').height - Math.max(keyboardHeight, 280) - 24;
+        const overflow = y + height - visibleBottom;
+        if (overflow <= 8) return;
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, scrollY.current + overflow),
+          animated: true,
+        });
+      });
+    }, 80);
+  };
+
   const formatClock = (date: Date | null) => {
     if (!date) return '--:--';
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -231,6 +270,47 @@ export function ConnectionDetailScreen({ route }: any) {
     connection?.status === 'PAUSED' ||
     connection?.status === 'PENDING';
 
+  const confirmNoSurplus = () => {
+    if (!connection?.today?.id) return;
+    showConfirmAlert({
+      title: 'No surplus today?',
+      message: `Today’s collection will be cancelled and ${charity} will be notified. Your regular Connection will continue as usual.`,
+      confirmLabel: 'Confirm no surplus today',
+      cancelLabel: 'Go back',
+      onConfirm: () =>
+        run(
+          () => connectionsService.declareNoSurplus(Number(connection.today?.id)),
+          `${charity} has been told there is no collection today.`,
+        ),
+    });
+  };
+
+  const confirmPause = () => {
+    if (!connection) return;
+    showConfirmAlert({
+      title: 'Pause this connection?',
+      message: `While paused, ${charity} won’t receive regular collection offers from you. ${charity} will be notified and you can resume the Connection at any time.`,
+      confirmLabel: 'Pause Connection',
+      cancelLabel: 'Keep active',
+      onConfirm: () => run(() => connectionsService.pause(connection.id), 'Connection paused'),
+    });
+  };
+
+  const confirmEnd = () => {
+    if (!connection) return;
+    showConfirmAlert({
+      title: 'End this connection?',
+      message: 'This site will offer surplus to nearby charities again. Published listings stay as they are.',
+      confirmLabel: 'End connection',
+      destructive: true,
+      onConfirm: () =>
+        run(async () => {
+          await connectionsService.end(connection.id);
+          navigation.goBack();
+        }, 'Connection ended'),
+    });
+  };
+
   const hasScheduleChanges =
     days.join(',') !== savedSchedule.days.join(',') ||
     formatHhMm(windowStart) !== savedSchedule.windowStart ||
@@ -238,6 +318,14 @@ export function ConnectionDetailScreen({ route }: any) {
     typicalSurplus.trim() !== savedSchedule.typicalSurplus.trim() ||
     typicalQuantity.trim() !== savedSchedule.typicalQuantity.trim() ||
     notes.trim() !== savedSchedule.notes.trim();
+
+  const canListToday = canListPreferredSurplus({
+    dayId: connection?.today?.id,
+    outcome: connection?.today?.outcome,
+    windowStartAt: connection?.today?.windowStartAt,
+    windowEndAt: connection?.today?.windowEndAt,
+  });
+  const canReleaseToday = Boolean(isReservedPublished(connection?.today) && connection?.today?.id);
 
   const toggleDay = (id: number) => {
     setDays((current) =>
@@ -272,7 +360,20 @@ export function ConnectionDetailScreen({ route }: any) {
   };
 
   return (
-    <Screen scrollable backgroundColor={palette.creme} contentStyle={styles.screen} transparentTop>
+    <Screen
+      scrollable
+      keyboardAware
+      backgroundColor={palette.creme}
+      contentStyle={[
+        styles.screen,
+        { paddingBottom: insets.bottom + hp(4) + keyboardHeight },
+      ]}
+      transparentTop
+      scrollRef={scrollRef}
+      onScroll={(event) => {
+        scrollY.current = event.nativeEvent.contentOffset.y;
+      }}
+    >
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <HeroHeader
         source={require('../../../assets/placeholder/kale-header.png')}
@@ -349,36 +450,45 @@ export function ConnectionDetailScreen({ route }: any) {
                   </Pressable>
                 </View>
 
-                <AppText variant="label">Typical surplus - guide only</AppText>
-                <TextInput
-                  value={typicalSurplus}
-                  onChangeText={setTypicalSurplus}
-                  placeholder="e.g. Prepared meals, sandwiches and baked goods"
-                  placeholderTextColor={palette.stone}
-                  style={styles.input}
-                  maxLength={200}
-                />
+                <View ref={surplusRef} collapsable={false}>
+                  <AppText variant="label">Typical surplus - guide only</AppText>
+                  <TextInput
+                    value={typicalSurplus}
+                    onChangeText={setTypicalSurplus}
+                    placeholder="e.g. Prepared meals, sandwiches and baked goods"
+                    placeholderTextColor={palette.stone}
+                    style={styles.input}
+                    maxLength={200}
+                    onFocus={() => scrollFieldIntoView(surplusRef)}
+                  />
+                </View>
 
-                <AppText variant="label">Typical quantity - guide only</AppText>
-                <TextInput
-                  value={typicalQuantity}
-                  onChangeText={setTypicalQuantity}
-                  placeholder="e.g. Approximately 8 kg (20 meals)"
-                  placeholderTextColor={palette.stone}
-                  style={styles.input}
-                  maxLength={200}
-                />
+                <View ref={quantityRef} collapsable={false}>
+                  <AppText variant="label">Typical quantity - guide only</AppText>
+                  <TextInput
+                    value={typicalQuantity}
+                    onChangeText={setTypicalQuantity}
+                    placeholder="e.g. Approximately 8 kg (20 meals)"
+                    placeholderTextColor={palette.stone}
+                    style={styles.input}
+                    maxLength={200}
+                    onFocus={() => scrollFieldIntoView(quantityRef)}
+                  />
+                </View>
 
-                <AppText variant="label">Notes</AppText>
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Loading dock at the back"
-                  placeholderTextColor={palette.stone}
-                  style={[styles.input, styles.notes]}
-                  maxLength={500}
-                  multiline
-                />
+                <View ref={notesRef} collapsable={false}>
+                  <AppText variant="label">Notes</AppText>
+                  <TextInput
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Loading dock at the back"
+                    placeholderTextColor={palette.stone}
+                    style={[styles.input, styles.notes]}
+                    maxLength={500}
+                    multiline
+                    onFocus={() => scrollFieldIntoView(notesRef)}
+                  />
+                </View>
 
                 {hasScheduleChanges ? (
                   <Pressable
@@ -394,54 +504,14 @@ export function ConnectionDetailScreen({ route }: any) {
               </>
             ) : null}
 
-            {canListPreferredSurplus({
-              dayId: connection.today?.id,
-              outcome: connection.today?.outcome,
-              windowEndAt: connection.today?.windowEndAt,
-            }) ? (
+            {canListToday ? (
               <View style={styles.listBox}>
                 <AppText variant="bodySmall" color={palette.stone}>
-                  Same as List for them on Surplus. Publish today’s food so only {charity} can see it.
+                  {isConnectionListByDue(connection.today?.windowStartAt) ||
+                  connection.today?.outcome === 'NO_RESPONSE'
+                    ? `The add-by time has passed, but you can still list or confirm no surplus until pickup ends. Only ${charity} will see listed food.`
+                    : `Same as List for them on Surplus. Publish today’s food so only ${charity} can see it.`}
                 </AppText>
-                <Pressable
-                  style={[styles.primary, submitting && { opacity: 0.6 }]}
-                  disabled={submitting}
-                  onPress={() =>
-                    navigation.navigate('AddDailySurplus', {
-                      dayId: connection.today?.id,
-                      connectionId: connection.id,
-                      charityName: charity,
-                      schedule: connection.schedule,
-                      windowStartAt: connection.today?.windowStartAt,
-                      windowEndAt: connection.today?.windowEndAt,
-                    })
-                  }
-                >
-                  <AppText variant="bodyBold" color={palette.white}>
-                    List for them
-                  </AppText>
-                </Pressable>
-                <Pressable
-                  style={[styles.secondary, submitting && { opacity: 0.6 }]}
-                  disabled={submitting}
-                  onPress={() =>
-                    showConfirmAlert({
-                      title: 'No surplus today?',
-                      message: `Today’s collection will be cancelled and ${charity} will be notified. Your regular Connection will continue as usual.`,
-                      confirmLabel: 'Confirm no surplus today',
-                      cancelLabel: 'Go back',
-                      onConfirm: () =>
-                        run(
-                          () => connectionsService.declareNoSurplus(Number(connection.today?.id)),
-                          `${charity} has been told there is no collection today.`,
-                        ),
-                    })
-                  }
-                >
-                  <AppText variant="bodyBold" color={palette.primary}>
-                    No surplus today
-                  </AppText>
-                </Pressable>
               </View>
             ) : connection.today?.outcome === 'NO_SURPLUS' ? (
               <View style={styles.listBox}>
@@ -458,9 +528,41 @@ export function ConnectionDetailScreen({ route }: any) {
             ) : null}
 
             <View style={styles.actions}>
-              {isReservedPublished(connection.today) && connection.today?.id ? (
+              {canListToday ? (
+                <View style={styles.actionGrid}>
+                  <Pressable
+                    style={[styles.primary, styles.actionCell, submitting && { opacity: 0.6 }]}
+                    disabled={submitting}
+                    onPress={() =>
+                      navigation.navigate('AddDailySurplus', {
+                        dayId: connection.today?.id,
+                        connectionId: connection.id,
+                        charityName: charity,
+                        schedule: connection.schedule,
+                        windowStartAt: connection.today?.windowStartAt,
+                        windowEndAt: connection.today?.windowEndAt,
+                      })
+                    }
+                  >
+                    <AppText variant="bodyBold" color={palette.white} style={styles.actionLabel}>
+                      List for them
+                    </AppText>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.secondary, styles.actionCell, submitting && { opacity: 0.6 }]}
+                    disabled={submitting}
+                    onPress={confirmNoSurplus}
+                  >
+                    <AppText variant="bodyBold" color={palette.primary} style={styles.actionLabel}>
+                      No surplus today
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {canReleaseToday ? (
                 <Pressable
-                  style={[styles.secondary, submitting && { opacity: 0.6 }]}
+                  style={[styles.primary, styles.actionFull, submitting && { opacity: 0.6 }]}
                   disabled={submitting}
                   onPress={() => {
                     const others = otherOpenConnections(todayRows, connection.id);
@@ -471,32 +573,15 @@ export function ConnectionDetailScreen({ route }: any) {
                     setReleaseOpen(true);
                   }}
                 >
-                  <AppText variant="bodyBold" color={palette.primary}>
+                  <AppText variant="bodyBold" color={palette.white}>
                     Release
                   </AppText>
                 </Pressable>
               ) : null}
 
-              {connection.status === 'ACTIVE' ? (
-                <Pressable
-                  style={[styles.secondary, submitting && { opacity: 0.6 }]}
-                  disabled={submitting}
-                  onPress={() =>
-                    showConfirmAlert({
-                      title: 'Pause this connection?',
-                      message: 'Scheduled prompts stop until you resume. History is kept.',
-                      confirmLabel: 'Pause connection',
-                      onConfirm: () => run(() => connectionsService.pause(connection.id), 'Connection paused'),
-                    })
-                  }
-                >
-                  <AppText variant="bodyBold" color={palette.primary}>Pause connection</AppText>
-                </Pressable>
-              ) : null}
-
               {connection.status === 'PAUSED' ? (
                 <Pressable
-                  style={[styles.primary, submitting && { opacity: 0.6 }]}
+                  style={[styles.primary, styles.actionFull, submitting && { opacity: 0.6 }]}
                   disabled={submitting}
                   onPress={() => run(() => connectionsService.resume(connection.id), 'Connection resumed')}
                 >
@@ -504,26 +589,31 @@ export function ConnectionDetailScreen({ route }: any) {
                 </Pressable>
               ) : null}
 
-              {canEdit ? (
-                <Pressable
-                  style={[styles.danger, submitting && { opacity: 0.6 }]}
-                  disabled={submitting}
-                  onPress={() =>
-                    showConfirmAlert({
-                      title: 'End this connection?',
-                      message: 'This site will offer surplus to nearby charities again. Published listings stay as they are.',
-                      confirmLabel: 'End connection',
-                      destructive: true,
-                      onConfirm: () =>
-                        run(async () => {
-                          await connectionsService.end(connection.id);
-                          navigation.goBack();
-                        }, 'Connection ended'),
-                    })
-                  }
-                >
-                  <AppText variant="bodyBold" color={palette.danger}>End connection</AppText>
-                </Pressable>
+              {connection.status === 'ACTIVE' || canEdit ? (
+                <View style={styles.actionGrid}>
+                  {connection.status === 'ACTIVE' ? (
+                    <Pressable
+                      style={[styles.secondary, styles.actionCell, submitting && { opacity: 0.6 }]}
+                      disabled={submitting}
+                      onPress={confirmPause}
+                    >
+                      <AppText variant="bodyBold" color={palette.primary} style={styles.actionLabel}>
+                        Pause connection
+                      </AppText>
+                    </Pressable>
+                  ) : null}
+                  {canEdit ? (
+                    <Pressable
+                      style={[styles.danger, styles.actionCell, submitting && { opacity: 0.6 }]}
+                      disabled={submitting}
+                      onPress={confirmEnd}
+                    >
+                      <AppText variant="bodyBold" color={palette.danger} style={styles.actionLabel}>
+                        End connection
+                      </AppText>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : null}
             </View>
           </>
@@ -712,37 +802,53 @@ const styles = StyleSheet.create({
     color: palette.black,
   },
   notes: { minHeight: 80, textAlignVertical: 'top' },
-  listBox: { gap: 10 },
+  listBox: { gap: 8 },
   actions: { gap: 10 },
-  primary: {
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  actionCell: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    minWidth: '47%',
+  },
+  actionLabel: {
+    textAlign: 'center',
+  },
+  actionFull: {
     width: '100%',
+  },
+  primary: {
     backgroundColor: palette.kale,
-    minHeight: 50,
+    minHeight: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: wp(4),
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   secondary: {
-    width: '100%',
-    minHeight: 50,
+    minHeight: 48,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: palette.primary,
     backgroundColor: palette.white,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: wp(4),
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   danger: {
-    width: '100%',
-    minHeight: 50,
+    minHeight: 48,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: palette.danger,
     backgroundColor: palette.white,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: wp(4),
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
 });

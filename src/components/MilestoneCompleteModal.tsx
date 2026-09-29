@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { ModalArt } from '@/components/ModalArt';
 import {
   MILESTONE_COMPLETE_CONTENT,
   type MilestoneKind,
@@ -39,7 +40,8 @@ export function MilestoneCompleteModal({
     >
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <AppText style={styles.title}>🎉 {content.title}</AppText>
+          <ModalArt kind="success" />
+          <AppText style={styles.title}>{content.title}</AppText>
           <AppText style={styles.subtitle}>{content.subtitle}</AppText>
           <AppText style={styles.body}>{content.body}</AppText>
           <AppText style={styles.tip}>💡 {content.tip}</AppText>
@@ -83,7 +85,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.kale,
     paddingHorizontal: wp(6),
-    paddingTop: hp(3),
+    paddingTop: hp(2.4),
     paddingBottom: hp(2.4),
     alignItems: 'center',
   },
@@ -94,6 +96,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Saveful-Bold',
     fontSize: normalize(20),
     lineHeight: normalize(26),
+    marginTop: hp(1.4),
     marginBottom: hp(0.8),
   },
   subtitle: {

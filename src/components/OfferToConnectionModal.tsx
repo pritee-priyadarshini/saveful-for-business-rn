@@ -2,9 +2,10 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { ModalArt } from '@/components/ModalArt';
 import { palette } from '@/theme/colors';
 import { formatWindowLabel } from '@/utils/connections';
-import { wp } from '@/utils/responsive';
+import { hp, wp } from '@/utils/responsive';
 
 type Props = {
   visible: boolean;
@@ -33,7 +34,8 @@ export function OfferToConnectionModal({
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={() => undefined}>
-          <AppText variant="h6">Move to {toCharity || 'this connection'}?</AppText>
+          <ModalArt kind="notice" />
+          <AppText variant="h6" style={styles.title}>Move to {toCharity || 'this connection'}?</AppText>
           <AppText variant="bodySmall" color={palette.stone} style={styles.copy}>
             {fromCharity || 'The current charity'} will no longer see this listing.
           </AppText>
@@ -74,20 +76,32 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: palette.white,
-    borderRadius: 16,
+    borderRadius: 22,
     padding: 20,
+    alignItems: 'center',
+  },
+  title: {
+    textAlign: 'center',
+    marginTop: hp(1.4),
   },
   copy: {
+    width: '100%',
     marginTop: 6,
     marginBottom: 14,
+    textAlign: 'center',
   },
   window: {
+    width: '100%',
     marginTop: 4,
+    textAlign: 'center',
   },
   note: {
+    width: '100%',
     marginTop: 8,
+    textAlign: 'center',
   },
   moveBtn: {
+    width: '100%',
     marginTop: 16,
     minHeight: 44,
     borderRadius: 10,

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { ModalArt } from '@/components/ModalArt';
 import { palette } from '@/theme/colors';
 import { formatWindowLabel } from '@/utils/connections';
 import { hp, wp } from '@/utils/responsive';
@@ -34,7 +35,10 @@ export function ReleaseDestinationModal({
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={() => undefined}>
-          <AppText variant="h6">Where should this go?</AppText>
+          <View style={styles.art}>
+            <ModalArt kind="notice" />
+          </View>
+          <AppText variant="h6" style={styles.title}>Where should this go?</AppText>
           <AppText variant="bodySmall" color={palette.stone} style={styles.copy}>
             {currentCharity || 'This charity'} will no longer have it reserved.
           </AppText>
@@ -81,13 +85,21 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: palette.white,
-    borderRadius: 16,
+    borderRadius: 22,
     padding: 20,
     maxHeight: '78%',
+  },
+  art: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  title: {
+    textAlign: 'center',
   },
   copy: {
     marginTop: 6,
     marginBottom: 12,
+    textAlign: 'center',
   },
   list: {
     maxHeight: hp(42),
