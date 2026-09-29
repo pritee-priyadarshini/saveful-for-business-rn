@@ -58,6 +58,7 @@ export function AppAlertHost() {
   const cancelLabel = useAppAlertStore((s) => s.cancelLabel);
   const destructive = useAppAlertStore((s) => s.destructive);
   const onConfirm = useAppAlertStore((s) => s.onConfirm);
+  const onCancel = useAppAlertStore((s) => s.onCancel);
   const close = useAppAlertStore((s) => s.close);
   const setLoading = useAppAlertStore((s) => s.setLoading);
 
@@ -68,9 +69,15 @@ export function AppAlertHost() {
   const iconName =
     destructive && isConfirm ? 'warning' : TONE[variant].icon;
 
+  const handleDismiss = () => {
+    if (loading) return;
+    close();
+  };
+
   const handleCancel = () => {
     if (loading) return;
     close();
+    onCancel?.();
   };
 
   const handlePrimary = async () => {
@@ -108,11 +115,11 @@ export function AppAlertHost() {
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={handleCancel}
+      onRequestClose={handleDismiss}
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={handleCancel} />
+        <Pressable style={styles.backdrop} onPress={handleDismiss} />
 
         <View style={styles.sheet}>
           <View style={[styles.badge, { backgroundColor: iconBg }, styles.badgeShadow]}>

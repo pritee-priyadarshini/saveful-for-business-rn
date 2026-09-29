@@ -49,7 +49,12 @@ export function CharityInviteCard({
 
       {connection.typicalSurplus ? (
         <AppText variant="bodySmall" color={palette.midgray}>
-          {connection.typicalSurplus}
+          Typical surplus - guide only: {connection.typicalSurplus}
+        </AppText>
+      ) : null}
+      {connection.typicalQuantity ? (
+        <AppText variant="bodySmall" color={palette.midgray}>
+          Typical quantity - guide only: {connection.typicalQuantity}
         </AppText>
       ) : null}
 

@@ -10,6 +10,8 @@ export type AppAlertPayload = {
   cancelLabel?: string;
   destructive?: boolean;
   onConfirm?: () => void | Promise<void>;
+  /** Called when the confirm-sheet cancel button is pressed (not backdrop dismiss). */
+  onCancel?: () => void;
   /** Called when the primary OK button is pressed (success / error / info). */
   onDismiss?: () => void;
 };
@@ -24,6 +26,7 @@ type AppAlertState = {
   cancelLabel: string;
   destructive: boolean;
   onConfirm?: () => void | Promise<void>;
+  onCancel?: () => void;
   onDismiss?: () => void;
   show: (payload: AppAlertPayload) => void;
   close: (options?: { runPrimaryDismiss?: boolean }) => void;
@@ -41,6 +44,7 @@ const IDLE: Omit<
   cancelLabel: 'Cancel',
   destructive: false,
   onConfirm: undefined,
+  onCancel: undefined,
   onDismiss: undefined,
 };
 
@@ -62,6 +66,7 @@ export const useAppAlertStore = create<AppAlertState>((set, get) => ({
       cancelLabel: payload.cancelLabel ?? 'Cancel',
       destructive: payload.destructive ?? false,
       onConfirm: payload.onConfirm,
+      onCancel: payload.onCancel,
       onDismiss: payload.onDismiss,
     });
   },
@@ -88,6 +93,7 @@ export function showConfirmAlert(options: {
   cancelLabel?: string;
   destructive?: boolean;
   onConfirm: () => void | Promise<void>;
+  onCancel?: () => void;
 }) {
   showAppAlert({
     variant: 'confirm',
@@ -97,6 +103,7 @@ export function showConfirmAlert(options: {
     cancelLabel: options.cancelLabel,
     destructive: options.destructive,
     onConfirm: options.onConfirm,
+    onCancel: options.onCancel,
   });
 }
 

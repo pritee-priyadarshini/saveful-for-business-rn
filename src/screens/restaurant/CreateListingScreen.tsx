@@ -881,13 +881,13 @@ export function CreateListingScreen({ navigation }: any) {
               COLLECTION NOTES (OPTIONAL)
             </AppText>
             <AppText variant="caption" color={palette.stone} style={styles.notesHint}>
-              Add anything the collector should know about collection
+              Add anything the collector should know about this pickup.
             </AppText>
             <View style={styles.notesCard}>
               <TextInput
                 value={collectionNotes}
                 onChangeText={(value) => setCollectionNotes(value.slice(0, 300))}
-                placeholder="e.g. Enter via loading dock, ask for kitchen manager, bring crates."
+                placeholder="e.g. Enter via the loading dock, ask for the kitchen manager or bring crates."
                 placeholderTextColor={palette.stone}
                 style={styles.notesInput}
                 multiline

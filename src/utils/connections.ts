@@ -1,3 +1,10 @@
+/** Business reminder fires this long before the pickup window starts. */
+export const CONNECTION_PROMPT_LEAD_MINUTES = 4 * 60;
+/** Business must add food and quantities this long before pickup. */
+export const CONNECTION_LIST_BY_MINUTES = 150;
+/** Charity must confirm collection this long before pickup. */
+export const CONNECTION_CHARITY_CONFIRM_MINUTES = 90;
+
 export const ISO_WEEKDAYS = [
   { id: 1, label: 'Mon', full: 'Monday' },
   { id: 2, label: 'Tue', full: 'Tuesday' },
@@ -34,6 +41,7 @@ export type ConnectionDayOutcome =
   | 'PROMPTED'
   | 'PUBLISHED'
   | 'NO_SURPLUS'
+  | 'NO_RESPONSE'
   | 'COLLECTED'
   | 'RELEASED'
   | 'MISSED';
@@ -142,10 +150,15 @@ export function outcomeNeedsSurplus(outcome?: string | null): boolean {
 export function canListPreferredSurplus(row?: {
   dayId?: number | null;
   outcome?: string | null;
+  windowStartAt?: string | null;
   windowEndAt?: string | null;
 } | null): boolean {
   if (!row?.dayId) return false;
   if (!outcomeNeedsSurplus(row.outcome)) return false;
+  if (row.windowStartAt) {
+    const listBy = new Date(row.windowStartAt).getTime() - CONNECTION_LIST_BY_MINUTES * 60_000;
+    if (Number.isFinite(listBy) && Date.now() >= listBy) return false;
+  }
   if (row.windowEndAt) {
     const end = new Date(row.windowEndAt).getTime();
     if (Number.isFinite(end) && Date.now() > end) return false;
@@ -160,7 +173,7 @@ export function isReservedPublished(row?: {
 } | null): boolean {
   if (!row || row.releasedAt) return false;
   const outcome = String(row.outcome || '').toUpperCase();
-  if (['RELEASED', 'COLLECTED', 'NO_SURPLUS', 'MISSED'].includes(outcome)) return false;
+  if (['RELEASED', 'COLLECTED', 'NO_SURPLUS', 'NO_RESPONSE', 'MISSED'].includes(outcome)) return false;
   if (outcomeAwaitingCharity(outcome)) return true;
   return Boolean(row.listingId) && outcome !== 'PROMPTED';
 }

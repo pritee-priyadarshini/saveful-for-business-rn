@@ -32,9 +32,76 @@ function getNotificationsModule() {
   return require('expo-notifications') as typeof import('expo-notifications');
 }
 
+export const CONNECTION_DAILY_PROMPT_CATEGORY = 'CONNECTION_DAILY_PROMPT';
+export const CONNECTION_COLLECTION_READY_CATEGORY = 'CONNECTION_COLLECTION_READY';
+
+const CONNECTION_ACTION_IDS = new Set([
+  'ADD_SURPLUS',
+  'NO_SURPLUS',
+  'CONFIRM_COLLECTION',
+  'CANNOT_COLLECT',
+  'PAUSE',
+]);
+
+export async function registerNotificationCategories(): Promise<void> {
+  try {
+    const Notifications = getNotificationsModule();
+    await Notifications.setNotificationCategoryAsync(CONNECTION_DAILY_PROMPT_CATEGORY, [
+      {
+        identifier: 'ADD_SURPLUS',
+        buttonTitle: 'Add today’s surplus',
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: 'NO_SURPLUS',
+        buttonTitle: 'No surplus today',
+        options: { opensAppToForeground: true },
+      },
+    ]);
+    await Notifications.setNotificationCategoryAsync(CONNECTION_COLLECTION_READY_CATEGORY, [
+      {
+        identifier: 'CONFIRM_COLLECTION',
+        buttonTitle: 'Confirm Collection',
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: 'CANNOT_COLLECT',
+        buttonTitle: 'Can’t collect today',
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: 'PAUSE',
+        buttonTitle: 'Pause',
+        options: { opensAppToForeground: true },
+      },
+    ]);
+  } catch (error) {
+    console.log('[Push] Notification categories not registered', error);
+  }
+}
+
+function notificationCategoryForData(data?: Record<string, string>): string | undefined {
+  const type = String(data?.type ?? data?.notificationType ?? data?.event ?? '').toUpperCase();
+  const category = String(data?.categoryId ?? '').trim();
+  if (type === CONNECTION_DAILY_PROMPT_CATEGORY || category === CONNECTION_DAILY_PROMPT_CATEGORY) {
+    return CONNECTION_DAILY_PROMPT_CATEGORY;
+  }
+  if (type === CONNECTION_COLLECTION_READY_CATEGORY || category === CONNECTION_COLLECTION_READY_CATEGORY) {
+    return CONNECTION_COLLECTION_READY_CATEGORY;
+  }
+  return undefined;
+}
+
+function actionFromIdentifier(identifier?: string): string {
+  const id = String(identifier ?? '').trim();
+  if (CONNECTION_ACTION_IDS.has(id)) return id;
+  return 'CHOOSE';
+}
+
 async function setupAndroidNotificationChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return;
   const Notifications = getNotificationsModule();
+  await registerNotificationCategories();
+  if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
     name: 'Default',
     importance: Notifications.AndroidImportance.MAX,
@@ -379,14 +446,16 @@ export function setupForegroundNotificationHandler(): void {
     // Firebase does not auto-display notifications when the app is in the foreground.
     // Schedule a local notification via expo-notifications so the user sees a banner.
     if (remoteMessage.notification?.title || remoteMessage.notification?.body) {
+      const data = { ...(remoteMessage.data ?? {}), _localNotif: '1' } as Record<string, string>;
       await Notifications.scheduleNotificationAsync({
         content: {
           title: remoteMessage.notification.title ?? '',
           body: remoteMessage.notification.body ?? '',
           // Stamp so addNotificationResponseReceivedListener can tell this apart from
           // a Firebase remote notification tap (which goes through onNotificationOpenedApp).
-          data: { ...(remoteMessage.data ?? {}), _localNotif: '1' },
+          data,
           sound: true,
+          categoryIdentifier: notificationCategoryForData(data),
         },
         trigger: null,
       });
@@ -421,6 +490,8 @@ export async function setupNotificationOpenedHandler(
     return;
   }
 
+  void registerNotificationCategories();
+
   const Notifications =
     require('expo-notifications') as typeof import('expo-notifications');
   const { default: messaging } =
@@ -441,11 +512,14 @@ export async function setupNotificationOpenedHandler(
   // Firebase background/killed taps are handled exclusively by onNotificationOpenedApp above.
   const localNotifSub = Notifications.addNotificationResponseReceivedListener((response) => {
     const data = (response.notification.request.content.data ?? {}) as Record<string, string>;
-    if (!data._localNotif) return; // not a locally scheduled notification — ignore
+    const action = actionFromIdentifier(response.actionIdentifier);
+    const isConnectionAction = CONNECTION_ACTION_IDS.has(action);
+    // Local banners we scheduled, plus iOS category buttons on the remote reminder.
+    if (!data._localNotif && !isConnectionAction) return;
     console.log('[Push] Foreground notification tapped:', response.notification.request.identifier);
     onOpen({
       messageId: response.notification.request.identifier,
-      data,
+      data: { ...data, _action: action },
       notification: {
         title: response.notification.request.content.title ?? undefined,
         body: response.notification.request.content.body ?? undefined,
@@ -545,7 +619,82 @@ export type NotificationNavigationTarget =
   | { name: 'ManageSites'; params?: undefined }
   | { name: 'Connections'; params?: { siteId?: number } }
   | { name: 'CharityConnections' }
-  | { name: 'AddDailySurplus'; params: { dayId: number; charityName?: string } };
+  | { name: 'AddDailySurplus'; params: { dayId: number; connectionId?: number; charityName?: string } };
+
+export type DailyPromptDecision = {
+  dayId: number;
+  connectionId?: number;
+  charityName?: string;
+  action: 'ADD_SURPLUS' | 'NO_SURPLUS' | 'CHOOSE';
+  title?: string;
+  body?: string;
+};
+
+export type CollectionReadyDecision = {
+  connectionId: number;
+  dayId?: number;
+  listingId?: number;
+  donorName?: string;
+  action: 'CONFIRM_COLLECTION' | 'CANNOT_COLLECT' | 'PAUSE' | 'CHOOSE';
+  title?: string;
+  body?: string;
+};
+
+export function resolveCollectionReadyDecision(
+  payload: NotificationPayload,
+): CollectionReadyDecision | null {
+  const data = payload.data ?? {};
+  const rawType = String(data.type ?? data.notificationType ?? data.event ?? '').toUpperCase();
+  if (rawType !== CONNECTION_COLLECTION_READY_CATEGORY) return null;
+
+  const connectionId = Number(data.connectionId);
+  if (!Number.isFinite(connectionId) || connectionId <= 0) return null;
+
+  const rawAction = String(data._action ?? '').toUpperCase();
+  const action =
+    rawAction === 'CONFIRM_COLLECTION' ||
+    rawAction === 'CANNOT_COLLECT' ||
+    rawAction === 'PAUSE'
+      ? rawAction
+      : 'CHOOSE';
+
+  const dayId = Number(data.connectionDayId);
+  const listingId = Number(data.listingId);
+
+  return {
+    connectionId,
+    dayId: Number.isFinite(dayId) && dayId > 0 ? dayId : undefined,
+    listingId: Number.isFinite(listingId) && listingId > 0 ? listingId : undefined,
+    donorName: data.donorName ? String(data.donorName) : undefined,
+    action,
+    title: payload.notification?.title,
+    body: payload.notification?.body,
+  };
+}
+
+export function resolveDailyPromptDecision(
+  payload: NotificationPayload,
+): DailyPromptDecision | null {
+  const data = payload.data ?? {};
+  const rawType = String(data.type ?? data.notificationType ?? data.event ?? '').toUpperCase();
+  if (rawType !== CONNECTION_DAILY_PROMPT_CATEGORY) return null;
+
+  const dayId = Number(data.connectionDayId);
+  if (!Number.isFinite(dayId) || dayId <= 0) return null;
+
+  const rawAction = String(data._action ?? '').toUpperCase();
+  const action =
+    rawAction === 'NO_SURPLUS' || rawAction === 'ADD_SURPLUS' ? rawAction : 'CHOOSE';
+
+  return {
+    dayId,
+    connectionId: Number(data.connectionId) > 0 ? Number(data.connectionId) : undefined,
+    charityName: data.charityName ? String(data.charityName) : undefined,
+    action,
+    title: payload.notification?.title,
+    body: payload.notification?.body,
+  };
+}
 
 export function resolveNotificationTarget(
   payload: NotificationPayload,
@@ -577,6 +726,7 @@ export function resolveNotificationTarget(
         name: 'AddDailySurplus',
         params: {
           dayId,
+          connectionId: Number(data.connectionId) || undefined,
           charityName: data.charityName ? String(data.charityName) : undefined,
         },
       };
@@ -587,10 +737,15 @@ export function resolveNotificationTarget(
   if (
     rawType === 'CONNECTION_INVITATION' ||
     rawType === 'CONNECTION_COLLECTION_READY' ||
-    rawType === 'CONNECTION_NO_SURPLUS'
+    rawType === 'CONNECTION_NO_SURPLUS' ||
+    rawType === 'CONNECTION_NO_RESPONSE'
   ) {
-    if (rawType === 'CONNECTION_COLLECTION_READY') {
-      return { name: 'Tabs', params: { screen: 'Available' } };
+    if (rawType === 'CONNECTION_COLLECTION_READY' || rawType === 'CONNECTION_NO_RESPONSE') {
+      const connId = Number(data.connectionId);
+      if (Number.isFinite(connId) && connId > 0) {
+        return { name: 'CharityConnectionDetail', params: { connectionId: connId } };
+      }
+      return { name: 'CharityConnections' };
     }
     return { name: 'CharityConnections' };
   }

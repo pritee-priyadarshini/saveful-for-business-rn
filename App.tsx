@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import { SplashScreen } from './src/screens/SplashScreen';
 import { CircularImageCropHost } from './src/components/CircularImageCropModal';
 import { AppAlertHost } from './src/components/AppAlertModal';
+import { registerNotificationCategories } from './src/services/pushNotifications';
 
 export default function App() {
   const [splashTimerDone, setSplashTimerDone] = useState(false);
@@ -34,6 +35,7 @@ export default function App() {
       }
     };
     void lockPortrait();
+    void registerNotificationCategories();
   }, []);
 
   useEffect(() => {

@@ -57,9 +57,16 @@ import {
   setupNotificationOpenedHandler,
   teardownNotificationOpenedHandler,
   emitNotificationReceived,
+  resolveCollectionReadyDecision,
+  resolveDailyPromptDecision,
   resolveNotificationTarget,
+  type CollectionReadyDecision,
+  type DailyPromptDecision,
   type NotificationPayload,
 } from '../services/pushNotifications';
+import { connectionsService } from '../services/connections.service';
+import { showConfirmAlert } from '../store/appAlertStore';
+import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import type { UserRole } from '../types';
 
 export type RootStackParamList = {
@@ -90,7 +97,7 @@ export type RootStackParamList = {
     siteName?: string;
   };
   CharityConnections: undefined;
-  CharityConnectionDetail: { connectionId: number };
+  CharityConnectionDetail: { connectionId: number; openListing?: boolean };
   //CreateSite: undefined;
   CreateSite: { mode?: 'site' | 'manager'; siteId?: number };
   SiteAnalytics: undefined;
@@ -209,10 +216,129 @@ export function AppNavigator() {
   const effectiveRoleRef = useRef<UserRole>(effectiveRole);
   useEffect(() => { effectiveRoleRef.current = effectiveRole; }, [effectiveRole]);
 
+  function goToAddDailySurplus(prompt: DailyPromptDecision) {
+    if (!navigationRef.current?.isReady()) return;
+    navigationRef.current.navigate('AddDailySurplus', {
+      dayId: prompt.dayId,
+      connectionId: prompt.connectionId,
+      charityName: prompt.charityName,
+    });
+  }
+
+  function confirmNoSurplusFromPrompt(prompt: DailyPromptDecision) {
+    const charity = prompt.charityName || 'the charity';
+    showConfirmAlert({
+      title: 'No surplus today?',
+      message: `Today’s collection will be cancelled and ${charity} will be notified. Your regular Connection will continue as usual.`,
+      confirmLabel: 'Confirm no surplus today',
+      cancelLabel: 'Go back',
+      onConfirm: async () => {
+        try {
+          const result = await connectionsService.declareNoSurplus(prompt.dayId);
+          showSuccessAlert(
+            result.message || `${charity} has been told there is no collection today.`,
+          );
+        } catch (error) {
+          showErrorAlert(error, 'Could not update today’s collection');
+        }
+      },
+    });
+  }
+
+  function goToCharityConnection(connectionId: number, openListing = false) {
+    if (!navigationRef.current?.isReady()) return;
+    navigationRef.current.navigate('CharityConnectionDetail', { connectionId, openListing });
+  }
+
+  function confirmCannotCollect(ready: CollectionReadyDecision) {
+    if (!ready.dayId) {
+      goToCharityConnection(ready.connectionId, true);
+      return;
+    }
+    showConfirmAlert({
+      title: "Can't collect today?",
+      message: 'This listing will be offered to nearby charities immediately.',
+      confirmLabel: 'Release to network',
+      cancelLabel: 'Go back',
+      onConfirm: async () => {
+        try {
+          const result = await connectionsService.cannotCollect(ready.dayId!);
+          showSuccessAlert(result.message || 'Released to nearby charities.');
+        } catch (error) {
+          showErrorAlert(error, 'Could not update today’s collection');
+        }
+      },
+    });
+  }
+
+  function confirmPauseConnection(ready: CollectionReadyDecision) {
+    const donor = ready.donorName || 'this business';
+    showConfirmAlert({
+      title: 'Pause this connection?',
+      message: `While paused, you won’t receive regular collection offers from ${donor}. ${donor} will be notified and you can resume the Connection at any time.`,
+      confirmLabel: 'Pause Connection',
+      cancelLabel: 'Keep active',
+      onConfirm: async () => {
+        try {
+          await connectionsService.pauseAsCharity(ready.connectionId);
+          showSuccessAlert('Connection paused');
+        } catch (error) {
+          showErrorAlert(error, 'Could not pause this connection');
+        }
+      },
+    });
+  }
+
+  function presentCollectionReady(ready: CollectionReadyDecision) {
+    if (ready.action === 'CANNOT_COLLECT') {
+      confirmCannotCollect(ready);
+      return;
+    }
+    if (ready.action === 'PAUSE') {
+      confirmPauseConnection(ready);
+      return;
+    }
+    goToCharityConnection(ready.connectionId, true);
+  }
+
+  function presentDailyPrompt(prompt: DailyPromptDecision) {
+    if (prompt.action === 'ADD_SURPLUS') {
+      goToAddDailySurplus(prompt);
+      return;
+    }
+    if (prompt.action === 'NO_SURPLUS') {
+      confirmNoSurplusFromPrompt(prompt);
+      return;
+    }
+
+    showConfirmAlert({
+      title: prompt.title || 'Confirm today’s collection',
+      message:
+        prompt.body ||
+        `Your Connection${prompt.charityName ? ` with ${prompt.charityName}` : ''} is scheduled for today. Add the food and quantities available, or confirm there is no surplus today.`,
+      confirmLabel: 'Add today’s surplus',
+      cancelLabel: 'No surplus today',
+      onConfirm: () => goToAddDailySurplus(prompt),
+      onCancel: () => confirmNoSurplusFromPrompt(prompt),
+    });
+  }
+
   function tryNavigateFromNotification(payload: NotificationPayload): boolean {
     if (!navigationRef.current?.isReady()) return false;
 
     emitNotificationReceived(payload);
+
+    const dailyPrompt = resolveDailyPromptDecision(payload);
+    if (dailyPrompt) {
+      presentDailyPrompt(dailyPrompt);
+      return true;
+    }
+
+    const collectionReady = resolveCollectionReadyDecision(payload);
+    if (collectionReady) {
+      presentCollectionReady(collectionReady);
+      return true;
+    }
 
     const target = resolveNotificationTarget(payload, effectiveRoleRef.current);
 

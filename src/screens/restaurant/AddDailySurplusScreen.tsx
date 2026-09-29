@@ -6,9 +6,11 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
+import { usePreviousListingRelist } from '@/hooks/usePreviousListingRelist';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { connectionsService } from '@/services/connections.service';
 import { foodListingService } from '@/services/foodListing.service';
+import { getPeopleRelistFormValues } from '@/utils/listingRelist';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { useListingsStore } from '@/store/listingsStore';
 import { palette } from '@/theme/colors';
@@ -73,6 +75,7 @@ export function AddDailySurplusScreen({ route }: any) {
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
   const { submitting, withLock } = useSubmitLock();
+  const { hasPreviousListing, previousListing } = usePreviousListingRelist('people');
 
   const dayId = Number(route?.params?.dayId);
   const charityName = String(route?.params?.charityName || 'Preferred charity');
@@ -85,6 +88,7 @@ export function AddDailySurplusScreen({ route }: any) {
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
   const [collectionNotes, setCollectionNotes] = useState('');
   const [confirmedSafe, setConfirmedSafe] = useState(false);
+  const [relistApplied, setRelistApplied] = useState(false);
   const [errors, setErrors] = useState<{
     foodItems?: string;
     storage?: string;
@@ -114,6 +118,25 @@ export function AddDailySurplusScreen({ route }: any) {
         : [...current, { name, qty: 0, iconKey: 'preparedMeals' }],
     );
     setCustomItem('');
+  };
+
+  const useLastCollection = () => {
+    if (!previousListing) return;
+    const values = getPeopleRelistFormValues(previousListing, seedItems);
+    setItems(values.items);
+    setStorage(values.storage);
+    setReheating(values.reheating);
+    setSelectedAllergens(values.selectedAllergens);
+    setCollectionNotes(values.collectionNotes);
+    setImages(values.images);
+    setConfirmedSafe(false);
+    setRelistApplied(true);
+    setErrors((prev) => ({
+      ...prev,
+      foodItems: undefined,
+      storage: undefined,
+      reheating: undefined,
+    }));
   };
 
   const toggleAllergen = (allergen: string) => {
@@ -187,9 +210,10 @@ export function AddDailySurplusScreen({ route }: any) {
 
   const noSurplus = () =>
     showConfirmAlert({
-      title: 'Nothing today?',
-      message: `${charityName} will be told not to come, rather than left waiting.`,
-      confirmLabel: 'No surplus today',
+      title: 'No surplus today?',
+      message: `Today’s collection will be cancelled and ${charityName} will be notified. Your regular Connection will continue as usual.`,
+      confirmLabel: 'Confirm no surplus today',
+      cancelLabel: 'Go back',
       onConfirm: () =>
         withLock(async () => {
           try {
@@ -219,6 +243,31 @@ export function AddDailySurplusScreen({ route }: any) {
           </AppText>
           <View style={styles.headerSpacer} />
         </View>
+
+        {hasPreviousListing && !relistApplied ? (
+          <View style={styles.relistCard}>
+            <AppText variant="bodyBold" color={palette.midgray}>
+              Same as last time?
+            </AppText>
+            <AppText variant="caption" color={palette.stone} style={styles.relistCopy}>
+              Use last collection, then check the quantities are still correct.
+            </AppText>
+            <Pressable style={styles.relistBtn} onPress={useLastCollection}>
+              <AppText variant="bodyBold" color={palette.white}>
+                Use last collection
+              </AppText>
+              <Ionicons name="arrow-forward" size={normalize(16)} color={palette.white} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {relistApplied ? (
+          <View style={styles.relistCard}>
+            <AppText variant="bodyBold" color={palette.middlegreen} style={styles.relistHint}>
+              Copied from last collection. Please check the quantities are correct before you list.
+            </AppText>
+          </View>
+        ) : null}
 
         <View style={styles.stepWrap}>
           <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
@@ -332,13 +381,13 @@ export function AddDailySurplusScreen({ route }: any) {
             COLLECTION NOTES (OPTIONAL)
           </AppText>
           <AppText variant="caption" color={palette.stone} style={styles.notesHint}>
-            Add anything the collector should know about collection
+            Add anything the collector should know about this pickup.
           </AppText>
           <View style={styles.notesCard}>
             <TextInput
               value={collectionNotes}
               onChangeText={(value) => setCollectionNotes(value.slice(0, 300))}
-              placeholder="e.g. Enter via loading dock, ask for kitchen manager, bring crates."
+              placeholder="e.g. Enter via the loading dock, ask for the kitchen manager or bring crates."
               placeholderTextColor={palette.stone}
               style={styles.notesInput}
               multiline
@@ -567,6 +616,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FBF3',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  relistCard: {
+    borderWidth: normalize(2),
+    borderColor: palette.kale,
+    backgroundColor: '#F0F5E8',
+    borderRadius: normalize(12),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(3),
+    alignItems: 'center',
+    gap: hp(0.8),
+    marginTop: hp(1.2),
+  },
+  relistCopy: {
+    textAlign: 'center',
+    textTransform: 'none',
+    lineHeight: normalize(18),
+  },
+  relistBtn: {
+    width: '100%',
+    minHeight: hp(4.4),
+    borderRadius: normalize(8),
+    backgroundColor: palette.kale,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+  },
+  relistHint: {
+    textAlign: 'center',
+    textTransform: 'none',
+    lineHeight: normalize(20),
+    paddingVertical: hp(0.6),
   },
   stepWrap: { marginTop: hp(1.2), gap: hp(0.9) },
   sectionTitle: { marginTop: hp(0.2) },

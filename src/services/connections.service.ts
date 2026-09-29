@@ -38,6 +38,7 @@ export type ConnectionStats = {
   declined: number;
   missed: number;
   noSurplusDays: number;
+  noResponseDays?: number;
   reliabilityPercent: number;
 };
 
@@ -53,6 +54,7 @@ export type Connection = {
   leadTimeMinutes?: number;
   cutoffMinutes?: number;
   typicalSurplus?: string | null;
+  typicalQuantity?: string | null;
   notes?: string | null;
   respondedAt?: string | null;
   pausedAt?: string | null;
@@ -104,6 +106,7 @@ export type CreateConnectionPayload = {
   leadTimeMinutes?: number;
   cutoffMinutes?: number;
   typicalSurplus?: string;
+  typicalQuantity?: string;
   notes?: string;
 };
 
@@ -114,6 +117,7 @@ export type UpdateConnectionPayload = {
   leadTimeMinutes?: number;
   cutoffMinutes?: number;
   typicalSurplus?: string;
+  typicalQuantity?: string;
   notes?: string;
 };
 
@@ -251,13 +255,27 @@ export const connectionsService = {
   },
 
   invite: async (payload: CreateConnectionPayload): Promise<Connection> => {
-    const res = await api.post('/connections', payload);
-    return asObject<Connection>(res.data);
+    try {
+      const res = await api.post('/connections', payload);
+      return asObject<Connection>(res.data);
+    } catch (error) {
+      if (!isUnknownPropertyRejection(error) || !payload.typicalQuantity) throw error;
+      const { typicalQuantity: _typicalQuantity, ...withoutQuantity } = payload;
+      const res = await api.post('/connections', withoutQuantity);
+      return asObject<Connection>(res.data);
+    }
   },
 
   update: async (id: number, payload: UpdateConnectionPayload): Promise<Connection> => {
-    const res = await api.patch(`/connections/${id}`, payload);
-    return asObject<Connection>(res.data);
+    try {
+      const res = await api.patch(`/connections/${id}`, payload);
+      return asObject<Connection>(res.data);
+    } catch (error) {
+      if (!isUnknownPropertyRejection(error) || payload.typicalQuantity === undefined) throw error;
+      const { typicalQuantity: _typicalQuantity, ...withoutQuantity } = payload;
+      const res = await api.patch(`/connections/${id}`, withoutQuantity);
+      return asObject<Connection>(res.data);
+    }
   },
 
   pause: async (id: number): Promise<Connection> => {
@@ -481,6 +499,11 @@ export const connectionsService = {
 
   pauseAsCharity: async (id: number): Promise<Connection> => {
     const res = await api.post(`/charity/connections/${id}/pause`);
+    return asObject<Connection>(res.data);
+  },
+
+  resumeAsCharity: async (id: number): Promise<Connection> => {
+    const res = await api.post(`/charity/connections/${id}/resume`);
     return asObject<Connection>(res.data);
   },
 

@@ -17,6 +17,8 @@ import { palette } from '@/theme/colors';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import {
   COMMON_TIMEZONES,
+  CONNECTION_CHARITY_CONFIRM_MINUTES,
+  CONNECTION_PROMPT_LEAD_MINUTES,
   ISO_WEEKDAYS,
   deviceTimezone,
   formatHhMm,
@@ -48,12 +50,14 @@ export function CreateConnectionScreen({ route }: any) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerValue, setPickerValue] = useState(new Date());
   const [typicalSurplus, setTypicalSurplus] = useState('');
+  const [typicalQuantity, setTypicalQuantity] = useState('');
   const [notes, setNotes] = useState('');
   const [timezone, setTimezone] = useState(deviceTimezone());
   const [openSelect, setOpenSelect] = useState<'charity' | 'timezone' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const timezoneRef = useRef<View>(null);
   const surplusRef = useRef<View>(null);
+  const quantityRef = useRef<View>(null);
   const notesRef = useRef<View>(null);
   const scrollY = useRef(0);
   const insets = useSafeAreaInsets();
@@ -185,7 +189,10 @@ export function CreateConnectionScreen({ route }: any) {
           daysOfWeek: days,
           windowStart: formatHhMm(windowStart),
           windowEnd: formatHhMm(windowEnd),
+          leadTimeMinutes: CONNECTION_PROMPT_LEAD_MINUTES,
+          cutoffMinutes: CONNECTION_CHARITY_CONFIRM_MINUTES,
           typicalSurplus: typicalSurplus.trim() || undefined,
+          typicalQuantity: typicalQuantity.trim() || undefined,
           notes: notes.trim() || undefined,
         });
         const extra = created.warning ? `\n\n${created.warning}` : '';
@@ -288,7 +295,9 @@ export function CreateConnectionScreen({ route }: any) {
 
       <View style={styles.body}>
         <AppText variant="body1" color={palette.stone} style={styles.intro}>
-          Choose the charity, days and pickup window. Surplus is only created on a scheduled day.
+          Set up a Connection for regular collections with a specific charity. Choose the usual days
+          and pickup window — you’ll confirm the actual food and quantities at least 2.5 hours before
+          each pickup.
         </AppText>
 
         <AppText variant="label">Nearby charity</AppText>
@@ -339,16 +348,37 @@ export function CreateConnectionScreen({ route }: any) {
           </Pressable>
         </View>
 
-        <AppText variant="label">Typical surplus (optional)</AppText>
+        <AppText variant="label">Typical surplus - guide only</AppText>
+        <AppText variant="caption" color={palette.stone} style={styles.fieldHint}>
+          Give the charity an example of the food usually available. You’ll confirm the actual items
+          before each pickup.
+        </AppText>
         <View ref={surplusRef}>
           <TextInput
             value={typicalSurplus}
             onChangeText={setTypicalSurplus}
-            placeholder="Prepared meals & bakery"
+            placeholder="e.g. Prepared meals, sandwiches and baked goods"
             placeholderTextColor={palette.stone}
             style={styles.input}
             maxLength={200}
             onFocus={() => scrollFieldIntoView(surplusRef)}
+          />
+        </View>
+
+        <AppText variant="label">Typical quantity - guide only</AppText>
+        <AppText variant="caption" color={palette.stone} style={styles.fieldHint}>
+          Give the charity an example of the quantity usually available. You’ll confirm the quantities
+          before each pickup.
+        </AppText>
+        <View ref={quantityRef}>
+          <TextInput
+            value={typicalQuantity}
+            onChangeText={setTypicalQuantity}
+            placeholder="e.g. Approximately 8 kg (20 meals)"
+            placeholderTextColor={palette.stone}
+            style={styles.input}
+            maxLength={200}
+            onFocus={() => scrollFieldIntoView(quantityRef)}
           />
         </View>
 
@@ -432,6 +462,7 @@ const styles = StyleSheet.create({
     gap: hp(1.2),
   },
   intro: { lineHeight: normalize(22) },
+  fieldHint: { lineHeight: normalize(18), textTransform: 'none', marginTop: -hp(0.4) },
   days: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   day: {
     borderWidth: 1,

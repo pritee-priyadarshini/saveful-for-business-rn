@@ -670,17 +670,9 @@ export function RestaurantHomeScreen({ navigation }: any) {
                     <Ionicons name="people-outline" size={normalize(20)} color={palette.kale} />
                   </View>
                   <View style={styles.connectionsCopy}>
-                    <AppText variant="bodyBold">Preferred collections</AppText>
-                    <AppText variant="caption" color={palette.stone} numberOfLines={1}>
-                      {connectionSummary.pending
-                        ? connectionSummary.pending === 1
-                          ? '1 invitation awaiting the charity'
-                          : `${connectionSummary.pending} invitations awaiting`
-                        : connectionSummary.active
-                          ? connectionSummary.active === 1
-                            ? '1 preferred charity'
-                            : `${connectionSummary.active} preferred charities`
-                          : 'Offer surplus to a charity first'}
+                    <AppText variant="bodyBold">Connections</AppText>
+                    <AppText variant="caption" color={palette.stone} numberOfLines={2}>
+                      Regular collections with your charity partners
                     </AppText>
                   </View>
                   {connectionSummary.pending ? (

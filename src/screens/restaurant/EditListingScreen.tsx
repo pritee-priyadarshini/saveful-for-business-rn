@@ -821,13 +821,13 @@ function EditPeopleListingForm({
               COLLECTION NOTES (OPTIONAL)
             </AppText>
             <AppText variant="caption" color={palette.stone} style={peopleStyles.notesHint}>
-              Add anything the collector should know about collection
+              Add anything the collector should know about this pickup.
             </AppText>
             <View style={peopleStyles.notesCard}>
               <TextInput
                 value={collectionNotes}
                 onChangeText={(value) => setCollectionNotes(value.slice(0, 300))}
-                placeholder="e.g. Enter via loading dock, ask for kitchen manager, bring crates."
+                placeholder="e.g. Enter via the loading dock, ask for the kitchen manager or bring crates."
                 placeholderTextColor={palette.stone}
                 style={peopleStyles.notesInput}
                 multiline
@@ -1685,7 +1685,7 @@ function EditFarmListingForm({
               COLLECTION NOTES (OPTIONAL)
             </AppText>
             <AppText variant="caption" color={palette.stone} style={farmStyles.notesHint}>
-              Add anything the collector should know about collection
+              Add anything the collector should know about this pickup.
             </AppText>
             <View style={farmStyles.notesCard}>
               <TextInput

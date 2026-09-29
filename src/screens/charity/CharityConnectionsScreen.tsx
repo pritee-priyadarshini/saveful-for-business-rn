@@ -153,6 +153,14 @@ export function CharityConnectionsScreen() {
           </View>
         ) : null}
 
+        {!loading && (
+          <AppText variant="body1" color={palette.stone} style={styles.pageDescription}>
+            {connections.length === 0
+              ? 'Review invitations from food businesses that would like to arrange regular collections with you. The food and quantities available for each collection will be confirmed before pickup.'
+              : 'View and manage your regular collection Connections. Each business will confirm the food and quantities available before that day\u2019s pickup.'}
+          </AppText>
+        )}
+
         {loading ? (
           <ActivityIndicator color={palette.kale} />
         ) : connections.length === 0 ? (
@@ -259,9 +267,21 @@ function ConnectionDetailsModal({
           {location ? <DetailRow label="Location" value={location} /> : null}
           {connection?.schedule ? <DetailRow label="Schedule" value={connection.schedule} /> : null}
           {connection?.typicalSurplus ? (
-            <DetailRow label="Typical surplus" value={connection.typicalSurplus} />
+            <DetailRow label="Typical surplus - guide only" value={connection.typicalSurplus} />
           ) : null}
+          {connection?.typicalQuantity ? (
+            <DetailRow label="Typical quantity - guide only" value={connection.typicalQuantity} />
+          ) : (
+            <DetailRow label="Typical quantity - guide only" value="Quantity varies" />
+          )}
           {connection?.notes ? <DetailRow label="Notes" value={connection.notes} /> : null}
+          <AppText
+            variant="bodySmall"
+            color={palette.stone}
+            style={styles.modalDisclaimer}
+          >
+            The business will confirm the actual food and quantities before each pickup.
+          </AppText>
           <Pressable style={styles.modalClose} onPress={onClose}>
             <AppText variant="bodyBold" color={palette.primary}>Close</AppText>
           </Pressable>
@@ -315,6 +335,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(5),
     paddingTop: hp(0.6),
     gap: hp(1.3),
+  },
+  pageDescription: {
+    marginBottom: hp(2),
+    lineHeight: 20,
   },
   todayBox: {
     backgroundColor: palette.white,
@@ -374,6 +398,12 @@ const styles = StyleSheet.create({
   detailRow: {
     marginBottom: 12,
     gap: 3,
+  },
+  modalDisclaimer: {
+    marginTop: hp(1.5),
+    marginBottom: hp(0.5),
+    lineHeight: 18,
+    textAlign: 'center',
   },
   modalClose: {
     alignItems: 'center',

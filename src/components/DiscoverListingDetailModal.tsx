@@ -36,6 +36,7 @@ type Props = {
   onClose: () => void;
   /** When set, shows a Claim action (e.g. navigate to Available to claim). */
   onClaim?: () => void;
+  claimLabel?: string;
   /** Animal-feed listings call these "Feed items". */
   itemsTitle?: string;
   /** Animal-feed listings store possible contaminants in the same field. */
@@ -73,6 +74,7 @@ export function DiscoverListingDetailModal({
   listing,
   onClose,
   onClaim,
+  claimLabel = 'Claim',
   itemsTitle = 'Food items',
   allergensTitle = 'Allergens',
   reserved = false,
@@ -236,7 +238,7 @@ export function DiscoverListingDetailModal({
               />
             ) : null}
             {onClaim ? (
-              <Button label="Claim" size="compact" onPress={onClaim} style={styles.claimBtn} />
+              <Button label={claimLabel} size="compact" onPress={onClaim} style={styles.claimBtn} />
             ) : null}
             <Button
               label="Close"

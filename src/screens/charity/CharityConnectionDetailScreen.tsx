@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { AppText } from '@/components/AppText';
@@ -7,13 +7,27 @@ import { Screen } from '@/components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { DiscoverListingDetailModal } from '@/components/DiscoverListingDetailModal';
 import { connectionsService, type Connection } from '@/services/connections.service';
+import {
+  fetchListingDetail,
+  mapDiscoverListing,
+  type FoodItem,
+} from '@/services/foodListing.service';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { connectionPartyName, formatWindowLabel, statusLabel } from '@/utils/connections';
-import { hp, useResponsiveLayout, wp } from '@/utils/responsive';
+import { resolveFoodIconFromLabel } from '@/utils/foodListing';
+import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
+
+function formatCutoffTime(cutoffAt?: string | null): string {
+  if (!cutoffAt) return '';
+  const d = new Date(cutoffAt);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 
 export function CharityConnectionDetailScreen({ route }: any) {
   useTransparentStatusBar('light');
@@ -24,6 +38,10 @@ export function CharityConnectionDetailScreen({ route }: any) {
   const { submitting, withLock } = useSubmitLock();
   const [connection, setConnection] = useState<Connection | null>(null);
   const [loading, setLoading] = useState(true);
+  const [listingItems, setListingItems] = useState<FoodItem[]>([]);
+  const [listingPreview, setListingPreview] = useState<ReturnType<typeof mapDiscoverListing> | null>(null);
+  const [listingModalOpen, setListingModalOpen] = useState(false);
+  const [listingLoading, setListingLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(connectionId)) return;
@@ -42,6 +60,41 @@ export function CharityConnectionDetailScreen({ route }: any) {
     }, [load]),
   );
 
+  // Fetch listing items whenever a PUBLISHED listing becomes available
+  const listingId = connection?.today?.listingId;
+  const todayOutcome = connection?.today?.outcome;
+
+  useEffect(() => {
+    if (todayOutcome !== 'PUBLISHED' || !listingId) {
+      setListingItems([]);
+      setListingPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setListingLoading(true);
+    fetchListingDetail(listingId)
+      .then((detail) => {
+        if (cancelled) return;
+        setListingItems(detail.foodItems ?? []);
+        setListingPreview(mapDiscoverListing(detail));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setListingItems([]);
+        setListingPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setListingLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [listingId, todayOutcome]);
+
+  useEffect(() => {
+    if (route?.params?.openListing && listingPreview) {
+      setListingModalOpen(true);
+    }
+  }, [listingPreview, route?.params?.openListing]);
+
   const run = (action: () => Promise<unknown>, success: string) =>
     withLock(async () => {
       try {
@@ -56,6 +109,17 @@ export function CharityConnectionDetailScreen({ route }: any) {
   const donor = connectionPartyName(connection?.donorSite, connection?.donorOrg?.name || 'Business');
   const today = connection?.today;
   const canDeclineToday = today?.outcome === 'PUBLISHED' && today.id;
+  const cutoffLabel = formatCutoffTime(today?.cutoffAt);
+
+  const confirmPause = () =>
+    showConfirmAlert({
+      title: 'Pause this connection?',
+      message: `While paused, you won’t receive regular collection offers from ${donor}. ${donor} will be notified and you can resume the Connection at any time.`,
+      confirmLabel: 'Pause Connection',
+      cancelLabel: 'Keep active',
+      onConfirm: () =>
+        run(() => connectionsService.pauseAsCharity(connection!.id), 'Connection paused'),
+    });
 
   return (
     <Screen scrollable backgroundColor={palette.creme} contentStyle={styles.screen} transparentTop>
@@ -69,7 +133,12 @@ export function CharityConnectionDetailScreen({ route }: any) {
             <AppText variant="body1">{connection.schedule}</AppText>
             {connection.typicalSurplus ? (
               <AppText variant="bodySmall" color={palette.stone}>
-                Typical surplus: {connection.typicalSurplus}
+                Typical surplus - guide only: {connection.typicalSurplus}
+              </AppText>
+            ) : null}
+            {connection.typicalQuantity ? (
+              <AppText variant="bodySmall" color={palette.stone}>
+                Typical quantity - guide only: {connection.typicalQuantity}
               </AppText>
             ) : null}
             {connection.notes ? (
@@ -118,25 +187,89 @@ export function CharityConnectionDetailScreen({ route }: any) {
               </>
             ) : null}
 
+            {today?.outcome === 'NO_RESPONSE' ? (
+              <View style={styles.todayBox}>
+                <AppText variant="label">Today’s collection was not confirmed</AppText>
+                <AppText variant="bodySmall" color={palette.stone}>
+                  {donor} did not confirm any surplus for today. No collection is required. Your regular Connection remains active.
+                </AppText>
+              </View>
+            ) : null}
+
             {today?.outcome === 'PUBLISHED' ? (
               <View style={styles.todayBox}>
-                <AppText variant="label">Today’s collection</AppText>
-                <AppText variant="bodySmall">
-                  {formatWindowLabel(today.windowStartAt, today.windowEndAt) || connection.schedule}
+                <AppText variant="label">Today's collection is ready</AppText>
+
+                {/* Item breakdown */}
+                {listingLoading ? (
+                  <ActivityIndicator size="small" color={palette.kale} style={{ alignSelf: 'flex-start' }} />
+                ) : listingItems.length > 0 ? (
+                  <View style={styles.itemList}>
+                    {listingItems.map((item, idx) => (
+                      <View key={item.id ?? idx} style={styles.itemRow}>
+                        <Image
+                          source={resolveFoodIconFromLabel(item.name, item.category)}
+                          style={styles.itemIcon}
+                          resizeMode="contain"
+                        />
+                        <AppText variant="bodySmall" color={palette.ink} style={styles.itemText}>
+                          {`${item.totalQtyKg} kg ${item.name ?? item.category ?? ''}`}
+                        </AppText>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {listingPreview?.allergens?.length ? (
+                  <AppText variant="bodySmall" color={palette.stone}>
+                    Allergens: {listingPreview.allergens.join(', ')}
+                  </AppText>
+                ) : null}
+                {listingPreview?.storage ? (
+                  <AppText variant="bodySmall" color={palette.stone}>
+                    Storage: {listingPreview.storage}
+                  </AppText>
+                ) : null}
+                {listingPreview?.collectionNotes ? (
+                  <AppText variant="bodySmall" color={palette.stone}>
+                    {listingPreview.collectionNotes}
+                  </AppText>
+                ) : null}
+
+                {/* Pickup window */}
+                <AppText variant="bodySmall" color={palette.stone}>
+                  {`Pickup between ${formatWindowLabel(today.windowStartAt, today.windowEndAt) || connection.schedule}`}
                 </AppText>
+
+                {/* Confirm CTA */}
                 <Pressable
                   style={styles.primary}
-                  onPress={() => navigation.navigate('Tabs', { screen: 'Available' })}
+                  onPress={() => {
+                    if (listingPreview) {
+                      setListingModalOpen(true);
+                      return;
+                    }
+                    navigation.navigate('Tabs', { screen: 'Available' });
+                  }}
                 >
-                  <AppText variant="bodyBold" color={palette.white}>Confirm — claim as usual</AppText>
+                  <AppText variant="bodyBold" color={palette.white}>Confirm Collection</AppText>
                 </Pressable>
+
+                {/* Cutoff reminder */}
+                {cutoffLabel ? (
+                  <AppText variant="bodySmall" color={palette.stone} style={styles.cutoffText}>
+                    {`Please confirm by ${cutoffLabel}. If you can't collect or don't confirm by then, the food will be offered to nearby charities.`}
+                  </AppText>
+                ) : null}
+
+                {/* Can't collect today */}
                 {canDeclineToday ? (
                   <Pressable
-                    style={styles.secondary}
+                    style={styles.secondaryInBox}
                     disabled={submitting}
                     onPress={() =>
                       showConfirmAlert({
-                        title: 'Can’t collect today?',
+                        title: "Can't collect today?",
                         message: 'This listing will be offered to nearby charities immediately.',
                         confirmLabel: 'Release to network',
                         onConfirm: () =>
@@ -147,26 +280,43 @@ export function CharityConnectionDetailScreen({ route }: any) {
                       })
                     }
                   >
-                    <AppText variant="bodyBold" color={palette.primary}>Can’t collect</AppText>
+                    <AppText variant="bodyBold" color={palette.primary}>Can't collect today</AppText>
+                  </Pressable>
+                ) : null}
+
+                {/* Pause — inside today box as per design */}
+                {connection.status === 'ACTIVE' ? (
+                  <Pressable
+                    style={styles.secondaryInBox}
+                    disabled={submitting}
+                    onPress={confirmPause}
+                  >
+                    <AppText variant="bodyBold" color={palette.primary}>Pause Connection</AppText>
                   </Pressable>
                 ) : null}
               </View>
             ) : null}
 
-            {connection.status === 'ACTIVE' ? (
+            {/* Pause button when there is no active today-box (no PUBLISHED collection) */}
+            {today?.outcome !== 'PUBLISHED' && connection.status === 'ACTIVE' ? (
               <Pressable
                 style={styles.secondary}
                 disabled={submitting}
+                onPress={confirmPause}
+              >
+                <AppText variant="bodyBold" color={palette.primary}>Pause Connection</AppText>
+              </Pressable>
+            ) : null}
+
+            {connection.status === 'PAUSED' ? (
+              <Pressable
+                style={styles.primary}
+                disabled={submitting}
                 onPress={() =>
-                  showConfirmAlert({
-                    title: 'Pause this connection?',
-                    message: 'You will not be offered first until it is resumed.',
-                    confirmLabel: 'Pause',
-                    onConfirm: () => run(() => connectionsService.pauseAsCharity(connection.id), 'Connection paused'),
-                  })
+                  run(() => connectionsService.resumeAsCharity(connection.id), 'Connection resumed')
                 }
               >
-                <AppText variant="bodyBold" color={palette.primary}>Pause</AppText>
+                <AppText variant="bodyBold" color={palette.white}>Resume Connection</AppText>
               </Pressable>
             ) : null}
 
@@ -194,6 +344,35 @@ export function CharityConnectionDetailScreen({ route }: any) {
           </>
         )}
       </View>
+
+      <DiscoverListingDetailModal
+        visible={listingModalOpen}
+        listing={listingPreview}
+        reserved
+        onClose={() => setListingModalOpen(false)}
+        claimLabel="Confirm Collection"
+        onClaim={() => {
+          setListingModalOpen(false);
+          navigation.navigate('Tabs', { screen: 'Available' });
+        }}
+        onCannotCollect={
+          canDeclineToday
+            ? () => {
+                setListingModalOpen(false);
+                showConfirmAlert({
+                  title: "Can't collect today?",
+                  message: 'This listing will be offered to nearby charities immediately.',
+                  confirmLabel: 'Release to network',
+                  onConfirm: () =>
+                    run(
+                      () => connectionsService.cannotCollect(today.id!),
+                      'Released to nearby charities.',
+                    ),
+                });
+              }
+            : undefined
+        }
+      />
     </Screen>
   );
 }
@@ -209,6 +388,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.kale,
   },
+  itemList: {
+    gap: 8,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemIcon: {
+    width: normalize(22),
+    height: normalize(22),
+  },
+  itemText: {
+    flex: 1,
+  },
+  cutoffText: {
+    lineHeight: 18,
+  },
   primary: {
     backgroundColor: palette.kale,
     minHeight: 48,
@@ -219,6 +416,14 @@ const styles = StyleSheet.create({
   },
   secondary: {
     minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryInBox: {
+    minHeight: 44,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: palette.primary,

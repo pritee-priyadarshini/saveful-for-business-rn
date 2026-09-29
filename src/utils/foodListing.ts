@@ -19,7 +19,7 @@ const FOOD_ICON_SOURCES: Record<FoodIconKey, any> = {
   meat: require('../../assets/placeholder/meat_icon.png'),
   dairy: require('../../assets/placeholder/milk_icon.png'),
   sandwiches: require('../../assets/placeholder/sandwich_icon.png'),
-  salads: require('../../assets/placeholder/bowl.png'),
+  salads: require('../../assets/placeholder/salad.png'),
   defaultMeal: require('../../assets/placeholder/meal_icon.png'),
 };
 

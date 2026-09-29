@@ -20,6 +20,8 @@ import { showConfirmAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import {
+  CONNECTION_CHARITY_CONFIRM_MINUTES,
+  CONNECTION_PROMPT_LEAD_MINUTES,
   ISO_WEEKDAYS,
   canListPreferredSurplus,
   connectionPartyName,
@@ -47,6 +49,7 @@ export function ConnectionDetailScreen({ route }: any) {
   const [windowStart, setWindowStart] = useState(() => parseHhMm('16:00', 16, 0));
   const [windowEnd, setWindowEnd] = useState(() => parseHhMm('17:00', 17, 0));
   const [typicalSurplus, setTypicalSurplus] = useState('');
+  const [typicalQuantity, setTypicalQuantity] = useState('');
   const [notes, setNotes] = useState('');
   const [pickerTarget, setPickerTarget] = useState<'start' | 'end' | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -65,6 +68,7 @@ export function ConnectionDetailScreen({ route }: any) {
     windowStart: '',
     windowEnd: '',
     typicalSurplus: '',
+    typicalQuantity: '',
     notes: '',
   });
 
@@ -90,18 +94,21 @@ export function ConnectionDetailScreen({ route }: any) {
     const nextDays = Array.isArray(row.daysOfWeek) ? [...row.daysOfWeek].sort((a, b) => a - b) : [];
     const window = resolveWindow(row);
     const nextSurplus = row.typicalSurplus || '';
+    const nextQuantity = row.typicalQuantity || '';
     const nextNotes = row.notes || '';
     setConnection(row);
     setDays(nextDays);
     setWindowStart(window.start);
     setWindowEnd(window.end);
     setTypicalSurplus(nextSurplus);
+    setTypicalQuantity(nextQuantity);
     setNotes(nextNotes);
     setSavedSchedule({
       days: nextDays,
       windowStart: formatHhMm(window.start),
       windowEnd: formatHhMm(window.end),
       typicalSurplus: nextSurplus,
+      typicalQuantity: nextQuantity,
       notes: nextNotes,
     });
   };
@@ -229,6 +236,7 @@ export function ConnectionDetailScreen({ route }: any) {
     formatHhMm(windowStart) !== savedSchedule.windowStart ||
     formatHhMm(windowEnd) !== savedSchedule.windowEnd ||
     typicalSurplus.trim() !== savedSchedule.typicalSurplus.trim() ||
+    typicalQuantity.trim() !== savedSchedule.typicalQuantity.trim() ||
     notes.trim() !== savedSchedule.notes.trim();
 
   const toggleDay = (id: number) => {
@@ -249,7 +257,10 @@ export function ConnectionDetailScreen({ route }: any) {
           daysOfWeek: days,
           windowStart: formatHhMm(windowStart),
           windowEnd: formatHhMm(windowEnd),
+          leadTimeMinutes: CONNECTION_PROMPT_LEAD_MINUTES,
+          cutoffMinutes: CONNECTION_CHARITY_CONFIRM_MINUTES,
           typicalSurplus: typicalSurplus.trim(),
+          typicalQuantity: typicalQuantity.trim(),
           notes: notes.trim(),
         });
         applyConnection(updated);
@@ -338,11 +349,21 @@ export function ConnectionDetailScreen({ route }: any) {
                   </Pressable>
                 </View>
 
-                <AppText variant="label">Typical surplus</AppText>
+                <AppText variant="label">Typical surplus - guide only</AppText>
                 <TextInput
                   value={typicalSurplus}
                   onChangeText={setTypicalSurplus}
-                  placeholder="Prepared meals & bakery"
+                  placeholder="e.g. Prepared meals, sandwiches and baked goods"
+                  placeholderTextColor={palette.stone}
+                  style={styles.input}
+                  maxLength={200}
+                />
+
+                <AppText variant="label">Typical quantity - guide only</AppText>
+                <TextInput
+                  value={typicalQuantity}
+                  onChangeText={setTypicalQuantity}
+                  placeholder="e.g. Approximately 8 kg (20 meals)"
                   placeholderTextColor={palette.stone}
                   style={styles.input}
                   maxLength={200}
@@ -383,7 +404,8 @@ export function ConnectionDetailScreen({ route }: any) {
                   Same as List for them on Surplus. Publish today’s food so only {charity} can see it.
                 </AppText>
                 <Pressable
-                  style={styles.primary}
+                  style={[styles.primary, submitting && { opacity: 0.6 }]}
+                  disabled={submitting}
                   onPress={() =>
                     navigation.navigate('AddDailySurplus', {
                       dayId: connection.today?.id,
@@ -399,76 +421,111 @@ export function ConnectionDetailScreen({ route }: any) {
                     List for them
                   </AppText>
                 </Pressable>
+                <Pressable
+                  style={[styles.secondary, submitting && { opacity: 0.6 }]}
+                  disabled={submitting}
+                  onPress={() =>
+                    showConfirmAlert({
+                      title: 'No surplus today?',
+                      message: `Today’s collection will be cancelled and ${charity} will be notified. Your regular Connection will continue as usual.`,
+                      confirmLabel: 'Confirm no surplus today',
+                      cancelLabel: 'Go back',
+                      onConfirm: () =>
+                        run(
+                          () => connectionsService.declareNoSurplus(Number(connection.today?.id)),
+                          `${charity} has been told there is no collection today.`,
+                        ),
+                    })
+                  }
+                >
+                  <AppText variant="bodyBold" color={palette.primary}>
+                    No surplus today
+                  </AppText>
+                </Pressable>
+              </View>
+            ) : connection.today?.outcome === 'NO_SURPLUS' ? (
+              <View style={styles.listBox}>
+                <AppText variant="bodySmall" color={palette.stone}>
+                  No surplus today. {charity} has been told. This Connection stays active for the next scheduled day.
+                </AppText>
+              </View>
+            ) : connection.today?.outcome === 'NO_RESPONSE' ? (
+              <View style={styles.listBox}>
+                <AppText variant="bodySmall" color={palette.stone}>
+                  Today’s surplus was not confirmed in time. {charity} has been told no collection is required. This Connection stays active for the next scheduled day.
+                </AppText>
               </View>
             ) : null}
 
-            {isReservedPublished(connection.today) && connection.today?.id ? (
-              <Pressable
-                style={styles.secondary}
-                disabled={submitting}
-                onPress={() => {
-                  const others = otherOpenConnections(todayRows, connection.id);
-                  if (others.length) {
-                    setReleaseChooserOpen(true);
-                    return;
+            <View style={styles.actions}>
+              {isReservedPublished(connection.today) && connection.today?.id ? (
+                <Pressable
+                  style={[styles.secondary, submitting && { opacity: 0.6 }]}
+                  disabled={submitting}
+                  onPress={() => {
+                    const others = otherOpenConnections(todayRows, connection.id);
+                    if (others.length) {
+                      setReleaseChooserOpen(true);
+                      return;
+                    }
+                    setReleaseOpen(true);
+                  }}
+                >
+                  <AppText variant="bodyBold" color={palette.primary}>
+                    Release
+                  </AppText>
+                </Pressable>
+              ) : null}
+
+              {connection.status === 'ACTIVE' ? (
+                <Pressable
+                  style={[styles.secondary, submitting && { opacity: 0.6 }]}
+                  disabled={submitting}
+                  onPress={() =>
+                    showConfirmAlert({
+                      title: 'Pause this connection?',
+                      message: 'Scheduled prompts stop until you resume. History is kept.',
+                      confirmLabel: 'Pause connection',
+                      onConfirm: () => run(() => connectionsService.pause(connection.id), 'Connection paused'),
+                    })
                   }
-                  setReleaseOpen(true);
-                }}
-              >
-                <AppText variant="bodyBold" color={palette.primary}>
-                  Release
-                </AppText>
-              </Pressable>
-            ) : null}
+                >
+                  <AppText variant="bodyBold" color={palette.primary}>Pause connection</AppText>
+                </Pressable>
+              ) : null}
 
-            {connection.status === 'ACTIVE' ? (
-              <Pressable
-                style={styles.secondary}
-                disabled={submitting}
-                onPress={() =>
-                  showConfirmAlert({
-                    title: 'Pause this connection?',
-                    message: 'Scheduled prompts stop until you resume. History is kept.',
-                    confirmLabel: 'Pause',
-                    onConfirm: () => run(() => connectionsService.pause(connection.id), 'Connection paused'),
-                  })
-                }
-              >
-                <AppText variant="bodyBold" color={palette.primary}>Pause</AppText>
-              </Pressable>
-            ) : null}
+              {connection.status === 'PAUSED' ? (
+                <Pressable
+                  style={[styles.primary, submitting && { opacity: 0.6 }]}
+                  disabled={submitting}
+                  onPress={() => run(() => connectionsService.resume(connection.id), 'Connection resumed')}
+                >
+                  <AppText variant="bodyBold" color={palette.white}>Resume connection</AppText>
+                </Pressable>
+              ) : null}
 
-            {connection.status === 'PAUSED' ? (
-              <Pressable
-                style={styles.primary}
-                disabled={submitting}
-                onPress={() => run(() => connectionsService.resume(connection.id), 'Connection resumed')}
-              >
-                <AppText variant="bodyBold" color={palette.white}>Resume</AppText>
-              </Pressable>
-            ) : null}
-
-            {canEdit ? (
-              <Pressable
-                style={styles.danger}
-                disabled={submitting}
-                onPress={() =>
-                  showConfirmAlert({
-                    title: 'End this connection?',
-                    message: 'This site will offer surplus to nearby charities again. Published listings stay as they are.',
-                    confirmLabel: 'End connection',
-                    destructive: true,
-                    onConfirm: () =>
-                      run(async () => {
-                        await connectionsService.end(connection.id);
-                        navigation.goBack();
-                      }, 'Connection ended'),
-                  })
-                }
-              >
-                <AppText variant="bodyBold" color={palette.danger}>End connection</AppText>
-              </Pressable>
-            ) : null}
+              {canEdit ? (
+                <Pressable
+                  style={[styles.danger, submitting && { opacity: 0.6 }]}
+                  disabled={submitting}
+                  onPress={() =>
+                    showConfirmAlert({
+                      title: 'End this connection?',
+                      message: 'This site will offer surplus to nearby charities again. Published listings stay as they are.',
+                      confirmLabel: 'End connection',
+                      destructive: true,
+                      onConfirm: () =>
+                        run(async () => {
+                          await connectionsService.end(connection.id);
+                          navigation.goBack();
+                        }, 'Connection ended'),
+                    })
+                  }
+                >
+                  <AppText variant="bodyBold" color={palette.danger}>End connection</AppText>
+                </Pressable>
+              ) : null}
+            </View>
           </>
         )}
       </View>
@@ -656,24 +713,36 @@ const styles = StyleSheet.create({
   },
   notes: { minHeight: 80, textAlignVertical: 'top' },
   listBox: { gap: 10 },
+  actions: { gap: 10 },
   primary: {
+    width: '100%',
     backgroundColor: palette.kale,
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: wp(4),
   },
   secondary: {
-    minHeight: 48,
+    width: '100%',
+    minHeight: 50,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: palette.primary,
+    backgroundColor: palette.white,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: wp(4),
   },
   danger: {
-    minHeight: 48,
+    width: '100%',
+    minHeight: 50,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.danger,
+    backgroundColor: palette.white,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: wp(4),
   },
 });

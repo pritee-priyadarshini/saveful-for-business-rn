@@ -395,7 +395,10 @@ function ConnectionDetailsModal({
           {location ? <DetailRow label="Location" value={location} /> : null}
           {connection?.schedule ? <DetailRow label="Schedule" value={connection.schedule} /> : null}
           {connection?.typicalSurplus ? (
-            <DetailRow label="Typical surplus" value={connection.typicalSurplus} />
+            <DetailRow label="Typical surplus - guide only" value={connection.typicalSurplus} />
+          ) : null}
+          {connection?.typicalQuantity ? (
+            <DetailRow label="Typical quantity - guide only" value={connection.typicalQuantity} />
           ) : null}
           {connection?.notes ? <DetailRow label="Notes" value={connection.notes} /> : null}
           {connection?.stats ? (

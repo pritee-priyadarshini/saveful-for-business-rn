@@ -751,7 +751,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
               COLLECTION NOTES (OPTIONAL)
             </AppText>
             <AppText variant="caption" color={palette.stone} style={styles.notesHint}>
-              Add anything the collector should know about collection
+              Add anything the collector should know about this pickup.
             </AppText>
             <View style={styles.notesCard}>
               <TextInput
