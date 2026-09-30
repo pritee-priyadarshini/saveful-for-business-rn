@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { Screen } from '../../components/Screen';
 import { AppText } from '../../components/AppText';
+import { ClaimPickupDetails } from '@/components/ClaimPickupDetails';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { palette } from '../../theme/colors';
 import { getUserFriendlyErrorMessage, showErrorAlert, showInfoAlert } from '@/utils/apiError';
@@ -511,7 +512,7 @@ export default function CharityPickupScreen({ navigation }: any) {
             ]}
           >
             <View style={styles.modalTopBar}>
-              <AppText variant="h6">Items</AppText>
+              <AppText variant="h6">Collection details</AppText>
               <Pressable style={styles.closeIconBtn} onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={normalize(20)} color={palette.black} />
               </Pressable>
@@ -522,6 +523,18 @@ export default function CharityPickupScreen({ navigation }: any) {
                 <AppText variant="bodyBold" style={styles.modalSubtitle}>
                   {selectedPickup.restaurantName}
                 </AppText>
+
+                <ClaimPickupDetails
+                  details={{
+                    address: selectedPickup.restaurantAddress,
+                    windowLabel: [selectedPickup.pickupDateLabel, selectedPickup.pickupTimeLabel]
+                      .filter(Boolean)
+                      .join(' · '),
+                    contactName: selectedPickup.contactName,
+                    contactPhone: selectedPickup.restaurantPhone,
+                    notes: selectedPickup.instructions,
+                  }}
+                />
 
                 <View style={styles.modalHeaderRow}>
                   <AppText variant="bodyBold" style={styles.modalColWide}>

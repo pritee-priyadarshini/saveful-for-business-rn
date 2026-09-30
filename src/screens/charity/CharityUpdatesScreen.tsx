@@ -4,6 +4,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   RefreshControl,
   StyleSheet,
   View,
@@ -13,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppText } from '../../components/AppText';
+import { ClaimPickupDetails } from '@/components/ClaimPickupDetails';
 import { RatingSummary } from '@/components/RatingSummary';
 import { Screen } from '../../components/Screen';
 import { HeroHeader } from '../../components/HeroHeader';
@@ -650,7 +652,7 @@ export function CharityUpdatesScreen() {
             ]}
           >
             <View style={styles.modalTopBar}>
-              <AppText variant="h6">Items</AppText>
+              <AppText variant="h6">Collection details</AppText>
               <Pressable
                 style={styles.closeIconBtn}
                 onPress={() => setDetailsModalVisible(false)}
@@ -660,10 +662,24 @@ export function CharityUpdatesScreen() {
             </View>
 
             {selectedDetails ? (
-              <>
+              <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <AppText variant="bodyBold" style={styles.modalSubtitle}>
                   {selectedDetails.title}
                 </AppText>
+
+                <ClaimPickupDetails
+                  details={{
+                    address: selectedDetails.pickupAddress,
+                    windowLabel: selectedDetails.pickupWindow || selectedDetails.timeLabel,
+                    contactName: selectedDetails.contactName,
+                    contactPhone: selectedDetails.contactPhone,
+                    notes: selectedDetails.collectionNotes,
+                  }}
+                />
 
                 <View style={styles.modalHeaderRow}>
                   <AppText variant="bodyBold" style={styles.modalColWide}>
@@ -716,7 +732,7 @@ export function CharityUpdatesScreen() {
                     />
                   </View>
                 ) : null}
-              </>
+              </ScrollView>
             ) : null}
           </View>
         </View>
@@ -1120,6 +1136,14 @@ const styles = StyleSheet.create({
     paddingTop: hp(2),
     paddingBottom: hp(4),
     gap: hp(1.2),
+    maxHeight: '88%',
+  },
+  modalScroll: {
+    maxHeight: hp(62),
+  },
+  modalScrollContent: {
+    gap: hp(1.2),
+    paddingBottom: hp(1),
   },
   modalTopBar: {
     flexDirection: 'row',

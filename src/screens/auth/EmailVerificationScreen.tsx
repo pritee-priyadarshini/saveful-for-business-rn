@@ -34,6 +34,7 @@ import {
   OTP_KEYBOARD_ACCESSORY_ID,
   otpInputKeyboardProps,
 } from '@/components/KeyboardSubmitAccessory';
+import { applyOtpInput, otpPasteFieldProps } from '@/utils/otpInput';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailVerification'>;
 
@@ -150,13 +151,9 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
   };
 
   const handleChange = (text: string, index: number) => {
-    const newOtp = [...otp];
-    newOtp[index] = text;
-    setOtp(newOtp);
-
-    if (text && index < 5) {
-      inputs.current[index + 1]?.focus();
-    }
+    const { next, focusIndex } = applyOtpInput(otp, index, text);
+    setOtp(next);
+    inputs.current[focusIndex]?.focus();
   };
 
   const handleBackspace = (text: string, index: number) => {
@@ -273,7 +270,7 @@ export function EmailVerificationScreen({ navigation, route }: Props) {
                   r.isTablet && { width: 56, height: 64 },
                 ]}
                 {...otpInputKeyboardProps(OTP_KEYBOARD_ACCESSORY_ID)}
-                maxLength={1}
+                {...otpPasteFieldProps}
                 value={digit}
                 onChangeText={(text) => handleChange(text, index)}
                 onSubmitEditing={() => {

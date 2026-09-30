@@ -54,6 +54,13 @@ function humanizeRawMessage(message: string): string {
 
   const lower = trimmed.toLowerCase();
 
+  if (
+    lower.includes('already has a collection') ||
+    lower.includes('choose different days or a different pickup') ||
+    (lower.includes('pickup window') && lower.includes('already'))
+  ) {
+    return 'This pickup window is already in use for this charity. Choose a different window or different days to add a new Connection, or use the Connection you already have.';
+  }
   if (lower.includes('invalid credentials') || lower.includes('wrong password')) {
     return 'Email or password is incorrect. Please try again.';
   }

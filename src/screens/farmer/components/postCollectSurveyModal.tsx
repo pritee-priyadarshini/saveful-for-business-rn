@@ -159,6 +159,11 @@ export function PostCollectSurveyModal({
     navigation.navigate('Home');
   };
 
+  const handleGoImpact = () => {
+    handleClose();
+    navigation.navigate('Impact');
+  };
+
   const presentCollectionSuccess = async (message: string, title: string) => {
     onSubmitted?.();
     const isFirst = await useMilestoneStore.getState().offer('collection');
@@ -572,9 +577,9 @@ export function PostCollectSurveyModal({
                   You helped reduce food waste and supported your community today.
                 </AppText>
 
-                <Pressable style={styles.primaryBtn} onPress={handleGoHome}>
+                <Pressable style={styles.primaryBtn} onPress={handleGoImpact}>
                   <AppText variant="label" style={styles.primaryText}>
-                    Go To Home Screen
+                    Go to Impact Screen
                   </AppText>
                 </Pressable>
               </>

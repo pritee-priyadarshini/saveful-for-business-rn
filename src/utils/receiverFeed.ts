@@ -33,6 +33,11 @@ export type ReceiverUpdateItem = {
   rating?: number | null;
   ratingNote?: string | null;
   partnerRating?: number | null;
+  pickupAddress?: string | null;
+  pickupWindow?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  collectionNotes?: string | null;
   /** Completed driver delivery exists for this claim. */
   canRateDriver?: boolean;
   /** Claimant already rated the driver. */
@@ -61,6 +66,7 @@ export type ReceiverPickup = {
   restaurantAddress: string;
   distance: string;
   restaurantPhone: string;
+  contactName?: string | null;
   driverName: string | null;
   driverPhone: string | null;
   /** "Driver" when a driver pickup exists, otherwise "Collector". */
@@ -301,6 +307,29 @@ function pickupStatusFromClaim(claim: any): ReceiverPickupCardStatus {
   return 'claimed';
 }
 
+function listingPickupContact(listing: any) {
+  const site = listing?.site || {};
+  const org = listing?.organisation || {};
+  const address = [listing?.pickupAddress || site.address, listing?.pickupPostcode || site.postcode]
+    .filter(Boolean)
+    .join(', ');
+  return {
+    pickupAddress: address || listing?.pickupAddress || site.address || '',
+    contactName: site.contactName || org.contactName || '',
+    contactPhone:
+      site.contactMobile ||
+      site.contactPhone ||
+      site.phoneNumber ||
+      org.contactMobile ||
+      '',
+    collectionNotes:
+      listing?.collectionNotes ||
+      listing?.collectionInstructions ||
+      site.collectionInstructions ||
+      '',
+  };
+}
+
 function storageInstructions(listing: any): string {
   const bits: string[] = [];
   if (listing?.needsRefrigeration) bits.push('Needs refrigeration');
@@ -402,6 +431,7 @@ export function mapReceiverUpdates(params: {
     const distance = '';
     const city = cityFromAddress(address, listing?.pickupPostcode || listing?.site?.postcode);
     const timeLabel = formatTimeLabel(listing?.pickupFromTime, listing?.pickupByTime);
+    const pickup = listingPickupContact(listing);
     const collected = isCollectedClaim(claim);
     const rating = parseStarRating(claim?.rating);
     const partnerRating = parseStarRating(claim?.providerRating ?? claim?.provider_rating);
@@ -469,6 +499,11 @@ export function mapReceiverUpdates(params: {
       rating,
       ratingNote,
       partnerRating,
+      pickupAddress: pickup.pickupAddress,
+      pickupWindow: timeLabel,
+      contactName: pickup.contactName,
+      contactPhone: pickup.contactPhone,
+      collectionNotes: pickup.collectionNotes,
     });
   }
 
@@ -546,6 +581,7 @@ export function mapReceiverPickups(params: {
       const phone = activeDriver ? driverPhone(claim) : null;
       const canMarkCollected =
         cardStatus === 'claimed' && !activeDriver;
+      const pickup = listingPickupContact(listing);
 
       return {
         id: String(claim.id),
@@ -553,9 +589,10 @@ export function mapReceiverPickups(params: {
           listing?.organisation?.name ||
           listing?.site?.organisationName ||
           'Business',
-        restaurantAddress: listing?.pickupAddress || listing?.site?.address || 'Address unavailable',
+        restaurantAddress: pickup.pickupAddress || 'Address unavailable',
         distance: '',
-        restaurantPhone: listing?.site?.contactMobile || '',
+        restaurantPhone: pickup.contactPhone,
+        contactName: pickup.contactName,
         driverName: name,
         driverPhone: phone,
         assigneeLabel: driverRoleLabel(claim),

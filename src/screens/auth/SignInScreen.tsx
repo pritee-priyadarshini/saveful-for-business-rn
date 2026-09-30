@@ -56,6 +56,7 @@ import {
   KeyboardSubmitAccessory,
   otpInputKeyboardProps,
 } from '@/components/KeyboardSubmitAccessory';
+import { applyOtpInput, otpPasteFieldProps } from '@/utils/otpInput';
 
 type Mode = 'login' | 'forgot';
 
@@ -178,12 +179,10 @@ function ResetPasswordModalFields({
   onClearError,
 }: ResetPasswordModalFieldsProps) {
   const handleOtpInput = (text: string, index: number) => {
+    const { next } = applyOtpInput(otp, index, text);
     onOtpChange(text, index);
-    const nextDigit = text.replace(/[^0-9]/g, '');
-    const nextOtp = [...otp];
-    nextOtp[index] = nextDigit;
 
-    if (nextOtp.join('').length === 6) {
+    if (next.join('').length === 6) {
       onClearError();
       Keyboard.dismiss();
       setTimeout(() => onStepChange(2), 280);
@@ -242,7 +241,7 @@ function ResetPasswordModalFields({
                     inputs.current[index] = ref;
                   }}
                   style={[styles.otpInput, digit ? styles.otpInputFilled : null]}
-                  maxLength={1}
+                  {...otpPasteFieldProps}
                   {...otpInputKeyboardProps(SIGNIN_OTP_ACCESSORY_ID)}
                   value={digit}
                   onChangeText={(t) => handleOtpInput(t, index)}
@@ -721,14 +720,10 @@ export function SignInScreen() {
   };
 
   const handleOtpChange = (text: string, index: number) => {
-    const next = [...otp];
-    next[index] = text.replace(/[^0-9]/g, '');
+    const { next, focusIndex } = applyOtpInput(otp, index, text);
     setOtp(next);
     setResetError('');
-
-    if (text && index < 5) {
-      inputs.current[index + 1]?.focus();
-    }
+    inputs.current[focusIndex]?.focus();
   };
 
   const handleOtpBackspace = (digit: string, index: number) => {

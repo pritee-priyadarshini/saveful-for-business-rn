@@ -4,22 +4,22 @@ import {
     StyleSheet,
     TextInput,
     View,
-    KeyboardAvoidingView,
     Keyboard,
     Platform,
     ScrollView,
+    Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { InputField } from '../../components/InputField';
 import { Screen } from '../../components/Screen';
-import { HeroHeader } from '../../components/HeroHeader';
+import { StackHeroHeader } from '../../components/StackHeroHeader';
 import { palette } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { authService } from '@/services/auth.service';
 import { RootStackParamList } from '@/navigation/AppNavigator';
@@ -42,6 +42,7 @@ import {
     KeyboardSubmitAccessory,
     otpInputKeyboardProps,
 } from '@/components/KeyboardSubmitAccessory';
+import { applyOtpInput, otpPasteFieldProps } from '@/utils/otpInput';
 
 export default function ForgotPasswordScreen() {
     useTransparentStatusBar('light');
@@ -61,8 +62,53 @@ export default function ForgotPasswordScreen() {
     const [confirmPassword, setConfirmPassword] = useState('');
 
     const inputs = useRef<(TextInput | null)[]>([]);
+    const scrollRef = useRef<ScrollView>(null);
+    const otpRef = useRef<View>(null);
+    const scrollY = useRef(0);
+    const insets = useSafeAreaInsets();
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
     const trimmedEmail = email.trim().toLowerCase();
+
+    useEffect(() => {
+        const show = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (event) => setKeyboardHeight(event.endCoordinates.height),
+        );
+        const hide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => setKeyboardHeight(0),
+        );
+        return () => {
+            show.remove();
+            hide.remove();
+        };
+    }, []);
+
+    const scrollNodeIntoView = (node?: View | null) => {
+        setTimeout(() => {
+            node?.measureInWindow((_x, y, _w, height) => {
+                const accessory = codeSent && Platform.OS === 'android' ? 56 : 0;
+                const visibleBottom =
+                    Dimensions.get('window').height -
+                    Math.max(keyboardHeight, 280) -
+                    accessory -
+                    24;
+                const overflow = y + height - visibleBottom;
+                if (overflow <= 8) return;
+                scrollRef.current?.scrollTo({
+                    y: Math.max(0, scrollY.current + overflow),
+                    animated: true,
+                });
+            });
+        }, 80);
+    };
+
+    useEffect(() => {
+        if (!codeSent) return;
+        const timer = setTimeout(() => scrollNodeIntoView(otpRef.current), 220);
+        return () => clearTimeout(timer);
+    }, [codeSent]);
 
     useEffect(() => {
         if (authUser?.profile?.user) {
@@ -72,14 +118,10 @@ export default function ForgotPasswordScreen() {
     }, [authUser]);
 
     const handleChange = (text: string, index: number) => {
-        const next = [...otp];
-        next[index] = text.replace(/[^0-9]/g, '');
+        const { next, focusIndex } = applyOtpInput(otp, index, text);
         setOtp(next);
         setFormError('');
-
-        if (text && index < 5) {
-            inputs.current[index + 1]?.focus();
-        }
+        inputs.current[focusIndex]?.focus();
     };
 
     const handleBackspace = (text: string, index: number) => {
@@ -219,30 +261,38 @@ export default function ForgotPasswordScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-            <Screen scrollable={false} backgroundColor={palette.creme} transparentTop>
+        <>
+            <Screen
+                scrollable
+                keyboardAware
+                backgroundColor={palette.creme}
+                transparentTop
+                scrollRef={scrollRef}
+                onScroll={(event) => {
+                    scrollY.current = event.nativeEvent.contentOffset.y;
+                }}
+                contentStyle={[
+                    styles.screen,
+                    {
+                        paddingBottom:
+                            insets.bottom +
+                            hp(4) +
+                            (Platform.OS === 'android' ? keyboardHeight : 0),
+                    },
+                ]}
+            >
                 <StatusBar style="light" translucent backgroundColor="transparent" />
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <HeroHeader
+                <StackHeroHeader
+                    title="Reset Password"
                     source={require('../../../assets/placeholder/feed-bg.png')}
-                    height={hp(20)}
-                    padContentRight={false}
-                    contentStyle={styles.headerContent}
-                >
-                    <Pressable
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                    >
-                        <Ionicons name="arrow-back" size={26} color={palette.white} />
-                    </Pressable>
-
-                    <AppText variant="h5" color={palette.white}>
-                        Reset Password
-                    </AppText>
-                </HeroHeader>
+                    height={hp(16)}
+                    showBack
+                    onBack={() => {
+                        if (navigation.canGoBack()) {
+                            navigation.goBack();
+                        }
+                    }}
+                />
 
                 <View style={styles.content}>
                     <AppText variant="heading" style={styles.title}>
@@ -269,6 +319,7 @@ export default function ForgotPasswordScreen() {
                         editable={!authUser}
                         keyboardType="email-address"
                         autoCapitalize="none"
+                        onFieldFocus={scrollNodeIntoView}
                     />
 
                     <Button
@@ -290,7 +341,7 @@ export default function ForgotPasswordScreen() {
                                 Verification code
                             </AppText>
 
-                            <View style={styles.otpContainer}>
+                            <View ref={otpRef} style={styles.otpContainer}>
                                 {otp.map((digit, index) => (
                                     <TextInput
                                         key={index}
@@ -299,9 +350,10 @@ export default function ForgotPasswordScreen() {
                                         }}
                                         style={styles.otpInput}
                                         {...otpInputKeyboardProps('saveful-forgot-otp-submit')}
-                                        maxLength={1}
+                                        {...otpPasteFieldProps}
                                         value={digit}
                                         onChangeText={(t) => handleChange(t, index)}
+                                        onFocus={() => scrollNodeIntoView(otpRef.current)}
                                         onSubmitEditing={() => Keyboard.dismiss()}
                                         onKeyPress={({ nativeEvent }) => {
                                             if (nativeEvent.key === 'Backspace') {
@@ -331,6 +383,7 @@ export default function ForgotPasswordScreen() {
                                 }}
                                 secureTextEntry
                                 isPassword
+                                onFieldFocus={scrollNodeIntoView}
                             />
 
                             <InputField
@@ -342,6 +395,7 @@ export default function ForgotPasswordScreen() {
                                 }}
                                 secureTextEntry
                                 isPassword
+                                onFieldFocus={scrollNodeIntoView}
                             />
 
                             <Button
@@ -359,7 +413,6 @@ export default function ForgotPasswordScreen() {
                         </AppText>
                     ) : null}
                 </View>
-                </ScrollView>
             </Screen>
             {codeSent ? (
                 <KeyboardSubmitAccessory
@@ -368,20 +421,13 @@ export default function ForgotPasswordScreen() {
                     onSubmit={() => Keyboard.dismiss()}
                 />
             ) : null}
-        </KeyboardAvoidingView>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
-    headerContent: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    backButton: {
-        position: 'absolute',
-        left: 15,
-        top: hp(1.5),
+    screen: {
+        flexGrow: 1,
     },
 
     content: {

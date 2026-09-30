@@ -10,7 +10,7 @@ import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { WhiteSelect } from '@/components/WhiteSelect';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { connectionsService, type NearbyCharity } from '@/services/connections.service';
+import { connectionsService, type Connection, type NearbyCharity } from '@/services/connections.service';
 import { useAppContext } from '@/store/AppContext';
 import { useSitesStore } from '@/store/sitesStore';
 import { palette } from '@/theme/colors';
@@ -21,12 +21,23 @@ import {
   CONNECTION_PROMPT_LEAD_MINUTES,
   ISO_WEEKDAYS,
   deviceTimezone,
+  findOverlappingConnections,
   formatHhMm,
+  formatScheduleSummary,
+  isConnectionOverlapError,
+  resolveConnectionWindow,
+  statusLabel,
 } from '@/utils/connections';
 import { getSitePickupCoords } from '@/utils/listingLocation';
 import { resolveListingSiteId } from '@/utils/listingSite';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
+
+function sameCharityLabel(orgName?: string | null, siteName?: string | null): boolean {
+  const org = String(orgName || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const site = String(siteName || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return Boolean(org && site && org === site);
+}
 
 export function CreateConnectionScreen({ route }: any) {
   useTransparentStatusBar('light');
@@ -41,6 +52,7 @@ export function CreateConnectionScreen({ route }: any) {
     Number.isFinite(Number(route?.params?.siteId)) ? Number(route.params.siteId) : null,
   );
   const [charities, setCharities] = useState<NearbyCharity[]>([]);
+  const [liveConnections, setLiveConnections] = useState<Connection[]>([]);
   const [loadingCharities, setLoadingCharities] = useState(true);
   const [selected, setSelected] = useState<NearbyCharity | null>(null);
   const [days, setDays] = useState<number[]>([]);
@@ -62,6 +74,12 @@ export function CreateConnectionScreen({ route }: any) {
   const scrollY = useRef(0);
   const insets = useSafeAreaInsets();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const footerBottomPad =
+    (insets.bottom > 8
+      ? insets.bottom
+      : Platform.OS === 'android'
+        ? 48
+        : 12) + hp(1.5);
 
   const region =
     organisation?.region ||
@@ -93,36 +111,12 @@ export function CreateConnectionScreen({ route }: any) {
           }),
           connectionsService.listForSite(resolved).catch(() => []),
         ]);
-        const live = existing.filter((connection) =>
-          ['PENDING', 'ACTIVE', 'PAUSED'].includes(String(connection.status || '').toUpperCase()),
-        );
-        const connectedSiteIds = new Set(
-          live
-            .map((connection) => Number(connection.receiverSite?.id))
-            .filter((id) => Number.isFinite(id) && id > 0),
-        );
-        const connectedOrgIds = new Set(
-          live
-            .map((connection) => Number(connection.receiverOrg?.id))
-            .filter((id) => Number.isFinite(id) && id > 0),
-        );
         if (!cancelled) {
-          setCharities(
-            rows.filter((row) => {
-              const site = Number(row.siteId);
-              const org = Number(row.orgId);
-              if (!(site > 0)) return false;
-              if (connectedSiteIds.has(site)) return false;
-              if (org > 0 && connectedOrgIds.has(org)) return false;
-              return true;
-            }),
+          const live = existing.filter((connection) =>
+            ['PENDING', 'ACTIVE', 'PAUSED'].includes(String(connection.status || '').toUpperCase()),
           );
-          setSelected((current) => {
-            if (!current) return current;
-            if (connectedSiteIds.has(Number(current.siteId))) return null;
-            if (connectedOrgIds.has(Number(current.orgId))) return null;
-            return current;
-          });
+          setLiveConnections(live);
+          setCharities(rows.filter((row) => Number(row.siteId) > 0));
         }
       } catch (error) {
         showErrorAlert(error, 'Could not load nearby charities');
@@ -205,7 +199,16 @@ export function CreateConnectionScreen({ route }: any) {
         return;
       }
       if (formatHhMm(windowStart) === formatHhMm(windowEnd)) {
-        showErrorAlert('The pickup window cannot be zero minutes long.');
+        return;
+      }
+      if (
+        findOverlappingConnections(liveConnections, {
+          receiverSiteId: Number(selected.siteId),
+          daysOfWeek: days,
+          windowStart: formatHhMm(windowStart),
+          windowEnd: formatHhMm(windowEnd),
+        }).length
+      ) {
         return;
       }
       try {
@@ -230,23 +233,74 @@ export function CreateConnectionScreen({ route }: any) {
         showSuccessAlert(`Invitation sent.${extra}`, 'Connection');
         navigation.goBack();
       } catch (error) {
+        if (isConnectionOverlapError(error)) {
+          return;
+        }
         showErrorAlert(error, 'Could not send invitation');
       }
     });
 
+  const connectedSiteIds = useMemo(
+    () =>
+      new Set(
+        liveConnections
+          .map((connection) => Number(connection.receiverSite?.id))
+          .filter((id) => Number.isFinite(id) && id > 0),
+      ),
+    [liveConnections],
+  );
+
+  const existingForCharity = useMemo(() => {
+    if (!selected?.siteId) return [];
+    return liveConnections.filter(
+      (connection) => Number(connection.receiverSite?.id) === Number(selected.siteId),
+    );
+  }, [liveConnections, selected]);
+
+  const overlappingNow = useMemo(() => {
+    if (!selected?.siteId || !days.length || !windowStart || !windowEnd) return [];
+    return findOverlappingConnections(liveConnections, {
+      receiverSiteId: Number(selected.siteId),
+      daysOfWeek: days,
+      windowStart: formatHhMm(windowStart),
+      windowEnd: formatHhMm(windowEnd),
+    });
+  }, [days, liveConnections, selected, windowEnd, windowStart]);
+
+  const canSendInvitation = Boolean(
+    siteId &&
+      selected?.siteId &&
+      days.length &&
+      windowStart &&
+      windowEnd &&
+      formatHhMm(windowStart) !== formatHhMm(windowEnd) &&
+      !overlappingNow.length &&
+      !submitting,
+  );
+
   const charityOptions = useMemo(
     () =>
-      charities.map((charity) => ({
-        value: Number(charity.siteId),
-        label: charity.orgName,
-        subtitle: [
-          charity.siteName || charity.address || 'Charity site',
-          charity.distanceKm != null ? `${charity.distanceKm.toFixed(1)} km` : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-      })),
-    [charities],
+      charities.map((charity) => {
+        const alreadyConnected = connectedSiteIds.has(Number(charity.siteId));
+        const sameName = sameCharityLabel(charity.orgName, charity.siteName);
+        const extraPlace = sameName
+          ? charity.address && !sameCharityLabel(charity.orgName, charity.address)
+            ? charity.address
+            : null
+          : charity.siteName || charity.address || null;
+        return {
+          value: Number(charity.siteId),
+          label: charity.orgName,
+          badge: alreadyConnected ? 'Connected' : undefined,
+          subtitle: [
+            extraPlace,
+            charity.distanceKm != null ? `${charity.distanceKm.toFixed(1)} km` : null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        };
+      }),
+    [charities, connectedSiteIds],
   );
 
   const zoneOptions = useMemo(() => {
@@ -284,8 +338,12 @@ export function CreateConnectionScreen({ route }: any) {
   const scrollFieldIntoView = (target: React.RefObject<View | null>) => {
     setTimeout(() => {
       target.current?.measureInWindow((_x, y, _w, height) => {
+        const footerReserve = 66 + footerBottomPad;
         const visibleBottom =
-          Dimensions.get('window').height - Math.max(keyboardHeight, 280) - 24;
+          Dimensions.get('window').height -
+          Math.max(keyboardHeight, 280) -
+          footerReserve -
+          24;
         const overflow = y + height - visibleBottom;
         if (overflow <= 8) return;
         scrollRef.current?.scrollTo({
@@ -303,13 +361,20 @@ export function CreateConnectionScreen({ route }: any) {
   }, [openSelect, insets.bottom]);
 
   return (
+    <View style={styles.page}>
     <Screen
       scrollable
       keyboardAware
       backgroundColor={palette.creme}
       contentStyle={[
         styles.screen,
-        { paddingBottom: insets.bottom + hp(4) + (Platform.OS === 'android' ? keyboardHeight : 0) },
+        {
+          paddingBottom:
+            hp(2) +
+            66 +
+            footerBottomPad +
+            (Platform.OS === 'android' ? keyboardHeight : 0),
+        },
       ]}
       transparentTop
       scrollRef={scrollRef}
@@ -344,6 +409,10 @@ export function CreateConnectionScreen({ route }: any) {
             setSelected(charities.find((row) => Number(row.siteId) === siteIdValue) ?? null);
           }}
         />
+        <AppText variant="caption" color={palette.stone} style={styles.fieldHint}>
+          Charities you already collect with stay on this list. You can add another Connection
+          with different days or a different pickup window.
+        </AppText>
 
         <AppText variant="label">Collection days</AppText>
         <View style={styles.days}>
@@ -378,6 +447,50 @@ export function CreateConnectionScreen({ route }: any) {
             </AppText>
           </Pressable>
         </View>
+
+        {existingForCharity.length ? (
+          <View style={[styles.existingCard, overlappingNow.length ? styles.existingCardWarn : null]}>
+            <AppText variant="bodyBold" color={palette.primary} style={styles.existingTitle}>
+              {overlappingNow.length
+                ? 'This pickup window already exists'
+                : 'You already have a Connection with this charity'}
+            </AppText>
+            {existingForCharity.map((connection) => {
+              const window = resolveConnectionWindow(connection);
+              const schedule = formatScheduleSummary(
+                connection.daysOfWeek,
+                window?.start,
+                window?.end,
+              );
+              const clashes = overlappingNow.some((row) => row.id === connection.id);
+              return (
+                <Pressable
+                  key={connection.id}
+                  onPress={() =>
+                    navigation.navigate('ConnectionDetail', {
+                      connectionId: connection.id,
+                      siteId: siteId ?? undefined,
+                    })
+                  }
+                  style={[styles.existingRow, clashes && styles.existingRowWarn]}
+                >
+                  <AppText variant="body1" color={palette.black}>
+                    {schedule || connection.schedule || 'Open to view schedule'}
+                  </AppText>
+                  <AppText variant="caption" color={palette.stone} style={styles.existingStatus}>
+                    {statusLabel(connection.status)}
+                    {clashes ? ' · overlaps the times you just chose' : ''}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+            <AppText variant="caption" color={palette.stone} style={styles.existingHint}>
+              {overlappingNow.length
+                ? 'Choose a new pickup window or different days to add another Connection, or open the existing one above.'
+                : 'You can add another Connection if the days or pickup window are different.'}
+            </AppText>
+          </View>
+        ) : null}
 
         <AppText variant="label">Typical surplus - guide only</AppText>
         <AppText variant="caption" color={palette.stone} style={styles.fieldHint}>
@@ -438,17 +551,20 @@ export function CreateConnectionScreen({ route }: any) {
             onChange={setTimezone}
           />
         </View>
-
-        <Pressable
-          style={[styles.submit, submitting && { opacity: 0.6 }]}
-          onPress={submit}
-          disabled={submitting}
-        >
-          <AppText variant="bodyBold" color={palette.white}>
-            {submitting ? 'Sending…' : 'Send invitation'}
-          </AppText>
-        </Pressable>
       </View>
+    </Screen>
+
+    <View style={[styles.footer, { paddingBottom: footerBottomPad }]}>
+      <Pressable
+        style={[styles.submit, !canSendInvitation && styles.submitDisabled]}
+        onPress={submit}
+        disabled={!canSendInvitation}
+      >
+        <AppText variant="bodyBold" color={canSendInvitation ? palette.white : palette.stone}>
+          {submitting ? 'Sending…' : 'Send invitation'}
+        </AppText>
+      </Pressable>
+    </View>
 
       {Platform.OS === 'ios' ? (
         <Modal visible={pickerVisible} transparent animationType="slide" onRequestClose={closeIOSPicker}>
@@ -481,12 +597,23 @@ export function CreateConnectionScreen({ route }: any) {
           onChange={onNativePickerChange}
         />
       ) : null}
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flexGrow: 1, paddingBottom: hp(4) },
+  page: {
+    flex: 1,
+    backgroundColor: palette.creme,
+  },
+  screen: { flexGrow: 1 },
+  footer: {
+    backgroundColor: palette.creme,
+    paddingHorizontal: wp(5),
+    paddingTop: hp(1.2),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#D9DED2',
+  },
   body: {
     paddingHorizontal: wp(5),
     paddingTop: hp(2),
@@ -547,6 +674,40 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(1),
+  },
+  submitDisabled: {
+    backgroundColor: '#D9DED2',
+  },
+  existingCard: {
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: '#D9DED2',
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+  },
+  existingCardWarn: {
+    borderColor: palette.orange,
+    backgroundColor: '#FFF8F0',
+  },
+  existingTitle: {
+    textTransform: 'none',
+  },
+  existingRow: {
+    paddingVertical: 4,
+    gap: 2,
+  },
+  existingRowWarn: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#FFF1E4',
+  },
+  existingStatus: {
+    textTransform: 'none',
+  },
+  existingHint: {
+    lineHeight: normalize(18),
+    textTransform: 'none',
   },
 });

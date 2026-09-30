@@ -16,6 +16,7 @@ export type WhiteSelectOption<T extends string | number> = {
   value: T;
   label: string;
   subtitle?: string;
+  badge?: string;
 };
 
 type Props<T extends string | number> = {
@@ -57,13 +58,23 @@ export function WhiteSelect<T extends string | number>({
         onPress={() => !loading && setOpen(!open)}
       >
         <View style={styles.fieldCopy}>
-          <AppText
-            variant="bodySmall"
-            color={selected ? palette.black : palette.stone}
-            numberOfLines={1}
-          >
-            {selected?.label || placeholder}
-          </AppText>
+          <View style={styles.titleRow}>
+            <AppText
+              variant="bodySmall"
+              color={selected ? palette.black : palette.stone}
+              numberOfLines={1}
+              style={styles.titleText}
+            >
+              {selected?.label || placeholder}
+            </AppText>
+            {selected?.badge ? (
+              <View style={styles.badge}>
+                <AppText variant="caption" color={palette.kale} style={styles.badgeText}>
+                  {selected.badge}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
           {selected?.subtitle ? (
             <AppText variant="caption" color={palette.stone} numberOfLines={1}>
               {selected.subtitle}
@@ -105,9 +116,18 @@ export function WhiteSelect<T extends string | number>({
                     }}
                   >
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <AppText variant="bodySmall" numberOfLines={1}>
-                        {option.label}
-                      </AppText>
+                      <View style={styles.titleRow}>
+                        <AppText variant="bodySmall" numberOfLines={1} style={styles.titleText}>
+                          {option.label}
+                        </AppText>
+                        {option.badge ? (
+                          <View style={styles.badge}>
+                            <AppText variant="caption" color={palette.kale} style={styles.badgeText}>
+                              {option.badge}
+                            </AppText>
+                          </View>
+                        ) : null}
+                      </View>
                       {option.subtitle ? (
                         <AppText variant="caption" color={palette.stone} numberOfLines={1}>
                           {option.subtitle}
@@ -151,6 +171,24 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: 2,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titleText: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  badge: {
+    backgroundColor: '#E8F0E4',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    textTransform: 'none',
   },
   menu: {
     marginTop: 6,

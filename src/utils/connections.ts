@@ -264,3 +264,193 @@ export function isCutoffDue(cutoffAt?: string | null, outcome?: string | null): 
   const at = new Date(cutoffAt).getTime();
   return Number.isFinite(at) && Date.now() >= at;
 }
+
+function minutesFromClock(value: string): number {
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(value || '').trim());
+  if (!match) return NaN;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+export function normalizeHhMm(value?: string | null): string {
+  const match = /^(\d{1,2}):([0-5]\d)$/.exec(String(value || '').trim());
+  if (!match) return String(value || '').trim();
+  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
+}
+
+/** Shared weekday plus overlapping clock — touching at the boundary is allowed. */
+export function pickupWindowsOverlap(
+  startA: string,
+  endA: string,
+  startB: string,
+  endB: string,
+): boolean {
+  const a0 = minutesFromClock(normalizeHhMm(startA));
+  const a1 = minutesFromClock(normalizeHhMm(endA));
+  const b0 = minutesFromClock(normalizeHhMm(startB));
+  const b1 = minutesFromClock(normalizeHhMm(endB));
+  if (![a0, a1, b0, b1].every(Number.isFinite) || a1 <= a0 || b1 <= b0) return false;
+  return a0 < b1 && b0 < a1;
+}
+
+export function sharedWeekdays(a?: number[] | null, b?: number[] | null): number[] {
+  if (!Array.isArray(a) || !Array.isArray(b)) return [];
+  const set = new Set(a);
+  return b.filter((day) => set.has(day)).sort((left, right) => left - right);
+}
+
+export function formatWeekdaysLabel(days?: number[] | null): string {
+  const names = (days || [])
+    .slice()
+    .sort((left, right) => left - right)
+    .map((id) => ISO_WEEKDAYS.find((day) => day.id === id)?.full)
+    .filter(Boolean) as string[];
+  if (!names.length) return '';
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+export function formatClock12(hhmm?: string | null): string {
+  if (!hhmm) return '';
+  return parseHhMm(normalizeHhMm(hhmm)).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+export function formatScheduleSummary(
+  days?: number[] | null,
+  start?: string | null,
+  end?: string | null,
+): string {
+  const daysLabel = formatWeekdaysLabel(days);
+  const window = start && end ? `${formatClock12(start)} – ${formatClock12(end)}` : '';
+  return [daysLabel, window].filter(Boolean).join(' · ');
+}
+
+export function resolveConnectionWindow(row: {
+  windowStart?: string | null;
+  windowEnd?: string | null;
+  schedule?: string | null;
+}): { start: string; end: string } | null {
+  const start = normalizeHhMm(row.windowStart);
+  const end = normalizeHhMm(row.windowEnd);
+  if (/^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
+    return { start, end };
+  }
+  if (!row.schedule) return null;
+  const parsed = parseWindowFromSchedule(row.schedule);
+  return { start: formatHhMm(parsed.start), end: formatHhMm(parsed.end) };
+}
+
+export type OverlapConnection = {
+  id: number;
+  charityName: string;
+  daysOfWeek: number[];
+  windowStart: string;
+  windowEnd: string;
+  status?: string;
+  sharedDays: number[];
+};
+
+export function findOverlappingConnections<
+  T extends {
+    id: number;
+    status?: string | null;
+    daysOfWeek?: number[];
+    windowStart?: string | null;
+    windowEnd?: string | null;
+    schedule?: string | null;
+    receiverSite?: { id?: number; name?: string | null; organisationName?: string | null } | null;
+    receiverOrg?: { name?: string | null } | null;
+  },
+>(
+  rows: T[],
+  input: {
+    receiverSiteId: number;
+    daysOfWeek: number[];
+    windowStart: string;
+    windowEnd: string;
+    exceptId?: number;
+  },
+): OverlapConnection[] {
+  const live = new Set(['PENDING', 'ACTIVE', 'PAUSED']);
+  return rows.flatMap((row) => {
+    if (input.exceptId && row.id === input.exceptId) return [];
+    if (!live.has(String(row.status || '').toUpperCase())) return [];
+    if (Number(row.receiverSite?.id) !== Number(input.receiverSiteId)) return [];
+    const window = resolveConnectionWindow(row);
+    if (!window) return [];
+    const shared = sharedWeekdays(row.daysOfWeek, input.daysOfWeek);
+    if (!shared.length) return [];
+    if (!pickupWindowsOverlap(input.windowStart, input.windowEnd, window.start, window.end)) {
+      return [];
+    }
+    return [
+      {
+        id: row.id,
+        charityName:
+          row.receiverOrg?.name ||
+          row.receiverSite?.organisationName ||
+          row.receiverSite?.name ||
+          'this charity',
+        daysOfWeek: Array.isArray(row.daysOfWeek) ? row.daysOfWeek : [],
+        windowStart: window.start,
+        windowEnd: window.end,
+        status: row.status || undefined,
+        sharedDays: shared,
+      },
+    ];
+  });
+}
+
+export function buildOverlapInviteMessage(
+  overlaps: OverlapConnection[],
+  charityName?: string | null,
+): { title: string; message: string } {
+  const charity = charityName || overlaps[0]?.charityName || 'this charity';
+  const shared = [...new Set(overlaps.flatMap((row) => row.sharedDays))].sort((a, b) => a - b);
+  const daysPhrase = formatWeekdaysLabel(shared) || 'these days';
+
+  const existing = overlaps
+    .map((row) => {
+      const schedule = formatScheduleSummary(row.daysOfWeek, row.windowStart, row.windowEnd);
+      const status = statusLabel(row.status);
+      return `• ${row.charityName}\n  ${schedule}${status ? `\n  ${status}` : ''}`;
+    })
+    .join('\n\n');
+
+  return {
+    title: 'This pickup window is already in use',
+    message: [
+      `You already have a Connection with ${charity} on ${daysPhrase} during this pickup window.`,
+      '',
+      overlaps.length > 1 ? 'Existing Connections' : 'Existing Connection',
+      existing,
+      '',
+      'To add a new Connection, choose a different pickup window or different days.',
+      '',
+      'To keep this schedule, use the Connection you already have — no need to send another invitation.',
+    ]
+      .filter((line) => line !== undefined)
+      .join('\n'),
+  };
+}
+
+export function isConnectionOverlapError(error: unknown): boolean {
+  const text = String(
+    (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message ||
+      (error as Error)?.message ||
+      error ||
+      '',
+  ).toLowerCase();
+  return (
+    text.includes('already has a collection') ||
+    text.includes('already has a connection') ||
+    text.includes('overlapping') ||
+    text.includes('choose different days') ||
+    text.includes('connection_exists') ||
+    text.includes('pickup window') && text.includes('already')
+  );
+}
