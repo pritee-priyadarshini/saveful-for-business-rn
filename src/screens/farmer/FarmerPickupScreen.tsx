@@ -527,6 +527,8 @@ export default function FarmerPickupScreen({ navigation }: any) {
                 <ClaimPickupDetails
                   details={{
                     address: selectedPickup.restaurantAddress,
+                    latitude: selectedPickup.pickupLat,
+                    longitude: selectedPickup.pickupLng,
                     windowLabel: [selectedPickup.pickupDateLabel, selectedPickup.pickupTimeLabel]
                       .filter(Boolean)
                       .join(' · '),

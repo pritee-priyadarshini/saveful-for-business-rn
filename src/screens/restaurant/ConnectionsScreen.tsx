@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   StatusBar as RNStatusBar,
   StyleSheet,
   View,
@@ -23,10 +24,11 @@ import { useSitesStore } from '@/store/sitesStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert } from '@/utils/apiError';
 import {
+  canListPreferredSurplus,
   connectionLocationLabel,
   connectionPartyName,
+  isCollectionDueToday,
   isCutoffDue,
-  outcomeAwaitingCharity,
   outcomeNeedsSurplus,
   statusLabel,
 } from '@/utils/connections';
@@ -59,6 +61,7 @@ export function ConnectionsScreen({ route }: any) {
   );
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [details, setDetails] = useState<Connection | null>(null);
 
   const resolveSite = useCallback(async () => {
@@ -91,6 +94,15 @@ export function ConnectionsScreen({ route }: any) {
     }, [load]),
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
+
   const selectSite = (id: number) => {
     if (id === siteId) return;
     setSiteId(id);
@@ -106,14 +118,7 @@ export function ConnectionsScreen({ route }: any) {
   const past = connections.filter((c) => !live.includes(c));
   const activeCount = connections.filter((c) => c.status === 'ACTIVE').length;
   const pendingCount = connections.filter((c) => c.status === 'PENDING').length;
-  const dueToday = live.filter((c) => {
-    const today = c.today;
-    return (
-      outcomeNeedsSurplus(today?.outcome) ||
-      outcomeAwaitingCharity(today?.outcome) ||
-      isCutoffDue(today?.cutoffAt, today?.outcome)
-    );
-  });
+  const dueToday = live.filter((c) => isCollectionDueToday(c));
 
   const statsLabel = loading
     ? 'Loading connections'
@@ -133,6 +138,14 @@ export function ConnectionsScreen({ route }: any) {
       backgroundColor={palette.creme}
       contentStyle={styles.screen}
       transparentTop
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[palette.primary]}
+          tintColor={palette.primary}
+        />
+      }
     >
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <HeroHeader
@@ -193,25 +206,58 @@ export function ConnectionsScreen({ route }: any) {
           <View style={styles.todayBox}>
             <AppText variant="label">Due today</AppText>
             {dueToday.map((connection) => {
-              const needsSurplus = outcomeNeedsSurplus(connection.today?.outcome);
+              const needsSurplus = outcomeNeedsSurplus(connection.today?.outcome ?? 'PROMPTED');
+              const listingId = Number(connection.today?.listingId);
+              const hasListing = Number.isFinite(listingId) && listingId > 0;
+              const overdue = isCutoffDue(connection.today?.cutoffAt, connection.today?.outcome);
+              const charityName = connectionPartyName(
+                connection.receiverSite,
+                connection.receiverOrg?.name || 'Charity',
+              );
+              const canList = canListPreferredSurplus({
+                dayId: connection.today?.id,
+                outcome: connection.today?.outcome,
+                windowStartAt: connection.today?.windowStartAt,
+                windowEndAt: connection.today?.windowEndAt,
+              });
+              const openDue = () => {
+                if (!needsSurplus && hasListing) {
+                  navigation.navigate('ReservedListing', { listingId, charityName });
+                  return;
+                }
+                if (needsSurplus && canList) {
+                  navigation.navigate('AddDailySurplus', {
+                    dayId: connection.today?.id,
+                    connectionId: connection.id,
+                    charityName,
+                    schedule: connection.schedule,
+                    windowStartAt: connection.today?.windowStartAt,
+                    windowEndAt: connection.today?.windowEndAt,
+                  });
+                  return;
+                }
+                navigation.navigate('ConnectionDetail', { connectionId: connection.id, siteId });
+              };
               return (
                 <Pressable
                   key={connection.id}
                   style={styles.todayRow}
-                  onPress={() =>
-                    navigation.navigate('ConnectionDetail', { connectionId: connection.id, siteId })
-                  }
+                  onPress={openDue}
                 >
                   <View style={{ flex: 1 }}>
                     <AppText variant="bodyBold">
                       {connectionPartyName(connection.receiverSite, connection.receiverOrg?.name || 'Charity')}
                     </AppText>
                     <AppText variant="caption" color={palette.stone}>
-                      {needsSurplus ? 'List reserved surplus' : 'Awaiting collection'}
+                      {needsSurplus
+                        ? 'List reserved surplus'
+                        : overdue
+                          ? 'They haven’t confirmed'
+                          : 'Listed for them'}
                     </AppText>
                   </View>
                   <AppText variant="caption" color={palette.kale}>
-                    {needsSurplus ? 'List' : 'Open'}
+                    {needsSurplus ? 'List' : 'View'}
                   </AppText>
                 </Pressable>
               );
@@ -302,12 +348,9 @@ function RestaurantConnectionCard({
   onMoreDetails: (connection: Connection) => void;
 }) {
   const charity = connectionPartyName(connection.receiverSite, connection.receiverOrg?.name || 'Charity');
-  const today = connection.today;
-  const due =
-    outcomeNeedsSurplus(today?.outcome) ||
-    outcomeAwaitingCharity(today?.outcome) ||
-    isCutoffDue(today?.cutoffAt, today?.outcome);
+  const due = isCollectionDueToday(connection);
   const pending = connection.status === 'PENDING';
+  const ended = connection.status === 'ENDED';
 
   return (
     <View style={styles.card}>
@@ -321,10 +364,20 @@ function RestaurantConnectionCard({
               {connection.schedule || 'Days and pickup window not set yet'}
             </AppText>
           </View>
-          <View style={[styles.statusBadge, pending && styles.statusBadgePending]}>
+          <View
+            style={[
+              styles.statusBadge,
+              pending && styles.statusBadgePending,
+              ended && styles.statusBadgeEnded,
+            ]}
+          >
             <AppText
               variant="caption"
-              style={[styles.statusBadgeText, pending && styles.statusBadgePendingText]}
+              style={[
+                styles.statusBadgeText,
+                pending && styles.statusBadgePendingText,
+                ended && styles.statusBadgeEndedText,
+              ]}
             >
               {statusLabel(connection.status)}
             </AppText>
@@ -550,6 +603,12 @@ const styles = StyleSheet.create({
   },
   statusBadgePendingText: {
     color: palette.orange,
+  },
+  statusBadgeEnded: {
+    backgroundColor: '#FDECEC',
+  },
+  statusBadgeEndedText: {
+    color: palette.danger,
   },
   modalOverlay: {
     flex: 1,

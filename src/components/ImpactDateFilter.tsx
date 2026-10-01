@@ -61,6 +61,15 @@ function parseApiDate(isoDate?: string): Date {
 
 const PRESET_DAYS = [7, 30, 90] as const;
 
+type PeriodChoice = 'all_time' | (typeof PRESET_DAYS)[number];
+
+const PERIOD_OPTIONS: { value: PeriodChoice; label: string }[] = [
+  { value: 'all_time', label: 'All time' },
+  { value: 7, label: 'Last 7 days' },
+  { value: 30, label: 'Last 30 days' },
+  { value: 90, label: 'Last 90 days' },
+];
+
 /** Inclusive of today, so "7 days" covers today plus the six before it. */
 function presetRange(days: number) {
   const end = new Date();
@@ -75,13 +84,35 @@ function isPresetActive(filter: ImpactFilter, days: number) {
   return filter.startDate === range.startDate && filter.endDate === range.endDate;
 }
 
+function activePeriod(filter: ImpactFilter): PeriodChoice | 'custom' {
+  if (filter.mode === 'all_time') return 'all_time';
+  for (const days of PRESET_DAYS) {
+    if (isPresetActive(filter, days)) return days;
+  }
+  return 'custom';
+}
+
 export function ImpactDateFilter({ filter, onChange }: Props) {
   const r = useResponsiveLayout();
   const compact = r.isTablet;
   const [pickerTarget, setPickerTarget] = useState<'from' | 'to' | null>(null);
   const [draftDate, setDraftDate] = useState(new Date());
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const selectedPeriod = activePeriod(filter);
+  const periodLabel =
+    PERIOD_OPTIONS.find((option) => option.value === selectedPeriod)?.label ?? 'Custom range';
+
+  const choosePeriod = (value: PeriodChoice) => {
+    setPeriodOpen(false);
+    if (value === 'all_time') {
+      onChange({ mode: 'all_time' });
+      return;
+    }
+    onChange({ mode: 'custom', ...presetRange(value) });
+  };
 
   const openPicker = (target: 'from' | 'to') => {
+    setPeriodOpen(false);
     const seed =
       target === 'from'
         ? parseApiDate(filter.startDate)
@@ -133,74 +164,62 @@ export function ImpactDateFilter({ filter, onChange }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.headerRow}>
-        <AppText
-          variant="bodyBold"
-          style={[styles.title, compact && styles.titleCompact]}
-          numberOfLines={1}
-        >
-          Select time period
+      <View style={styles.periodBlock}>
+        <AppText style={[styles.dateLabel, compact && styles.dateLabelCompact]}>
+          Time period
         </AppText>
-
         <Pressable
           style={[
-            styles.allTimeChip,
-            compact && styles.allTimeChipCompact,
-            filter.mode === 'all_time' && styles.allTimeChipActive,
+            styles.periodField,
+            compact && styles.periodFieldCompact,
+            periodOpen && styles.dateFieldActive,
           ]}
-          onPress={() => onChange({ mode: 'all_time' })}
+          onPress={() => setPeriodOpen((open) => !open)}
           accessibilityRole="button"
-          accessibilityState={{ selected: filter.mode === 'all_time' }}
-          hitSlop={6}
+          accessibilityLabel={`Time period, ${periodLabel}`}
+          accessibilityState={{ expanded: periodOpen }}
         >
-          <Ionicons
-            name="infinite-outline"
-            size={compact ? 13 : normalize(15)}
-            color={filter.mode === 'all_time' ? palette.white : palette.kale}
-          />
           <AppText
-            style={[
-              styles.allTimeText,
-              compact && styles.allTimeTextCompact,
-              filter.mode === 'all_time' && styles.allTimeTextActive,
-            ]}
+            style={[styles.periodValue, compact && styles.periodValueCompact]}
             numberOfLines={1}
           >
-            All time
+            {periodLabel}
           </AppText>
+          <Ionicons
+            name={periodOpen ? 'chevron-up' : 'chevron-down'}
+            size={compact ? 14 : normalize(16)}
+            color={palette.kale}
+          />
         </Pressable>
-      </View>
-
-      <View style={styles.presetRow}>
-        {PRESET_DAYS.map((days) => {
-          const active = isPresetActive(filter, days);
-          return (
-            <Pressable
-              key={days}
-              style={[
-                styles.presetChip,
-                compact && styles.presetChipCompact,
-                active && styles.presetChipActive,
-              ]}
-              onPress={() => onChange({ mode: 'custom', ...presetRange(days) })}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`Last ${days} days`}
-              hitSlop={4}
-            >
-              <AppText
-                style={[
-                  styles.presetText,
-                  compact && styles.presetTextCompact,
-                  active && styles.presetTextActive,
-                ]}
-                numberOfLines={1}
-              >
-                Last {days} days
-              </AppText>
-            </Pressable>
-          );
-        })}
+        {periodOpen ? (
+          <View style={styles.periodMenu}>
+            {PERIOD_OPTIONS.map((option) => {
+              const selected = option.value === selectedPeriod;
+              return (
+                <Pressable
+                  key={String(option.value)}
+                  style={[styles.periodOption, selected && styles.periodOptionOn]}
+                  onPress={() => choosePeriod(option.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                >
+                  <AppText
+                    style={[
+                      styles.periodOptionText,
+                      compact && styles.periodValueCompact,
+                      selected && styles.periodOptionTextOn,
+                    ]}
+                  >
+                    {option.label}
+                  </AppText>
+                  {selected ? (
+                    <Ionicons name="checkmark" size={normalize(16)} color={palette.kale} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.dateRow}>
@@ -295,93 +314,70 @@ const styles = StyleSheet.create({
     gap: hp(1),
     marginBottom: hp(0.5),
   },
-  headerRow: {
+  periodBlock: {
+    gap: hp(0.45),
+  },
+  periodField: {
+    minHeight: normalize(44),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: wp(3),
-    minWidth: 0,
+    gap: wp(2),
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: `${palette.kale}44`,
+    borderRadius: normalize(12),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
   },
-  title: {
+  periodFieldCompact: {
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  periodValue: {
     flex: 1,
     minWidth: 0,
-    color: palette.black,
+    fontFamily: 'Saveful-Bold',
     fontSize: normalize(14),
+    color: palette.black,
     textTransform: 'none',
   },
-  titleCompact: {
+  periodValueCompact: {
     fontSize: 13,
     lineHeight: 17,
   },
-  allTimeChip: {
-    flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.2),
-    borderWidth: 1.5,
-    borderColor: palette.kale,
-    backgroundColor: palette.creme,
-    borderRadius: normalize(20),
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(0.7),
-  },
-  allTimeChipCompact: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  allTimeChipActive: {
-    backgroundColor: palette.kale,
-  },
-  allTimeText: {
-    fontFamily: 'Saveful-Bold',
-    fontSize: normalize(13),
-    color: palette.kale,
-    textTransform: 'none',
-  },
-  allTimeTextCompact: {
-    fontSize: 12,
-  },
-  allTimeTextActive: {
-    color: palette.white,
-  },
-  presetRow: {
-    flexDirection: 'row',
-    gap: wp(2),
-  },
-  presetChip: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+  periodMenu: {
+    backgroundColor: palette.white,
     borderWidth: 1,
     borderColor: `${palette.kale}44`,
-    backgroundColor: palette.white,
-    borderRadius: normalize(20),
-    paddingHorizontal: wp(2),
-    paddingVertical: hp(0.6),
+    borderRadius: normalize(12),
+    overflow: 'hidden',
   },
-  presetChipCompact: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 14,
+  periodOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(2),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.15),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8E2D6',
   },
-  presetChipActive: {
-    borderColor: palette.kale,
-    backgroundColor: palette.kale,
+  periodOptionOn: {
+    backgroundColor: '#F4F7F1',
   },
-  presetText: {
+  periodOptionText: {
+    flex: 1,
     fontFamily: 'Saveful-SemiBold',
-    fontSize: normalize(12),
-    color: palette.kale,
+    fontSize: normalize(14),
+    color: palette.black,
     textTransform: 'none',
   },
-  presetTextCompact: {
-    fontSize: 11,
-  },
-  presetTextActive: {
+  periodOptionTextOn: {
     fontFamily: 'Saveful-Bold',
-    color: palette.white,
+    color: palette.kale,
   },
   dateRow: {
     flexDirection: 'row',

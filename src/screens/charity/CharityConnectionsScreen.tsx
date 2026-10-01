@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, StatusBar as RNStatusBar, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, RefreshControl, StatusBar as RNStatusBar, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -19,7 +19,7 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { connectionsService, type Connection, type ConnectionToday } from '@/services/connections.service';
 import { palette } from '@/theme/colors';
 import { showErrorAlert } from '@/utils/apiError';
-import { connectionLocationLabel, connectionPartyName, formatWindowLabel, statusLabel } from '@/utils/connections';
+import { connectionCharitySiteLabel, connectionLocationLabel, connectionPartyName, formatWindowLabel, statusLabel } from '@/utils/connections';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 
@@ -34,6 +34,7 @@ export function CharityConnectionsScreen() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [today, setToday] = useState<ConnectionToday[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [details, setDetails] = useState<Connection | null>(null);
 
   const load = useCallback(async () => {
@@ -57,6 +58,15 @@ export function CharityConnectionsScreen() {
       void load();
     }, [load]),
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   const pending = connections.filter((c) => c.status === 'PENDING');
   const rest = connections.filter((c) => c.status !== 'PENDING');
@@ -101,6 +111,14 @@ export function CharityConnectionsScreen() {
       backgroundColor={palette.creme}
       contentStyle={styles.screen}
       transparentTop
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[palette.primary]}
+          tintColor={palette.primary}
+        />
+      }
     >
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <HeroHeader
@@ -157,7 +175,7 @@ export function CharityConnectionsScreen() {
           <AppText variant="body1" color={palette.stone} style={styles.pageDescription}>
             {connections.length === 0
               ? 'Review invitations from food businesses that would like to arrange regular collections with you. The food and quantities available for each collection will be confirmed before pickup.'
-              : 'View and manage your regular collection Connections. Each business will confirm the food and quantities available before that day\u2019s pickup.'}
+              : 'View and manage your regular collection Connections. A business invites one of your sites, not the whole organisation. They confirm the food and quantities before that day\u2019s pickup.'}
           </AppText>
         )}
 
@@ -190,7 +208,9 @@ export function CharityConnectionsScreen() {
                 Your connections
               </AppText>
             ) : null}
-            {rest.map((connection) => (
+            {rest.map((connection) => {
+              const yourSite = connectionCharitySiteLabel(connection);
+              return (
               <View key={connection.id} style={styles.card}>
                 <Pressable
                   onPress={() => navigation.navigate('CharityConnectionDetail', { connectionId: connection.id })}
@@ -201,9 +221,25 @@ export function CharityConnectionsScreen() {
                         {connectionPartyName(connection.donorSite, connection.donorOrg?.name || 'Business')}
                       </AppText>
                       <AppText variant="bodySmall" color={palette.stone}>{connection.schedule}</AppText>
+                      {yourSite ? (
+                        <AppText variant="caption" color={palette.midgray} numberOfLines={2}>
+                          Your site · {yourSite}
+                        </AppText>
+                      ) : null}
                     </View>
-                    <View style={styles.statusBadge}>
-                      <AppText variant="caption" style={styles.statusBadgeText}>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        connection.status === 'ENDED' && styles.statusBadgeEnded,
+                      ]}
+                    >
+                      <AppText
+                        variant="caption"
+                        style={[
+                          styles.statusBadgeText,
+                          connection.status === 'ENDED' && styles.statusBadgeEndedText,
+                        ]}
+                      >
                         {statusLabel(connection.status)}
                       </AppText>
                     </View>
@@ -213,7 +249,8 @@ export function CharityConnectionsScreen() {
                   <AppText variant="caption" color={palette.primary}>More details</AppText>
                 </Pressable>
               </View>
-            ))}
+              );
+            })}
           </>
         )}
       </View>
@@ -235,6 +272,7 @@ function ConnectionDetailsModal({
   const siteName = connection?.donorSite?.name || '';
   const location = connectionLocationLabel(connection?.donorSite);
   const showOrg = orgName && siteName && orgName !== siteName;
+  const yourSite = connectionCharitySiteLabel(connection);
 
   return (
     <Modal
@@ -265,6 +303,7 @@ function ConnectionDetailsModal({
           {showOrg ? <DetailRow label="Organisation" value={orgName} /> : null}
           {siteName ? <DetailRow label="Site" value={siteName} /> : null}
           {location ? <DetailRow label="Location" value={location} /> : null}
+          {yourSite ? <DetailRow label="Your site" value={yourSite} /> : null}
           {connection?.schedule ? <DetailRow label="Schedule" value={connection.schedule} /> : null}
           {connection?.typicalSurplus ? (
             <DetailRow label="Typical surplus - guide only" value={connection.typicalSurplus} />
@@ -418,5 +457,11 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     color: palette.middlegreen,
     fontWeight: '600',
+  },
+  statusBadgeEnded: {
+    backgroundColor: '#FDECEC',
+  },
+  statusBadgeEndedText: {
+    color: palette.danger,
   },
 });

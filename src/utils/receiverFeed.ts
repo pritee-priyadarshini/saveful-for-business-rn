@@ -34,6 +34,8 @@ export type ReceiverUpdateItem = {
   ratingNote?: string | null;
   partnerRating?: number | null;
   pickupAddress?: string | null;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
   pickupWindow?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
@@ -64,6 +66,8 @@ export type ReceiverPickup = {
   id: string;
   restaurantName: string;
   restaurantAddress: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
   distance: string;
   restaurantPhone: string;
   contactName?: string | null;
@@ -307,6 +311,28 @@ function pickupStatusFromClaim(claim: any): ReceiverPickupCardStatus {
   return 'claimed';
 }
 
+function readCoordinate(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function listingPickupCoordinates(listing: any): { pickupLat: number | null; pickupLng: number | null } {
+  const site = listing?.site || {};
+  const candidates = [
+    [listing?.pickupLat, listing?.pickupLng],
+    [site.latitude ?? site.lat, site.longitude ?? site.lng],
+  ];
+  for (const [rawLat, rawLng] of candidates) {
+    const lat = readCoordinate(rawLat);
+    const lng = readCoordinate(rawLng);
+    if (lat !== null && lng !== null && !(lat === 0 && lng === 0)) {
+      return { pickupLat: lat, pickupLng: lng };
+    }
+  }
+  return { pickupLat: null, pickupLng: null };
+}
+
 function listingPickupContact(listing: any) {
   const site = listing?.site || {};
   const org = listing?.organisation || {};
@@ -314,6 +340,7 @@ function listingPickupContact(listing: any) {
     .filter(Boolean)
     .join(', ');
   return {
+    ...listingPickupCoordinates(listing),
     pickupAddress: address || listing?.pickupAddress || site.address || '',
     contactName: site.contactName || org.contactName || '',
     contactPhone:
@@ -500,6 +527,8 @@ export function mapReceiverUpdates(params: {
       ratingNote,
       partnerRating,
       pickupAddress: pickup.pickupAddress,
+      pickupLat: pickup.pickupLat,
+      pickupLng: pickup.pickupLng,
       pickupWindow: timeLabel,
       contactName: pickup.contactName,
       contactPhone: pickup.contactPhone,
@@ -590,6 +619,8 @@ export function mapReceiverPickups(params: {
           listing?.site?.organisationName ||
           'Business',
         restaurantAddress: pickup.pickupAddress || 'Address unavailable',
+        pickupLat: pickup.pickupLat,
+        pickupLng: pickup.pickupLng,
         distance: '',
         restaurantPhone: pickup.contactPhone,
         contactName: pickup.contactName,

@@ -41,6 +41,7 @@ import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { organizationService } from '@/services/organization.service';
 import { useAuthStore } from '@/store/authStore';
 import { driversService, type SiteDriver } from '@/services/drivers.service';
+import { connectionsService } from '@/services/connections.service';
 import { normalizeAuthProfile } from '@/utils/coordinates';
 
 type NavigationProp = CompositeNavigationProp<
@@ -138,6 +139,7 @@ export default function MultiCharityManageSitesScreen() {
     const [expandedSite, setExpandedSite] = useState<number | null>(null);
     const [locationModalVisible, setLocationModalVisible] = useState(false);
     const [homeSection, setHomeSection] = useState<HomeSection>('sites');
+    const [inviteCount, setInviteCount] = useState(0);
     const [siteDrivers, setSiteDrivers] = useState<SiteDriverRow[]>([]);
     const [driversLoading, setDriversLoading] = useState(false);
     const [driversError, setDriversError] = useState<string | null>(null);
@@ -347,6 +349,21 @@ export default function MultiCharityManageSitesScreen() {
 
     const loadSiteDriversRef = useRef(loadSiteDrivers);
     loadSiteDriversRef.current = loadSiteDrivers;
+
+    const loadInvites = useCallback(async () => {
+        try {
+            const rows = await connectionsService.listForCharity();
+            setInviteCount(rows.filter((row) => row.status === 'PENDING').length);
+        } catch {
+            setInviteCount(0);
+        }
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadInvites();
+        }, [loadInvites]),
+    );
 
     const onRefresh = async () => {
         try {
@@ -742,11 +759,45 @@ export default function MultiCharityManageSitesScreen() {
                         <AppText
                             variant="label"
                             style={homeSection === 'drivers' ? styles.toggleTextActive : styles.toggleText}
+                            numberOfLines={1}
                         >
                             Drivers
                         </AppText>
                     </Pressable>
                 </View>
+
+                <Pressable
+                    onPress={() => navigation.navigate('CharityConnections')}
+                    style={({ pressed }) => [
+                        styles.connectionsCard,
+                        tabletInsetReset,
+                        pressed && { opacity: 0.92 },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Preferred collections"
+                >
+                    <View style={styles.connectionsIcon}>
+                        <Ionicons name="people-outline" size={normalize(20)} color={palette.kale} />
+                    </View>
+                    <View style={styles.connectionsCopy}>
+                        <AppText variant="bodyBold">Preferred collections</AppText>
+                        <AppText variant="caption" color={palette.stone} numberOfLines={2}>
+                            {inviteCount
+                                ? inviteCount === 1
+                                    ? '1 invitation waiting'
+                                    : `${inviteCount} invitations waiting`
+                                : 'Regular pickups offered to one of your sites'}
+                        </AppText>
+                    </View>
+                    {inviteCount ? (
+                        <View style={styles.inviteCount}>
+                            <AppText variant="caption" style={styles.inviteCountText}>
+                                {inviteCount}
+                            </AppText>
+                        </View>
+                    ) : null}
+                    <Ionicons name="chevron-forward" size={normalize(16)} color={palette.primary} />
+                </Pressable>
 
                 {homeSection === 'sites' ? (
                 <>
@@ -761,16 +812,6 @@ export default function MultiCharityManageSitesScreen() {
                             </AppText>
                         </View>
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <Pressable
-                        style={styles.addLink}
-                        onPress={() => navigation.navigate('CharityConnections')}
-                        hitSlop={8}
-                    >
-                        <AppText variant="bodyBold" style={styles.addLinkText}>
-                            Connections
-                        </AppText>
-                    </Pressable>
                     <Pressable
                         style={styles.addLink}
                         onPress={() => navigation.navigate('CreateCharitySite' as any)}
@@ -781,7 +822,6 @@ export default function MultiCharityManageSitesScreen() {
                             Add
                         </AppText>
                     </Pressable>
-                    </View>
                 </View>
 
                 {sites.length === 0 ? (
@@ -1392,6 +1432,46 @@ const styles = StyleSheet.create({
     },
     toggleTextActive: {
         color: palette.white,
+        textTransform: 'none',
+    },
+    connectionsCard: {
+        marginHorizontal: wp(4),
+        marginBottom: hp(1.8),
+        paddingVertical: hp(1.2),
+        paddingHorizontal: wp(3.4),
+        borderRadius: normalize(18),
+        backgroundColor: palette.white,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: '#D9D9D9',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2.6),
+    },
+    connectionsIcon: {
+        width: normalize(40),
+        height: normalize(40),
+        borderRadius: normalize(20),
+        backgroundColor: '#E8F3EC',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    connectionsCopy: {
+        flex: 1,
+        minWidth: 0,
+        gap: 2,
+    },
+    inviteCount: {
+        minWidth: normalize(18),
+        height: normalize(18),
+        borderRadius: normalize(9),
+        backgroundColor: palette.kale,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 5,
+    },
+    inviteCountText: {
+        color: palette.white,
+        fontWeight: '700',
         textTransform: 'none',
     },
     sitesHeader: {

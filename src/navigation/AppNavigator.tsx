@@ -41,6 +41,7 @@ import { ConnectionsScreen } from '@/screens/restaurant/ConnectionsScreen';
 import { CreateConnectionScreen } from '@/screens/restaurant/CreateConnectionScreen';
 import { ConnectionDetailScreen } from '@/screens/restaurant/ConnectionDetailScreen';
 import { AddDailySurplusScreen } from '@/screens/restaurant/AddDailySurplusScreen';
+import { ReservedListingScreen } from '@/screens/restaurant/ReservedListingScreen';
 import { CharityConnectionsScreen } from '@/screens/charity/CharityConnectionsScreen';
 import { CharityConnectionDetailScreen } from '@/screens/charity/CharityConnectionDetailScreen';
 import CreateSiteScreen from '@/screens/restaurant/CreateSiteScreen';
@@ -87,6 +88,7 @@ export type RootStackParamList = {
   Connections: { siteId?: number } | undefined;
   CreateConnection: { siteId?: number } | undefined;
   ConnectionDetail: { connectionId: number; siteId?: number };
+  ReservedListing: { listingId: number; charityName?: string };
   AddDailySurplus: {
     dayId: number;
     connectionId?: number;
@@ -468,6 +470,7 @@ export function AppNavigator() {
             <RootStack.Screen name="CreateConnection" component={CreateConnectionScreen} />
             <RootStack.Screen name="ConnectionDetail" component={ConnectionDetailScreen} />
             <RootStack.Screen name="AddDailySurplus" component={AddDailySurplusScreen} />
+            <RootStack.Screen name="ReservedListing" component={ReservedListingScreen} />
             <RootStack.Screen name="CharityConnections" component={CharityConnectionsScreen} />
             <RootStack.Screen name="CharityConnectionDetail" component={CharityConnectionDetailScreen} />
             <RootStack.Screen name="SiteAnalytics" component={SiteAnalyticsScreen} />

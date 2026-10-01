@@ -1,12 +1,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/AppText';
 import { connectionsService, type Connection } from '@/services/connections.service';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
-import { connectionPartyName } from '@/utils/connections';
+import { connectionCharitySiteLabel, connectionPartyName } from '@/utils/connections';
 import { hp, normalize, wp } from '@/utils/responsive';
 
 type Props = {
@@ -28,6 +29,7 @@ export function CharityInviteCard({
     connection.donorSite,
     connection.donorOrg?.name || 'Business',
   );
+  const yourSite = connectionCharitySiteLabel(connection);
 
   return (
     <View style={styles.card}>
@@ -39,6 +41,11 @@ export function CharityInviteCard({
           <AppText variant="bodySmall" color={palette.stone} numberOfLines={2}>
             {connection.schedule}
           </AppText>
+          {yourSite ? (
+            <AppText variant="caption" color={palette.midgray} numberOfLines={2}>
+              Your site · {yourSite}
+            </AppText>
+          ) : null}
         </View>
         <View style={styles.badge}>
           <AppText variant="caption" style={styles.badgeText}>
@@ -47,20 +54,39 @@ export function CharityInviteCard({
         </View>
       </View>
 
-      {connection.typicalSurplus ? (
-        <AppText variant="bodySmall" color={palette.midgray}>
-          Typical surplus - guide only: {connection.typicalSurplus}
-        </AppText>
-      ) : null}
-      {connection.typicalQuantity ? (
-        <AppText variant="bodySmall" color={palette.midgray}>
-          Typical quantity - guide only: {connection.typicalQuantity}
-        </AppText>
+      {connection.typicalSurplus || connection.typicalQuantity ? (
+        <View style={styles.facts}>
+          {connection.typicalSurplus ? (
+            <View style={styles.fact}>
+              <AppText variant="caption" color={palette.stone}>
+                Typical surplus · guide only
+              </AppText>
+              <AppText variant="bodySmall">{connection.typicalSurplus}</AppText>
+            </View>
+          ) : null}
+          {connection.typicalQuantity ? (
+            <View style={styles.fact}>
+              <AppText variant="caption" color={palette.stone}>
+                Typical quantity · guide only
+              </AppText>
+              <AppText variant="bodySmall">{connection.typicalQuantity}</AppText>
+            </View>
+          ) : null}
+        </View>
       ) : null}
 
       {onMoreDetails ? (
-        <Pressable onPress={() => onMoreDetails(connection)} hitSlop={8}>
-          <AppText variant="caption" color={palette.primary}>More details</AppText>
+        <Pressable
+          onPress={() => onMoreDetails(connection)}
+          style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="More details"
+        >
+          <Ionicons name="information-circle-outline" size={normalize(16)} color={palette.primary} />
+          <AppText variant="bodySmall" color={palette.primary} style={styles.detailsLabel}>
+            More details
+          </AppText>
+          <Ionicons name="chevron-forward" size={normalize(16)} color={palette.primary} />
         </Pressable>
       ) : null}
 
@@ -138,19 +164,41 @@ const styles = StyleSheet.create({
   },
   titleWrap: { flex: 1, gap: hp(0.3) },
   badge: {
-    backgroundColor: '#E8F3EC',
+    backgroundColor: '#FFF3E4',
     paddingHorizontal: wp(2.5),
     paddingVertical: hp(0.5),
     borderRadius: normalize(12),
   },
   badgeText: {
-    color: palette.middlegreen,
+    color: palette.orange,
+    fontWeight: '600',
+  },
+  facts: {
+    backgroundColor: '#F7F6EF',
+    borderRadius: normalize(14),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.1),
+    gap: hp(0.9),
+  },
+  fact: { gap: 2 },
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 36,
+    marginTop: hp(0.2),
+  },
+  detailsLabel: {
+    flex: 1,
     fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
     gap: 10,
     marginTop: hp(0.4),
+    paddingTop: hp(1.4),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E6E6E6',
   },
   acceptBtn: {
     flex: 1,

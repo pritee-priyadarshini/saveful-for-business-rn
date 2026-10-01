@@ -108,6 +108,22 @@ export function formatWindowLabel(start?: string | null, end?: string | null): s
   return a || b;
 }
 
+/** The charity location a business invited. Not the whole organisation, and not always HQ. */
+export function connectionCharitySiteLabel(connection?: {
+  receiverSite?: {
+    name?: string | null;
+    address?: string | null;
+    organisationName?: string | null;
+  } | null;
+} | null): string {
+  const site = connection?.receiverSite;
+  const name = site?.name?.trim();
+  if (!name) return '';
+  const place = site?.address?.split(',')[0]?.trim();
+  if (place && place.toLowerCase() !== name.toLowerCase()) return `${name} · ${place}`;
+  return name;
+}
+
 export function connectionPartyName(
   party?: { name?: string | null; organisationName?: string | null } | null,
   fallback = 'Charity',
@@ -144,6 +160,31 @@ export function statusLabel(status?: string | null): string {
 export function outcomeNeedsSurplus(outcome?: string | null): boolean {
   const value = String(outcome || 'PROMPTED').toUpperCase();
   return value === 'PROMPTED' || value === '';
+}
+
+/** True only when this Connection has a collection on the current weekday. */
+export function isCollectionDueToday(connection?: {
+  daysOfWeek?: number[] | null;
+  today?: {
+    id?: number | null;
+    outcome?: string | null;
+    cutoffAt?: string | null;
+  } | null;
+} | null): boolean {
+  if (!connection) return false;
+  if (Array.isArray(connection.daysOfWeek) && connection.daysOfWeek.length > 0) {
+    if (!isScheduledToday(connection.daysOfWeek)) return false;
+  } else if (!connection.today?.id) {
+    return false;
+  }
+
+  const today = connection.today;
+  if (!today?.id) return false;
+  return (
+    outcomeNeedsSurplus(today.outcome) ||
+    outcomeAwaitingCharity(today.outcome) ||
+    isCutoffDue(today.cutoffAt, today.outcome)
+  );
 }
 
 export function isConnectionWindowEnded(windowEndAt?: string | null): boolean {

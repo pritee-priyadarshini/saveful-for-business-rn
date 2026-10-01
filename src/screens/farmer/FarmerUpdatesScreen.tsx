@@ -674,6 +674,8 @@ export function FarmerUpdatesScreen() {
                 <ClaimPickupDetails
                   details={{
                     address: selectedDetails.pickupAddress,
+                    latitude: selectedDetails.pickupLat,
+                    longitude: selectedDetails.pickupLng,
                     windowLabel: selectedDetails.pickupWindow || selectedDetails.timeLabel,
                     contactName: selectedDetails.contactName,
                     contactPhone: selectedDetails.contactPhone,

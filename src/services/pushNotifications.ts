@@ -1,4 +1,4 @@
-﻿import { AppState, Linking, Platform } from 'react-native';
+import { AppState, Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 
@@ -399,26 +399,30 @@ export async function unregisterDeviceToken(): Promise<void> {
     tokenRefreshUnsubscribe = null;
   }
 
-  if (!FIREBASE_ENABLED) {
-    console.log('[Push] Logout — skipped token unregister (Firebase not configured, no FCM token was registered)');
+  if (!FIREBASE_ENABLED || IS_EXPO_GO) {
+    console.log('[Push] Logout — skipped token unregister (no FCM token was registered on this device)');
     return;
   }
 
+  const { default: messaging } =
+    require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
+
+  // Only this device: unregistering all of the user's tokens would silence
+  // their other phones, which stay logged in.
   try {
-    await notificationsService.unregisterAllTokens('business');
-    console.log('[Push] Business app tokens unregistered');
+    const fcmToken = await messaging().getToken();
+    if (fcmToken) {
+      await notificationsService.unregisterToken(fcmToken);
+      console.log('[Push] This device unregistered');
+    }
   } catch (error) {
     console.log('[Push] Token unregister failed', error);
   }
 
-  if (!IS_EXPO_GO) {
-    try {
-      const { default: messaging } =
-        require('@react-native-firebase/messaging') as typeof import('@react-native-firebase/messaging');
-      await messaging().deleteToken();
-    } catch (error) {
-      console.log('[Push] FCM deleteToken failed', error);
-    }
+  try {
+    await messaging().deleteToken();
+  } catch (error) {
+    console.log('[Push] FCM deleteToken failed', error);
   }
 }
 

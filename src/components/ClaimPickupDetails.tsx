@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/AppText';
@@ -8,6 +8,8 @@ import { hp, normalize, wp } from '@/utils/responsive';
 
 export type ClaimPickupDetailsData = {
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   windowLabel?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
@@ -18,9 +20,27 @@ type Props = {
   details: ClaimPickupDetailsData;
 };
 
-async function openMaps(address: string) {
-  const query = encodeURIComponent(address);
-  await Linking.openURL(`https://maps.google.com/?q=${query}`);
+function coordinateDestination(latitude?: number | null, longitude?: number | null): string | null {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (latitude == null || longitude == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) return null;
+  return `${lat},${lng}`;
+}
+
+async function openDirections(address: string, latitude?: number | null, longitude?: number | null) {
+  const destination = encodeURIComponent(coordinateDestination(latitude, longitude) ?? address);
+  const google = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+  const apple = `http://maps.apple.com/?daddr=${destination}&dirflg=d`;
+  const androidNavigation = `google.navigation:q=${destination}&mode=d`;
+  const url = Platform.OS === 'ios' ? apple : androidNavigation;
+  try {
+    await Linking.openURL(url);
+  } catch {
+    await Linking.openURL(google);
+  }
 }
 
 async function callPhone(phone: string) {
@@ -73,9 +93,33 @@ export function ClaimPickupDetails({ details }: Props) {
       </AppText>
 
       {address ? (
-        <Pressable onPress={() => void openMaps(address)}>
-          <DetailLine icon="location-outline" label="Address" value={address} />
-        </Pressable>
+        <View style={styles.row}>
+          <Ionicons name="location-outline" size={normalize(16)} color={palette.kale} />
+          <View style={styles.copy}>
+            <AppText variant="caption" color={palette.stone}>
+              Address
+            </AppText>
+            <Pressable
+              onPress={() => void openDirections(address, details.latitude, details.longitude)}
+              accessibilityRole="link"
+              accessibilityLabel="Get directions"
+            >
+              <AppText variant="bodySmall" style={[styles.value, styles.link]}>
+                {address}
+              </AppText>
+            </Pressable>
+            <Pressable
+              style={styles.action}
+              onPress={() => void openDirections(address, details.latitude, details.longitude)}
+              accessibilityRole="link"
+              accessibilityLabel="Get directions"
+            >
+              <AppText variant="bodyBold" color={palette.kale}>
+                Directions
+              </AppText>
+            </Pressable>
+          </View>
+        </View>
       ) : null}
 
       {windowLabel ? (
@@ -145,6 +189,10 @@ const styles = StyleSheet.create({
   value: {
     textTransform: 'none',
     color: palette.black,
+  },
+  link: {
+    color: palette.kale,
+    textDecorationLine: 'underline',
   },
   actions: {
     flexDirection: 'row',

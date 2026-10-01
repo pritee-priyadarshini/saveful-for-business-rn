@@ -17,7 +17,7 @@ import {
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
-import { connectionPartyName, formatWindowLabel, statusLabel } from '@/utils/connections';
+import { connectionCharitySiteLabel, connectionPartyName, formatWindowLabel, statusLabel } from '@/utils/connections';
 import { resolveFoodIconFromLabel } from '@/utils/foodListing';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
@@ -131,6 +131,11 @@ export function CharityConnectionDetailScreen({ route }: any) {
           <>
             <AppText variant="label">{statusLabel(connection.status)}</AppText>
             <AppText variant="body1">{connection.schedule}</AppText>
+            {connectionCharitySiteLabel(connection) ? (
+              <AppText variant="bodySmall" color={palette.stone}>
+                Your site · {connectionCharitySiteLabel(connection)}
+              </AppText>
+            ) : null}
             {connection.typicalSurplus ? (
               <AppText variant="bodySmall" color={palette.stone}>
                 Typical surplus - guide only: {connection.typicalSurplus}

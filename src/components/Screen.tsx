@@ -17,6 +17,7 @@ type ScreenProps = PropsWithChildren<{
   onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   /** Reserve space for the keyboard so the page can scroll to the focused field. */
   keyboardAware?: boolean;
+  refreshControl?: React.ReactElement;
 }>;
 
 export function Screen({
@@ -29,6 +30,7 @@ export function Screen({
   scrollRef: scrollRefProp,
   onScroll,
   keyboardAware = false,
+  refreshControl,
 }: ScreenProps) {
   const edges: Edge[] | undefined = transparentTop ? [] : undefined;
   const internalScrollRef = useRef<ScrollView>(null);
@@ -74,6 +76,7 @@ export function Screen({
           contentInsetAdjustmentBehavior={keyboardAware ? 'always' : 'never'}
           onScroll={onScroll}
           scrollEventThrottle={16}
+          refreshControl={refreshControl}
         >
           {children}
         </ScrollView>

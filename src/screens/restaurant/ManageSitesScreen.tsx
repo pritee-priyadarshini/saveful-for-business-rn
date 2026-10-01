@@ -217,7 +217,6 @@ export default function ManageSitesScreen() {
       primary: true,
     },
     { label: 'Add Location', route: 'CreateSite' },
-    { label: 'Connections', route: 'Connections' },
     { label: 'View Analytics', tab: 'Insights' },
     { label: 'Your Profile', route: 'Account' },
   ];
@@ -533,6 +532,24 @@ export default function ManageSitesScreen() {
             </Pressable>
           ))}
         </View>
+
+        <Pressable
+          onPress={() => navigation.navigate('Connections')}
+          style={({ pressed }) => [styles.connectionsCard, tabletInsetReset, pressed && { opacity: 0.92 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Connections"
+        >
+          <View style={styles.connectionsIcon}>
+            <Ionicons name="people-outline" size={normalize(20)} color={palette.kale} />
+          </View>
+          <View style={styles.connectionsCopy}>
+            <AppText variant="bodyBold">Connections</AppText>
+            <AppText variant="caption" color={palette.stone} numberOfLines={2}>
+              Regular collections with your charity partners
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={normalize(16)} color={palette.primary} />
+        </Pressable>
 
         <View style={[styles.sitesHeader, tabletInsetReset]}>
           <View style={styles.sitesHeaderLeft}>
@@ -983,6 +1000,32 @@ const styles = StyleSheet.create({
   },
   actionTextPrimary: {
     color: palette.white,
+  },
+  connectionsCard: {
+    marginHorizontal: wp(4),
+    marginBottom: hp(2),
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3.4),
+    borderRadius: normalize(18),
+    backgroundColor: palette.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D9D9D9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.6),
+  },
+  connectionsIcon: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    backgroundColor: '#E8F3EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  connectionsCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
   sitesHeader: {
     marginHorizontal: wp(4),

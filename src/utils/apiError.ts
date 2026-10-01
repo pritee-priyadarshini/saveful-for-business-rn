@@ -85,7 +85,13 @@ function humanizeRawMessage(message: string): string {
   ) {
     return 'This code has expired. Please request a new one.';
   }
-  if (lower.includes('not found') || lower.includes('no account') || lower.includes('no user')) {
+  if (
+    lower.includes('no account') ||
+    lower.includes('no user') ||
+    lower.includes('account not found') ||
+    lower.includes('user not found') ||
+    (lower.includes('email') && lower.includes('not found'))
+  ) {
     return FORGOT_PASSWORD_ACCOUNT_NOT_FOUND_MESSAGE;
   }
 

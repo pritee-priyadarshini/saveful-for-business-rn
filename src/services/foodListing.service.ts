@@ -141,16 +141,35 @@ export type ListingDetail = FoodListing & {
   images?: string[];
 };
 
+function looksLikeListing(value: any): boolean {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      (value.id != null ||
+        value.foodItems != null ||
+        value.pickupAddress != null ||
+        value.listingType != null ||
+        value.bestBefore != null),
+  );
+}
+
+function unwrapListing(value: any, depth = 0): any | null {
+  if (!value || typeof value !== 'object' || depth > 4) return null;
+  if (looksLikeListing(value) && (value.foodItems != null || value.pickupAddress != null || value.listingType != null || value.bestBefore != null)) {
+    return value;
+  }
+  return (
+    unwrapListing(value.listing, depth + 1) ||
+    unwrapListing(value.data, depth + 1) ||
+    unwrapListing(value.response, depth + 1) ||
+    (looksLikeListing(value) ? value : null)
+  );
+}
+
 export function normalizeListingResponse(response: any): ListingDetail | null {
-  const raw = response?.data ?? response;
-  if (!raw || typeof raw !== 'object') return null;
-
-  const listing =
-    raw.id != null || raw.foodItems != null || raw.pickupAddress != null
-      ? raw
-      : raw.listing ?? raw.response ?? raw.data ?? null;
-
-  if (!listing || typeof listing !== 'object') return null;
+  const listing = unwrapListing(response?.data ?? response);
+  if (!listing) return null;
   return stampListingReservation(listing) as ListingDetail;
 }
 
@@ -427,18 +446,24 @@ export async function fetchListingDetail(
     return listingDetailCache.get(id)!;
   }
 
-  const response = await api.get(`/food-listings/${id}`, {
-    skipBillingHandler: true,
-    skipUnauthorizedHandler: true,
-  });
-  const listing = normalizeListingResponse(response);
-
-  if (!listing) {
-    throw new Error('Listing not found');
+  let lastError: unknown;
+  for (const path of [`/food-listings/${id}`, `/listings/${id}`]) {
+    try {
+      const response = await api.get(path, {
+        skipBillingHandler: true,
+        skipUnauthorizedHandler: true,
+      });
+      const listing = normalizeListingResponse(response);
+      if (listing) {
+        listingDetailCache.set(Number(listing.id) || id, listing);
+        return listing;
+      }
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  listingDetailCache.set(id, listing);
-  return listing;
+  throw lastError ?? new Error('Listing not found');
 }
 
 export function invalidateListingDetail(listingId: number) {
