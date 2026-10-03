@@ -56,7 +56,6 @@ import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { connectionsService, type ConnectionToday } from '@/services/connections.service';
 import {
   isReservedListing,
-  isReservedPublished,
   matchReservedDay,
   otherOpenConnections,
 } from '@/utils/connections';
@@ -748,14 +747,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const active = isListingActive(item);
     const partial = isListingPartial(item);
     const statusLabel = getListingStatusLabel(item);
-    const publishedToday = today.filter((row) => isReservedPublished(row));
-    const reservedRow =
-      reservedDayFor(item) ??
-      (active &&
-      listings.filter((listing) => isListingActive(listing)).length === 1 &&
-      publishedToday.length === 1
-        ? publishedToday[0]
-        : undefined);
+    const reservedRow = reservedDayFor(item);
     const reserved = isReservedListing(item) || Boolean(reservedRow);
 
     const statusConfig = expired

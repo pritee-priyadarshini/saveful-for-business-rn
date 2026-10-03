@@ -690,6 +690,11 @@ export type SelfPickupClaim = {
   listingId: number;
   businessName: string;
   address: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  contactName: string;
+  contactPhone: string;
+  collectionNotes: string;
   quantityKg: number;
   timeLabel: string;
   items: ReceiverPickupItem[];
@@ -710,6 +715,7 @@ export function mapSelfPickupClaims(
     })
     .map((claim) => {
       const listing = claim?.listing || {};
+      const pickup = listingPickupContact(listing);
       return {
         claimId: Number(claim.id),
         listingId: Number(listing?.id || claim?.listingId),
@@ -717,7 +723,12 @@ export function mapSelfPickupClaims(
           listing?.organisation?.name ||
           listing?.site?.organisationName ||
           'Business',
-        address: listing?.pickupAddress || listing?.site?.address || '',
+        address: pickup.pickupAddress || listing?.pickupAddress || listing?.site?.address || '',
+        pickupLat: pickup.pickupLat,
+        pickupLng: pickup.pickupLng,
+        contactName: pickup.contactName,
+        contactPhone: pickup.contactPhone,
+        collectionNotes: pickup.collectionNotes,
         quantityKg: claimQuantityKg(claim),
         timeLabel: formatTimeLabel(listing?.pickupFromTime, listing?.pickupByTime),
         items: claimItemsToPickupItems(claim),

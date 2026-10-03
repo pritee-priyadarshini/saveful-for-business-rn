@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/AppText';
+import { ClaimPickupDetails } from '@/components/ClaimPickupDetails';
 import { PostCollectSurveyModal as CharitySurveyModal } from '@/screens/charity/components/postCollectSurveyModal';
 import { PostCollectSurveyModal as FarmerSurveyModal } from '@/screens/farmer/components/postCollectSurveyModal';
 import { claimsService } from '@/services/claims.service';
@@ -27,6 +28,7 @@ export function SelfPickupClaimsSection({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [markingClaimId, setMarkingClaimId] = useState<number | null>(null);
+  const [detailsClaim, setDetailsClaim] = useState<SelfPickupClaim | null>(null);
   const [surveyVisible, setSurveyVisible] = useState(false);
   const [surveyClaimId, setSurveyClaimId] = useState<number | null>(null);
   const [surveyBusinessName, setSurveyBusinessName] = useState('');
@@ -38,7 +40,7 @@ export function SelfPickupClaimsSection({
     if (claims.length === 0) setExpanded(false);
   }, [claims.length]);
 
-  if (!loading && claims.length === 0 && !surveyVisible) return null;
+  if (!loading && claims.length === 0 && !surveyVisible && !detailsClaim) return null;
 
   const confirmSelfPickup = (claim: SelfPickupClaim) => {
     if (markingClaimId != null) return;
@@ -73,6 +75,14 @@ export function SelfPickupClaimsSection({
         }
       },
     });
+  };
+
+  const markFromDetails = () => {
+    const claim = detailsClaim;
+    if (!claim) return;
+    setDetailsClaim(null);
+    // Two RN modals cannot be presented at once on iOS; let the sheet dismiss first.
+    setTimeout(() => confirmSelfPickup(claim), 350);
   };
 
   const SurveyModal = variant === 'farmer' ? FarmerSurveyModal : CharitySurveyModal;
@@ -131,7 +141,7 @@ export function SelfPickupClaimsSection({
                   markingClaimId === claim.claimId && styles.ctaDisabled,
                 ]}
                 disabled={markingClaimId != null}
-                onPress={() => confirmSelfPickup(claim)}
+                onPress={() => setDetailsClaim(claim)}
               >
                 <AppText variant="bodyBold" style={styles.ctaText} numberOfLines={1}>
                   {markingClaimId === claim.claimId ? '…' : 'Collect'}
@@ -141,6 +151,101 @@ export function SelfPickupClaimsSection({
           ))}
         </View>
       ) : null}
+
+      <Modal
+        visible={detailsClaim != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailsClaim(null)}
+      >
+        <View style={styles.modalWrap}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalTopBar}>
+              <AppText variant="h6">Collection details</AppText>
+              <Pressable
+                style={styles.closeIconBtn}
+                onPress={() => setDetailsClaim(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={normalize(20)} color={palette.black} />
+              </Pressable>
+            </View>
+
+            {detailsClaim ? (
+              <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <AppText variant="bodyBold" style={styles.modalSubtitle}>
+                  {detailsClaim.businessName}
+                </AppText>
+
+                <ClaimPickupDetails
+                  details={{
+                    address: detailsClaim.address,
+                    latitude: detailsClaim.pickupLat,
+                    longitude: detailsClaim.pickupLng,
+                    windowLabel: detailsClaim.timeLabel,
+                    contactName: detailsClaim.contactName,
+                    contactPhone: detailsClaim.contactPhone,
+                    notes: detailsClaim.collectionNotes,
+                  }}
+                />
+
+                <View style={styles.modalHeaderRow}>
+                  <AppText variant="bodyBold" style={styles.modalColWide}>
+                    Item Name
+                  </AppText>
+                  <AppText variant="bodyBold" style={styles.modalCol}>
+                    Available
+                  </AppText>
+                  <AppText variant="bodyBold" style={styles.modalCol}>
+                    Claimed
+                  </AppText>
+                </View>
+
+                {detailsClaim.items.length > 0 ? (
+                  detailsClaim.items.map((food, idx) => (
+                    <View key={idx} style={styles.modalItemRow}>
+                      <AppText variant="bodyBold" style={styles.modalColWide}>
+                        {food.name}
+                      </AppText>
+                      <AppText variant="bodySmall" style={styles.modalCol}>
+                        {food.available} kg
+                      </AppText>
+                      <AppText variant="bodySmall" style={styles.modalCol}>
+                        {food.claimed} kg
+                      </AppText>
+                    </View>
+                  ))
+                ) : (
+                  <AppText variant="bodySmall" color={palette.stone} style={styles.modalEmpty}>
+                    No item breakdown available for this claim.
+                  </AppText>
+                )}
+
+                <AppText variant="bodyBold" style={styles.modalTotal}>
+                  Total claimed: {detailsClaim.quantityKg} kg
+                </AppText>
+              </ScrollView>
+            ) : null}
+
+            <Pressable
+              style={({ pressed }) => [styles.collectedBtn, pressed && styles.pressed]}
+              onPress={markFromDetails}
+              disabled={markingClaimId != null}
+              accessibilityRole="button"
+            >
+              <Ionicons name="checkmark-circle-outline" size={normalize(18)} color={palette.white} />
+              <AppText variant="bodyBold" style={styles.collectedBtnText}>
+                Collected
+              </AppText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <SurveyModal
         visible={surveyVisible}
@@ -251,5 +356,85 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.9,
+  },
+  modalWrap: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: palette.white,
+    borderTopLeftRadius: normalize(24),
+    borderTopRightRadius: normalize(24),
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2),
+    paddingBottom: hp(4),
+    gap: hp(1.2),
+    maxHeight: '88%',
+  },
+  modalScroll: {
+    maxHeight: hp(58),
+  },
+  modalScrollContent: {
+    gap: hp(1.2),
+    paddingBottom: hp(1),
+  },
+  modalTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  closeIconBtn: {
+    width: normalize(36),
+    height: normalize(36),
+    borderRadius: normalize(18),
+    backgroundColor: palette.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubtitle: {
+    textTransform: 'none',
+    color: palette.midgray,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    paddingBottom: hp(1),
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+  },
+  modalItemRow: {
+    flexDirection: 'row',
+    paddingVertical: hp(0.5),
+  },
+  modalColWide: {
+    flex: 2,
+    textTransform: 'none',
+  },
+  modalCol: {
+    flex: 1,
+    textAlign: 'center',
+    textTransform: 'none',
+  },
+  modalEmpty: {
+    textTransform: 'none',
+    textAlign: 'center',
+    paddingVertical: hp(1),
+  },
+  modalTotal: {
+    textTransform: 'none',
+  },
+  collectedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2),
+    backgroundColor: palette.middlegreen,
+    borderRadius: normalize(14),
+    paddingVertical: hp(1.6),
+  },
+  collectedBtnText: {
+    color: palette.white,
+    textTransform: 'none',
+    fontSize: normalize(15),
   },
 });

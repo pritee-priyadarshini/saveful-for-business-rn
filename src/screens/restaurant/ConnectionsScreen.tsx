@@ -24,12 +24,16 @@ import { useSitesStore } from '@/store/sitesStore';
 import { palette } from '@/theme/colors';
 import { showErrorAlert } from '@/utils/apiError';
 import {
+  CONNECTION_PROMPT_LEAD_MINUTES,
   canListPreferredSurplus,
   connectionLocationLabel,
   connectionPartyName,
   isCollectionDueToday,
+  isConnectionWindowEnded,
   isCutoffDue,
+  isScheduledToday,
   outcomeNeedsSurplus,
+  parseWindowFromSchedule,
   statusLabel,
 } from '@/utils/connections';
 import { isVirtualHqSiteId } from '@/utils/defaultHqSite';
@@ -119,6 +123,17 @@ export function ConnectionsScreen({ route }: any) {
   const activeCount = connections.filter((c) => c.status === 'ACTIVE').length;
   const pendingCount = connections.filter((c) => c.status === 'PENDING').length;
   const dueToday = live.filter((c) => isCollectionDueToday(c));
+
+  const listToday = (connection: Connection) => {
+    navigation.navigate('AddDailySurplus', {
+      dayId: connection.today?.id,
+      connectionId: connection.id,
+      charityName: connectionPartyName(connection.receiverSite, connection.receiverOrg?.name || 'Charity'),
+      schedule: connection.schedule,
+      windowStartAt: connection.today?.windowStartAt,
+      windowEndAt: connection.today?.windowEndAt,
+    });
+  };
 
   const statsLabel = loading
     ? 'Loading connections'
@@ -308,6 +323,7 @@ export function ConnectionsScreen({ route }: any) {
                   navigation.navigate('ConnectionDetail', { connectionId: connection.id, siteId })
                 }
                 onMoreDetails={setDetails}
+                onListToday={listToday}
               />
             ))}
             {past.length ? (
@@ -338,19 +354,54 @@ export function ConnectionsScreen({ route }: any) {
   );
 }
 
+function formatClock(date: Date): string {
+  return date
+    .toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+    .replace(' ', '')
+    .toLowerCase();
+}
+
+/** On a collection day: list now, or the time listing opens (4h before pickup). */
+function todayListingState(connection: Connection): { canList: boolean; opensAt: string | null } {
+  if (connection.status !== 'ACTIVE' || !isScheduledToday(connection.daysOfWeek)) {
+    return { canList: false, opensAt: null };
+  }
+  const today = connection.today;
+  if (today?.id) {
+    return {
+      canList: canListPreferredSurplus({
+        dayId: today.id,
+        outcome: today.outcome,
+        windowStartAt: today.windowStartAt,
+        windowEndAt: today.windowEndAt,
+      }),
+      opensAt: null,
+    };
+  }
+  const window = parseWindowFromSchedule(connection.schedule);
+  if (isConnectionWindowEnded(window.end.toISOString())) return { canList: false, opensAt: null };
+  const opens = new Date(window.start.getTime() - CONNECTION_PROMPT_LEAD_MINUTES * 60_000);
+  return { canList: false, opensAt: Date.now() < opens.getTime() ? formatClock(opens) : null };
+}
+
 function RestaurantConnectionCard({
   connection,
   onPress,
   onMoreDetails,
+  onListToday,
 }: {
   connection: Connection;
   onPress: () => void;
   onMoreDetails: (connection: Connection) => void;
+  onListToday?: (connection: Connection) => void;
 }) {
   const charity = connectionPartyName(connection.receiverSite, connection.receiverOrg?.name || 'Charity');
   const due = isCollectionDueToday(connection);
   const pending = connection.status === 'PENDING';
   const ended = connection.status === 'ENDED';
+  const { canList, opensAt } = onListToday
+    ? todayListingState(connection)
+    : { canList: false, opensAt: null };
 
   return (
     <View style={styles.card}>
@@ -397,9 +448,29 @@ function RestaurantConnectionCard({
           </AppText>
         ) : null}
       </Pressable>
-      <Pressable onPress={() => onMoreDetails(connection)} hitSlop={8} style={styles.moreLink}>
-        <AppText variant="caption" color={palette.primary}>More details</AppText>
-      </Pressable>
+      <View style={styles.cardFooter}>
+        <Pressable onPress={() => onMoreDetails(connection)} hitSlop={8} style={styles.moreLink}>
+          <AppText variant="caption" color={palette.primary}>More details</AppText>
+        </Pressable>
+        {canList ? (
+          <Pressable
+            onPress={() => onListToday?.(connection)}
+            style={({ pressed }) => [styles.listTodayBtn, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Confirm today’s listing for ${charity}`}
+          >
+            <AppText variant="caption" style={styles.listTodayText}>
+              Confirm today’s listing
+            </AppText>
+          </Pressable>
+        ) : opensAt ? (
+          <View style={styles.opensAtChip}>
+            <AppText variant="caption" style={styles.opensAtText}>
+              Listing opens {opensAt}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -588,6 +659,37 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   moreLink: { marginTop: 8 },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  listTodayBtn: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: palette.kale,
+    backgroundColor: '#EEF7F2',
+    borderRadius: normalize(10),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.6),
+  },
+  listTodayText: {
+    color: palette.kale,
+    textTransform: 'none',
+  },
+  opensAtChip: {
+    marginTop: 8,
+    borderRadius: normalize(10),
+    backgroundColor: '#F2F0EA',
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.6),
+  },
+  opensAtText: {
+    color: palette.stone,
+    textTransform: 'none',
+  },
   statusBadge: {
     backgroundColor: '#E8F3EC',
     paddingHorizontal: wp(2.5),
