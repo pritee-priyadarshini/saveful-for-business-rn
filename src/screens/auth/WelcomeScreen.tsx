@@ -172,7 +172,7 @@ export function WelcomeScreen({ navigation }: Props) {
               ]}
             >
               <AppText variant="bodyBold" style={styles.primaryButtonText}>
-                Get Started
+                Create an account
               </AppText>
               <View style={styles.primaryButtonArrow}>
                 <Ionicons name="arrow-forward" size={16} color={palette.white} />

@@ -29,7 +29,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useAppContext } from '@/store/AppContext';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { showErrorAlert, showSuccessAlert, showTeamMemberAddedAlert } from '@/utils/apiError';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 
@@ -337,11 +337,7 @@ export default function CharityManageAccessScreen() {
           showSuccessAlert('User updated');
         } else {
           await addMember(payload);
-          showSuccessAlert(
-            activeTab === 'driver'
-              ? 'Driver added. Login credentials were sent by email.'
-              : 'User added. Login credentials were sent by email.',
-          );
+          showTeamMemberAddedAlert(activeTab === 'driver' ? 'driver' : 'user');
         }
 
         await fetchUsers(true);

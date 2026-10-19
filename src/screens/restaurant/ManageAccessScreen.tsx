@@ -25,7 +25,7 @@ import { spacing } from '@/theme/spacing';
 import { useSitesStore } from '@/store/sitesStore';
 import { useSubscriptionStore, selectCanManageBilling } from '@/store/subscriptionStore';
 import { showConfirmAlert } from '@/store/appAlertStore';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { showErrorAlert, showSuccessAlert, showTeamMemberAddedAlert } from '@/utils/apiError';
 import { billingCycleLabel, formatBillingDate } from '@/utils/billingHelpers';
 import { usePlanCancellation } from '@/hooks/usePlanCancellation';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
@@ -225,7 +225,7 @@ export default function ManageAccessScreen() {
           await addStaff(resolvedSiteId, payload);
         }
 
-        showSuccessAlert('User added');
+        showTeamMemberAddedAlert();
 
         setForm({
           firstName: '',

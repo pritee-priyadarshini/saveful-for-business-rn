@@ -134,6 +134,17 @@ export function RoleSelectionScreen({ navigation }: Props) {
           r.isTablet && { paddingHorizontal: 0 },
         ]}
       >
+        {navigation.canGoBack() ? (
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={normalize(22)} color={palette.black} />
+          </Pressable>
+        ) : null}
         <AppText
           variant="h3"
           color={palette.black}
@@ -203,6 +214,20 @@ const styles = StyleSheet.create({
   headerWrap: {
     alignItems: 'center',
     paddingHorizontal: wp(8),
+  },
+
+  backBtn: {
+    alignSelf: 'flex-start',
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: '#E4E4E4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -wp(4),
+    marginBottom: hp(1),
   },
 
   title: {

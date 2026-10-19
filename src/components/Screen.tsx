@@ -73,7 +73,8 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={keyboardAware ? 'interactive' : 'none'}
           automaticallyAdjustKeyboardInsets={keyboardAware && Platform.OS === 'ios'}
-          contentInsetAdjustmentBehavior={keyboardAware ? 'always' : 'never'}
+          // 'always' adds the iOS status-bar inset, which opens a gap above full-bleed heroes.
+          contentInsetAdjustmentBehavior={keyboardAware && !transparentTop ? 'always' : 'never'}
           onScroll={onScroll}
           scrollEventThrottle={16}
           refreshControl={refreshControl}

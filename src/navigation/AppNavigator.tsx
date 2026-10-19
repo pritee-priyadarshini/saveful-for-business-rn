@@ -114,13 +114,13 @@ export type RootStackParamList = {
   };
 
   CharityManageAccess: {
-    locationId: number;
+    locationId?: number;
     orgType: 'restaurant' | 'charity' | 'farmer';
     initialTab?: 'user' | 'driver';
   };
 
   FarmerManageAccess: {
-    locationId: number;
+    locationId?: number;
     orgType: 'restaurant' | 'charity' | 'farmer';
     initialTab?: 'user' | 'driver';
   };

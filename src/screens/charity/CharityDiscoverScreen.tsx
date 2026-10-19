@@ -511,13 +511,13 @@ export function CharityDiscoverScreen() {
           <Ionicons name="people-outline" size={normalize(20)} color={palette.kale} />
         </View>
         <View style={styles.connectionsCopy}>
-          <AppText variant="bodyBold">Preferred collections</AppText>
-          <AppText variant="caption" color={palette.stone} numberOfLines={1}>
+          <AppText variant="bodyBold">Connections</AppText>
+          <AppText variant="caption" color={palette.stone} numberOfLines={2}>
             {inviteCount
               ? inviteCount === 1
                 ? '1 invitation waiting'
                 : `${inviteCount} invitations waiting`
-              : 'Regular pickups offered to you first'}
+              : 'Regular collections offered by food businesses'}
           </AppText>
         </View>
         {inviteCount ? (
@@ -883,8 +883,8 @@ const styles = StyleSheet.create({
   headingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(2.2),
-    marginBottom: hp(1.8),
+    marginTop: hp(4.5),
+    marginBottom: hp(2.6),
     paddingHorizontal: wp(5),
   },
 

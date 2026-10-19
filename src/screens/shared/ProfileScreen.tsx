@@ -10,6 +10,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import { pickSquareImage } from '@/utils/pickSquareImage';
 import { Picker } from '@react-native-picker/picker';
 
@@ -1020,15 +1022,30 @@ export function ProfileScreen() {
             <AppText variant='label'>Delete my account</AppText>
           </Pressable>
 
+          <AppText variant='caption' style={styles.versionText}>
+            {APP_VERSION_LABEL}
+          </AppText>
         </View>
       </ScrollView>
     </Screen>
   );
 }
 
+const APP_VERSION = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '';
+const APP_BUILD = Application.nativeBuildVersion;
+const APP_VERSION_LABEL = APP_VERSION
+  ? `Version ${APP_VERSION}${APP_BUILD ? ` (${APP_BUILD})` : ''}`
+  : '';
+
 const styles = StyleSheet.create({
   container: {
     padding: spacing.xl,
+  },
+  versionText: {
+    textAlign: 'center',
+    color: palette.stone,
+    textTransform: 'none',
+    marginTop: spacing.sm,
   },
 
   header: {

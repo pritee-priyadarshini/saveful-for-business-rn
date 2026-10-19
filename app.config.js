@@ -91,7 +91,7 @@ export default {
   expo: {
     name: 'Saveful For Business',
     slug: 'saveful-business',
-    version: '1.1.0',
+    version: '1.1.1',
     orientation: 'portrait',
     userInterfaceStyle: 'light',
     icon: './assets/intro/Saveful-for-Business-logo.png',
@@ -113,6 +113,7 @@ export default {
         'aps-environment': apsEnvironment,
       },
       infoPlist: {
+        CFBundleDisplayName: 'Saveful for Business',
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription:
           "Saveful uses the camera so you can take a photo of your organisation's logo or surplus food in the app. For example, you can photograph leftover sandwiches so collecting organisations can identify the food.",

@@ -774,19 +774,19 @@ export default function MultiCharityManageSitesScreen() {
                         pressed && { opacity: 0.92 },
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel="Preferred collections"
+                    accessibilityLabel="Connections"
                 >
                     <View style={styles.connectionsIcon}>
                         <Ionicons name="people-outline" size={normalize(20)} color={palette.kale} />
                     </View>
                     <View style={styles.connectionsCopy}>
-                        <AppText variant="bodyBold">Preferred collections</AppText>
+                        <AppText variant="bodyBold">Connections</AppText>
                         <AppText variant="caption" color={palette.stone} numberOfLines={2}>
                             {inviteCount
                                 ? inviteCount === 1
                                     ? '1 invitation waiting'
                                     : `${inviteCount} invitations waiting`
-                                : 'Regular pickups offered to one of your sites'}
+                                : 'Regular collections offered by food businesses'}
                         </AppText>
                     </View>
                     {inviteCount ? (

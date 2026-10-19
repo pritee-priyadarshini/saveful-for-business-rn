@@ -71,7 +71,10 @@ function resetNestedStackOnTabPress(tabName: string, rootScreen: string) {
         | { index?: number; routes?: Array<{ name: string }> }
         | undefined;
       const nestedIndex = nested?.index ?? 0;
-      const nestedName = nested?.routes?.[nestedIndex]?.name;
+      // With unmountOnBlur the nested state is gone, but `navigate(tab, { screen })`
+      // params stay on the tab route and would remount the stack on that screen.
+      const pendingScreen = (tabRoute?.params as { screen?: string } | undefined)?.screen;
+      const nestedName = nested?.routes?.[nestedIndex]?.name ?? pendingScreen;
       if (!nestedName || nestedName === rootScreen) return;
 
       e.preventDefault();

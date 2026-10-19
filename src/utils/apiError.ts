@@ -259,6 +259,18 @@ export function showSuccessAlert(
   });
 }
 
+export function showTeamMemberAddedAlert(kind: 'user' | 'driver' = 'user') {
+  const who = kind === 'driver' ? 'driver' : 'team member';
+  showAppAlert({
+    variant: 'success',
+    title: 'Success!',
+    message:
+      `Your new ${who} has been added. We’ve sent them an email with download instructions and their login details.\n\n` +
+      'Please ask them to check their inbox and junk/spam folder. They should use the details in the email to log in to their existing account.',
+    confirmLabel: 'Done',
+  });
+}
+
 export function formatApiErrorMessage(message: unknown, fallback: string) {
   if (Array.isArray(message)) {
     return message

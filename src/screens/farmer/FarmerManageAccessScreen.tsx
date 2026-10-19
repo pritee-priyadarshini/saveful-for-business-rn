@@ -27,7 +27,7 @@ import {
   type FarmerConsumerMember,
 } from '@/store/farmerConsumerStore';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
-import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
+import { showErrorAlert, showSuccessAlert, showTeamMemberAddedAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
@@ -268,11 +268,7 @@ export default function FarmerManageAccessScreen() {
             password: form.password,
             role: mapRoleToApi(finalRole),
           });
-          showSuccessAlert(
-            activeTab === 'driver'
-              ? 'Driver added. Login credentials were sent by email.'
-              : 'User added. Login credentials were sent by email.',
-          );
+          showTeamMemberAddedAlert(activeTab === 'driver' ? 'driver' : 'user');
         }
 
         await fetchUsers(true);
