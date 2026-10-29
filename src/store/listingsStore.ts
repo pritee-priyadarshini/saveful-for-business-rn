@@ -16,6 +16,7 @@ import {
   sortListingsByNewest,
 } from '../utils/foodListing';
 import type { RelistAudience } from '../utils/listingRelist';
+import { isSiteScopedImpactUser, profileSiteIds } from '../utils/impactSites';
 
 
 const STALE_TIME_MS = 5 * 60 * 1000; 
@@ -107,7 +108,12 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
         limit: 200,
       });
       const { listings: all } = normalizeListingsResponse(res);
-      set({ orgListings: sortListingsByNewest(all), orgLastFetched: Date.now() });
+      // Site staff in a multi-site organisation only see their own sites' listings.
+      const ownSiteIds = isSiteScopedImpactUser(authUser) ? profileSiteIds(authUser) : [];
+      const visible = ownSiteIds.length
+        ? all.filter((listing) => ownSiteIds.includes(Number(listing.siteId)))
+        : all;
+      set({ orgListings: sortListingsByNewest(visible), orgLastFetched: Date.now() });
     } catch (error: unknown) {
       if (isSubscriptionGateError(error)) {
         return;

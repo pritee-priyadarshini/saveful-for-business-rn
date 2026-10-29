@@ -1,9 +1,9 @@
 /** Business reminder fires this long before the pickup window starts. */
 export const CONNECTION_PROMPT_LEAD_MINUTES = 4 * 60;
 /** Business must add food and quantities this long before pickup. */
-export const CONNECTION_LIST_BY_MINUTES = 150;
+export const CONNECTION_LIST_BY_MINUTES = 60;
 /** Charity must confirm collection this long before pickup. */
-export const CONNECTION_CHARITY_CONFIRM_MINUTES = 90;
+export const CONNECTION_CHARITY_CONFIRM_MINUTES = 30;
 
 export const ISO_WEEKDAYS = [
   { id: 1, label: 'Mon', full: 'Monday' },

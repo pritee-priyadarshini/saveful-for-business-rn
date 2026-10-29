@@ -69,6 +69,32 @@ function isBusinessMultiOrg(authUser: any): boolean {
   return orgType === 'BUSINESS_MULTI' || orgType === 'FARMER_PRODUCER';
 }
 
+const MULTI_SITE_ORG_TYPES = ['BUSINESS_MULTI', 'CHARITY_MULTI', 'FARMER_PRODUCER'];
+const HEAD_OFFICE_ORG_ROLES = ['SUPER_ADMIN', 'ORG_ADMIN', 'HEAD_OFFICE_ADMIN', 'HEAD_OFFICE'];
+const SITE_LEVEL_ROLES = ['SITE_ADMIN', 'STAFF', 'LOCATION_ADMIN', 'TEAM_MEMBER', 'DRIVER'];
+
+/**
+ * Site staff in a multi-site organisation only see impact for the sites they
+ * work at; organisation-wide totals are for head office.
+ */
+export function isSiteScopedImpactUser(authUser: any): boolean {
+  const orgType = String(
+    authUser?.orgType ?? normalizeAuthProfile(authUser)?.organisation?.organizationType ?? '',
+  ).toUpperCase();
+  if (!MULTI_SITE_ORG_TYPES.includes(orgType)) return false;
+
+  const orgRole = String(authUser?.orgRole ?? '').toUpperCase();
+  if (HEAD_OFFICE_ORG_ROLES.includes(orgRole)) return false;
+
+  const siteRole = String(authUser?.siteRole ?? '').toUpperCase();
+  return orgRole === 'ORG_MEMBER' || SITE_LEVEL_ROLES.includes(siteRole);
+}
+
+/** Site ids a site-scoped user works at, from their login profile. */
+export function profileSiteIds(authUser: any): number[] {
+  return sitesFromProfile(authUser).map((site) => site.id);
+}
+
 function mergeSites(...groups: AccessibleSite[][]): AccessibleSite[] {
   const byId = new Map<number, AccessibleSite>();
   for (const group of groups) {

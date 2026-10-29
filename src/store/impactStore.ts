@@ -5,7 +5,11 @@ import {
   fetchAggregatedSiteImpact,
   fetchAggregatedSiteImpactByRange,
 } from '../utils/impactData';
-import { AccessibleSite, resolveAccessibleSites } from '../utils/impactSites';
+import {
+  AccessibleSite,
+  isSiteScopedImpactUser,
+  resolveAccessibleSites,
+} from '../utils/impactSites';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
 import { useAuthStore } from './authStore';
 
@@ -276,6 +280,7 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
       // on the site endpoint so a location admin does not mix sibling sites.
       const preferOrgScope =
         siteId == null &&
+        !isSiteScopedImpactUser(authUser) &&
         (orgType === 'CHARITY_MULTI' ||
           orgType === 'FARMER_CONSUMER' ||
           orgType === 'BUSINESS_MULTI' ||
@@ -370,6 +375,7 @@ export const useImpactStore = create<ImpactAnalyticsState>((set, get) => ({
       ).toUpperCase();
       const preferOrgScope =
         siteId == null &&
+        !isSiteScopedImpactUser(authUser) &&
         (orgType === 'CHARITY_MULTI' ||
           orgType === 'FARMER_CONSUMER' ||
           orgType === 'BUSINESS_MULTI' ||

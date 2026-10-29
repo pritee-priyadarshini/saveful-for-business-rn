@@ -392,7 +392,7 @@ export function CreateConnectionScreen({ route }: any) {
       <View style={styles.body}>
         <AppText variant="body1" color={palette.stone} style={styles.intro}>
           Set up a Connection for regular collections with a specific charity. Choose the usual days
-          and pickup window — you’ll confirm the actual food and quantities at least 2.5 hours before
+          and pickup window — you’ll confirm the actual food and quantities at least 1 hour before
           each pickup.
         </AppText>
 

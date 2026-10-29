@@ -35,6 +35,8 @@ import {
   canShowSpecificFoodSavings,
 } from '@/utils/impactAccess';
 import { showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
+import { isSiteScopedImpactUser } from '@/utils/impactSites';
+import { useAuthStore } from '@/store/authStore';
 import { useNavigation } from '@react-navigation/native';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
@@ -131,6 +133,7 @@ export function RestaurantAnalyticsScreen({
   const bottomPadding = variant === 'stack' ? stackBottomPadding : tabBottomPadding;
   const { width } = useWindowDimensions();
   const { currentProfile, selectedRole } = useAppContext();
+  const authUser = useAuthStore((state) => state.authUser);
   const entitlements = useSubscriptionStore((s) => s.entitlements);
   const showFoodSavings = canShowSpecificFoodSavings(entitlements);
   const showRecipients = canShowDonationRecipients(entitlements);
@@ -161,6 +164,14 @@ export function RestaurantAnalyticsScreen({
     chartPeriod: range,
     siteId: selectedSiteId,
   });
+
+  // Site staff with one site: always scope Insights to that site (never the organisation).
+  const siteScoped = isSiteScopedImpactUser(authUser);
+  React.useEffect(() => {
+    if (!siteScoped || sites.length !== 1) return;
+    const onlySiteId = sites[0].id;
+    if (selectedSiteId !== onlySiteId) setSelectedSiteId(onlySiteId);
+  }, [siteScoped, sites, selectedSiteId]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
