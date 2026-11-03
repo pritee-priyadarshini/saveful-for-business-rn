@@ -87,11 +87,21 @@ const expoNotificationsPlugin = [
   },
 ];
 
+const EAS_PROJECT_ID = '6863db47-e894-4b7e-944c-c0c66152e71d';
+
 export default {
   expo: {
     name: 'Saveful For Business',
     slug: 'saveful-business',
     version: '1.1.1',
+    // OTA updates only reach builds with the same `version`. Bump `version` whenever
+    // native code changes (new native package, plugin or permission) and ship a store build.
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
+    updates: {
+      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+    },
     orientation: 'portrait',
     userInterfaceStyle: 'light',
     icon: './assets/intro/Saveful-for-Business-logo.png',
@@ -197,7 +207,7 @@ export default {
 
     extra: {
       eas: {
-        projectId: '6863db47-e894-4b7e-944c-c0c66152e71d',
+        projectId: EAS_PROJECT_ID,
       },
       firebaseEnabled: includeFirebase,
     },

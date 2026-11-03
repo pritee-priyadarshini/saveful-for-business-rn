@@ -18,6 +18,15 @@ function isOnOrBeforeBestBeforeDay(value: Date, bestBefore: Date): boolean {
   return calendarDayMs(value) <= calendarDayMs(bestBefore);
 }
 
+function minuteMs(date: Date): number {
+  const copy = new Date(date);
+  copy.setSeconds(0, 0);
+  return copy.getTime();
+}
+
+export const BEST_BEFORE_BEFORE_PICKUP_END_MESSAGE =
+  'Best before time must be at or after the pickup end time, otherwise the listing expires before it can be collected.';
+
 export function getListingFoodItemsError(totalQty: number): string | undefined {
   if (totalQty <= 0) {
     return 'Add at least one food item with quantity greater than 0.';
@@ -53,6 +62,9 @@ export function getListingDateErrors(
     }
     if (pickupTo && !isOnOrBeforeBestBeforeDay(pickupTo, bestBefore)) {
       errors.pickupTo = 'Pickup end must be on or before the best before date.';
+    } else if (pickupTo && minuteMs(bestBefore) < minuteMs(pickupTo)) {
+      // The backend expires a listing at the earlier of best-before and pickup end.
+      errors.bestBefore = BEST_BEFORE_BEFORE_PICKUP_END_MESSAGE;
     }
   }
 
