@@ -35,6 +35,7 @@ import { useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { showSubscriptionRequiredPrompt, canAccessSubscription } from '@/utils/subscriptionAccess';
 import { formatMobileForDisplay } from '@/data/countryCodes';
 import { useAppContext } from '@/store/AppContext';
+import { ConsolidatedPermissionSection } from '@/components/consolidated/ConsolidatedPermissionSection';
 import { pickDefaultSiteId } from '@/utils/defaultHqSite';
 
 const RESTAURANT_ROLE_OPTIONS = [
@@ -48,7 +49,7 @@ const inputPropsBase = { compact: true as const, labelVariant: 'bodyBold' as con
 
 export default function ManageAccessScreen() {
   useTransparentStatusBar('light');
-  const { selectedRole } = useAppContext();
+  const { selectedRole, authUser } = useAppContext();
   const entitlements = useSubscriptionStore((s) => s.entitlements);
 
   const planLabel =
@@ -590,6 +591,9 @@ export default function ManageAccessScreen() {
         </View>
 
         {/* TEAM MEMBERS */}
+        {String(authUser?.orgRole || '').toUpperCase() === 'SUPER_ADMIN' ? (
+          <ConsolidatedPermissionSection />
+        ) : null}
         <View style={styles.sectionTitleBox}>
           <AppText variant="bodyBold">Team Members</AppText>
         </View>

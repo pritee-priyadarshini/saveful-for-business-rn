@@ -16,6 +16,8 @@ import { estimateMealsSaved, resolveFoodIconSource, type FoodIconKey } from '../
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
+import { handoverInstruction } from '@/utils/consolidated';
+import type { HandoverMethod } from '@/types/consolidated';
 
 export function ListingConfirmationScreen({ navigation, route }: any) {
   useTransparentStatusBar('light');
@@ -34,7 +36,7 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
 
   const tabletInsetReset = r.isTablet ? { marginHorizontal: 0 } : {};
 
-  const { listing } = route.params || {};
+  const { listing, consolidated } = route.params || {};
 
   if (!listing) {
     return (
@@ -86,6 +88,28 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
 
         <View style={contentColumn}>
           <View style={[styles.subHeader, tabletInsetReset]}>
+            {consolidated ? (
+              <>
+                <AppText variant="bodyLarge" style={styles.center}>
+                  {consolidated.status === 'LATE_PENDING_APPROVAL'
+                    ? 'Sent for approval — the listing deadline had passed, so your manager will confirm.'
+                    : `Added to the ${consolidated.pointName || 'shared'} consolidated collection.`}
+                </AppText>
+                <AppText variant="bodyBold" color={palette.kale} style={styles.center}>
+                  {handoverInstruction({
+                    method: consolidated.method as HandoverMethod | undefined,
+                    point: { name: consolidated.pointName },
+                    handoverStartAt: consolidated.handoverStartAt,
+                    handoverEndAt: consolidated.handoverEndAt,
+                    timezone: consolidated.timezone,
+                  })}
+                </AppText>
+                <AppText variant="bodySmall" color={palette.stone} style={styles.center}>
+                  When it's done, confirm the handover from Your Listings.
+                </AppText>
+              </>
+            ) : (
+              <>
             <AppText variant="bodyLarge" style={styles.center}>
               Your surplus is now live and we have notified nearby charities.
             </AppText>
@@ -93,6 +117,8 @@ export function ListingConfirmationScreen({ navigation, route }: any) {
             <AppText variant="bodyLarge" style={styles.center}>
               We'll let you know as soon as someone claims it.
             </AppText>
+              </>
+            )}
           </View>
 
           <Card style={[styles.card, tabletInsetReset]}>

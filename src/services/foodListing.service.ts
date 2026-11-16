@@ -15,6 +15,7 @@ export type FoodItem = {
   totalQtyKg: number;
   remainingQtyKg?: number;
   unit?: string;
+  quantityDescription?: string;
 };
 
 export type FoodListing = {
@@ -49,6 +50,18 @@ export type FoodListing = {
   createdAt?: string;
   updatedAt?: string;
   foodClaims?: any[];
+  consolidatedRole?: 'STANDARD' | 'CONTRIBUTION' | 'MASTER';
+  requiresItemCheck?: boolean;
+  consolidated?: {
+    contributionId: number;
+    collectionId: number;
+    status: string;
+    method: 'SITE_DROP_OFF' | 'INTERNAL_COLLECTION';
+    pointName: string;
+    handoverEndAt: string;
+    handoverStartAt?: string;
+    timezone: string;
+  };
 };
 
 export type CreateFoodItemPayload = {
@@ -56,6 +69,7 @@ export type CreateFoodItemPayload = {
   totalQtyKg: number;
   unit?: string;
   category?: string;
+  quantityDescription?: string;
 };
 
 export type CreateListingPayload = {
@@ -571,6 +585,7 @@ export function mapDiscoverListing(item: FoodListing | Record<string, any>) {
     ),
     connectionId: (item as any).connectionId ?? null,
     exclusiveUntil: (item as any).exclusiveUntil ?? null,
+    requiresItemCheck: Boolean((item as any).requiresItemCheck || (item as any).consolidatedRole === 'MASTER'),
   };
 }
 

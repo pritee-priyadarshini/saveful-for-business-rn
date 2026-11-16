@@ -95,11 +95,12 @@ export function ClaimConfirmModal({
     setError(null);
 
     try {
+      const mode = listing.requiresItemCheck ? 'FULL' : claimMode;
       const claim = await createClaim({
         listingId: listing.listingId,
-        claimMode,
+        claimMode: mode,
         claimItems:
-          claimMode === 'PARTIAL'
+          mode === 'PARTIAL'
             ? items.map((item) => ({
                 foodItemId: item.foodItemId,
                 qtyKg: item.qtyKg,
@@ -260,9 +261,12 @@ export function ClaimConfirmModal({
 
               <View style={styles.modePill}>
                 <AppText variant="label" style={styles.modeText}>
-                  {claimMode === 'FULL' ? 'Full claim' : 'Partial claim'}
+                  {listing.requiresItemCheck || claimMode === 'FULL' ? 'Full claim' : 'Partial claim'}
                 </AppText>
               </View>
+              {listing.requiresItemCheck ? (
+                <AppText variant="bodySmall" color={palette.midgray}>You'll collect all items listed.</AppText>
+              ) : null}
 
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
                 <View style={styles.summaryCard}>

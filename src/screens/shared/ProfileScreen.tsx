@@ -36,6 +36,7 @@ import { useAuthStore } from '@/store/authStore';
 import { showErrorAlert, showSuccessAlert, showInfoAlert } from '@/utils/apiError';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
+import { useConsolidatedAccess } from '@/hooks/useConsolidatedAccess';
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
 import { sitesService } from '@/services/sites.service';
@@ -182,6 +183,7 @@ export function ProfileScreen() {
   };
 
   const { selectedRole, logout } = useAppContext();
+  const { canManage: canManageCollections } = useConsolidatedAccess();
 
   const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
   const isRestaurantMulti = selectedRole === 'restaurant_multi';
@@ -990,6 +992,18 @@ export function ProfileScreen() {
             </Pressable>
           )}
 
+          {/* Canva CM1: one-time setup lives directly under Manage Access. */}
+          {canManageCollections ? (
+            <Pressable
+              style={styles.linkRow}
+              onPress={() => navigation.navigate('ConsolidatedGroups')}
+            >
+              {/* Text takes the remaining width so the icon stays in the same column as the rows above. */}
+              <AppText variant="body" style={styles.linkRowLabel}>Consolidated Collection Groups</AppText>
+              <Ionicons name="git-merge-outline" size={18} style={styles.linkRowIcon} />
+            </Pressable>
+          ) : null}
+
           {[
             { label: 'Privacy Policy', url: 'https://www.saveful.com/privacy-policy' },
             { label: 'Terms of Service', url: 'https://www.saveful.com/saveful-for-business-terms-conditions' },
@@ -1302,6 +1316,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderColor: palette.white,
   },
+  linkRowLabel: { flex: 1, marginRight: spacing.md },
+  linkRowIcon: { alignSelf: 'center' },
 
   passwordLink: {
     flexDirection: 'row',

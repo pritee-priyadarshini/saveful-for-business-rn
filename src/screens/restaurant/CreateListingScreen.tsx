@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Linking,
@@ -19,6 +19,11 @@ import { Screen } from '../../components/Screen';
 import { useAppContext } from '../../store/AppContext';
 import { palette } from '../../theme/colors';
 import { foodListingService } from '../../services/foodListing.service';
+import { consolidatedService } from '@/services/consolidated.service';
+import { useConsolidatedStore } from '@/store/consolidatedStore';
+import { ConsolidatedLogisticsCard, type LogisticsView } from '@/components/consolidated/ConsolidatedLogisticsCard';
+import { DeclarationCheckbox } from '@/components/consolidated/DeclarationCheckbox';
+import { DECLARATION_FALLBACK, handoverInstruction } from '@/utils/consolidated';
 import { useListingsStore } from '../../store/listingsStore';
 import { estimateMealsSaved, estimateCo2AvoidedKg, formatCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import { getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
@@ -48,6 +53,7 @@ type FoodItem = {
   name: string;
   qty: number;
   iconKey: FoodIconKey;
+  quantityDescription?: string;
 };
 
 const stepMeta = [
@@ -65,6 +71,8 @@ const seedItems: FoodItem[] = [
   { name: 'Dairy', qty: 0, iconKey: 'dairy' },
   { name: 'Sandwiches', qty: 0, iconKey: 'sandwiches' },
   { name: 'Salads', qty: 0, iconKey: 'salads' },
+  { name: 'Snacks', qty: 0, iconKey: 'defaultMeal' },
+  { name: 'Drinks', qty: 0, iconKey: 'defaultMeal' },
 ];
 
 const ALLERGEN_OPTIONS = [
@@ -128,7 +136,11 @@ const hasExplicitBestBeforeTime = (date: Date | null) => {
   return !(date.getHours() === 23 && date.getMinutes() === 59);
 };
 
-export function CreateListingScreen({ navigation }: any) {
+export function CreateListingScreen({ navigation, route }: any) {
+  const consolidatedCollectionId = Number(route?.params?.consolidatedCollectionId);
+  // The site the collection was offered to — not necessarily this user's default site.
+  const consolidatedSiteId = Number(route?.params?.consolidatedSiteId);
+  const isConsolidated = Number.isFinite(consolidatedCollectionId) && consolidatedCollectionId > 0;
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
   const { currentProfile, authUser, selectedRole } = useAppContext();
@@ -159,6 +171,9 @@ export function CreateListingScreen({ navigation }: any) {
   const [collectionNotes, setCollectionNotes] = useState('');
   const [confirmedSafe, setConfirmedSafe] = useState(false);
   const [relistApplied, setRelistApplied] = useState(false);
+  const [logistics, setLogistics] = useState<LogisticsView | null>(null);
+  const declarations = useConsolidatedStore((state) => state.declarations);
+  const fetchDeclarations = useConsolidatedStore((state) => state.fetchDeclarations);
 
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
@@ -173,6 +188,47 @@ export function CreateListingScreen({ navigation }: any) {
       reheating?: string;
     }
   >({});
+
+  useEffect(() => {
+    if (!isConsolidated) return;
+    void fetchDeclarations().catch(() => undefined);
+    const cached = Object.values(useConsolidatedStore.getState().openBySite)
+      .flat()
+      .find((row) => row.id === consolidatedCollectionId);
+    if (cached) {
+      setLogistics({
+        method: cached.method,
+        pointName: cached.point.name,
+        address: cached.point.address,
+        directions: cached.point.directions,
+        submissionsCloseAt: cached.submissionsCloseAt,
+        handoverStartAt: cached.handoverStartAt,
+        handoverEndAt: cached.handoverEndAt,
+        pickupStartAt: cached.pickupStartAt,
+        pickupEndAt: cached.pickupEndAt,
+        suitabilityNotes: cached.suitabilityNotes,
+        instructions: cached.instructions,
+        timezone: cached.timezone,
+      });
+      return;
+    }
+    void consolidatedService.getCollection(consolidatedCollectionId).then((dashboard) => {
+      setLogistics({
+        method: dashboard.method,
+        pointName: dashboard.point.name,
+        address: dashboard.point.address,
+        directions: dashboard.point.directions,
+        submissionsCloseAt: dashboard.times.submissionsCloseAt,
+        handoverStartAt: dashboard.times.handoverStartAt,
+        handoverEndAt: dashboard.times.handoverEndAt,
+        pickupStartAt: dashboard.times.pickupStartAt,
+        pickupEndAt: dashboard.times.pickupEndAt,
+        suitabilityNotes: dashboard.suitabilityNotes,
+        instructions: dashboard.instructions,
+        timezone: dashboard.timezone,
+      });
+    }).catch(() => undefined);
+  }, [consolidatedCollectionId, fetchDeclarations, isConsolidated]);
 
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
   const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
@@ -380,7 +436,9 @@ export function CreateListingScreen({ navigation }: any) {
     }
 
     if (step === 2) {
-      const dateErrors = getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
+      const dateErrors = isConsolidated
+        ? (bestBeforeDate ? {} : { bestBefore: 'Please select a best before date.' })
+        : getListingDateErrors(bestBeforeDate, pickupFromDate, pickupToDate);
       const nextErrors: typeof stepErrors = { ...dateErrors };
       if (!storage) {
         nextErrors.storage = 'Please select a storage requirement.';
@@ -388,7 +446,10 @@ export function CreateListingScreen({ navigation }: any) {
       if (!reheating) {
         nextErrors.reheating = 'Please select whether reheating is required.';
       }
-      if (hasListingDateErrors(dateErrors) || nextErrors.storage || nextErrors.reheating) {
+      const blocked = isConsolidated
+        ? Boolean(nextErrors.bestBefore || nextErrors.storage || nextErrors.reheating)
+        : hasListingDateErrors(dateErrors) || Boolean(nextErrors.storage || nextErrors.reheating);
+      if (blocked) {
         setStepErrors(nextErrors);
         return;
       }
@@ -447,6 +508,71 @@ export function CreateListingScreen({ navigation }: any) {
         reheating: !reheating ? 'Please select whether reheating is required.' : undefined,
       });
       setStep(2);
+      return;
+    }
+
+    if (isConsolidated) {
+      if (!bestBeforeDate) {
+        setStepErrors({ bestBefore: 'Please select a best before date.' });
+        setStep(2);
+        return;
+      }
+      if (!logistics) {
+        showErrorAlert('This collection is no longer open.', 'Collection unavailable');
+        return;
+      }
+      const declaration = declarations?.SITE || DECLARATION_FALLBACK.SITE;
+      const bestBefore = bestBeforeDate;
+      await withLock(async () => {
+        try {
+          const result = await consolidatedService.createContribution(consolidatedCollectionId, {
+            siteId: Number.isFinite(consolidatedSiteId) && consolidatedSiteId > 0 ? consolidatedSiteId : resolvedSiteId,
+            foodItems: activeItems.map((item) => ({
+              name: item.name,
+              category: item.name,
+              totalQtyKg: item.qty,
+              unit: 'kg',
+              quantityDescription: item.quantityDescription?.trim() || undefined,
+            })),
+            bestBefore: bestBefore.toISOString(),
+            needsRefrigeration: storage === 'Fridge',
+            needsFreezer: storage === 'Freezer',
+            needsAmbient: storage === 'Ambient',
+            needsHot: storage === 'Hot',
+            needsReheating: reheating === 'Yes',
+            allergens: selectedAllergens,
+            collectionNotes: collectionNotes.trim() || undefined,
+            photos: images,
+            declaration: { version: declaration.version, accepted: true },
+          });
+          useListingsStore.getState().invalidateSite();
+          navigation.replace('ListingConfirmation', {
+            listing: {
+              foodItems: activeItems.map((item) => ({
+                name: item.name,
+                category: item.name,
+                totalQtyKg: item.qty,
+                quantityDescription: item.quantityDescription,
+              })),
+              totalQtyKg: totalQuantity,
+              allergens: selectedAllergens,
+              bestBefore: bestBefore.toISOString(),
+              collectionNotes,
+            },
+            consolidated: {
+              method: logistics.method,
+              pointName: logistics.pointName,
+              handoverStartAt: logistics.handoverStartAt,
+              handoverEndAt: logistics.handoverEndAt,
+              timezone: logistics.timezone,
+              status: result.status,
+            },
+          });
+        } catch (error: any) {
+          if (isSubscriptionGateError(error)) return;
+          showErrorAlert(error, 'Could not add food', 'Please try again.');
+        }
+      });
       return;
     }
 
@@ -587,7 +713,7 @@ export function CreateListingScreen({ navigation }: any) {
           </View>
         </View>
 
-        {hasPreviousListing && !relistApplied && step === 1 ? (
+        {hasPreviousListing && !relistApplied && step === 1 && !isConsolidated ? (
           <View style={styles.relistCard}>
             <AppText variant="bodyBold" color={palette.midgray}>
               Same as last time?
@@ -623,31 +749,48 @@ export function CreateListingScreen({ navigation }: any) {
               </View>
 
               {items.map((item, index) => (
-                <View key={`${item.name}-${index}`} style={styles.foodRow}>
-                  <View style={styles.foodNameWrap}>
-                    <Image source={resolveFoodIconSource(item.iconKey)} style={styles.foodIcon} />
-                    <AppText variant="body1" color={palette.midgray} style={styles.foodLabel}>
-                      {item.name}
-                    </AppText>
-                  </View>
-
-                  <View style={styles.qtyWrap}>
-                    <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, -0.5)}>
-                      <AppText variant="h6" color={palette.stone}>
-                        -
+                <View key={`${item.name}-${index}`}>
+                  <View style={styles.foodRow}>
+                    <View style={styles.foodNameWrap}>
+                      <Image source={resolveFoodIconSource(item.iconKey)} style={styles.foodIcon} />
+                      <AppText variant="body1" color={palette.midgray} style={styles.foodLabel}>
+                        {item.name}
                       </AppText>
-                    </Pressable>
+                    </View>
 
-                    <AppText variant="bodyBold" color={palette.midgray} style={styles.qtyValue}>
-                      {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
-                    </AppText>
+                    <View style={styles.qtyWrap}>
+                      <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, -0.5)}>
+                        <AppText variant="h6" color={palette.stone}>
+                          -
+                        </AppText>
+                      </Pressable>
 
-                    <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, 0.5)}>
-                      <AppText variant="h6" color={palette.stone}>
-                        +
+                      <AppText variant="bodyBold" color={palette.midgray} style={styles.qtyValue}>
+                        {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
                       </AppText>
-                    </Pressable>
+
+                      <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, 0.5)}>
+                        <AppText variant="h6" color={palette.stone}>
+                          +
+                        </AppText>
+                      </Pressable>
+                    </View>
                   </View>
+                  {isConsolidated && item.qty > 0 ? (
+                    <TextInput
+                      value={item.quantityDescription || ''}
+                      onChangeText={(value) => {
+                        setItems((prev) => {
+                          const next = [...prev];
+                          next[index] = { ...next[index], quantityDescription: value };
+                          return next;
+                        });
+                      }}
+                      placeholder="Descriptive quantity (e.g. 3 trays)"
+                      placeholderTextColor={palette.stone}
+                      style={styles.addInput}
+                    />
+                  ) : null}
                 </View>
               ))}
 
@@ -738,6 +881,9 @@ export function CreateListingScreen({ navigation }: any) {
 
         {step === 2 ? (
           <View style={styles.stepWrap}>
+            {isConsolidated && logistics ? <ConsolidatedLogisticsCard collection={logistics} /> : null}
+            {!isConsolidated ? (
+              <>
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               PICKUP LOCATION
             </AppText>
@@ -778,6 +924,8 @@ export function CreateListingScreen({ navigation }: any) {
               <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
                 {stepErrors.location}
               </AppText>
+            ) : null}
+              </>
             ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
@@ -843,7 +991,14 @@ export function CreateListingScreen({ navigation }: any) {
                 {stepErrors.bestBefore}
               </AppText>
             ) : null}
+            {isConsolidated && logistics?.pickupEndAt && bestBeforeDate && bestBeforeDate.getTime() < new Date(logistics.pickupEndAt).getTime() ? (
+              <AppText variant="caption" color={palette.warning} style={styles.inlineError}>
+                This food may not be accepted — its best-before is before the pickup ends.
+              </AppText>
+            ) : null}
 
+            {!isConsolidated ? (
+              <>
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
               PICKUP WINDOW
             </AppText>
@@ -875,6 +1030,8 @@ export function CreateListingScreen({ navigation }: any) {
               <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
                 {stepErrors.pickupTo}
               </AppText>
+            ) : null}
+              </>
             ) : null}
 
             <AppText variant="h8" color={palette.black} style={styles.fieldLabel}>
@@ -1088,7 +1245,9 @@ export function CreateListingScreen({ navigation }: any) {
               <View style={styles.summaryInfoRow}>
                 <Ionicons name="location-outline" size={normalize(18)} color={palette.kale} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  {location || 'Address not provided'}
+                  {isConsolidated
+                    ? `${logistics?.pointName || 'Collection point'}${logistics?.address ? `\n${logistics.address}` : ''}`
+                    : (location || 'Address not provided')}
                 </AppText>
               </View>
 
@@ -1102,9 +1261,26 @@ export function CreateListingScreen({ navigation }: any) {
               <View style={styles.summaryInfoRow}>
                 <Ionicons name="time-outline" size={normalize(18)} color={palette.kale} />
                 <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
-                  Pick up - {formatDateShort(pickupFromDate)} {formatTime(pickupFromDate)} to {formatDateShort(pickupToDate)} {formatTime(pickupToDate)}
+                  {isConsolidated
+                    ? (logistics ? handoverInstruction({
+                        method: logistics.method,
+                        point: { name: logistics.pointName },
+                        handoverStartAt: logistics.handoverStartAt,
+                        handoverEndAt: logistics.handoverEndAt,
+                        timezone: logistics.timezone,
+                      }) : '—')
+                    : `Pick up - ${formatDateShort(pickupFromDate)} ${formatTime(pickupFromDate)} to ${formatDateShort(pickupToDate)} ${formatTime(pickupToDate)}`}
                 </AppText>
               </View>
+              {isConsolidated && logistics?.suitabilityNotes ? (
+                <View style={styles.summaryInfoRow}>
+                  <Ionicons name="shield-checkmark-outline" size={normalize(18)} color={palette.kale} />
+                  <AppText variant="bodyBold" color={palette.midgray} style={styles.summaryInfoText}>
+                    Suitability{'\n'}
+                    {logistics.suitabilityNotes}
+                  </AppText>
+                </View>
+              ) : null}
 
               <View style={styles.summaryInfoRow}>
                 <Ionicons name="snow-outline" size={normalize(18)} color={palette.kale} />
@@ -1138,6 +1314,17 @@ export function CreateListingScreen({ navigation }: any) {
               ) : null}
             </View>
 
+            {isConsolidated ? (
+              <DeclarationCheckbox
+                declaration={declarations?.SITE || DECLARATION_FALLBACK.SITE}
+                checked={confirmedSafe}
+                onChange={(value) => {
+                  setConfirmedSafe(value);
+                  setStepErrors((prev) => ({ ...prev, confirmedSafe: undefined }));
+                }}
+                error={stepErrors.confirmedSafe}
+              />
+            ) : (
             <Pressable style={styles.confirmWrap} onPress={() => {
               setConfirmedSafe((prev) => !prev);
               setStepErrors((prev) => ({ ...prev, confirmedSafe: undefined }));
@@ -1156,7 +1343,8 @@ export function CreateListingScreen({ navigation }: any) {
                 </AppText>
               </AppText>
             </Pressable>
-            {stepErrors.confirmedSafe ? (
+            )}
+            {!isConsolidated && stepErrors.confirmedSafe ? (
               <AppText variant="caption" color={palette.danger} style={styles.inlineError}>
                 {stepErrors.confirmedSafe}
               </AppText>

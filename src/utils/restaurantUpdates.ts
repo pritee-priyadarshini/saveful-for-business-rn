@@ -44,6 +44,7 @@ export type RestaurantUpdate = {
   /** Completed driver delivery — restaurant can rate the driver. */
   canRateDriver?: boolean;
   driverName?: string | null;
+  sharedCollection?: boolean;
 };
 
 function startOfDay(d: Date) {
@@ -224,6 +225,7 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
             .trim() || null
         : null;
 
+      const sharedCollection = listing?.consolidatedRole === 'CONTRIBUTION';
       const sectionDate = collected
         ? claim?.collectedAt || pickup?.collectedAt || claim?.updatedAt || claim?.createdAt
         : claim?.createdAt || claim?.confirmedAt;
@@ -255,6 +257,7 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
           providerConfirmed: providerDone,
           canRateDriver,
           driverName: driverLabel,
+          sharedCollection,
           ...claimRatings(claim),
         });
       }
@@ -284,6 +287,7 @@ export function mapListingsToRestaurantUpdates(listings: any[]): RestaurantUpdat
         providerConfirmed: providerDone,
         canRateDriver,
         driverName: driverLabel,
+        sharedCollection,
         ...claimRatings(claim),
       });
     }

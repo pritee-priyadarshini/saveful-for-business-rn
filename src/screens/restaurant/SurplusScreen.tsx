@@ -21,6 +21,10 @@ import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { connectionsService, type ConnectionToday } from '@/services/connections.service';
+import { consolidatedService } from '@/services/consolidated.service';
+import { useConsolidatedStore } from '@/store/consolidatedStore';
+import type { OpenCollection } from '@/types/consolidated';
+import { formatDateInZone, formatTimeInZone, handoverInstruction } from '@/utils/consolidated';
 import { palette } from '../../theme/colors';
 import { elevation } from '@/theme/elevation';
 import {
@@ -85,6 +89,7 @@ export function SurplusScreen({ navigation }: any) {
 	const [today, setToday] = useState<ConnectionToday[]>([]);
 	const [todayLoading, setTodayLoading] = useState(false);
 	const [chooseOpen, setChooseOpen] = useState(false);
+	const [openCollections, setOpenCollections] = useState<(OpenCollection & { siteId: number; siteName: string | null })[]>([]);
 	const [releaseTarget, setReleaseTarget] = useState<ConnectionToday | null>(null);
 	const [releaseChooser, setReleaseChooser] = useState<ConnectionToday | null>(null);
 	const [offerTarget, setOfferTarget] = useState<{
@@ -101,13 +106,33 @@ export function SurplusScreen({ navigation }: any) {
 			const ids = siteIds.length ? siteIds : fallback ? [fallback] : [];
 			if (!ids.length) {
 				setToday([]);
+				setOpenCollections([]);
 				return;
 			}
 			setTodayLoading(true);
 			const rows = await Promise.all(
 				ids.map((id) => connectionsService.listTodayForSite(id).catch(() => [])),
 			);
+			const openRows = await Promise.all(
+				ids.map((id) => consolidatedService.getOpenCollectionsForSite(id).catch(() => [] as OpenCollection[])),
+			);
 			setToday(rows.flat());
+			// Keep the site each collection was offered to: the food is that site's
+			// contribution, and another site of the same user may not be participating.
+			const siteNameById = new Map(
+				(rawSites ?? []).map((site: any) => [Number(site?.id), site?.siteName || site?.name || null]),
+			);
+			setOpenCollections(
+				ids.flatMap((id, index) =>
+					(openRows[index] || []).map((row) => ({ ...row, siteId: id, siteName: siteNameById.get(id) ?? null })),
+				),
+			);
+			useConsolidatedStore.setState((state) => ({
+				openBySite: {
+					...state.openBySite,
+					...Object.fromEntries(ids.map((id, index) => [id, openRows[index] || []])),
+				},
+			}));
 		} catch {
 			setToday([]);
 		} finally {
@@ -150,7 +175,7 @@ export function SurplusScreen({ navigation }: any) {
 			navigation.navigate('CreateFarmListing');
 			return;
 		}
-		if (availableConnections.length) {
+		if (availableConnections.length || openCollections.length) {
 			setChooseOpen(true);
 			return;
 		}
@@ -437,9 +462,13 @@ export function SurplusScreen({ navigation }: any) {
 			>
 				<Pressable style={styles.modalBackdrop} onPress={() => setChooseOpen(false)}>
 					<Pressable style={styles.modalCard} onPress={() => undefined}>
-						<AppText variant="h6">Who should see this listing?</AppText>
+						<AppText variant="h6">
+							{openCollections.length ? 'Choose collection method' : 'Who should see this listing?'}
+						</AppText>
 						<AppText variant="bodySmall" color={palette.stone} style={{ marginTop: 6, marginBottom: 12 }}>
-							Only new listings. Existing listings are not changed.
+							{openCollections.length
+								? 'Send this food straight to a charity, or add it to a shared collection.'
+								: 'Only new listings. Existing listings are not changed.'}
 						</AppText>
 						<ScrollView
 							style={styles.modalList}
@@ -455,9 +484,13 @@ export function SurplusScreen({ navigation }: any) {
 									openNetworkListing();
 								}}
 							>
-								<AppText variant="bodyBold">Nearby charities</AppText>
+								<AppText variant="bodyBold">
+									{openCollections.length ? 'Direct charity collection' : 'Nearby charities'}
+								</AppText>
 								<AppText variant="caption" color={palette.stone}>
-									Open network — anyone nearby can claim
+									{openCollections.length
+										? 'Nearby charities are notified and collect from your site'
+										: 'Open network — anyone nearby can claim'}
 								</AppText>
 							</Pressable>
 							{availableConnections.map((row) => (
@@ -478,6 +511,47 @@ export function SurplusScreen({ navigation }: any) {
 									</AppText>
 								</Pressable>
 							))}
+							{openCollections.length ? (
+								<AppText variant="label" color={palette.kale} style={{ marginTop: 8 }}>
+									OR
+								</AppText>
+							) : null}
+							{openCollections.map((row) => {
+								// Same rule as the API: only a collection that is no longer OPEN takes late food.
+								const late = row.lateAllowed;
+								const multiSite = new Set(openCollections.map((item) => item.siteId)).size > 1;
+								return (
+									<Pressable
+										key={`${row.id}-${row.siteId}`}
+										style={[styles.choiceBtn, styles.choiceBtnShared]}
+										onPress={() => {
+											setChooseOpen(false);
+											navigation.navigate('CreateListing', {
+												consolidatedCollectionId: row.id,
+												consolidatedSiteId: row.siteId,
+											});
+										}}
+									>
+										<AppText variant="bodyBold">{row.groupName} Consolidated Collection</AppText>
+										<AppText variant="caption" color={palette.midgray}>
+											{formatDateInZone(row.scheduledDate || row.handoverStartAt, row.timezone)}
+											{multiSite && row.siteName ? ` · for ${row.siteName}` : ''}
+										</AppText>
+										<AppText variant="caption" color={palette.kale} style={{ marginTop: 2 }}>
+											{handoverInstruction(row)}
+										</AppText>
+										{late ? (
+											<AppText variant="caption" color={palette.warning}>
+												Listing has closed — your food will need manager approval
+											</AppText>
+										) : (
+											<AppText variant="caption" color={palette.stone}>
+												List by {formatTimeInZone(row.submissionsCloseAt, row.timezone)}
+											</AppText>
+										)}
+									</Pressable>
+								);
+							})}
 						</ScrollView>
 						<Pressable style={styles.modalCancel} onPress={() => setChooseOpen(false)}>
 							<AppText variant="bodyBold" color={palette.primary}>Cancel</AppText>
@@ -647,6 +721,10 @@ const styles = StyleSheet.create({
 		padding: 12,
 		marginBottom: 8,
 		backgroundColor: palette.creme,
+	},
+	choiceBtnShared: {
+		borderColor: palette.kale,
+		backgroundColor: '#EEF7F2',
 	},
 	modalCancel: {
 		alignItems: 'center',

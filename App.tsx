@@ -15,6 +15,10 @@ import { SplashScreen } from './src/screens/SplashScreen';
 import { CircularImageCropHost } from './src/components/CircularImageCropModal';
 import { AppAlertHost } from './src/components/AppAlertModal';
 import { registerNotificationCategories } from './src/services/pushNotifications';
+import { CONSOLIDATED_PREVIEW, ConsolidatedPreviewApp, installConsolidatedFixtures } from './src/dev/consolidatedPreview';
+
+// Dev-only visual preview of the Consolidated Collections screens (inert unless the env flag is set in __DEV__).
+if (CONSOLIDATED_PREVIEW) installConsolidatedFixtures();
 
 export default function App() {
   const [splashTimerDone, setSplashTimerDone] = useState(false);
@@ -70,7 +74,7 @@ export default function App() {
       <SafeAreaProvider>
         <AppProvider>
           <StatusBar style="dark" backgroundColor={palette.background} />
-          <AppNavigator />
+          {CONSOLIDATED_PREVIEW ? <ConsolidatedPreviewApp /> : <AppNavigator />}
           <AppAlertHost />
           <CircularImageCropHost />
         </AppProvider>

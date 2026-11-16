@@ -54,6 +54,17 @@ import DriverTrackingScreen from '@/screens/shared/DriverTrackingScreen';
 import CharityManageAccessScreen from '@/screens/charity/CharityManageAccessScreen';
 import FarmerManageAccessScreen from '@/screens/farmer/FarmerManageAccessScreen';
 import ForgotPasswordScreen from '@/screens/shared/ForgotPasswordScreen';
+import { ConsolidatedGroupsScreen } from '@/screens/consolidated/ConsolidatedGroupsScreen';
+import { ConsolidatedGroupFormScreen } from '@/screens/consolidated/ConsolidatedGroupFormScreen';
+import { ConsolidatedCollectionsScreen } from '@/screens/consolidated/ConsolidatedCollectionsScreen';
+import { ScheduleCollectionScreen } from '@/screens/consolidated/ScheduleCollectionScreen';
+import { CollectionDashboardScreen } from '@/screens/consolidated/CollectionDashboardScreen';
+import { ReviewPublishScreen } from '@/screens/consolidated/ReviewPublishScreen';
+import { ContributionDetailScreen } from '@/screens/consolidated/ContributionDetailScreen';
+import { ConsolidatedReportScreen } from '@/screens/consolidated/ConsolidatedReportScreen';
+import { ConsolidatedInvitationsScreen } from '@/screens/consolidated/ConsolidatedInvitationsScreen';
+import { PickupCheckScreen } from '@/screens/charity/PickupCheckScreen';
+import { bindConsolidatedPushRefresh } from '@/store/consolidatedStore';
 import {
   setupNotificationOpenedHandler,
   teardownNotificationOpenedHandler,
@@ -138,6 +149,21 @@ export type RootStackParamList = {
     trackingId: string;
     source: 'restaurant' | 'charity' | 'farmer';
   };
+  ConsolidatedGroups: undefined;
+  ConsolidatedGroupForm: { groupId?: number } | undefined;
+  ConsolidatedCollections: { groupId?: number; tab?: 'upcoming' | 'active' | 'past' } | undefined;
+  ScheduleCollection: {
+    groupId?: number;
+    scheduleId?: number;
+    collectionId?: number;
+    mode: 'create' | 'editSeries' | 'editOccurrence';
+  };
+  CollectionDashboard: { collectionId: number };
+  ReviewPublish: { collectionId: number };
+  ContributionDetail: { contributionId?: number; listingId?: number };
+  ConsolidatedReport: { groupId?: number } | undefined;
+  ConsolidatedInvitations: undefined;
+  PickupCheck: { claimId: number };
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -354,7 +380,12 @@ export function AppNavigator() {
       return true;
     }
 
-    navigationRef.current.navigate(target.name as keyof RootStackParamList, target.params as never);
+    navigationRef.current.dispatch(
+      CommonActions.navigate({
+        name: target.name,
+        params: 'params' in target ? target.params : undefined,
+      }),
+    );
     return true;
   }
 
@@ -380,6 +411,10 @@ export function AppNavigator() {
     });
     return () => teardownNotificationOpenedHandler();
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return bindConsolidatedPushRefresh();
   }, []);
 
   // Flush pending notification when session is ready; clear it when user logs out.
@@ -482,6 +517,16 @@ export function AppNavigator() {
             <RootStack.Screen name="CharityManageAccess" component={CharityManageAccessScreen} />
             <RootStack.Screen name="FarmerManageAccess" component={FarmerManageAccessScreen} />
             <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <RootStack.Screen name="ConsolidatedGroups" component={ConsolidatedGroupsScreen} />
+            <RootStack.Screen name="ConsolidatedGroupForm" component={ConsolidatedGroupFormScreen} />
+            <RootStack.Screen name="ConsolidatedCollections" component={ConsolidatedCollectionsScreen} />
+            <RootStack.Screen name="ScheduleCollection" component={ScheduleCollectionScreen} />
+            <RootStack.Screen name="CollectionDashboard" component={CollectionDashboardScreen} />
+            <RootStack.Screen name="ReviewPublish" component={ReviewPublishScreen} />
+            <RootStack.Screen name="ContributionDetail" component={ContributionDetailScreen} />
+            <RootStack.Screen name="ConsolidatedReport" component={ConsolidatedReportScreen} />
+            <RootStack.Screen name="ConsolidatedInvitations" component={ConsolidatedInvitationsScreen} />
+            <RootStack.Screen name="PickupCheck" component={PickupCheckScreen} />
 
           </RootStack.Navigator>
 

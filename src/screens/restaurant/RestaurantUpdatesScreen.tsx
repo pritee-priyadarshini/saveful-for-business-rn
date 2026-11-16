@@ -102,9 +102,13 @@ function renderCardHeadline(
   primary: string,
   secondary: string,
   textStyles?: { primary?: TextStyle; secondary?: TextStyle },
+  shared?: boolean,
 ) {
   return (
     <View style={styles.cardHeadline}>
+      {shared ? (
+        <AppText variant="caption" color={palette.kale}>Shared collection</AppText>
+      ) : null}
       <AppText
         variant="h8"
         style={[styles.cardHeadlinePrimary, textStyles?.primary]}
@@ -322,7 +326,7 @@ export function RestaurantUpdatesScreen() {
           {renderCardHeadline(item.claimerName ?? 'Someone', 'claimed your listing', {
             primary: adaptive.cardHeadlinePrimary,
             secondary: adaptive.cardHeadlineSecondary,
-          })}
+          }, item.sharedCollection)}
 
           <View style={[styles.metaStack, adaptive.updateMetaStack]}>
             {item.location ? (
@@ -522,6 +526,7 @@ export function RestaurantUpdatesScreen() {
               primary: adaptive.cardHeadlinePrimary,
               secondary: adaptive.cardHeadlineSecondary,
             },
+            item.sharedCollection,
           )}
 
           <View style={styles.feedbackActions}>
@@ -585,7 +590,7 @@ export function RestaurantUpdatesScreen() {
           {renderCardHeadline('Listing collected', 'Your surplus was picked up successfully', {
             primary: adaptive.cardHeadlinePrimary,
             secondary: adaptive.cardHeadlineSecondary,
-          })}
+          }, item.sharedCollection)}
 
           {item.providerRating != null || item.claimantRating != null ? (
             <View style={{ gap: 6 }}>

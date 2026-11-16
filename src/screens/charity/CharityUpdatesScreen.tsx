@@ -30,6 +30,7 @@ import { useReceiverFeed } from '@/hooks/useReceiverFeed';
 import { claimsService } from '@/services/claims.service';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { getUserFriendlyErrorMessage, showErrorAlert } from '@/utils/apiError';
+import { PendingChangeBanner } from '@/components/consolidated/PendingChangeBanner';
 import type {
   ReceiverUpdateItem,
   ReceiverUpdateType,
@@ -199,6 +200,10 @@ export function CharityUpdatesScreen() {
 
   const handleMarkCollected = (item: UpdateItem) => {
     if (!item.claimId || markingClaimId != null) return;
+    if (item.requiresItemCheck && !item.itemCheckDone) {
+      navigation.navigate('PickupCheck', { claimId: item.claimId });
+      return;
+    }
     showConfirmAlert({
       title: 'Mark as collected?',
       message: `Confirm you collected ${item.quantityKg} kg from ${item.title}. Only confirm after you’ve picked it up.`,
@@ -310,13 +315,15 @@ export function CharityUpdatesScreen() {
 
   const renderStandardCard = (item: UpdateItem) => {
     const theme = CARD_THEMES[item.type];
-    const selfPickup = item.type === 'pickup' && item.canMarkCollected;
+    const selfPickup = item.type === 'pickup' && (item.canMarkCollected || (item.requiresItemCheck && !item.itemCheckDone));
     const badgeLabel = selfPickup ? 'CLAIMED' : theme.badgeLabel;
     const primaryLabel =
       selfPickup && markingClaimId === item.claimId
         ? 'Marking…'
         : selfPickup
-          ? 'Mark as collected'
+          ? item.requiresItemCheck && !item.itemCheckDone
+            ? 'Confirm items'
+            : 'Mark as collected'
           : 'View Details';
 
     return (
@@ -396,6 +403,31 @@ export function CharityUpdatesScreen() {
                 </>
               ) : null}
             </View>
+
+            {item.pendingChangeId && item.claimId ? (
+              <PendingChangeBanner
+                claimId={item.claimId}
+                changeId={item.pendingChangeId}
+                summary={item.pendingChangeSummary}
+                onAcknowledged={() => { void reload(); }}
+                onCancelPickup={() => {
+                  showConfirmAlert({
+                    title: 'Cancel pickup?',
+                    message: 'This pickup will be cancelled.',
+                    confirmLabel: 'Cancel pickup',
+                    destructive: true,
+                    onConfirm: async () => {
+                      try {
+                        await claimsService.cancelClaim(item.claimId!);
+                        void reload();
+                      } catch (error) {
+                        showErrorAlert(error, 'Could not cancel pickup');
+                      }
+                    },
+                  });
+                }}
+              />
+            ) : null}
 
             <View style={styles.cardActions}>
               {selfPickup ? (

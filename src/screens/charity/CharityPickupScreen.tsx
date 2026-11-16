@@ -29,6 +29,7 @@ import { useReceiverFeed } from '@/hooks/useReceiverFeed';
 import { claimsService } from '@/services/claims.service';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { PostCollectSurveyModal } from './components/postCollectSurveyModal';
+import { PendingChangeBanner } from '@/components/consolidated/PendingChangeBanner';
 import type {
   ReceiverPickup,
   ReceiverPickupCardStatus,
@@ -189,6 +190,10 @@ export default function CharityPickupScreen({ navigation }: any) {
 
   const handleMarkCollected = (pickup: Pickup) => {
     if (!pickup.claimId || markingClaimId != null) return;
+    if (pickup.requiresItemCheck && !pickup.itemCheckDone) {
+      navigation.navigate('PickupCheck', { claimId: pickup.claimId });
+      return;
+    }
     showConfirmAlert({
       title: 'Mark as collected?',
       message: `Confirm you collected ${pickup.weightKg} kg from ${pickup.restaurantName}. Only confirm after you’ve picked it up.`,
@@ -319,7 +324,32 @@ export default function CharityPickupScreen({ navigation }: any) {
             ) : null}
 
             <View style={styles.cardActions}>
-              {pickup.canMarkCollected ? (
+              {pickup.pendingChangeId ? (
+                <PendingChangeBanner
+                  claimId={pickup.claimId || 0}
+                  changeId={pickup.pendingChangeId}
+                  summary={pickup.pendingChangeSummary}
+                  onAcknowledged={() => { void reload(); }}
+                  onCancelPickup={() => {
+                    if (!pickup.claimId) return;
+                    showConfirmAlert({
+                      title: 'Cancel pickup?',
+                      message: 'This pickup will be cancelled.',
+                      confirmLabel: 'Cancel pickup',
+                      destructive: true,
+                      onConfirm: async () => {
+                        try {
+                          await claimsService.cancelClaim(pickup.claimId!);
+                          void reload();
+                        } catch (error) {
+                          showErrorAlert(error, 'Could not cancel pickup');
+                        }
+                      },
+                    });
+                  }}
+                />
+              ) : null}
+              {(pickup.canMarkCollected || (pickup.requiresItemCheck && !pickup.itemCheckDone)) ? (
                 <Pressable
                   style={[styles.viewDetailsBtn, theme.viewDetailsBtn]}
                   disabled={markingClaimId != null}
@@ -330,7 +360,11 @@ export default function CharityPickupScreen({ navigation }: any) {
                     style={[styles.viewDetailsText, theme.viewDetailsText]}
                     numberOfLines={1}
                   >
-                    {markingClaimId === pickup.claimId ? 'Marking…' : 'Mark as collected'}
+                    {markingClaimId === pickup.claimId
+                      ? 'Marking…'
+                      : pickup.requiresItemCheck && !pickup.itemCheckDone
+                        ? 'Confirm items'
+                        : 'Mark as collected'}
                   </AppText>
                 </Pressable>
               ) : null}

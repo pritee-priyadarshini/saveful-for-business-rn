@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { AppText } from '@/components/AppText';
 import { ClaimPickupDetails } from '@/components/ClaimPickupDetails';
@@ -12,6 +13,7 @@ import { palette } from '@/theme/colors';
 import { getUserFriendlyErrorMessage, showErrorAlert } from '@/utils/apiError';
 import { hp, normalize, wp } from '@/utils/responsive';
 import type { SelfPickupClaim } from '@/utils/receiverFeed';
+import { PendingChangeBanner } from '@/components/consolidated/PendingChangeBanner';
 
 type Props = {
   claims: SelfPickupClaim[];
@@ -26,6 +28,7 @@ export function SelfPickupClaimsSection({
   onChanged,
   variant,
 }: Props) {
+  const navigation = useNavigation<any>();
   const [expanded, setExpanded] = useState(false);
   const [markingClaimId, setMarkingClaimId] = useState<number | null>(null);
   const [detailsClaim, setDetailsClaim] = useState<SelfPickupClaim | null>(null);
@@ -44,6 +47,10 @@ export function SelfPickupClaimsSection({
 
   const confirmSelfPickup = (claim: SelfPickupClaim) => {
     if (markingClaimId != null) return;
+    if (variant === 'charity' && claim.requiresItemCheck && !claim.itemCheckDone && claim.claimId) {
+      navigation.navigate('PickupCheck', { claimId: claim.claimId });
+      return;
+    }
     showConfirmAlert({
       title: 'Pick this up yourself?',
       message: `Mark ${claim.quantityKg} kg from ${claim.businessName} as collected? Only do this after you’ve picked it up.`,
@@ -232,6 +239,34 @@ export function SelfPickupClaimsSection({
               </ScrollView>
             ) : null}
 
+            {variant === 'charity' && detailsClaim?.pendingChangeId && detailsClaim.claimId ? (
+              <PendingChangeBanner
+                claimId={detailsClaim.claimId}
+                changeId={detailsClaim.pendingChangeId}
+                summary={detailsClaim.pendingChangeSummary}
+                onAcknowledged={() => onChanged?.()}
+                onCancelPickup={() => {
+                  const claimId = detailsClaim.claimId;
+                  if (!claimId) return;
+                  showConfirmAlert({
+                    title: 'Cancel pickup?',
+                    message: 'This pickup will be cancelled.',
+                    confirmLabel: 'Cancel pickup',
+                    destructive: true,
+                    onConfirm: async () => {
+                      try {
+                        await claimsService.cancelClaim(claimId);
+                        setDetailsClaim(null);
+                        onChanged?.();
+                      } catch (error) {
+                        showErrorAlert(error, 'Could not cancel pickup');
+                      }
+                    },
+                  });
+                }}
+              />
+            ) : null}
+
             <Pressable
               style={({ pressed }) => [styles.collectedBtn, pressed && styles.pressed]}
               onPress={markFromDetails}
@@ -240,7 +275,9 @@ export function SelfPickupClaimsSection({
             >
               <Ionicons name="checkmark-circle-outline" size={normalize(18)} color={palette.white} />
               <AppText variant="bodyBold" style={styles.collectedBtnText}>
-                Collected
+                {variant === 'charity' && detailsClaim?.requiresItemCheck && !detailsClaim?.itemCheckDone
+                  ? 'Confirm items'
+                  : 'Collected'}
               </AppText>
             </Pressable>
           </View>

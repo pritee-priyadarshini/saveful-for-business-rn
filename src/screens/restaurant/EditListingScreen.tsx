@@ -78,6 +78,8 @@ const seedItems: FoodItem[] = [
   { name: 'Dairy', qty: 0, iconKey: 'dairy' },
   { name: 'Sandwiches', qty: 0, iconKey: 'sandwiches' },
   { name: 'Salads', qty: 0, iconKey: 'salads' },
+  { name: 'Snacks', qty: 0, iconKey: 'defaultMeal' },
+  { name: 'Drinks', qty: 0, iconKey: 'defaultMeal' },
 ];
 
 const ALLERGEN_OPTIONS = [

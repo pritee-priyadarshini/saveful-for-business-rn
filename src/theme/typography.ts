@@ -111,6 +111,12 @@ export const typography = {
     letterSpacing: 1,
     textTransform: 'uppercase' as const,
   },
+  /** Secondary sentence-case text: addresses, times, helper copy. (caption is uppercase.) */
+  meta: {
+    fontFamily: 'Saveful-Regular',
+    fontSize: fs(13),
+    lineHeight: lh(13, 18),
+  },
   metric: {
     fontFamily: 'Saveful-Bold',
     fontSize: fs(36),

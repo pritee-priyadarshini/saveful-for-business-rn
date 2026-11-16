@@ -25,6 +25,8 @@ import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { useAppContext } from '../../store/AppContext';
 import { useSitesStore } from '@/store/sitesStore';
 import { connectionsService } from '@/services/connections.service';
+import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
+import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { isVirtualHqSiteId } from '@/utils/defaultHqSite';
 import { resolveListingSiteId } from '@/utils/listingSite';
 import { useOrganizationLocation } from '../../hooks/useOrganizationLocation';
@@ -685,6 +687,9 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   <Ionicons name="chevron-forward" size={normalize(16)} color={palette.primary} />
                 </Pressable>
               ) : null}
+
+              <ConsolidatedInvitationsCard style={{ marginBottom: 10 }} />
+              <ConsolidatedHomeCard />
 
               <View style={styles.impactSection}>
                 <View style={[styles.sectionHeading, adaptive.sectionHeading]}>

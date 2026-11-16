@@ -38,6 +38,7 @@ import { showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
 import { isSiteScopedImpactUser } from '@/utils/impactSites';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigation } from '@react-navigation/native';
+import { useConsolidatedAccess } from '@/hooks/useConsolidatedAccess';
 import type { ImpactFilter } from '@/store/impactStore';
 import type { ChartMetricKey, ImpactDisplayStats } from '@/utils/impactData';
 import { toLineChartDatasets } from '@/utils/impactData';
@@ -138,7 +139,8 @@ export function RestaurantAnalyticsScreen({
   const showFoodSavings = canShowSpecificFoodSavings(entitlements);
   const showRecipients = canShowDonationRecipients(entitlements);
   const showReportDownload = canDownloadImpactReports(entitlements);
-  const stackNavigation = useNavigation();
+  const stackNavigation = useNavigation<any>();
+  const { inGroup: canOpenCollectionsReport } = useConsolidatedAccess();
   const chartWidth = dashboardChartWidth(r, width);
 
   const [filter, setFilter] = React.useState<ImpactFilter>({ mode: 'all_time' });
@@ -620,6 +622,16 @@ export function RestaurantAnalyticsScreen({
 
           <ImpactDateFilter filter={filter} onChange={setFilter} />
 
+          {canOpenCollectionsReport ? (
+            <Pressable
+              onPress={() => stackNavigation.navigate('ConsolidatedReport')}
+              style={({ pressed }) => [styles.reportLink, pressed && { opacity: 0.9 }]}
+            >
+              <AppText variant="bodyBold">Consolidated Collections report</AppText>
+              <Ionicons name="chevron-forward" size={16} color={palette.primary} />
+            </Pressable>
+          ) : null}
+
           {renderImpactMetricsSection(
             filter.mode === 'all_time' ? 'All-time impact' : `Impact · ${filterLabel}`,
             stats,
@@ -823,6 +835,19 @@ const styles = StyleSheet.create({
 
   siteSelectorSlot: {
     marginBottom: hp(0.5),
+  },
+
+  reportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: palette.white,
+    borderRadius: normalize(14),
+    borderWidth: 1,
+    borderColor: palette.strokecream,
+    paddingVertical: hp(1.4),
+    paddingHorizontal: wp(4),
+    marginBottom: hp(1),
   },
 
   createBtn: {

@@ -310,6 +310,18 @@ export function CharityMapScreen({ navigation }: any) {
 
   const openPartialClaim = useCallback(
     (listing: DiscoverListing, claimItems: ClaimFoodItem[]) => {
+      if (listing.requiresItemCheck) {
+        setPendingClaim({
+          listing,
+          claimMode: 'FULL',
+          items: claimItems.map((item) => ({
+            foodItemId: item.foodItemId,
+            name: item.name,
+            qtyKg: item.quantityKg,
+          })),
+        });
+        return;
+      }
       const items = buildPartialClaimItems(listing, claimItems);
       if (!items.length) {
         showInfoAlert(
@@ -677,6 +689,7 @@ export function CharityMapScreen({ navigation }: any) {
   const renderListing = ({ item }: { item: DiscoverListing }) => {
     const claimItems = foodItemsByListing[item.id] ?? [];
     const isLoadingItems = loadingFoodItems[item.id];
+    const wholeOnly = Boolean(item.requiresItemCheck);
     const totalSelected = getTotalSelected(item.id);
     const hasSelection = totalSelected > 0;
     const availableKg = getAvailableKg(item, claimItems);
@@ -757,13 +770,22 @@ export function CharityMapScreen({ navigation }: any) {
             contentContainerStyle={styles.listingPhotoRow}
             thumbnailStyle={styles.listingPhoto}
           />
+          {wholeOnly ? (
+            <AppText variant="bodySmall" color={palette.midgray}>
+              You'll collect all items listed.
+            </AppText>
+          ) : (
+            <>
           <AppText variant="label" style={styles.sectionTitle}>
             Select quantity per item
           </AppText>
           {renderClaimPanel(item, claimItems)}
+            </>
+          )}
         </View>
 
         <View style={styles.ctaRow}>
+          {wholeOnly ? null : (
           <Button
             label={`Claim ${formatKg(totalSelected)} kg`}
             variant="secondary"
@@ -773,12 +795,13 @@ export function CharityMapScreen({ navigation }: any) {
             style={styles.partialClaimBtn}
             onPress={() => openPartialClaim(item, claimItems)}
           />
+          )}
 
           <Button
             label="Claim All"
             size="compact"
             disabled={isLoadingItems || claimItems.length === 0}
-            style={styles.claimAllBtn}
+            style={wholeOnly ? styles.claimAllBtn : styles.claimAllBtn}
             onPress={() => openFullClaim(item, claimItems)}
           />
         </View>

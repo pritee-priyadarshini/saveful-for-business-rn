@@ -43,6 +43,10 @@ import { formatListingPickupDateRange } from '../../utils/dateFormat';
 import { showErrorAlert, showSuccessAlert } from '../../utils/apiError';
 import { isSubscriptionGateError } from '../../utils/billingErrors';
 import { showConfirmAlert } from '../../store/appAlertStore';
+import { CollectionStatusBadge } from '@/components/consolidated/CollectionStatusBadge';
+import { HandoverButton } from '@/components/consolidated/HandoverButton';
+import { consolidatedService } from '@/services/consolidated.service';
+import { canEditContribution, canWithdrawContribution } from '@/utils/consolidated';
 import { useAppContext } from '../../store/AppContext';
 import { useListingsStore } from '../../store/listingsStore';
 import { useSitesStore } from '../../store/sitesStore';
@@ -561,7 +565,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
   );
 
   const filteredListings = useMemo(() => {
-    let result = listings;
+    let result = listings.filter((listing) => listing?.consolidatedRole !== 'MASTER');
     if (listingFilter === 'people') result = result.filter((l) => isPeopleListing(l));
     else if (listingFilter === 'animals') result = result.filter((l) => isAnimalListing(l));
     result = result.filter((listing) => matchesStatusFilter(listing, statusFilter));
@@ -749,6 +753,8 @@ export function RestaurantListingsScreen({ navigation }: any) {
     const statusLabel = getListingStatusLabel(item);
     const reservedRow = reservedDayFor(item);
     const reserved = isReservedListing(item) || Boolean(reservedRow);
+    const contribution = item?.consolidatedRole === 'CONTRIBUTION';
+    const contributionMeta = item?.consolidated;
 
     const statusConfig = expired
       ? { bg: '#FFF1D6', color: palette.warning }
@@ -780,15 +786,27 @@ export function RestaurantListingsScreen({ navigation }: any) {
       <View key={item.id} style={[styles.listingCard, adaptive.listingCard, { borderColor: theme.border }]}>
 
         {/* Card header strip */}
-        <View style={[styles.cardHeader, adaptive.cardHeader, { backgroundColor: theme.bannerBg }]}>
+        <Pressable
+          disabled={!contribution}
+          onPress={() => navigation.navigate('ContributionDetail', {
+            listingId: Number(item.id),
+            contributionId: contributionMeta?.contributionId,
+          })}
+          style={[styles.cardHeader, adaptive.cardHeader, { backgroundColor: theme.bannerBg }]}
+        >
           <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
             <AppText
               variant="caption"
               style={[styles.statusBadgeText, adaptive.statusBadgeText, { color: statusConfig.color }]}
             >
-              {statusLabel}
+              {contribution
+                ? `Shared collection${contributionMeta?.pointName ? ` · ${contributionMeta.pointName}` : ''}`
+                : statusLabel}
             </AppText>
           </View>
+          {contribution ? (
+            <CollectionStatusBadge status={contributionMeta?.status} kind="contribution" method={contributionMeta?.method} />
+          ) : null}
           <View style={styles.categoryBadge}>
             <Image source={theme.categoryIcon} style={styles.categoryIcon} resizeMode="contain" />
             <AppText
@@ -798,11 +816,11 @@ export function RestaurantListingsScreen({ navigation }: any) {
               {theme.categoryLabel}
             </AppText>
           </View>
-        </View>
+        </Pressable>
 
         <View style={[styles.cardBody, adaptive.cardBody]}>
           {/* Notification / status message */}
-          {active && (
+          {active && !contribution && (
             <View style={styles.notificationRow}>
               <Ionicons
                 name={reserved ? 'people-outline' : 'location'}
@@ -891,8 +909,17 @@ export function RestaurantListingsScreen({ navigation }: any) {
             )}
           </View>
 
+          {active && contribution ? (
+            <View style={styles.notificationRow}>
+              <Ionicons name="cube-outline" size={normalize(13)} color={theme.accent} />
+              <AppText variant="caption" style={[styles.notificationText, { color: theme.accent }]}>
+                Shared collection · {contributionMeta?.pointName || 'Collection point'}
+              </AppText>
+            </View>
+          ) : null}
+
           {/* Instructions */}
-          {active && (
+          {active && !contribution && (
             <View style={[styles.instructionsBanner, { backgroundColor: theme.bannerBg, borderColor: theme.border }]}>
               <Ionicons name="information-circle-outline" size={normalize(13)} color={theme.accent} />
               <AppText variant="caption" style={[styles.instructionsText, { color: theme.accent }]}>
@@ -902,7 +929,49 @@ export function RestaurantListingsScreen({ navigation }: any) {
           )}
 
           {/* Action buttons */}
-          {active && reserved ? (
+          {contribution ? (
+            <View style={{ gap: 8 }}>
+              <Pressable onPress={() => navigation.navigate('ContributionDetail', { listingId: Number(item.id), contributionId: contributionMeta?.contributionId })}>
+                <AppText variant="caption" color={palette.kale}>
+                  {canEditContribution(contributionMeta?.status) ? 'Edit' : 'View'}
+                </AppText>
+              </Pressable>
+              {contributionMeta?.status === 'SUBMITTED' && contributionMeta?.contributionId ? (
+                <HandoverButton
+                  contributionId={Number(contributionMeta.contributionId)}
+                  method={contributionMeta.method}
+                  timezone={contributionMeta.timezone}
+                  onDone={() => { void loadListings(true); }}
+                />
+              ) : null}
+              {canWithdrawContribution(contributionMeta?.status) ? (
+                <Pressable
+                  onPress={() => {
+                    const id = Number(contributionMeta?.contributionId);
+                    if (!id) return;
+                    showConfirmAlert({
+                      title: 'Withdraw this food?',
+                      message: 'It will be removed from this collection.',
+                      confirmLabel: 'Withdraw',
+                      destructive: true,
+                      onConfirm: async () => {
+                        try {
+                          await consolidatedService.withdrawContribution(id);
+                          showSuccessAlert('Withdrawn.', 'Updated');
+                          await loadListings(true);
+                        } catch (error) {
+                          showErrorAlert(error, 'Could not withdraw');
+                        }
+                      },
+                    });
+                  }}
+                >
+                  <AppText variant="bodyBold" color={palette.danger}>Withdraw</AppText>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+          {active && reserved && !contribution ? (
             <Pressable
               style={[styles.releaseBtn, submitting && { opacity: 0.6 }]}
               disabled={submitting}
@@ -913,7 +982,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
               </AppText>
             </Pressable>
           ) : null}
-          {active && (
+          {active && !contribution && (
             <View style={styles.actionRow}>
               <Pressable
                 style={[

@@ -12,11 +12,21 @@ import { palette } from '@/theme/colors';
 
 type RestaurantStackParamList = {
   RestaurantListings: undefined;
-  CreateListing: undefined;
+  CreateListing: { consolidatedCollectionId?: number; consolidatedSiteId?: number } | undefined;
   CreateFarmListing: undefined;
   FarmListingConfirmation: { listing: any };
   EditListing: { listingId: number };
-  ListingConfirmation: { listing: any };
+  ListingConfirmation: {
+    listing: any;
+    consolidated?: {
+      method?: string;
+      pointName?: string;
+      handoverStartAt?: string;
+      handoverEndAt?: string;
+      timezone?: string | null;
+      status?: string;
+    };
+  };
   CollectionHistory: undefined;
   Surplus: undefined;
   AddDailySurplus: {

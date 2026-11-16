@@ -27,6 +27,8 @@ import { useSitesStore } from '@/store/sitesStore';
 import { showConfirmAlert, showAppAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
+import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding } from '@/hooks/useBottomTabPadding';
@@ -550,6 +552,9 @@ export default function ManageSitesScreen() {
           </View>
           <Ionicons name="chevron-forward" size={normalize(16)} color={palette.primary} />
         </Pressable>
+
+        <ConsolidatedInvitationsCard style={{ marginHorizontal: wp(4), marginBottom: hp(1.2) }} />
+        <ConsolidatedHomeCard style={{ marginHorizontal: wp(4), marginBottom: hp(2) }} />
 
         <View style={[styles.sitesHeader, tabletInsetReset]}>
           <View style={styles.sitesHeaderLeft}>

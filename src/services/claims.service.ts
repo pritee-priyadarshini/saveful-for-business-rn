@@ -18,6 +18,9 @@ export type FoodClaim = {
   listingId: number;
   claimMode: ClaimMode;
   status: string;
+  requiresItemCheck?: boolean;
+  itemCheckDone?: boolean;
+  pendingChangeId?: number | null;
   claimItems?: Array<{
     id: number;
     foodItemId: number;

@@ -238,7 +238,12 @@ export function DiscoverListingDetailModal({
               />
             ) : null}
             {onClaim ? (
-              <Button label={claimLabel} size="compact" onPress={onClaim} style={styles.claimBtn} />
+              <>
+                {listing?.requiresItemCheck ? (
+                  <AppText variant="caption" color={palette.midgray}>You'll collect all items listed.</AppText>
+                ) : null}
+                <Button label={claimLabel} size="compact" onPress={onClaim} style={styles.claimBtn} />
+              </>
             ) : null}
             <Button
               label="Close"

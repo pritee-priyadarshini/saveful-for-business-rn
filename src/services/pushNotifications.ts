@@ -602,6 +602,7 @@ export function isCollectionNotification(payload: NotificationPayload): boolean 
 export function isFoodListingNotification(payload: NotificationPayload): boolean {
   const data = payload.data ?? {};
   const type = normalizeNotificationValue(data.type ?? data.notificationType ?? data.event);
+  if (type.startsWith('consolidated_') || type === 'pickup_change') return false;
   const deepLink = normalizeNotificationValue(data.deepLink ?? data.deep_link ?? data.link);
   const screen = normalizeNotificationValue(data.screen ?? data.targetScreen);
 
@@ -623,7 +624,13 @@ export type NotificationNavigationTarget =
   | { name: 'ManageSites'; params?: undefined }
   | { name: 'Connections'; params?: { siteId?: number } }
   | { name: 'CharityConnections' }
-  | { name: 'AddDailySurplus'; params: { dayId: number; connectionId?: number; charityName?: string } };
+  | { name: 'AddDailySurplus'; params: { dayId: number; connectionId?: number; charityName?: string } }
+  | { name: 'CharityConnectionDetail'; params: { connectionId: number } }
+  | { name: 'CollectionDashboard'; params: { collectionId: number } }
+  | { name: 'ContributionDetail'; params: { contributionId?: number; listingId?: number } }
+  | { name: 'PickupCheck'; params: { claimId: number } }
+  | { name: 'ConsolidatedInvitations'; params?: undefined }
+  | { name: 'ConsolidatedGroupForm'; params: { groupId: number } };
 
 export type DailyPromptDecision = {
   dayId: number;
@@ -719,6 +726,47 @@ export function resolveNotificationTarget(
   const type = normalizeNotificationValue(data.type ?? data.notificationType ?? data.event);
   const deepLink = normalizeNotificationValue(data.deepLink ?? data.deep_link ?? data.link);
   const rawType = String(data.type ?? data.notificationType ?? data.event ?? '').toUpperCase();
+
+  if (type === 'consolidated_invitation') {
+    return { name: 'ConsolidatedInvitations' };
+  }
+  if (type === 'consolidated_invitation_accepted' || type === 'consolidated_invitation_declined') {
+    const groupId = Number(data.groupId);
+    if (Number.isFinite(groupId) && groupId > 0) return { name: 'ConsolidatedGroupForm', params: { groupId } };
+  }
+
+  if (type.startsWith('consolidated_')) {
+    const contributionId = Number(data.contributionId);
+    const collectionId = Number(data.collectionId);
+    const listingId = Number(data.listingId);
+    const siteTypes = new Set([
+      'consolidated_scheduled',
+      'consolidated_closing_soon',
+      'consolidated_received',
+      'consolidated_not_received',
+      'consolidated_change_decided',
+      'consolidated_completed',
+    ]);
+    if (siteTypes.has(type) && Number.isFinite(contributionId) && contributionId > 0) {
+      return {
+        name: 'ContributionDetail',
+        params: {
+          contributionId,
+          listingId: Number.isFinite(listingId) && listingId > 0 ? listingId : undefined,
+        },
+      };
+    }
+    if ((type === 'consolidated_scheduled' || type === 'consolidated_closing_soon') && !(contributionId > 0)) {
+      return { name: 'Tabs', params: { screen: 'Listings', params: { screen: 'Surplus' } } };
+    }
+    if (Number.isFinite(collectionId) && collectionId > 0) {
+      return { name: 'CollectionDashboard', params: { collectionId } };
+    }
+  }
+
+  if (type === 'pickup_change') {
+    return { name: 'Tabs', params: { screen: 'Updates' } };
+  }
 
   if (
     rawType === 'CONNECTION_DAILY_PROMPT' ||

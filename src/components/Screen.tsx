@@ -38,6 +38,8 @@ export function Screen({
   const setScrollRef = useCallback(
     (node: ScrollView | null) => {
       internalScrollRef.current = node;
+      // Dev-only hook for the visual preview (src/dev/consolidatedPreview.tsx) to scroll headless captures.
+      if (__DEV__ && node) (globalThis as { __previewScroll?: ScrollView | null }).__previewScroll = node;
       if (!scrollRefProp) return;
       if (typeof scrollRefProp === 'function') {
         scrollRefProp(node);

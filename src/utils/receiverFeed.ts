@@ -46,6 +46,10 @@ export type ReceiverUpdateItem = {
   driverRated?: boolean;
   /** Charity/farmer star rating of the driver (when already submitted). */
   driverRating?: number | null;
+  requiresItemCheck?: boolean;
+  itemCheckDone?: boolean;
+  pendingChangeId?: number | null;
+  pendingChangeSummary?: string | null;
 };
 
 export type ReceiverPickupCardStatus =
@@ -86,6 +90,10 @@ export type ReceiverPickup = {
   items: ReceiverPickupItem[];
   claimId?: number;
   listingId?: number;
+  requiresItemCheck?: boolean;
+  itemCheckDone?: boolean;
+  pendingChangeId?: number | null;
+  pendingChangeSummary?: string | null;
 };
 
 const CLAIMS_PAGE_SIZE = 100;
@@ -226,7 +234,7 @@ const ACTIVE_DRIVER_PICKUP_STATUSES = new Set([
 function hasActiveDriverPickup(claim: any): boolean {
   const pickups = Array.isArray(claim?.driverPickups) ? claim.driverPickups : [];
   if (
-    pickups.some((p) =>
+    pickups.some((p: { status?: string }) =>
       ACTIVE_DRIVER_PICKUP_STATUSES.has(String(p?.status || '').toUpperCase()),
     )
   ) {
@@ -404,6 +412,20 @@ function claimBelongsToViewerSite(claim: any, viewerSiteId?: number | null): boo
   return claimSite === viewerSiteId;
 }
 
+function itemCheckMeta(claim: any) {
+  const pendingId = Number(claim?.pendingChangeId);
+  return {
+    requiresItemCheck: Boolean(
+      claim?.requiresItemCheck ??
+        claim?.listing?.requiresItemCheck ??
+        (claim?.claimKind === 'CONSOLIDATED_MASTER' || claim?.listing?.consolidatedRole === 'MASTER'),
+    ),
+    itemCheckDone: Boolean(claim?.itemCheckDone),
+    pendingChangeId: Number.isFinite(pendingId) && pendingId > 0 ? pendingId : null,
+    pendingChangeSummary: claim?.pendingChange?.summary || claim?.pendingMaterialChange?.summary || null,
+  };
+}
+
 /**
  * Builds the charity/farmer Updates feed from the org's claims plus available
  * surplus nearby (or from the notification inbox feed).
@@ -533,6 +555,7 @@ export function mapReceiverUpdates(params: {
       contactName: pickup.contactName,
       contactPhone: pickup.contactPhone,
       collectionNotes: pickup.collectionNotes,
+      ...itemCheckMeta(claim),
     });
   }
 
@@ -642,6 +665,7 @@ export function mapReceiverPickups(params: {
         items: claimItemsToPickupItems(claim),
         claimId: Number(claim.id),
         listingId: Number(listing?.id || claim?.listingId),
+        ...itemCheckMeta(claim),
       } satisfies ReceiverPickup;
     })
     .sort((a, b) => Number(b.claimId || 0) - Number(a.claimId || 0));
@@ -678,7 +702,7 @@ export async function fetchAvailableListingsForAudience(
 /** True when a driver is/was assigned (not cancelled) — blocks self-pickup UI. */
 function hasDriverAssignment(claim: any): boolean {
   const pickups = Array.isArray(claim?.driverPickups) ? claim.driverPickups : [];
-  return pickups.some((p) => {
+  return pickups.some((p: { status?: string }) => {
     const s = String(p?.status || '').toUpperCase();
     return Boolean(s) && s !== 'CANCELLED';
   });
@@ -698,6 +722,10 @@ export type SelfPickupClaim = {
   quantityKg: number;
   timeLabel: string;
   items: ReceiverPickupItem[];
+  requiresItemCheck?: boolean;
+  itemCheckDone?: boolean;
+  pendingChangeId?: number | null;
+  pendingChangeSummary?: string | null;
 };
 
 export function mapSelfPickupClaims(
@@ -732,6 +760,7 @@ export function mapSelfPickupClaims(
         quantityKg: claimQuantityKg(claim),
         timeLabel: formatTimeLabel(listing?.pickupFromTime, listing?.pickupByTime),
         items: claimItemsToPickupItems(claim),
+        ...itemCheckMeta(claim),
       } satisfies SelfPickupClaim;
     })
     .sort((a, b) => b.claimId - a.claimId);

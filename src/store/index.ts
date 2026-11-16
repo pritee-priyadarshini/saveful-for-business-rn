@@ -29,6 +29,7 @@ import { useCharityStore } from './charityStore';
 import { useFarmerConsumerStore } from './farmerConsumerStore';
 import { useNotificationsStore } from './notificationsStore';
 import { useSubscriptionStore } from './subscriptionStore';
+import { useConsolidatedStore } from './consolidatedStore';
 import { clearListingDetailCache } from '../services/foodListing.service';
 
 export function resetAllDataStores(): void {
@@ -42,4 +43,5 @@ export function resetAllDataStores(): void {
   useFarmerConsumerStore.getState().reset();
   useNotificationsStore.getState().reset();
   useSubscriptionStore.getState().reset();
+  useConsolidatedStore.getState().reset();
 }

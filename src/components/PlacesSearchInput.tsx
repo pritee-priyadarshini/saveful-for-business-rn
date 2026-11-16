@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   StyleSheet,
   TextInput,
@@ -33,10 +32,14 @@ type Props = {
   onPlaceSelected: (place: PlaceSelection) => void;
 };
 
+/** Saveful operates in these countries only (backend `Region`: AU, US, IN). */
+const SERVED_COUNTRIES = 'au,us,in';
+
 async function fetchOsmSuggestions(query: string): Promise<Suggestion[]> {
   const url =
     `https://nominatim.openstreetmap.org/search` +
-    `?q=${encodeURIComponent(query)}&format=json&limit=6&addressdetails=1`;
+    `?q=${encodeURIComponent(query)}&format=json&limit=6&addressdetails=1` +
+    `&countrycodes=${SERVED_COUNTRIES}`;
 
   const response = await fetch(url, {
     headers: {
@@ -151,24 +154,26 @@ export function PlacesSearchInput({
       </View>
 
       {searchError && !suggestions.length ? (
-        <AppText style={styles.errorText}>{searchError}</AppText>
+        <AppText variant="bodySmall" style={styles.errorText}>{searchError}</AppText>
       ) : null}
 
+      {/* A plain list, not a FlatList: at most 6 rows, and this input always sits inside a
+          screen's ScrollView, where a nested VirtualizedList breaks scrolling. */}
       {suggestions.length > 0 ? (
-        <FlatList
-          data={suggestions}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="always"
-          style={styles.list}
-          nestedScrollEnabled
-          renderItem={({ item }) => (
-            <Pressable style={styles.row} onPress={() => handleSelect(item)}>
-              <AppText style={styles.rowText} numberOfLines={2}>
+        <View style={styles.list}>
+          {suggestions.map((item, index) => (
+            <Pressable
+              key={item.id}
+              style={({ pressed }) => [styles.row, index === suggestions.length - 1 && styles.rowLast, pressed && styles.rowPressed]}
+              onPress={() => handleSelect(item)}
+              accessibilityRole="button"
+            >
+              <AppText variant="bodySmall" style={styles.rowText} numberOfLines={2}>
                 {item.label}
               </AppText>
             </Pressable>
-          )}
-        />
+          ))}
+        </View>
       ) : null}
     </View>
   );
@@ -209,7 +214,7 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: normalize(4),
-    maxHeight: normalize(180),
+    overflow: 'hidden',
     borderRadius: normalize(10),
     borderWidth: 1,
     borderColor: palette.border,
@@ -223,6 +228,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: palette.border,
   },
+  rowLast: { borderBottomWidth: 0 },
+  rowPressed: { backgroundColor: palette.creme },
   rowText: {
     fontSize: normalize(13),
     color: palette.text,
