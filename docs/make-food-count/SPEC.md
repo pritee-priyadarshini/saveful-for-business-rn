@@ -31,7 +31,7 @@ The written spec (31 Oct) is newer than the deck (26 Oct), so it wins on **behav
 
 | # | Topic | Deck (26 Oct) | Written spec (31 Oct) | Build default |
 |---|---|---|---|---|
-| C1 | Fit for humans | No checkbox; all Overproduction is "for review" in the people listing | "Fit for humans" checkbox per Overproduction line; UAT-02 relies on it | Checkbox column on Overproduction, **ticked by default** (so it behaves like the deck unless someone unticks) |
+| C1 | Fit for humans | No checkbox; all Overproduction is "for review" in the people listing | "Fit for humans" checkbox per Overproduction line; UAT-02 relies on it | **No checkbox (decided 18 Nov 2026, follows the deck).** All Overproduction is offered for the people listing; the kitchen lowers amounts there if part isn't suitable. The API field stays and the app always sends `true` for Overproduction. |
 | C2 | Destination | Phone stepper step 3 "Choose destination"; not-fit listing has "Intended reuse: Animal feed / Bioenergy / Compost" chips | "Business is not asked to choose recovery destination" | No destination step or chips. Stepper: Select sources · Add quantities · Review · List |
 | C3 | "Wasted / landfill" | Insights card and bar show landfill kg | "Do not imply all uncollected food was disposed of without evidence" | Card reads **Not recovered**, with a status breakdown; no landfill wording |
 | C4 | Cluster filter | Not shown | Listed | Shown only if the organisation has clusters |

@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { MFC } from '@/constants/makeFoodCount';
@@ -125,9 +126,12 @@ export function MfcPageTitle({
   subtitle,
   eyebrow,
   back,
+  compact = false,
   style,
 }: {
   title: string;
+  /** Smaller title, for screens that should fit without scrolling. */
+  compact?: boolean;
   subtitle?: string | null;
   /** Breadcrumb, e.g. "Make Food Count / Food summary". */
   eyebrow?: string | null;
@@ -142,11 +146,11 @@ export function MfcPageTitle({
           {eyebrow}
         </AppText>
       ) : null}
-      <AppText variant="subheading" color={MFC.purple} style={styles.title} accessibilityRole="header">
+      <AppText variant="subheading" color={MFC.purple} style={compact ? styles.titleCompact : styles.title} accessibilityRole="header">
         {title}
       </AppText>
       {subtitle ? (
-        <AppText variant="body1" color={MFC.muted} style={styles.subtitle}>
+        <AppText variant={compact ? 'bodySmall' : 'body1'} color={MFC.muted} style={compact ? undefined : styles.subtitle}>
           {subtitle}
         </AppText>
       ) : null}
@@ -277,7 +281,7 @@ export function MfcBadge({ label, color, background }: { label: string; color: s
   );
 }
 
-/** The deck's view switcher: purple filled when on, white with a lilac outline when off. */
+/** Equal-width segmented control (purple when on), for switching views on one screen. */
 export function MfcTabs<T extends string>({
   options,
   value,
@@ -288,25 +292,31 @@ export function MfcTabs<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
+    <View style={styles.segmented} accessibilityRole="tablist">
       {options.map((option) => {
         const on = option.value === value;
         return (
           <Pressable
             key={option.value}
             onPress={() => onChange(option.value)}
-            hitSlop={4}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
-            style={({ pressed }) => [styles.tab, on && styles.tabOn, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.segment, on && styles.segmentOn, pressed && !on && styles.pressed]}
           >
-            <AppText variant="meta" color={on ? palette.white : MFC.purple} style={styles.strong}>
+            <AppText
+              variant="meta"
+              color={on ? MFC.white : MFC.purple}
+              style={styles.strong}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
               {option.label}
             </AppText>
           </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -461,6 +471,7 @@ const styles = StyleSheet.create({
   backLink: { alignSelf: 'flex-start', paddingVertical: 4 },
   pageTitle: { gap: 6 },
   title: { fontSize: normalize(28), lineHeight: normalize(33) },
+  titleCompact: { fontSize: normalize(22), lineHeight: normalize(27) },
   subtitle: { lineHeight: normalize(23) },
   cta: {
     minHeight: 50,
@@ -484,17 +495,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: { flexShrink: 1, fontFamily: 'Saveful-Bold' },
-  tabs: { flexDirection: 'row', gap: 8, paddingRight: 4 },
-  tab: {
-    minHeight: 38,
-    justifyContent: 'center',
-    paddingHorizontal: normalize(14),
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: MFC.chipBorder,
-    backgroundColor: MFC.white,
+  segmented: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    borderRadius: 999,
+    backgroundColor: MFC.lilac,
   },
-  tabOn: { backgroundColor: MFC.purple, borderColor: MFC.purple },
+  segment: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderRadius: 999,
+  },
+  segmentOn: { backgroundColor: MFC.purple },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   notice: { borderRadius: 12, paddingVertical: normalize(12), paddingHorizontal: normalize(14), gap: 8 },
   noticeHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
@@ -521,4 +537,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+});
+
+const FOOTER_GAP = 14;
+
+/** Buttons pinned to the bottom of a screen, above the home indicator. Pass as `<Screen footer>`. */
+export function MfcFooter({ children }: { children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return (
+    // Clear of the home indicator (gesture phones) and of Android's button bar, plus a little air.
+    <View style={[footerStyles.footer, { paddingBottom: insets.bottom + FOOTER_GAP }]}>
+      <View style={footerStyles.row}>{children}</View>
+    </View>
+  );
+}
+
+const footerStyles = StyleSheet.create({
+  footer: {
+    backgroundColor: MFC.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: MFC.panelBorder,
+    paddingTop: 12,
+    paddingHorizontal: normalize(16),
+    shadowColor: '#2B1A40',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  row: { flexDirection: 'row', gap: 10, width: '100%', maxWidth: 720, alignSelf: 'center' },
 });

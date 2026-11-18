@@ -608,6 +608,11 @@ export const makeFoodCountService = {
     return normalizeRecord(response.data);
   },
 
+  /** Discard a draft (server refuses saved records and drafts with a listing). */
+  async deleteRecord(id: number): Promise<void> {
+    await api.delete(`/mfc/records/${id}`);
+  },
+
   async getListingPrefill(id: number, kind: FoodListingKind): Promise<ListingPrefill> {
     return normalizeListingPrefill(await get(`/mfc/records/${id}/listing-prefill`, { kind }), kind);
   },

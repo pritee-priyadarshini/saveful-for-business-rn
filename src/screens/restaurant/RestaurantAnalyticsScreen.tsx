@@ -23,6 +23,7 @@ import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { useBottomTabPadding, useSafeBottomPadding } from '@/hooks/useBottomTabPadding';
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
+import { FoodImpactEntryCard } from '@/components/makeFoodCount/FoodImpactEntryCard';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import { DonationRecipients } from '@/components/DonationRecipients';
@@ -609,6 +610,12 @@ export function RestaurantAnalyticsScreen({
             </Pressable>
           ) : null}
 
+          {/* Make Food Count insights (the deck's Insights page). */}
+          <FoodImpactEntryCard
+            onPress={() => stackNavigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
+            style={styles.foodImpactCard}
+          />
+
           <View style={styles.siteSelectorSlot}>
             <ImpactSiteSelector
               sites={sites}
@@ -621,16 +628,6 @@ export function RestaurantAnalyticsScreen({
           </View>
 
           <ImpactDateFilter filter={filter} onChange={setFilter} />
-
-          <Pressable
-            onPress={() => stackNavigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
-            style={({ pressed }) => [styles.reportLink, pressed && { opacity: 0.9 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Food Impact"
-          >
-            <AppText variant="bodyBold">Food Impact</AppText>
-            <Ionicons name="chevron-forward" size={16} color={palette.primary} />
-          </Pressable>
 
           {canOpenCollectionsReport ? (
             <Pressable
@@ -846,6 +843,8 @@ const styles = StyleSheet.create({
   siteSelectorSlot: {
     marginBottom: hp(0.5),
   },
+
+  foodImpactCard: { marginBottom: hp(1.5) },
 
   reportLink: {
     flexDirection: 'row',

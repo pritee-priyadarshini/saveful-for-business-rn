@@ -18,6 +18,8 @@ import type { AxiosAdapter, InternalAxiosRequestConfig } from 'axios';
 import api from '@/services/api';
 import { AppText } from '@/components/AppText';
 import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard';
+import { RestaurantHomeScreen } from '@/screens/restaurant/RestaurantHomeScreen';
+import { RestaurantAnalyticsScreen } from '@/screens/restaurant/RestaurantAnalyticsScreen';
 import { MFC_ART_KEYS, MfcArt } from '@/components/makeFoodCount/MfcArt';
 import { MFC_STACK_SCREENS, mfcStackScreenOptions } from '@/navigation/MakeFoodCountStack';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
@@ -435,6 +437,8 @@ export function MakeFoodCountPreviewApp() {
         <Stack.Screen name="PreviewHome" component={PreviewHome} options={{ headerShown: false }} />
         <Stack.Screen name="PreviewHomeCard" component={PreviewHomeCard} options={{ headerShown: false }} />
         <Stack.Screen name="PreviewArt" component={PreviewArt} options={{ headerShown: false }} />
+        <Stack.Screen name="PreviewRestaurantHome" component={RestaurantHomeScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PreviewInsights" component={RestaurantAnalyticsScreen} options={{ headerShown: false }} />
         {MFC_STACK_SCREENS.map(({ name, component }) => (
           <Stack.Screen key={name} name={name} component={component} />
         ))}

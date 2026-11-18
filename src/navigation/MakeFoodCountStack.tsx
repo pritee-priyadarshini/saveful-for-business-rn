@@ -45,7 +45,8 @@ export type MakeFoodCountStackParamList = {
   /** source = the tab to open; defaults to the first selected source. */
   MfcRecord: { source?: FoodSource } | undefined;
   /** notice = one-off message after a listing is published ("Listed 7 kg for people"). */
-  MfcSummary: { notice?: string } | undefined;
+  /** mode 'view': a finished record opened from Recent records, shown read-only. */
+  MfcSummary: { notice?: string; mode?: 'view' } | undefined;
   /** view = the tab to open on (overview · happened · redistributed). */
   MfcFoodImpact: { view?: 'overview' | 'happened' | 'redistributed' } | undefined;
   MfcSourceDrilldown: { source: FoodSource };

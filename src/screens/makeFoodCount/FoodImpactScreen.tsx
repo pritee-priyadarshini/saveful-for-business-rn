@@ -43,9 +43,9 @@ import { normalize, useResponsiveLayout } from '@/utils/responsive';
 type ViewKey = 'overview' | 'happened' | 'redistributed';
 
 const VIEW_OPTIONS: { value: ViewKey; label: string }[] = [
-  { value: 'overview', label: 'Impact overview' },
-  { value: 'happened', label: 'What happened to the food?' },
-  { value: 'redistributed', label: 'Food redistributed' },
+  { value: 'overview', label: 'Overview' },
+  { value: 'happened', label: 'What happened' },
+  { value: 'redistributed', label: 'Redistributed' },
 ];
 
 const NO_DATA_TITLE = 'No food recorded for these filters';
@@ -120,11 +120,9 @@ export function FoodImpactScreen() {
           },
         ]}
       >
-        <MfcPageTitle
-          back={{ onPress: () => navigation.goBack() }}
-          title="Food Impact"
-          subtitle={`${organisationName || 'Your organisation'} · Food insights and recovery outcomes`}
-        />
+        <AppText variant="body1" color={MFC.muted}>
+          {`${organisationName || 'Your organisation'} · Food insights and recovery outcomes`}
+        </AppText>
 
         <InsightsFilterCard organisationName={organisationName} />
 
@@ -195,21 +193,30 @@ function OverviewView({
   return (
     <View style={styles.stack}>
       <View style={[styles.cards, isTablet && styles.row]}>
-        <MetricCard style={isTablet ? styles.flex : undefined} label="Total food recorded" kg={overview.recordedKg} note="Across all four categories" />
-        <MetricCard
-          style={isTablet ? styles.flex : undefined}
-          tone="recovered"
-          label="Redistributed / recovered"
-          kg={overview.recoveredKg}
-          note={`Charity and other recovery pathways · ≈ ${formatCount(overview.estimatedMeals)} meals, ≈ ${formatKg(overview.estimatedCo2Kg)} CO₂ avoided (estimated)`}
-        />
-        <MetricCard
-          style={isTablet ? styles.flex : undefined}
-          tone="notRecovered"
-          label="Not recovered"
-          kg={overview.notRecoveredKg}
-          note="Not collected for recovery"
-        />
+        <MetricCard style={isTablet ? styles.flex : undefined} label="Total food recorded" kg={overview.recordedKg} note="Across all four sources" />
+        <View style={[styles.row, styles.cards, isTablet && styles.flex2]}>
+          <MetricCard style={styles.flex} size="small" tone="recovered" label="Recovered" kg={overview.recoveredKg} note="Collected and verified" />
+          <MetricCard style={styles.flex} size="small" tone="notRecovered" label="Not recovered" kg={overview.notRecoveredKg} note="Not collected" />
+        </View>
+      </View>
+
+      <View style={styles.estimates} accessible accessibilityLabel={`Estimated ${formatCount(overview.estimatedMeals)} meals and ${formatKg(overview.estimatedCo2Kg)} CO2 avoided`}>
+        <View style={styles.estimate}>
+          <Ionicons name="restaurant-outline" size={normalize(16)} color={MFC.greenText} />
+          <AppText variant="bodySmall" color={MFC.ink} style={[styles.bold, tabular]}>
+            {`≈ ${formatCount(overview.estimatedMeals)} meals`}
+          </AppText>
+        </View>
+        <View style={styles.estimateDivider} />
+        <View style={styles.estimate}>
+          <Ionicons name="leaf-outline" size={normalize(16)} color={MFC.greenText} />
+          <AppText variant="bodySmall" color={MFC.ink} style={[styles.bold, tabular]}>
+            {`≈ ${formatKg(overview.estimatedCo2Kg)} CO₂`}
+          </AppText>
+        </View>
+        <AppText variant="meta" color={MFC.muted} style={styles.estimateTag}>
+          Estimated
+        </AppText>
       </View>
 
       <View style={[styles.stack, isTablet && styles.row, isTablet && styles.top]}>
@@ -254,12 +261,14 @@ function MetricCard({
   kg,
   note,
   tone = 'default',
+  size = 'large',
   style,
 }: {
   label: string;
   kg: number;
   note: string;
   tone?: 'default' | 'recovered' | 'notRecovered';
+  size?: 'large' | 'small';
   style?: object;
 }) {
   const colors =
@@ -277,9 +286,19 @@ function MetricCard({
       <AppText variant="meta" color={MFC.muted}>
         {label}
       </AppText>
-      <AppText variant="subheading" color={MFC.purple} style={[tabular, styles.metricNumber]} numberOfLines={1} adjustsFontSizeToFit>
-        {`${kgNumber(kg)} kg`}
-      </AppText>
+      <View style={styles.metricValue}>
+        <AppText
+          variant="subheading"
+          color={tone === 'recovered' ? MFC.greenText : MFC.purple}
+          style={[tabular, size === 'small' ? styles.metricNumberSmall : styles.metricNumber]}
+          numberOfLines={1}
+        >
+          {kgNumber(kg)}
+        </AppText>
+        <AppText variant="bodySmall" color={MFC.muted} style={styles.bold}>
+          kg
+        </AppText>
+      </View>
       <AppText variant="meta" color={MFC.muted}>
         {note}
       </AppText>
@@ -479,11 +498,22 @@ const styles = StyleSheet.create({
     padding: normalize(16),
     gap: 4,
   },
-  metricValue: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   flex2: { flex: 2 },
-  metricNumber: { fontSize: normalize(26), lineHeight: normalize(32) },
-  estimates: { gap: 10, paddingVertical: normalize(12) },
-  estimateDivider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.strokecream },
+  metricNumber: { fontSize: normalize(30), lineHeight: normalize(36) },
+  metricNumberSmall: { fontSize: normalize(22), lineHeight: normalize(28) },
+  metricValue: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  estimate: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  estimateDivider: { width: 1, height: 18, backgroundColor: MFC.divider },
+  estimateTag: { marginLeft: 'auto', fontFamily: 'Saveful-SemiBold' },
+  estimates: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 48,
+    paddingHorizontal: normalize(14),
+    borderRadius: 14,
+    backgroundColor: MFC.recoveredBg,
+  },
   estimateLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   sourceRow: {
     flexDirection: 'row',

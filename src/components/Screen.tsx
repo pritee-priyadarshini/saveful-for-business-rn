@@ -18,6 +18,8 @@ type ScreenProps = PropsWithChildren<{
   /** Reserve space for the keyboard so the page can scroll to the focused field. */
   keyboardAware?: boolean;
   refreshControl?: React.ReactElement;
+  /** Pinned under the scrolling content (e.g. Back / Next buttons). Only for scrollable screens. */
+  footer?: React.ReactNode;
 }>;
 
 export function Screen({
@@ -31,6 +33,7 @@ export function Screen({
   onScroll,
   keyboardAware = false,
   refreshControl,
+  footer,
 }: ScreenProps) {
   const edges: Edge[] | undefined = transparentTop ? [] : undefined;
   const internalScrollRef = useRef<ScrollView>(null);
@@ -70,6 +73,7 @@ export function Screen({
       <SafeAreaView edges={edges} style={[styles.safeArea, { backgroundColor }]}>
         <ScrollView
           ref={setScrollRef}
+          style={footer ? styles.flex : undefined}
           contentContainerStyle={[contentStyle]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -83,6 +87,7 @@ export function Screen({
         >
           {children}
         </ScrollView>
+        {footer}
       </SafeAreaView>
     );
   }
@@ -102,4 +107,5 @@ const styles = StyleSheet.create({
   staticContent: {
     flex: 1,
   },
+  flex: { flex: 1 },
 });

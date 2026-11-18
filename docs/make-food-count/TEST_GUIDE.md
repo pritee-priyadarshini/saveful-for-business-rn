@@ -7,7 +7,7 @@ Preview without a live API: set `EXPO_PUBLIC_MFC_PREVIEW=1` in a `__DEV__` build
 | ID | Account | Path | Expected |
 |---|---|---|---|
 | **UAT-01** | Kitchen staff | Home → Make Food Count → select 2+ sources → Continue → enter kg on source 1 → switch chips → return | Values on each tab are unchanged. Leaving / backgrounding still keeps them after relaunch. |
-| **UAT-02** | Kitchen staff | Overproduction only: Chicken 5 fit, Beef 3 unticked, Fish 2 fit → Review | Total **10 kg**; For people **7 kg**; Other **3 kg**. |
+| **UAT-02** | Kitchen staff | Overproduction only: Chicken 5, Beef 3, Fish 2 → Review | Total **10 kg**; For people **10 kg**; Other **0 kg** (no Fit-for-humans tick: all Overproduction is for review in the people listing). |
 | **UAT-03** | Kitchen staff | Continue UAT-02; add Preparation 4 kg + Plate Scraps 2 kg → Review | Total **16 kg**; For people **7 kg**; Other **9 kg**. |
 | **UAT-04** | Kitchen staff | Overproduction meat & seafood groups | Every subtype row is distinct; Fit ticks are independent; group total rows match the sum of subtypes. |
 | **UAT-05** | Kitchen staff | On Summary, Back to recording → edit a qty and untick Fit on Beef | Totals and “X kg available” on both listing cards update; nothing is lost when returning to Summary. |

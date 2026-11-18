@@ -287,6 +287,19 @@ function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
   };
 }
 
+/** Tiles share the row; below this width the row scrolls sideways instead of squashing them. */
+const IMPACT_TILE_MIN = 112;
+const IMPACT_GAP = 10;
+
+function impactTileWidth(rowWidth: number, count: number): ViewStyle {
+  if (rowWidth <= 0) return { width: IMPACT_TILE_MIN };
+  const shared = (rowWidth - 4 - IMPACT_GAP * (count - 1)) / count;
+  // Everything fits: share the row. Otherwise show two and a half tiles, so the next one peeks in
+  // and it's obvious the row scrolls.
+  const width = shared >= IMPACT_TILE_MIN ? shared : Math.max(IMPACT_TILE_MIN, (rowWidth - 4 - IMPACT_GAP * 2) / 2.5);
+  return { width, flexGrow: 0, flexShrink: 0, flexBasis: 'auto' };
+}
+
 export function RestaurantHomeScreen({ navigation }: any) {
   useTransparentStatusBar('light');
   const r = useResponsiveLayout();
@@ -342,7 +355,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const displayAddress = (currentProfile.address || capturedAddress || '').trim();
 
-  const showInsightsLink = !isFirstTimeUser || (homeImpact?.recordedKg ?? 0) > 0;
+  // Food Impact is always reachable from Home (it shows its own empty state).
+  const showInsightsLink = true;
 
   const impactStats = [
     {
@@ -390,6 +404,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
   }, [loadImpact]);
 
   const [refreshing, setRefreshing] = useState(false);
+  /** Width of the impact row, so each tile gets a real width and the row can scroll when they don't fit. */
+  const [impactRowWidth, setImpactRowWidth] = useState(0);
   const [connectionSummary, setConnectionSummary] = useState({ pending: 0, active: 0 });
 
   const loadConnections = useCallback(async () => {
@@ -713,7 +729,14 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   </AppText>
                 </View>
 
-                <View style={[styles.impactGrid, adaptive.impactGrid]}>
+                {/* One row, like before; scrolls sideways when the four tiles don't fit. */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.impactScroll}
+                  onLayout={(event) => setImpactRowWidth(event.nativeEvent.layout.width)}
+                  contentContainerStyle={styles.impactRow}
+                >
                   {impactStats.map((stat) => (
                     <View
                       key={stat.key}
@@ -721,6 +744,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                         styles.impactStatCard,
                         { backgroundColor: stat.tint },
                         adaptive.impactStatCard,
+                        impactTileWidth(impactRowWidth, impactStats.length),
                       ]}
                     >
                       <View style={[styles.impactIconWrap, adaptive.impactIconWrap]}>
@@ -755,7 +779,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                       </AppText>
                     </View>
                   ))}
-                </View>
+                </ScrollView>
 
                 {!showInsightsLink ? (
                   <View style={styles.encouragementCard}>
@@ -1127,10 +1151,15 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
+  impactScroll: { marginHorizontal: -2, alignSelf: 'stretch', flexGrow: 0 },
+
+  // No width here: the content must be as wide as the tiles so the row can scroll.
+  impactRow: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'stretch', paddingHorizontal: 2, gap: IMPACT_GAP },
+
   impactStatCard: {
     flexGrow: 1,
-    flexBasis: '45%',
-    minWidth: 0,
+    flexBasis: 0,
+    minWidth: wp(26),
     borderRadius: normalize(18),
     borderWidth: 1,
     borderColor: palette.strokecream,

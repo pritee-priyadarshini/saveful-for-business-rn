@@ -41,7 +41,7 @@ import {
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildFormShellStyles, formColumnWidth } from '@/utils/dashboardAdaptive';
 import { MfcListingBanner } from '@/components/makeFoodCount/MfcListingBanner';
-import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
+import { completeRecordAfterListing, useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import type { MfcListingRouteParams } from '@/types/makeFoodCount';
 import {
   buildMfcFoodRecord,
@@ -510,6 +510,8 @@ export function CreateFarmListingScreen({ navigation, route }: any) {
           );
           await foodListingService.createListing(payload, key);
           useListingsStore.getState().invalidateSite();
+          // Listing published: the record is done, so it no longer shows as a draft.
+          await completeRecordAfterListing(mfc.recordId);
           navigateToMfcSummary(navigation, {
             notice: mfcListedNotice(totalQuantity, 'not fit for human consumption'),
           });

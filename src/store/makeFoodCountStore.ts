@@ -117,7 +117,8 @@ function toDraftLine(line: FoodRecordLine): MfcDraftLine {
     category: line.category,
     subtype: line.subtype,
     qtyKg: line.qtyKg > 0 ? line.qtyKg : null,
-    fitForHumans: line.fitForHumans,
+    // No Fit-for-humans tick in the app: all Overproduction is offered for people.
+    fitForHumans: line.source === 'OVERPRODUCTION',
   };
 }
 
@@ -128,7 +129,8 @@ function toWritePayload(line: MfcDraftLine): LineWritePayload {
     category: line.category,
     ...(line.subtype ? { subtype: line.subtype } : {}),
     qtyKg: roundKg(line.qtyKg as number),
-    fitForHumans: line.source === 'OVERPRODUCTION' ? line.fitForHumans : false,
+    // All Overproduction is offered for the people listing; the kitchen lowers amounts there if needed.
+    fitForHumans: line.source === 'OVERPRODUCTION',
   };
 }
 
@@ -552,6 +554,24 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
     },
   ),
 );
+
+/**
+ * After a listing from this record is published, the record is done: mark it
+ * SAVED so it no longer shows as a draft. The server copy is reloaded first,
+ * because linking the listing can move the record's version. Never throws;
+ * if it fails the record simply stays a draft.
+ */
+export async function completeRecordAfterListing(recordId: number): Promise<void> {
+  const store = useMakeFoodCountStore.getState();
+  if (store.recordId !== recordId) return;
+  try {
+    if ((await store.loadRecord(recordId)) == null) return;
+    if (useMakeFoodCountStore.getState().status === 'SAVED') return;
+    await useMakeFoodCountStore.getState().saveRecord();
+  } catch {
+    // Listing is already published; the record can be saved later.
+  }
+}
 
 /** Flush the open draft when the app goes to the background; retry when it comes back. */
 export function bindAppStateFlush(): () => void {

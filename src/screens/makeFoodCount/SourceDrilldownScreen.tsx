@@ -8,7 +8,7 @@ import { tabular } from '@/components/consolidated/ui';
 import { formatDisplayDate } from '@/components/ImpactDateFilter';
 import { DestinationList, RecoveredByCategory, RecoverySplit } from '@/components/makeFoodCount/InsightsParts';
 import { MfcArt, SOURCE_ART } from '@/components/makeFoodCount/MfcArt';
-import { MfcBackLink, MfcCard, MfcCta, MfcEmpty, MfcNotice, MfcSkeleton } from '@/components/makeFoodCount/MfcAppUi';
+import { MfcCard, MfcCta, MfcEmpty, MfcNotice, MfcSkeleton } from '@/components/makeFoodCount/MfcAppUi';
 import { Screen } from '@/components/Screen';
 import { MFC, SOURCE_META } from '@/constants/makeFoodCount';
 import type { MakeFoodCountStackParamList } from '@/navigation/MakeFoodCountStack';
@@ -69,7 +69,6 @@ export function SourceDrilldownScreen() {
           },
         ]}
       >
-        <MfcBackLink label="Back to Food Impact" onPress={backToImpact} />
         <View style={styles.titleRow}>
           <MfcArt art={SOURCE_ART[source]} size={72} aspect={4 / 3} radius={8} accessibilityLabel={`${meta.label} illustration`} />
           <View style={styles.flex}>

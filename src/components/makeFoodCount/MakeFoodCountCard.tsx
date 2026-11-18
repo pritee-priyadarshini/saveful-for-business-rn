@@ -1,11 +1,12 @@
 import React from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { AppText } from '@/components/AppText';
 import { MfcArt } from '@/components/makeFoodCount/MfcArt';
 import { MFC } from '@/constants/makeFoodCount';
+import { palette } from '@/theme/colors';
 import { selectHasOpenDraft, useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { normalize } from '@/utils/responsive';
 
@@ -59,30 +60,73 @@ export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
         </View>
       </View>
 
-      <Pressable
-        onPress={open}
-        accessibilityRole="button"
-        accessibilityLabel={continuing ? 'Continue recording food waste' : 'Record food waste'}
-        style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
-      >
-        <AppText variant="bodyBold" color={MFC.white}>
-          {continuing ? 'Continue recording' : 'Record Food Waste'}
-        </AppText>
-        <Ionicons name="arrow-forward" size={normalize(18)} color={MFC.white} />
-      </Pressable>
+      {/* One row: the main action, then two icon buttons that say what they are at a glance. */}
+      <View style={styles.actionsRow}>
+        <Pressable
+          onPress={open}
+          accessibilityRole="button"
+          accessibilityLabel={continuing ? 'Continue recording food waste' : 'Record food waste'}
+          style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
+        >
+          <AppText variant="bodyBold" color={MFC.white} numberOfLines={1} style={styles.ctaText}>
+            {continuing ? 'Continue recording' : 'Record Food Waste'}
+          </AppText>
+          <Ionicons name="arrow-forward" size={normalize(18)} color={MFC.white} />
+        </Pressable>
+        <IconButton
+          icon="receipt-outline"
+          label="Recent records"
+          tint={MFC.lilac}
+          color={MFC.purple}
+          onPress={openRecent}
+        />
+        <IconButton
+          icon="pie-chart-outline"
+          label="Food Impact insights"
+          tint={MFC.greenBg}
+          color={MFC.greenText}
+          onPress={() => navigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
+        />
+      </View>
+    </View>
+  );
+}
 
+/** Square icon button; the label is spoken by screen readers and shown on long press. */
+function IconButton({
+  icon,
+  label,
+  tint,
+  color,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  tint: string;
+  color: string;
+  onPress: () => void;
+}) {
+  const [hint, setHint] = React.useState(false);
+  return (
+    <View>
       <Pressable
-        onPress={openRecent}
-        accessibilityRole="link"
-        accessibilityLabel="Recent records"
-        hitSlop={8}
-        style={({ pressed }) => [styles.recent, pressed && styles.pressed]}
+        onPress={onPress}
+        onLongPress={() => setHint(true)}
+        onPressOut={() => setHint(false)}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={4}
+        style={({ pressed }) => [styles.iconBtn, { backgroundColor: tint }, pressed && styles.pressed]}
       >
-        <AppText variant="meta" color={MFC.purple} style={styles.recentText}>
-          Recent records
-        </AppText>
-        <Ionicons name="chevron-forward" size={normalize(13)} color={MFC.purple} />
+        <Ionicons name={icon} size={normalize(22)} color={color} />
       </Pressable>
+      {hint ? (
+        <View style={styles.tooltip} pointerEvents="none">
+          <AppText variant="meta" color={MFC.white} numberOfLines={1} style={styles.tooltipText}>
+            {label}
+          </AppText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -90,12 +134,17 @@ export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    borderRadius: normalize(20),
+    // Same card as "Got surplus food?" on Home.
+    borderRadius: normalize(24),
     borderWidth: 1,
-    borderColor: '#DCCBF2',
-    backgroundColor: '#F3ECFD',
+    borderColor: palette.strokecream,
+    backgroundColor: palette.white,
     padding: normalize(16),
     gap: normalize(12),
+    ...Platform.select({
+      ios: { shadowColor: palette.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+      android: { elevation: 2 },
+    }),
   },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   copy: { flex: 1, minWidth: 0, gap: 6 },
@@ -111,8 +160,29 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: normalize(21), lineHeight: normalize(26) },
   body: { lineHeight: normalize(20) },
   art: { width: normalize(96), alignItems: 'center' },
+  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ctaText: { flexShrink: 1 },
+  iconBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tooltip: {
+    position: 'absolute',
+    bottom: 56,
+    right: 0,
+    backgroundColor: MFC.ink,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  tooltipText: { fontFamily: 'Saveful-SemiBold' },
   cta: {
+    flex: 1,
     minHeight: 50,
+    paddingHorizontal: normalize(14),
     borderRadius: 14,
     backgroundColor: MFC.purple,
     flexDirection: 'row',
@@ -120,7 +190,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  recent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 32 },
-  recentText: { fontFamily: 'Saveful-SemiBold' },
   pressed: { opacity: 0.88 },
 });

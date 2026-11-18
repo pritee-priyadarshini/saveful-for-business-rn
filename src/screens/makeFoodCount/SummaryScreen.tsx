@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useFocusEffect,
@@ -25,6 +25,7 @@ import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { makeFoodCountService, readMfcError } from '@/services/makeFoodCount.service';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { palette } from '@/theme/colors';
+import { showSuccessAlert } from '@/utils/apiError';
 import { elevation } from '@/theme/elevation';
 import type { FoodListingKind, FoodSource, KindOutcome, MfcListingRouteParams } from '@/types/makeFoodCount';
 import { buildSummaryTable, formatKg, kindAvailableKg, type SummaryRow } from '@/utils/makeFoodCountSummary';
@@ -42,6 +43,8 @@ export function SummaryScreen() {
   const route = useRoute();
   // One-off notice passed back by the listing screens ("Listed 7 kg for people").
   const routeNotice = (route.params as { notice?: string } | undefined)?.notice;
+  /** Opened from Recent records on a finished record: show what happened, don't ask again. */
+  const viewOnly = (route.params as { mode?: string } | undefined)?.mode === 'view';
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     if (!routeNotice) return;
@@ -162,7 +165,7 @@ export function SummaryScreen() {
         // Saved: the next recording must start a fresh record, so the open draft is cleared.
         useMakeFoodCountStore.getState().clearDraft();
         navigation.navigate('Tabs', { screen: 'Home' });
-        Alert.alert('Record saved', `${formatKg(totalKg)} of food recorded. It's kept as a record only; nothing was listed.`);
+        showSuccessAlert(`${formatKg(totalKg)} of food recorded. It's kept as a record only; nothing was listed.`, 'Record saved');
       } finally {
         setBusyKind(null);
       }
@@ -177,10 +180,14 @@ export function SummaryScreen() {
         ]}
       >
         <MfcPageTitle
-          back={{ label: 'Back to recording', onPress: () => openSource() }}
-          eyebrow="Make Food Count / Food summary"
-          title="Food summary"
-          subtitle="Review the food recorded. Overproduction is shown as potentially available for people, subject to your review and food safety checks during listing. Other recorded sources are shown separately."
+          back={viewOnly ? null : { label: 'Back to recording', onPress: () => openSource() }}
+          eyebrow={viewOnly ? 'Make Food Count / Saved record' : 'Make Food Count / Food summary'}
+          title={viewOnly ? 'Record summary' : 'Food summary'}
+          subtitle={
+            viewOnly
+              ? 'This record is complete. Here is what was recorded and what happened to it.'
+              : 'Review the food recorded. Overproduction is shown as potentially available for people, subject to your review and food safety checks during listing. Other recorded sources are shown separately.'
+          }
         />
 
         {notice ? (
@@ -206,8 +213,11 @@ export function SummaryScreen() {
           />
         ) : (
           <>
-            <SummaryTable rows={table.rows} total={table.total} onOpen={openSource} />
+            <SummaryTable rows={table.rows} total={table.total} onOpen={viewOnly ? undefined : openSource} />
 
+            {viewOnly ? (
+              <ResultPanel outcomes={outcomes} />
+            ) : (
             <View style={styles.nextPanel}>
               <View style={styles.nextHead}>
                 <MfcSectionLabel>What would you like to do next?</MfcSectionLabel>
@@ -253,6 +263,8 @@ export function SummaryScreen() {
               </View>
             </View>
 
+            )}
+
             <MfcNotice tone="tint" title="Food is not counted as recovered until collection is verified." />
           </>
         )}
@@ -270,7 +282,8 @@ function SummaryTable({
 }: {
   rows: SummaryRow[];
   total: { totalKg: number; forPeopleKg: number; otherKg: number };
-  onOpen: (source: FoodSource) => void;
+  /** Absent on a finished record: rows are not tappable. */
+  onOpen?: (source: FoodSource) => void;
 }) {
   return (
     <View style={styles.table}>
@@ -292,7 +305,8 @@ function SummaryTable({
       {rows.map((row) => (
         <Pressable
           key={row.source}
-          onPress={() => onOpen(row.source)}
+          onPress={onOpen ? () => onOpen(row.source) : undefined}
+          disabled={!onOpen}
           accessibilityRole="button"
           accessibilityLabel={`${row.label}: ${formatKg(row.totalKg)} recorded${
             row.forPeopleKg != null ? `, ${formatKg(row.forPeopleKg)} for people` : ''
@@ -332,6 +346,48 @@ function SummaryTable({
           {formatKg(total.otherKg)}
         </AppText>
       </View>
+    </View>
+  );
+}
+
+// ─── Finished record: what happened ──────────────────────────────────────────
+
+function ResultPanel({ outcomes }: { outcomes: Record<FoodListingKind, KindOutcome | null> }) {
+  const listed = (['EDIBLE', 'NON_EDIBLE'] as const).filter((kind) => (outcomes[kind]?.listedKg ?? 0) > 0);
+  return (
+    <View style={styles.nextPanel}>
+      <View style={styles.nextHead}>
+        <MfcSectionLabel>What happened</MfcSectionLabel>
+      </View>
+      {listed.length === 0 ? (
+        <View style={[styles.card, { backgroundColor: MFC.white, borderColor: MFC.panelBorder }]}>
+          <View style={styles.cardHead}>
+            <Ionicons name="document-text-outline" size={normalize(16)} color={MFC.purple} style={styles.cardIcon} />
+            <AppText variant="bodySmall" color={MFC.purple} style={[styles.flex, styles.bold]}>
+              Saved without listing
+            </AppText>
+          </View>
+          <AppText variant="meta" color={MFC.muted} style={styles.cardDetail}>
+            Kept as a record only. Nothing was listed.
+          </AppText>
+        </View>
+      ) : (
+        listed.map((kind) => {
+          const look = kind === 'EDIBLE' ? ACTION_TONES.green : ACTION_TONES.orange;
+          const outcome = outcomes[kind] as KindOutcome;
+          return (
+            <View key={kind} style={[styles.card, { backgroundColor: look.bg, borderColor: look.border }]}>
+              <View style={styles.cardHead}>
+                <Ionicons name={kind === 'EDIBLE' ? 'people-outline' : 'leaf-outline'} size={normalize(16)} color={look.title} style={styles.cardIcon} />
+                <AppText variant="bodySmall" color={look.title} style={[styles.flex, styles.bold]}>
+                  {kind === 'EDIBLE' ? 'Listed for people' : 'Listed as not fit for human consumption'}
+                </AppText>
+              </View>
+              <OutcomeProgress outcome={outcome} label={kind === 'EDIBLE' ? 'People listing' : 'Not-fit listing'} />
+            </View>
+          );
+        })
+      )}
     </View>
   );
 }
