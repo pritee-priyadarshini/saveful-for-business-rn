@@ -26,6 +26,8 @@ import { useAppContext } from '../../store/AppContext';
 import { useSitesStore } from '@/store/sitesStore';
 import { connectionsService } from '@/services/connections.service';
 import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard';
+import { useMilestoneStore } from '@/store/milestoneStore';
+import { useWhatsNewStore } from '@/store/whatsNewStore';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
 import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
@@ -428,6 +430,19 @@ export function RestaurantHomeScreen({ navigation }: any) {
       setConnectionSummary({ pending: 0, active: 0 });
     }
   }, [authUser, rawSites]);
+
+  // "What's new": once per release, after Home has settled, never on top of another popup.
+  const whatsNewHydrated = useWhatsNewStore((state) => state.hydrated);
+  useFocusEffect(
+    useCallback(() => {
+      if (!whatsNewHydrated) return undefined;
+      const timer = setTimeout(() => {
+        if (useMilestoneStore.getState().visibleKind) return;
+        useWhatsNewStore.getState().showIfNew();
+      }, 1200);
+      return () => clearTimeout(timer);
+    }, [whatsNewHydrated]),
+  );
 
   useFocusEffect(
     useCallback(() => {

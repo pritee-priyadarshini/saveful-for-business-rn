@@ -38,6 +38,7 @@ import { showConfirmAlert } from '@/store/appAlertStore';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
 import { useConsolidatedAccess } from '@/hooks/useConsolidatedAccess';
 import { GuideToggleRow } from '@/components/guide';
+import { useWhatsNewStore } from '@/store/whatsNewStore';
 import { useGuideStore } from '@/store/guideStore';
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
@@ -1014,6 +1015,13 @@ export function ProfileScreen() {
           ) : null}
 
           {showGuideToggle ? <GuideToggleRow style={styles.linkRow} /> : null}
+
+          {isRestaurant ? (
+            <Pressable style={styles.linkRow} onPress={() => useWhatsNewStore.getState().open()}>
+              <AppText variant="body" style={styles.linkRowLabel}>What's new</AppText>
+              <Ionicons name="sparkles-outline" size={18} style={styles.linkRowIcon} />
+            </Pressable>
+          ) : null}
 
           {[
             { label: 'Privacy Policy', url: 'https://www.saveful.com/privacy-policy' },

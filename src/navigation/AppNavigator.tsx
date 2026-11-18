@@ -23,6 +23,8 @@ import {
   showSubscriptionRequiredPrompt,
 } from '@/utils/subscriptionAccess';
 import { ReceiverWelcomeModal } from '@/components/ReceiverWelcomeModal';
+import { WhatsNewAnnouncement, type WhatsNewDestination } from '@/components/whatsNew/WhatsNewAnnouncement';
+import { isBusinessRole } from '@/utils/consolidated';
 import { MilestoneCompleteModal } from '@/components/MilestoneCompleteModal';
 import { useReceiverWelcomeModal } from '@/hooks/useReceiverWelcomeModal';
 import { isReceiverWelcomeRole } from '@/data/receiverWelcome';
@@ -543,6 +545,19 @@ export function AppNavigator() {
             />
 
           </RootStack.Navigator>
+
+          {isAuthenticated && isBusinessRole(effectiveRole) ? (
+            <WhatsNewAnnouncement
+              onNavigate={(to: WhatsNewDestination) => {
+                if (!navigationRef.current?.isReady()) return;
+                const route =
+                  to === 'makeFoodCount'
+                    ? { name: 'MakeFoodCount', params: { screen: 'MfcSources' } }
+                    : { name: to === 'consolidatedGroups' ? 'ConsolidatedGroups' : 'ConsolidatedCollections' };
+                navigationRef.current.dispatch(CommonActions.navigate(route));
+              }}
+            />
+          ) : null}
 
           <ReceiverWelcomeModal
             visible={welcomeVisible}

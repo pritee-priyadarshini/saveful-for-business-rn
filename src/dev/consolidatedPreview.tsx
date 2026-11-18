@@ -31,6 +31,8 @@ import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHome
 import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { ConsolidatedLogisticsCard } from '@/components/consolidated/ConsolidatedLogisticsCard';
 import { ConsolidatedPermissionSection } from '@/components/consolidated/ConsolidatedPermissionSection';
+import { WhatsNewAnnouncement } from '@/components/whatsNew/WhatsNewAnnouncement';
+import { useWhatsNewStore } from '@/store/whatsNewStore';
 
 export { CONSOLIDATED_PREVIEW } from './previewFlag';
 
@@ -374,6 +376,13 @@ export function ConsolidatedPreviewApp() {
   useEffect(() => {
     const open = (url: string | null) => {
       if (!url || !url.includes('://preview/')) return;
+      if (url.includes('://preview/whats-new')) {
+        // preview/whats-new opens the sheet; preview/whats-new-page-<makeFoodCount|consolidated|overview> switches page.
+        const page = url.split('whats-new-page-')[1];
+        if (page) (globalThis as { __whatsNewGo?: (p: string) => void }).__whatsNewGo?.(page.split(/[?-]/)[0]);
+        else useWhatsNewStore.getState().open();
+        return;
+      }
       if (url.includes('://preview/guide-')) {
         // e.g. preview/guide-next-3 (the suffix only makes repeated targets unique)
         (globalThis as { __guideGo?: (delta: 1 | -1) => void }).__guideGo?.(url.includes('guide-back') ? -1 : 1);
@@ -419,6 +428,7 @@ export function ConsolidatedPreviewApp() {
           <Stack.Screen key={name} name={name} component={component} />
         ))}
       </Stack.Navigator>
+      <WhatsNewAnnouncement onNavigate={() => undefined} />
     </NavigationContainer>
   );
 }
