@@ -1,10 +1,17 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { NavigationContainer, DefaultTheme, NavigationContainerRef, CommonActions } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  NavigationContainerRef,
+  CommonActions,
+  type NavigatorScreenParams,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { useAppContext } from '../store/AppContext';
 import { AuthStack } from './AuthStack';
 import { RoleTabs } from './RoleTabs';
+import { MakeFoodCountStack, type MakeFoodCountStackParamList } from './MakeFoodCountStack';
 import { setBillingRequiredHandler } from '../services/api';
 import {
   selectCanManageBilling,
@@ -164,6 +171,7 @@ export type RootStackParamList = {
   ConsolidatedReport: { groupId?: number } | undefined;
   ConsolidatedInvitations: undefined;
   PickupCheck: { claimId: number };
+  MakeFoodCount: NavigatorScreenParams<MakeFoodCountStackParamList> | undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -527,6 +535,12 @@ export function AppNavigator() {
             <RootStack.Screen name="ConsolidatedReport" component={ConsolidatedReportScreen} />
             <RootStack.Screen name="ConsolidatedInvitations" component={ConsolidatedInvitationsScreen} />
             <RootStack.Screen name="PickupCheck" component={PickupCheckScreen} />
+            {/* Make Food Count: nested stack with its own purple header; also runs in landscape on tablets. */}
+            <RootStack.Screen
+              name="MakeFoodCount"
+              component={MakeFoodCountStack}
+              options={{ headerShown: false, orientation: 'default' }}
+            />
 
           </RootStack.Navigator>
 

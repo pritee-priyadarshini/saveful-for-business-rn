@@ -16,9 +16,14 @@ import { CircularImageCropHost } from './src/components/CircularImageCropModal';
 import { AppAlertHost } from './src/components/AppAlertModal';
 import { registerNotificationCategories } from './src/services/pushNotifications';
 import { CONSOLIDATED_PREVIEW, ConsolidatedPreviewApp, installConsolidatedFixtures } from './src/dev/consolidatedPreview';
+import { bindAppStateFlush } from './src/store/makeFoodCountStore';
+import { MFC_PREVIEW, MakeFoodCountPreviewApp, installMakeFoodCountFixtures } from './src/dev/makeFoodCountPreview';
 
 // Dev-only visual preview of the Consolidated Collections screens (inert unless the env flag is set in __DEV__).
 if (CONSOLIDATED_PREVIEW) installConsolidatedFixtures();
+// Dev-only visual preview of Make Food Count. If both flags are set, Consolidated wins.
+const SHOW_MFC_PREVIEW = MFC_PREVIEW && !CONSOLIDATED_PREVIEW;
+if (SHOW_MFC_PREVIEW) installMakeFoodCountFixtures();
 
 export default function App() {
   const [splashTimerDone, setSplashTimerDone] = useState(false);
@@ -45,6 +50,9 @@ export default function App() {
   useEffect(() => {
     void useAuthStore.getState().restoreSession();
   }, []);
+
+  // Make Food Count: flush the open draft when the app goes to the background (app SPEC §8.1).
+  useEffect(() => bindAppStateFlush(), []);
 
   const [fontsLoaded, fontError] = useFonts({
     'Saveful-Bold': require('./assets/fonts/Saveful-Bold.ttf'),
@@ -74,7 +82,13 @@ export default function App() {
       <SafeAreaProvider>
         <AppProvider>
           <StatusBar style="dark" backgroundColor={palette.background} />
-          {CONSOLIDATED_PREVIEW ? <ConsolidatedPreviewApp /> : <AppNavigator />}
+          {CONSOLIDATED_PREVIEW ? (
+            <ConsolidatedPreviewApp />
+          ) : SHOW_MFC_PREVIEW ? (
+            <MakeFoodCountPreviewApp />
+          ) : (
+            <AppNavigator />
+          )}
           <AppAlertHost />
           <CircularImageCropHost />
         </AppProvider>

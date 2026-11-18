@@ -95,6 +95,12 @@ export type CreateListingPayload = {
   photoUrls?: string[];
   /** Local ImagePicker / camera URIs to upload as multipart `photos`. */
   photos?: string[];
+  /** Links this listing to a Make Food Count record. Items map to record lines by itemIndex. */
+  foodRecord?: {
+    recordId: number;
+    kind: 'EDIBLE' | 'NON_EDIBLE';
+    items: { lineId: number; itemIndex: number }[];
+  };
 };
 
 export type UpdateListingPayload = {
@@ -338,6 +344,7 @@ function normalizeCreateListingPayload(payload: CreateListingPayload): CreateLis
     photoUrls: allUris.filter(isRemotePhotoUrl),
     photos: allUris.filter((uri) => !isRemotePhotoUrl(uri)),
     foodItems,
+    ...(payload.foodRecord ? { foodRecord: payload.foodRecord } : {}),
   };
 }
 
@@ -368,6 +375,7 @@ function buildCreateListingFormData(body: CreateListingPayload): FormData {
   if (body.collectionNotes) form.append('collectionNotes', body.collectionNotes);
   form.append('photoUrls', JSON.stringify(body.photoUrls ?? []));
   form.append('foodItems', JSON.stringify(body.foodItems));
+  if (body.foodRecord) form.append('foodRecord', JSON.stringify(body.foodRecord));
 
   (body.photos ?? []).slice(0, 5).forEach((uri, index) => {
     const mime = guessImageMime(uri);
@@ -802,7 +810,12 @@ export async function fetchDiscoverListings(
 export const foodListingService = {
   uploadPhotos: (uris: string[]) => uploadListingPhotos(uris),
 
-  createListing: async (payload: CreateListingPayload) => {
+  /**
+   * `idempotencyKey` is sent as the `Idempotency-Key` header; a replayed key returns the
+   * first listing (used by Make Food Count so a double tap can't publish twice).
+   */
+  createListing: async (payload: CreateListingPayload, idempotencyKey?: string) => {
+    const headers = idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined;
     const body = normalizeCreateListingPayload(payload);
     const localPhotos = body.photos ?? [];
 
@@ -814,10 +827,10 @@ export const foodListingService = {
 
     const hasLocalPhotos = (body.photos?.length ?? 0) > 0;
     if (hasLocalPhotos) {
-      return postFormData('/food-listings', buildCreateListingFormData(body));
+      return postFormData('/food-listings', buildCreateListingFormData(body), headers);
     }
     const { photos: _photos, ...jsonBody } = body;
-    return api.post('/food-listings', jsonBody);
+    return api.post('/food-listings', jsonBody, headers ? { headers } : undefined);
   },
 
   getOrgListings: (orgId: number, params?: GetListingsParams) =>

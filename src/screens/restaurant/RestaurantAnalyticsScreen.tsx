@@ -622,6 +622,16 @@ export function RestaurantAnalyticsScreen({
 
           <ImpactDateFilter filter={filter} onChange={setFilter} />
 
+          <Pressable
+            onPress={() => stackNavigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
+            style={({ pressed }) => [styles.reportLink, pressed && { opacity: 0.9 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Food Impact"
+          >
+            <AppText variant="bodyBold">Food Impact</AppText>
+            <Ionicons name="chevron-forward" size={16} color={palette.primary} />
+          </Pressable>
+
           {canOpenCollectionsReport ? (
             <Pressable
               onPress={() => stackNavigation.navigate('ConsolidatedReport')}

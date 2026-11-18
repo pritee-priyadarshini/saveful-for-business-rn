@@ -7,9 +7,14 @@ const BASE_URL = 'https://s4b.saveful.app/api/v1';
  * FormData file parts correctly, while axios's XHR adapter fails with
  * ERR_NETWORK and surfaces as "Unable to reach the server".
  */
-async function sendFormData(method: 'POST' | 'PATCH', path: string, body: FormData) {
+async function sendFormData(
+  method: 'POST' | 'PATCH',
+  path: string,
+  body: FormData,
+  extraHeaders?: Record<string, string>,
+) {
   const token = await SecureStore.getItemAsync('accessToken');
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...extraHeaders };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -28,8 +33,8 @@ async function sendFormData(method: 'POST' | 'PATCH', path: string, body: FormDa
   return { data: json };
 }
 
-export function postFormData(path: string, body: FormData) {
-  return sendFormData('POST', path, body);
+export function postFormData(path: string, body: FormData, headers?: Record<string, string>) {
+  return sendFormData('POST', path, body, headers);
 }
 
 export function patchFormData(path: string, body: FormData) {

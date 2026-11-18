@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   Linking,
@@ -45,6 +45,22 @@ import {
 } from '../../utils/listingDateValidation';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildFormShellStyles } from '@/utils/dashboardAdaptive';
+import { MfcListingBanner } from '@/components/makeFoodCount/MfcListingBanner';
+import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
+import type { MfcListingRouteParams } from '@/types/makeFoodCount';
+import {
+  buildMfcFoodRecord,
+  buildMfcIdempotencyKey,
+  clampMfcQty,
+  formatMfcKg,
+  mfcItemsFromRoute,
+  mfcListedNotice,
+  nextMfcAttempt,
+  roundKg,
+  type MfcAttemptState,
+} from '@/utils/mfcListing';
+import { navigateToMfcSummary } from '@/utils/mfcNavigation';
+import { toListingIconKey } from '@/components/makeFoodCount/MfcArt';
 
 type Step = 1 | 2 | 3;
 type PickerTarget = 'bestBefore' | 'bestBeforeTime' | 'from' | 'to' | null;
@@ -54,6 +70,13 @@ type FoodItem = {
   qty: number;
   iconKey: FoodIconKey;
   quantityDescription?: string;
+  /** Make Food Count: record line this row is linked to (only on carried-forward rows). */
+  lineId?: number;
+  /** Listing category from the prefill (falls back to name). */
+  category?: string;
+  countedKg?: number;
+  /** Linked rows can't go above this. */
+  availableKg?: number;
 };
 
 const stepMeta = [
@@ -136,7 +159,25 @@ const hasExplicitBestBeforeTime = (date: Date | null) => {
   return !(date.getHours() === 23 && date.getMinutes() === 59);
 };
 
+/** Carried-forward Make Food Count rows first, then the usual seed rows (unlinked) for extras. */
+const buildMfcItems = (mfc: MfcListingRouteParams): FoodItem[] => {
+  const linked = mfcItemsFromRoute<FoodItem>(mfc, (item, base) => ({
+    ...base,
+    name: item.name,
+    category: item.category || item.name,
+    // The server's icon keys (chicken, produce …) are not listing icon keys: map them.
+    iconKey: toListingIconKey(item.iconKey, item.category),
+  }));
+  const taken = new Set(linked.map((item) => item.name.trim().toLowerCase()));
+  return [...linked, ...seedItems.filter((seed) => !taken.has(seed.name.trim().toLowerCase()))];
+};
+
 export function CreateListingScreen({ navigation, route }: any) {
+  // Make Food Count: only set when the Summary opened this screen with a prefilled record.
+  const mfc: MfcListingRouteParams | undefined = route?.params?.mfc;
+  const mfcKey = mfc ? `${mfc.recordId}:${mfc.kind}:${JSON.stringify(mfc.items)}` : null;
+  const mfcAttempt = useRef<MfcAttemptState>({ fingerprint: null, attempt: 0 });
+  const mfcSeededKey = useRef<string | null>(mfcKey);
   const consolidatedCollectionId = Number(route?.params?.consolidatedCollectionId);
   // The site the collection was offered to — not necessarily this user's default site.
   const consolidatedSiteId = Number(route?.params?.consolidatedSiteId);
@@ -154,7 +195,7 @@ export function CreateListingScreen({ navigation, route }: any) {
     'S';
 
   const [step, setStep] = useState<Step>(1);
-  const [items, setItems] = useState<FoodItem[]>(seedItems);
+  const [items, setItems] = useState<FoodItem[]>(() => (mfc ? buildMfcItems(mfc) : seedItems));
   const [customItem, setCustomItem] = useState('');
   const [images, setImages] = useState<string[]>([]);
 
@@ -230,8 +271,20 @@ export function CreateListingScreen({ navigation, route }: any) {
     }).catch(() => undefined);
   }, [consolidatedCollectionId, fetchDeclarations, isConsolidated]);
 
+  // Re-seed if the same screen instance is re-opened with a different Make Food Count prefill.
+  useEffect(() => {
+    if (mfcSeededKey.current === mfcKey) return;
+    mfcSeededKey.current = mfcKey;
+    mfcAttempt.current = { fingerprint: null, attempt: 0 };
+    if (mfc) setItems(buildMfcItems(mfc));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mfcKey]);
+
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
-  const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
+  const totalQuantity = useMemo(() => {
+    const sum = items.reduce((total, item) => total + item.qty, 0);
+    return mfc ? roundKg(sum) : sum;
+  }, [items, mfc]);
   const estimatedMeals = estimateMealsSaved(totalQuantity);
   const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
   const hasSelectedAllergens = selectedAllergens.length > 0;
@@ -259,12 +312,22 @@ export function CreateListingScreen({ navigation, route }: any) {
   const updateQty = (index: number, delta: number) => {
     setItems((prev) => {
       const next = [...prev];
+      const current = next[index];
+      if (typeof current.lineId === 'number' && typeof current.availableKg === 'number') {
+        // Linked Make Food Count row: 2 dp, never above availableKg, can go down to 0.
+        next[index] = { ...current, qty: clampMfcQty(current.qty + delta, current.availableKg) };
+        return next;
+      }
       next[index] = {
-        ...next[index],
-        qty: Math.max(0, Math.round((next[index].qty + delta) * 10) / 10),
+        ...current,
+        qty: Math.max(0, Math.round((current.qty + delta) * 10) / 10),
       };
       return next;
     });
+  };
+
+  const removeItem = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const addCustomItem = () => {
@@ -598,12 +661,12 @@ export function CreateListingScreen({ navigation, route }: any) {
 
     await withLock(async () => {
       try {
-        const payload = {
+        const payload: Parameters<typeof foodListingService.createListing>[0] = {
           siteId: resolvedSiteId,
           listingType: 'HUMAN' as const,
           foodItems: activeItems.map((item) => ({
             name: item.name,
-            category: item.name,
+            category: item.category || item.name,
             totalQtyKg: item.qty,
             unit: 'kg',
           })),
@@ -625,6 +688,23 @@ export function CreateListingScreen({ navigation, route }: any) {
           collectionNotes: collectionNotes.trim() || undefined,
           photos: images,
         };
+
+        if (mfc) {
+          // Linked rows only; itemIndex is the position in the foodItems array sent above.
+          payload.foodRecord = buildMfcFoodRecord(mfc, activeItems);
+          const attempt = nextMfcAttempt(mfcAttempt.current, JSON.stringify(payload));
+          const key = buildMfcIdempotencyKey(
+            useMakeFoodCountStore.getState().clientRequestId,
+            mfc.recordId,
+            'EDIBLE',
+            attempt,
+          );
+          await foodListingService.createListing(payload, key);
+          useListingsStore.getState().invalidateSite();
+          // Back to the Make Food Count Summary, not the generic confirmation.
+          navigateToMfcSummary(navigation, { notice: mfcListedNotice(totalQuantity, 'people') });
+          return;
+        }
 
         await foodListingService.createListing(payload);
         // Invalidate the site listings cache so the new listing shows immediately
@@ -737,6 +817,7 @@ export function CreateListingScreen({ navigation, route }: any) {
 
         {step === 1 ? (
           <View style={styles.stepWrap}>
+            {mfc ? <MfcListingBanner /> : null}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               WHAT FOOD DO YOU HAVE?
             </AppText>
@@ -753,9 +834,20 @@ export function CreateListingScreen({ navigation, route }: any) {
                   <View style={styles.foodRow}>
                     <View style={styles.foodNameWrap}>
                       <Image source={resolveFoodIconSource(item.iconKey)} style={styles.foodIcon} />
-                      <AppText variant="body1" color={palette.midgray} style={styles.foodLabel}>
-                        {item.name}
-                      </AppText>
+                      {typeof item.lineId === 'number' ? (
+                        <View style={[styles.foodLabel, styles.mfcLabelWrap]}>
+                          <AppText variant="body1" color={palette.midgray} style={styles.mfcName}>
+                            {item.name}
+                          </AppText>
+                          <AppText variant="caption" color={palette.stone} style={styles.mfcCounted}>
+                            Counted: {formatMfcKg(item.countedKg ?? 0)} kg
+                          </AppText>
+                        </View>
+                      ) : (
+                        <AppText variant="body1" color={palette.midgray} style={styles.foodLabel}>
+                          {item.name}
+                        </AppText>
+                      )}
                     </View>
 
                     <View style={styles.qtyWrap}>
@@ -766,7 +858,11 @@ export function CreateListingScreen({ navigation, route }: any) {
                       </Pressable>
 
                       <AppText variant="bodyBold" color={palette.midgray} style={styles.qtyValue}>
-                        {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
+                        {typeof item.lineId === 'number'
+                          ? formatMfcKg(item.qty)
+                          : item.qty % 1 === 0
+                            ? item.qty.toFixed(0)
+                            : item.qty.toFixed(1)}
                       </AppText>
 
                       <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, 0.5)}>
@@ -774,6 +870,17 @@ export function CreateListingScreen({ navigation, route }: any) {
                           +
                         </AppText>
                       </Pressable>
+                      {typeof item.lineId === 'number' ? (
+                        <Pressable
+                          onPress={() => removeItem(index)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${item.name} from this listing`}
+                          style={styles.mfcRemove}
+                        >
+                          <Ionicons name="close-circle" size={normalize(22)} color={palette.stone} />
+                        </Pressable>
+                      ) : null}
                     </View>
                   </View>
                   {isConsolidated && item.qty > 0 ? (
@@ -1617,6 +1724,10 @@ const styles = StyleSheet.create({
     marginLeft: wp(2),
     textTransform: 'none',
   },
+  mfcLabelWrap: { flex: 1 },
+  mfcName: { textTransform: 'none' },
+  mfcCounted: { textTransform: 'none', marginTop: 2 },
+  mfcRemove: { marginLeft: wp(0.5) },
   qtyWrap: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -25,6 +25,8 @@ import { LocationSetupModal } from '../../components/LocationSetupModal';
 import { useAppContext } from '../../store/AppContext';
 import { useSitesStore } from '@/store/sitesStore';
 import { connectionsService } from '@/services/connections.service';
+import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard';
+import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
 import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { isVirtualHqSiteId } from '@/utils/defaultHqSite';
@@ -42,6 +44,7 @@ const IMPACT_ICONS = {
   food: require('../../../assets/placeholder/storage_box_green.png'),
   collections: require('../../../assets/placeholder/truck_icon.png'),
   co2: require('../../../assets/placeholder/co2_green_icon.png'),
+  recorded: require('../../../assets/placeholder/storage_box_orange.png'),
 };
 
 type AdaptiveStyles = {
@@ -54,8 +57,6 @@ type AdaptiveStyles = {
   surplusBanner: ViewStyle;
   surplusBannerContent: ViewStyle;
   surplusBannerTitle: TextStyle;
-  surplusBannerIcon: ViewStyle;
-  surplusBannerIconImage: ImageStyle;
   surplusBody: ViewStyle;
   surplusDescription: TextStyle;
   surplusCta: ViewStyle;
@@ -95,8 +96,6 @@ function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
     surplusBanner: {},
     surplusBannerContent: {},
     surplusBannerTitle: {},
-    surplusBannerIcon: {},
-    surplusBannerIconImage: {},
     surplusBody: {},
     surplusDescription: {},
     surplusCta: {},
@@ -163,7 +162,6 @@ function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
     logoImage: {
       borderRadius: logoSize / 2,
     },
-    // Flex row instead of absolute icon overlay (Profile-style layout).
     surplusBanner: {
       height: Math.min(r.height * 0.16, isLargeTablet ? 180 : 156),
       flexDirection: 'row',
@@ -183,19 +181,6 @@ function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
     surplusBannerTitle: {
       fontSize: font(22, 26, 28),
       lineHeight: font(28, 32, 34),
-    },
-    surplusBannerIcon: {
-      position: 'relative',
-      right: 0,
-      bottom: 0,
-      width: bannerIcon,
-      height: bannerIcon,
-      borderRadius: 20,
-      flexShrink: 0,
-    },
-    surplusBannerIconImage: {
-      width: bannerIcon * 0.62,
-      height: bannerIcon * 0.62,
     },
     surplusBody: {
       paddingHorizontal: space(18, 22, 26),
@@ -238,11 +223,13 @@ function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
     },
     impactGrid: {
       flexDirection: 'row',
+      flexWrap: 'nowrap',
       alignItems: 'stretch',
       gap: space(10, 12, 14),
     },
     impactStatCard: {
       flex: 1,
+      flexBasis: 0,
       minWidth: 0,
       paddingVertical: space(14, 16, 18),
       paddingHorizontal: space(10, 12, 14),
@@ -325,6 +312,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
     fetchBusinessImpact,
   } = useDashboardStore();
 
+  const homeImpact = useMakeFoodCountStore((state) => state.homeImpact);
+
   const impact = businessImpact ?? {
     kgSaved: 0,
     mealsCreated: 0,
@@ -353,19 +342,29 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
   const displayAddress = (currentProfile.address || capturedAddress || '').trim();
 
+  const showInsightsLink = !isFirstTimeUser || (homeImpact?.recordedKg ?? 0) > 0;
+
   const impactStats = [
+    {
+      key: 'recorded',
+      icon: IMPACT_ICONS.recorded,
+      value: formatImpactValue(homeImpact?.recordedKg ?? 0),
+      unit: 'kg',
+      label: 'Food recorded',
+      tint: '#FFF4E8',
+    },
     {
       key: 'food',
       icon: IMPACT_ICONS.food,
-      value: formatImpactValue(impact.kgSaved),
+      value: formatImpactValue(homeImpact?.divertedKg ?? impact.kgSaved),
       unit: 'kg',
-      label: 'Food saved',
+      label: 'Food diverted',
       tint: '#E8F8EE',
     },
     {
       key: 'collections',
       icon: IMPACT_ICONS.collections,
-      value: formatImpactValue(impact.collectionsCompleted),
+      value: formatImpactValue(homeImpact?.collections ?? impact.collectionsCompleted),
       unit: '',
       label: 'Collections',
       tint: '#F0EBFF',
@@ -373,7 +372,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
     {
       key: 'co2',
       icon: IMPACT_ICONS.co2,
-      value: formatImpactValue(impact.co2SavedKg),
+      value: formatImpactValue(homeImpact?.co2AvoidedKg ?? impact.co2SavedKg),
       unit: 'kg',
       label: 'CO₂ avoided',
       tint: '#FFF4E8',
@@ -417,6 +416,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       fetchBusinessImpact(true).catch(() => undefined);
+      void useMakeFoodCountStore.getState().loadHomeImpact();
       void loadConnections();
     }, [fetchBusinessImpact, loadConnections]),
   );
@@ -424,7 +424,11 @@ export function RestaurantHomeScreen({ navigation }: any) {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([fetchBusinessImpact(true), loadConnections()]);
+      await Promise.all([
+        fetchBusinessImpact(true),
+        loadConnections(),
+        useMakeFoodCountStore.getState().loadHomeImpact(),
+      ]);
     } catch (e) {
       showErrorAlert(e, 'Could not load dashboard', 'Could not load dashboard data');
     } finally {
@@ -570,8 +574,15 @@ export function RestaurantHomeScreen({ navigation }: any) {
             </HeroHeader>
 
             <View style={[styles.mainContent, adaptive.mainContent]}>
+              <View style={r.isTablet ? styles.topCardsRow : styles.topCardsColumn}>
+              <MakeFoodCountCard style={r.isTablet ? styles.topCardTablet : undefined} />
+              <View style={r.isTablet ? styles.topCardTablet : undefined}>
               <Pressable
-                style={({ pressed }) => [styles.surplusCard, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.surplusCard,
+                  r.isTablet && styles.surplusCardFill,
+                  pressed && styles.pressed,
+                ]}
                 onPress={() =>
                   navigation.navigate('Listings', {
                     screen: 'Surplus',
@@ -604,13 +615,6 @@ export function RestaurantHomeScreen({ navigation }: any) {
                     >
                       Got surplus food?
                     </AppText>
-                  </View>
-                  <View style={[styles.surplusBannerIcon, adaptive.surplusBannerIcon]}>
-                    <Image
-                      source={IMPACT_ICONS.food}
-                      style={[styles.surplusBannerIconImage, adaptive.surplusBannerIconImage]}
-                      resizeMode="contain"
-                    />
                   </View>
                 </ImageBackground>
 
@@ -662,6 +666,8 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   </View>
                 </View>
               </Pressable>
+              </View>
+              </View>
 
               {selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi' ? (
                 <Pressable
@@ -751,7 +757,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   ))}
                 </View>
 
-                {isFirstTimeUser ? (
+                {!showInsightsLink ? (
                   <View style={styles.encouragementCard}>
                     <AppText variant="bodySmall" color={palette.textMuted} style={styles.encouragementText}>
                       List your first surplus to start tracking your impact here.
@@ -760,7 +766,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                 ) : (
                   <Pressable
                     style={({ pressed }) => [styles.insightsLink, pressed && styles.pressed]}
-                    onPress={() => navigation.navigate('Insights')}
+                    onPress={() => navigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
                   >
                     <View style={[styles.insightsLinkLeft, adaptive.insightsLinkLeft]}>
                       <Ionicons name="bar-chart-outline" size={normalize(20)} color={palette.primary} />
@@ -912,6 +918,25 @@ const styles = StyleSheet.create({
     fontSize: normalize(20),
   },
 
+  topCardsColumn: {
+    gap: hp(2.2),
+  },
+
+  topCardsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 16,
+  },
+
+  topCardTablet: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  surplusCardFill: {
+    flex: 1,
+  },
+
   surplusCard: {
     borderRadius: normalize(24),
     overflow: 'hidden',
@@ -940,7 +965,7 @@ const styles = StyleSheet.create({
     paddingBottom: hp(1.8),
     gap: hp(0.6),
     zIndex: 1,
-    maxWidth: '68%',
+    maxWidth: '100%',
   },
 
   surplusBadge: {
@@ -966,35 +991,6 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     fontSize: normalize(22),
     lineHeight: normalize(28),
-  },
-
-  surplusBannerIcon: {
-    position: 'absolute',
-    right: wp(4),
-    bottom: hp(1.2),
-    width: normalize(64),
-    height: normalize(64),
-    borderRadius: normalize(20),
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-    ...Platform.select({
-      ios: {
-        shadowColor: palette.black,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-
-  surplusBannerIconImage: {
-    width: normalize(40),
-    height: normalize(40),
   },
 
   surplusBody: {
@@ -1123,14 +1119,17 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
+  // Four tiles: 2x2 on phones (one row on tablets, see adaptive styles).
   impactGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: wp(2),
     width: '100%',
   },
 
   impactStatCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '45%',
     minWidth: 0,
     borderRadius: normalize(18),
     borderWidth: 1,

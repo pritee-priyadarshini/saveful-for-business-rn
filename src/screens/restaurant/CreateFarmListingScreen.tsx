@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   Linking,
@@ -23,7 +23,7 @@ import { useListingsStore } from '../../store/listingsStore';
 import { getSitePickupCoords, getSitePostcode } from '../../utils/listingLocation';
 import { resolveListingSiteId } from '../../utils/listingSite';
 import { isBusinessMultiHeadOffice } from '../../utils/defaultHqSite';
-import { estimateCo2AvoidedKg, estimateMealsSaved, formatCo2AvoidedKg } from '../../utils/foodListing';
+import { estimateCo2AvoidedKg, estimateMealsSaved, formatCo2AvoidedKg, resolveFoodIconSource, type FoodIconKey } from '../../utils/foodListing';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getFarmRelistFormValues } from '../../utils/listingRelist';
@@ -40,6 +40,22 @@ import {
 } from '../../utils/listingDateValidation';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildFormShellStyles, formColumnWidth } from '@/utils/dashboardAdaptive';
+import { MfcListingBanner } from '@/components/makeFoodCount/MfcListingBanner';
+import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
+import type { MfcListingRouteParams } from '@/types/makeFoodCount';
+import {
+  buildMfcFoodRecord,
+  buildMfcIdempotencyKey,
+  clampMfcQty,
+  formatMfcKg,
+  mfcItemsFromRoute,
+  mfcListedNotice,
+  nextMfcAttempt,
+  roundKg,
+  type MfcAttemptState,
+} from '@/utils/mfcListing';
+import { navigateToMfcSummary } from '@/utils/mfcNavigation';
+import { toListingIconKey } from '@/components/makeFoodCount/MfcArt';
 
 const STORAGE_COLS = 4;
 const CONTAMINANT_COLS = 3;
@@ -68,6 +84,13 @@ type FarmItem = {
   name: string;
   qty: number;
   icon: any;
+  /** Make Food Count: record line this row is linked to (only on carried-forward rows). */
+  lineId?: number;
+  /** Listing category from the prefill (falls back to name). */
+  category?: string;
+  countedKg?: number;
+  /** Linked rows can't go above this. */
+  availableKg?: number;
 };
 
 const stepMeta = [
@@ -120,7 +143,26 @@ const formatTime = (date: Date | null) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
-export function CreateFarmListingScreen({ navigation }: any) {
+/** Carried-forward Make Food Count rows first, then the usual seed rows (unlinked) for extras. */
+const buildMfcItems = (mfc: MfcListingRouteParams): FarmItem[] => {
+  const linked = mfcItemsFromRoute<FarmItem>(mfc, (item, base) => ({
+    ...base,
+    name: item.name,
+    category: item.category || item.name,
+    // The server's icon keys (chicken, produce …) are not listing icon keys: map them.
+    icon: resolveFoodIconSource(toListingIconKey(item.iconKey, item.category)),
+  }));
+  const taken = new Set(linked.map((item) => item.name.trim().toLowerCase()));
+  return [...linked, ...seedItems.filter((seed) => !taken.has(seed.name.trim().toLowerCase()))];
+};
+
+export function CreateFarmListingScreen({ navigation, route }: any) {
+  // Make Food Count: only set when the Summary opened this screen with a prefilled record.
+  // (No "Intended reuse" chips exist on this screen, so nothing to hide - C2 holds for both flows.)
+  const mfc: MfcListingRouteParams | undefined = route?.params?.mfc;
+  const mfcKey = mfc ? `${mfc.recordId}:${mfc.kind}:${JSON.stringify(mfc.items)}` : null;
+  const mfcAttempt = useRef<MfcAttemptState>({ fingerprint: null, attempt: 0 });
+  const mfcSeededKey = useRef<string | null>(mfcKey);
   const r = useResponsiveLayout();
   const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
   const columnWidth = r.isTablet ? formColumnWidth(r) : r.width;
@@ -140,7 +182,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
     'S';
 
   const [step, setStep] = useState<Step>(1);
-  const [items, setItems] = useState<FarmItem[]>(seedItems);
+  const [items, setItems] = useState<FarmItem[]>(() => (mfc ? buildMfcItems(mfc) : seedItems));
   const [customItem, setCustomItem] = useState('');
   const [images, setImages] = useState<string[]>([]);
 
@@ -164,8 +206,20 @@ export function CreateFarmListingScreen({ navigation }: any) {
     ListingDateFieldErrors & { foodItems?: string; location?: string; confirmedSafe?: string }
   >({});
 
+  // Re-seed if the same screen instance is re-opened with a different Make Food Count prefill.
+  useEffect(() => {
+    if (mfcSeededKey.current === mfcKey) return;
+    mfcSeededKey.current = mfcKey;
+    mfcAttempt.current = { fingerprint: null, attempt: 0 };
+    if (mfc) setItems(buildMfcItems(mfc));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mfcKey]);
+
   const activeItems = useMemo(() => items.filter((item) => item.qty > 0), [items]);
-  const totalQuantity = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
+  const totalQuantity = useMemo(() => {
+    const sum = items.reduce((total, item) => total + item.qty, 0);
+    return mfc ? roundKg(sum) : sum;
+  }, [items, mfc]);
   const estimatedMeals = estimateMealsSaved(totalQuantity);
   const estimatedCO2 = estimateCo2AvoidedKg(totalQuantity);
 
@@ -198,12 +252,22 @@ export function CreateFarmListingScreen({ navigation }: any) {
   const updateQty = (index: number, delta: number) => {
     setItems((prev) => {
       const next = [...prev];
+      const current = next[index];
+      if (typeof current.lineId === 'number' && typeof current.availableKg === 'number') {
+        // Linked Make Food Count row: 2 dp, never above availableKg, can go down to 0.
+        next[index] = { ...current, qty: clampMfcQty(current.qty + delta, current.availableKg) };
+        return next;
+      }
       next[index] = {
-        ...next[index],
-        qty: Math.max(0, Math.round((next[index].qty + delta) * 10) / 10),
+        ...current,
+        qty: Math.max(0, Math.round((current.qty + delta) * 10) / 10),
       };
       return next;
     });
+  };
+
+  const removeItem = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const addCustomItem = () => {
@@ -407,12 +471,12 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
     await withLock(async () => {
       try {
-        const payload = {
+        const payload: Parameters<typeof foodListingService.createListing>[0] = {
           siteId: resolvedSiteId,
           listingType: 'ANIMAL' as const,
           foodItems: activeItems.map((item) => ({
             name: item.name,
-            category: item.name,
+            category: item.category || item.name,
             totalQtyKg: item.qty,
             unit: 'kg',
           })),
@@ -433,6 +497,24 @@ export function CreateFarmListingScreen({ navigation }: any) {
           collectionNotes: collectionNotes.trim() || undefined,
           photos: images,
         };
+
+        if (mfc) {
+          // Linked rows only; itemIndex is the position in the foodItems array sent above.
+          payload.foodRecord = buildMfcFoodRecord(mfc, activeItems);
+          const attempt = nextMfcAttempt(mfcAttempt.current, JSON.stringify(payload));
+          const key = buildMfcIdempotencyKey(
+            useMakeFoodCountStore.getState().clientRequestId,
+            mfc.recordId,
+            'NON_EDIBLE',
+            attempt,
+          );
+          await foodListingService.createListing(payload, key);
+          useListingsStore.getState().invalidateSite();
+          navigateToMfcSummary(navigation, {
+            notice: mfcListedNotice(totalQuantity, 'not fit for human consumption'),
+          });
+          return;
+        }
 
         await foodListingService.createListing(payload);
         useListingsStore.getState().invalidateSite();
@@ -550,6 +632,7 @@ export function CreateFarmListingScreen({ navigation }: any) {
 
         {step === 1 ? (
           <View style={styles.stepWrap}>
+            {mfc ? <MfcListingBanner /> : null}
             {/* Food items */}
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
               WHAT FOOD DO YOU HAVE?
@@ -566,20 +649,46 @@ export function CreateFarmListingScreen({ navigation }: any) {
                 <View key={`${item.name}-${index}`} style={styles.foodRow}>
                   <View style={styles.foodNameWrap}>
                     <Image source={item.icon} style={styles.foodIcon} />
-                    <AppText variant="body1" color={palette.midgray} style={styles.foodLabel} numberOfLines={2}>
-                      {item.name}
-                    </AppText>
+                    {typeof item.lineId === 'number' ? (
+                      <View style={[styles.foodLabel, styles.mfcLabelWrap]}>
+                        <AppText variant="body1" color={palette.midgray} style={styles.mfcName} numberOfLines={2}>
+                          {item.name}
+                        </AppText>
+                        <AppText variant="caption" color={palette.stone} style={styles.mfcCounted}>
+                          Counted: {formatMfcKg(item.countedKg ?? 0)} kg
+                        </AppText>
+                      </View>
+                    ) : (
+                      <AppText variant="body1" color={palette.midgray} style={styles.foodLabel} numberOfLines={2}>
+                        {item.name}
+                      </AppText>
+                    )}
                   </View>
                   <View style={styles.qtyWrap}>
                     <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, -0.5)}>
                       <AppText variant="h6" color={palette.stone}>-</AppText>
                     </Pressable>
                     <AppText variant="bodyBold" color={palette.midgray} style={styles.qtyValue}>
-                      {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
+                      {typeof item.lineId === 'number'
+                        ? formatMfcKg(item.qty)
+                        : item.qty % 1 === 0
+                          ? item.qty.toFixed(0)
+                          : item.qty.toFixed(1)}
                     </AppText>
                     <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, 0.5)}>
                       <AppText variant="h6" color={palette.stone}>+</AppText>
                     </Pressable>
+                    {typeof item.lineId === 'number' ? (
+                      <Pressable
+                        onPress={() => removeItem(index)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${item.name} from this listing`}
+                        style={styles.mfcRemove}
+                      >
+                        <Ionicons name="close-circle" size={normalize(22)} color={palette.stone} />
+                      </Pressable>
+                    ) : null}
                   </View>
                 </View>
               ))}
@@ -1315,6 +1424,10 @@ const styles = StyleSheet.create({
     height: normalize(22),
     flexShrink: 0,
   },
+  mfcLabelWrap: { flex: 1 },
+  mfcName: { textTransform: 'none' },
+  mfcCounted: { textTransform: 'none', marginTop: 2 },
+  mfcRemove: { marginLeft: wp(0.5) },
   foodLabel: {
     flex: 1,
     flexShrink: 1,

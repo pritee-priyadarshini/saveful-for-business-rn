@@ -28,6 +28,7 @@ import { showConfirmAlert, showAppAlert } from '@/store/appAlertStore';
 import { palette } from '@/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
+import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard';
 import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -534,6 +535,9 @@ export default function ManageSitesScreen() {
             </Pressable>
           ))}
         </View>
+
+        {/* Make Food Count: multi-site kitchens (Compass sites) record waste from here too. */}
+        <MakeFoodCountCard style={[{ marginHorizontal: wp(4), marginBottom: hp(2), width: undefined }, tabletInsetReset]} />
 
         <Pressable
           onPress={() => navigation.navigate('Connections')}

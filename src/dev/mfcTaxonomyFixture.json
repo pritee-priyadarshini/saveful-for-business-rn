@@ -1,0 +1,232 @@
+{
+  "taxonomyVersion": "2026-11-17.1",
+  "limits": {
+    "maxKgPerLine": 500,
+    "decimals": 2
+  },
+  "entries": [
+    {
+      "source": "OVERPRODUCTION",
+      "key": "meat_poultry",
+      "label": "Meat & Poultry",
+      "imageKey": "meat_poultry",
+      "listingName": "Meat & poultry",
+      "listingIconKey": "meat",
+      "fitAllowed": true,
+      "subtypes": [
+        {
+          "key": "chicken",
+          "label": "Chicken",
+          "listingName": "Chicken",
+          "iconKey": "chicken"
+        },
+        {
+          "key": "beef",
+          "label": "Beef",
+          "listingName": "Beef",
+          "iconKey": "beef"
+        },
+        {
+          "key": "lamb",
+          "label": "Lamb",
+          "listingName": "Lamb",
+          "iconKey": "lamb"
+        },
+        {
+          "key": "pork",
+          "label": "Pork",
+          "listingName": "Pork",
+          "iconKey": "pork"
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "listingName": "Meat & poultry",
+          "iconKey": "meat"
+        }
+      ]
+    },
+    {
+      "source": "OVERPRODUCTION",
+      "key": "seafood",
+      "label": "Seafood",
+      "imageKey": "seafood",
+      "listingName": "Seafood",
+      "listingIconKey": "fish",
+      "fitAllowed": true,
+      "subtypes": [
+        {
+          "key": "fish",
+          "label": "Fish",
+          "listingName": "Fish",
+          "iconKey": "fish"
+        },
+        {
+          "key": "shellfish",
+          "label": "Shellfish",
+          "listingName": "Shellfish",
+          "iconKey": "shellfish"
+        },
+        {
+          "key": "other",
+          "label": "Other",
+          "listingName": "Seafood",
+          "iconKey": "fish"
+        }
+      ]
+    },
+    {
+      "source": "OVERPRODUCTION",
+      "key": "fruit_veg",
+      "label": "Fruit & vegetables",
+      "imageKey": "fruit_veg",
+      "listingName": "Fruit & vegetables",
+      "listingIconKey": "produce",
+      "fitAllowed": true
+    },
+    {
+      "source": "OVERPRODUCTION",
+      "key": "dairy",
+      "label": "Dairy",
+      "imageKey": "dairy",
+      "listingName": "Dairy",
+      "listingIconKey": "dairy",
+      "fitAllowed": true
+    },
+    {
+      "source": "OVERPRODUCTION",
+      "key": "bread_bakery",
+      "label": "Bread & baked goods",
+      "imageKey": "bread_bakery",
+      "listingName": "Bread & baked goods",
+      "listingIconKey": "bakery",
+      "fitAllowed": true
+    },
+    {
+      "source": "OVERPRODUCTION",
+      "key": "prepared_meals",
+      "label": "Prepared meals",
+      "imageKey": "prepared_meals",
+      "listingName": "Prepared meals",
+      "listingIconKey": "meal",
+      "fitAllowed": true
+    },
+    {
+      "source": "OVERPRODUCTION",
+      "key": "other",
+      "label": "Other",
+      "imageKey": "other",
+      "listingName": "Surplus food",
+      "listingIconKey": "other",
+      "fitAllowed": true
+    },
+    {
+      "source": "SPOILAGE",
+      "key": "fruit_veg",
+      "label": "Fruit & veg",
+      "imageKey": "fruit_veg",
+      "listingName": "Fruit & vegetables",
+      "listingIconKey": "produce",
+      "fitAllowed": false
+    },
+    {
+      "source": "SPOILAGE",
+      "key": "dairy",
+      "label": "Dairy",
+      "imageKey": "dairy",
+      "listingName": "Dairy",
+      "listingIconKey": "dairy",
+      "fitAllowed": false
+    },
+    {
+      "source": "SPOILAGE",
+      "key": "meat_poultry",
+      "label": "Meat & Poultry",
+      "imageKey": "meat_poultry",
+      "listingName": "Meat & poultry",
+      "listingIconKey": "meat",
+      "fitAllowed": false
+    },
+    {
+      "source": "SPOILAGE",
+      "key": "seafood",
+      "label": "Seafood",
+      "imageKey": "seafood",
+      "listingName": "Seafood",
+      "listingIconKey": "fish",
+      "fitAllowed": false
+    },
+    {
+      "source": "SPOILAGE",
+      "key": "bread_bakery",
+      "label": "Bread & baked goods",
+      "imageKey": "bread_bakery",
+      "listingName": "Bread & baked goods",
+      "listingIconKey": "bakery",
+      "fitAllowed": false
+    },
+    {
+      "source": "PREPARATION",
+      "key": "peels_trimmings",
+      "label": "Peels & trimmings",
+      "imageKey": "peels_trimmings",
+      "listingName": "Peels & trimmings",
+      "listingIconKey": "produce",
+      "fitAllowed": false
+    },
+    {
+      "source": "PREPARATION",
+      "key": "meat_offcuts",
+      "label": "Meat offcuts",
+      "imageKey": "meat_offcuts",
+      "listingName": "Meat offcuts",
+      "listingIconKey": "meat",
+      "fitAllowed": false
+    },
+    {
+      "source": "PREPARATION",
+      "key": "bread_bakery",
+      "label": "Bread & baked goods",
+      "imageKey": "bread_bakery",
+      "listingName": "Bread & baked goods",
+      "listingIconKey": "bakery",
+      "fitAllowed": false
+    },
+    {
+      "source": "PREPARATION",
+      "key": "shells",
+      "label": "Shells",
+      "imageKey": "shells",
+      "listingName": "Shells",
+      "listingIconKey": "shellfish",
+      "fitAllowed": false
+    },
+    {
+      "source": "PREPARATION",
+      "key": "coffee_grounds",
+      "label": "Coffee grounds",
+      "imageKey": "coffee_grounds",
+      "listingName": "Coffee grounds",
+      "listingIconKey": "coffee",
+      "fitAllowed": false
+    },
+    {
+      "source": "PREPARATION",
+      "key": "preparation_mistake",
+      "label": "Preparation mistake",
+      "imageKey": "preparation_mistake",
+      "listingName": "Preparation waste",
+      "listingIconKey": "other",
+      "fitAllowed": false
+    },
+    {
+      "source": "PLATE_SCRAPS",
+      "key": "plate_scraps",
+      "label": "Plate scraps",
+      "imageKey": "plate_scraps",
+      "listingName": "Plate scraps",
+      "listingIconKey": "other",
+      "fitAllowed": false
+    }
+  ]
+}

@@ -8,12 +8,13 @@ import CollectionHistoryScreen from '@/screens/restaurant/CollectionHistoryScree
 import{ SurplusScreen } from '@/screens/restaurant/SurplusScreen';
 import { AddDailySurplusScreen } from '@/screens/restaurant/AddDailySurplusScreen';
 import { palette } from '@/theme/colors';
+import type { MfcListingRouteParams } from '@/types/makeFoodCount';
 
 
 type RestaurantStackParamList = {
   RestaurantListings: undefined;
-  CreateListing: { consolidatedCollectionId?: number; consolidatedSiteId?: number } | undefined;
-  CreateFarmListing: undefined;
+  CreateListing: { consolidatedCollectionId?: number; consolidatedSiteId?: number; mfc?: MfcListingRouteParams } | undefined;
+  CreateFarmListing: { mfc?: MfcListingRouteParams } | undefined;
   FarmListingConfirmation: { listing: any };
   EditListing: { listingId: number };
   ListingConfirmation: {
