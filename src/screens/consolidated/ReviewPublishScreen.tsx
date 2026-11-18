@@ -9,6 +9,7 @@ import { Screen } from '@/components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { DeclarationCheckbox } from '@/components/consolidated/DeclarationCheckbox';
 import { Divider, IconBubble, InfoRow, Notice, Pill, SectionTitle, Surface, cc, tabular } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { normalize } from '@/utils/responsive';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -31,6 +32,7 @@ export function ReviewPublishScreen() {
   const [openBreakdown, setOpenBreakdown] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const guide = useScreenGuide(tours.reviewPublishTour, { ready: preview != null });
 
   useEffect(() => {
     let cancelled = false;
@@ -70,18 +72,24 @@ export function ReviewPublishScreen() {
 
   return (
     <Screen scrollable backgroundColor={palette.creme} transparentTop contentStyle={styles.screen}>
-      <StackHeroHeader title="Review & publish" subtitle="One listing for charities — check it, then publish" />
+      <StackHeroHeader
+        title="Review & publish"
+        subtitle="One listing for charities — check it, then publish"
+        right={<GuideHeaderRight onGuide={guide.start} />}
+      />
       {!preview ? <ActivityIndicator color={palette.kale} style={styles.loader} /> : (
         <View style={styles.body}>
           {preview.blockers.length ? (
-            <Notice tone="danger" title="Fix these before publishing">
-              {preview.blockers.map((item) => (
-                <View key={item} style={styles.bullet}>
-                  <Ionicons name="close-circle" size={normalize(15)} color={palette.danger} />
-                  <AppText variant="bodySmall" color={palette.midgray} style={styles.flex}>{item}</AppText>
-                </View>
-              ))}
-            </Notice>
+            <GuideTarget id="review.blockers">
+              <Notice tone="danger" title="Fix these before publishing">
+                {preview.blockers.map((item) => (
+                  <View key={item} style={styles.bullet}>
+                    <Ionicons name="close-circle" size={normalize(15)} color={palette.danger} />
+                    <AppText variant="bodySmall" color={palette.midgray} style={styles.flex}>{item}</AppText>
+                  </View>
+                ))}
+              </Notice>
+            </GuideTarget>
           ) : null}
           {preview.warnings.length ? (
             <Notice tone="warn" title="Good to know">
@@ -96,91 +104,97 @@ export function ReviewPublishScreen() {
 
           {/* What the charity sees */}
           <SectionTitle title="Charity preview" caption="Exactly what charities will see. No site names, no mention of outlets." />
-          <Surface style={styles.listing}>
-            <View style={styles.listingHead}>
-              <View style={styles.flex}>
-                <Pill label="Available" color={palette.kale} background={cc.tint} dot />
-                <AppText variant="subheading" style={styles.listingTitle}>{preview.pointName}</AppText>
-                <AppText variant="bodySmall" color={palette.stone}>{preview.pointAddress}</AppText>
-              </View>
-              <View style={styles.kgBadge}>
-                <AppText variant="subheading" color={palette.white} style={tabular}>{formatKg(totalKg)}</AppText>
-                <AppText variant="meta" color={palette.white}>kg</AppText>
-              </View>
-            </View>
-            <View style={styles.metaRow}>
-              <Pill
-                label={`Pickup ${formatWindowInZone(preview.pickupStartAt, preview.pickupEndAt, preview.timezone)}`}
-                color={palette.primary}
-                background={palette.creme3}
-                icon="time-outline"
-              />
-              {storage ? <Pill label={storage} color={palette.primary} background={palette.creme3} icon="snow-outline" /> : null}
-            </View>
-            <Divider />
-            {preview.items.map((item, index) => (
-              <View key={`${item.name}-${index}`} style={styles.itemRow}>
-                <View style={styles.itemDot} />
+          <GuideTarget id="review.preview">
+            <Surface style={styles.listing}>
+              <View style={styles.listingHead}>
                 <View style={styles.flex}>
-                  <AppText variant="bodyBold">{item.name}</AppText>
-                  {item.quantityDescription ? <AppText variant="meta" color={palette.stone}>{item.quantityDescription}</AppText> : null}
+                  <Pill label="Available" color={palette.kale} background={cc.tint} dot />
+                  <AppText variant="subheading" style={styles.listingTitle}>{preview.pointName}</AppText>
+                  <AppText variant="bodySmall" color={palette.stone}>{preview.pointAddress}</AppText>
                 </View>
-                <AppText variant="bodyBold">{formatKg(item.qtyKg)} kg</AppText>
+                <View style={styles.kgBadge}>
+                  <AppText variant="subheading" color={palette.white} style={tabular}>{formatKg(totalKg)}</AppText>
+                  <AppText variant="meta" color={palette.white}>kg</AppText>
+                </View>
               </View>
-            ))}
-            {allergens.length ? (
-              <AppText variant="meta" color={palette.stone}>Allergens · {allergens.join(', ')}</AppText>
-            ) : null}
-            {preview.suitabilityNotes || preview.instructions ? <Divider /> : null}
-            {preview.suitabilityNotes ? (
-              <InfoRow icon="shield-checkmark-outline" label="Handling" value={preview.suitabilityNotes} />
-            ) : null}
-            {preview.instructions ? (
-              <InfoRow icon="document-text-outline" label="Instructions" value={preview.instructions} />
-            ) : null}
-          </Surface>
+              <View style={styles.metaRow}>
+                <Pill
+                  label={`Pickup ${formatWindowInZone(preview.pickupStartAt, preview.pickupEndAt, preview.timezone)}`}
+                  color={palette.primary}
+                  background={palette.creme3}
+                  icon="time-outline"
+                />
+                {storage ? <Pill label={storage} color={palette.primary} background={palette.creme3} icon="snow-outline" /> : null}
+              </View>
+              <Divider />
+              {preview.items.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.itemRow}>
+                  <View style={styles.itemDot} />
+                  <View style={styles.flex}>
+                    <AppText variant="bodyBold">{item.name}</AppText>
+                    {item.quantityDescription ? <AppText variant="meta" color={palette.stone}>{item.quantityDescription}</AppText> : null}
+                  </View>
+                  <AppText variant="bodyBold">{formatKg(item.qtyKg)} kg</AppText>
+                </View>
+              ))}
+              {allergens.length ? (
+                <AppText variant="meta" color={palette.stone}>Allergens · {allergens.join(', ')}</AppText>
+              ) : null}
+              {preview.suitabilityNotes || preview.instructions ? <Divider /> : null}
+              {preview.suitabilityNotes ? (
+                <InfoRow icon="shield-checkmark-outline" label="Handling" value={preview.suitabilityNotes} />
+              ) : null}
+              {preview.instructions ? (
+                <InfoRow icon="document-text-outline" label="Instructions" value={preview.instructions} />
+              ) : null}
+            </Surface>
+          </GuideTarget>
 
           {/* Site breakdown (manager only) */}
-          <Surface onPress={() => setOpenBreakdown((value) => !value)} style={styles.breakdown}>
-            <View style={styles.breakdownHead}>
-              <IconBubble name="storefront-outline" size={34} />
-              <View style={styles.flex}>
-                <AppText variant="bodyBold">Where it came from</AppText>
-                <AppText variant="meta" color={palette.stone}>
-                  {preview.breakdown.length} site{preview.breakdown.length === 1 ? '' : 's'} · for your records only
-                </AppText>
-              </View>
-              <Ionicons name={openBreakdown ? 'chevron-up' : 'chevron-down'} size={normalize(18)} color={palette.stone} />
-            </View>
-            {openBreakdown ? preview.breakdown.map((site) => (
-              <View key={site.siteName} style={styles.siteBlock}>
-                <View style={styles.itemRow}>
-                  <AppText variant="bodyBold" style={styles.flex}>{site.siteName}</AppText>
-                  <AppText variant="bodyBold" color={palette.kale}>{formatKg(site.verifiedKg)} kg</AppText>
-                </View>
-                {site.items.map((item) => (
-                  <AppText key={item.name} variant="meta" color={palette.stone}>
-                    {item.name} · {formatKg(item.verifiedKg)} kg{item.quantityDescription ? ` · ${item.quantityDescription}` : ''}
+          <GuideTarget id="review.breakdown">
+            <Surface onPress={() => setOpenBreakdown((value) => !value)} style={styles.breakdown}>
+              <View style={styles.breakdownHead}>
+                <IconBubble name="storefront-outline" size={34} />
+                <View style={styles.flex}>
+                  <AppText variant="bodyBold">Where it came from</AppText>
+                  <AppText variant="meta" color={palette.stone}>
+                    {preview.breakdown.length} site{preview.breakdown.length === 1 ? '' : 's'} · for your records only
                   </AppText>
-                ))}
+                </View>
+                <Ionicons name={openBreakdown ? 'chevron-up' : 'chevron-down'} size={normalize(18)} color={palette.stone} />
               </View>
-            )) : null}
-          </Surface>
+              {openBreakdown ? preview.breakdown.map((site) => (
+                <View key={site.siteName} style={styles.siteBlock}>
+                  <View style={styles.itemRow}>
+                    <AppText variant="bodyBold" style={styles.flex}>{site.siteName}</AppText>
+                    <AppText variant="bodyBold" color={palette.kale}>{formatKg(site.verifiedKg)} kg</AppText>
+                  </View>
+                  {site.items.map((item) => (
+                    <AppText key={item.name} variant="meta" color={palette.stone}>
+                      {item.name} · {formatKg(item.verifiedKg)} kg{item.quantityDescription ? ` · ${item.quantityDescription}` : ''}
+                    </AppText>
+                  ))}
+                </View>
+              )) : null}
+            </Surface>
+          </GuideTarget>
 
-          <DeclarationCheckbox
-            title="Manager declaration"
-            declaration={declarations?.MANAGER}
-            checked={accepted}
-            onChange={(value) => { setAccepted(value); setError(null); }}
-            error={error}
-          />
-          <Button
-            label="Publish to charities"
-            icon="megaphone-outline"
-            onPress={publish}
-            loading={submitting}
-            disabled={preview.blockers.length > 0}
-          />
+          <GuideTarget id="review.publish" style={styles.publish}>
+            <DeclarationCheckbox
+              title="Manager declaration"
+              declaration={declarations?.MANAGER}
+              checked={accepted}
+              onChange={(value) => { setAccepted(value); setError(null); }}
+              error={error}
+            />
+            <Button
+              label="Publish to charities"
+              icon="megaphone-outline"
+              onPress={publish}
+              loading={submitting}
+              disabled={preview.blockers.length > 0}
+            />
+          </GuideTarget>
         </View>
       )}
     </Screen>
@@ -212,6 +226,7 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: palette.kale },
   breakdown: { gap: 10 },
+  publish: { gap: normalize(12) },
   breakdownHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   siteBlock: { gap: 3, backgroundColor: cc.muted, borderRadius: cc.radiusSm, padding: 10 },
 });

@@ -13,6 +13,7 @@ import { CollectionTimesCard } from '@/components/consolidated/CollectionTimesCa
 import { HandoverButton } from '@/components/consolidated/HandoverButton';
 import { ReceiptSheet } from '@/components/consolidated/ReceiptSheet';
 import { Divider, IconBubble, InfoRow, Notice, Pill, SectionTitle, StepTrack, Surface, cc } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { normalize } from '@/utils/responsive';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { consolidatedService } from '@/services/consolidated.service';
@@ -98,6 +99,8 @@ export function ContributionDetailScreen() {
     }
   };
 
+  const guide = useScreenGuide(detail ? tours.contributionTour(detail.method) : null, { ready: !loading && Boolean(detail) });
+
   if (loading || !detail) {
     return (
       <Screen backgroundColor={palette.creme} transparentTop>
@@ -118,151 +121,163 @@ export function ContributionDetailScreen() {
 
   return (
     <Screen scrollable backgroundColor={palette.creme} transparentTop contentStyle={styles.screen}>
-      <StackHeroHeader title={detail.pointName} subtitle={`${detail.groupName || 'Consolidated collection'} · ${formatKg(listedKg)} kg listed`} />
+      <StackHeroHeader
+        title={detail.pointName}
+        subtitle={`${detail.groupName || 'Consolidated collection'} · ${formatKg(listedKg)} kg listed`}
+        right={<GuideHeaderRight onGuide={guide.start} />}
+      />
       <View style={styles.body}>
         {banner ? <Notice tone="warn" icon="hourglass-outline" title={banner} body="Your manager will approve or reject it. Until then the published listing stays as it was." /> : null}
 
         {/* Progress */}
-        <Surface style={styles.gap12}>
-          <View style={styles.rowBetween}>
-            <AppText variant="bodyBold">Progress</AppText>
-            <CollectionStatusBadge status={detail.status} kind="contribution" method={detail.method} />
-          </View>
-          {notReceived ? (
-            <Notice tone="danger" icon="close-circle" title="Marked not received at the collection point" body={detail.receipt?.note || null} />
-          ) : (
-            <StepTrack
-              current={stage}
-              steps={[
-                { label: 'Listed', detail: when(detail.submittedAt, detail.submittedBy?.name) },
-                { label: internal ? 'Collected from your outlet' : 'Dropped off at the collection point', detail: when(detail.handover?.at, detail.handover?.by?.name) },
-                { label: `Received at ${detail.pointName}`, detail: received ? when(detail.receipt?.at, detail.receipt?.by?.name) : null },
-                { label: 'Collected by a charity', detail: detail.status === 'COMPLETED' ? `${formatKg(acceptedKg)} kg accepted` : null },
-              ]}
-            />
-          )}
-          {received && detail.receipt?.note ? (
-            <AppText variant="meta" color={palette.stone}>Receiver's note: {detail.receipt.note}</AppText>
-          ) : null}
-        </Surface>
+        <GuideTarget id="contribution.progress">
+          <Surface style={styles.gap12}>
+            <View style={styles.rowBetween}>
+              <AppText variant="bodyBold">Progress</AppText>
+              <CollectionStatusBadge status={detail.status} kind="contribution" method={detail.method} />
+            </View>
+            {notReceived ? (
+              <Notice tone="danger" icon="close-circle" title="Marked not received at the collection point" body={detail.receipt?.note || null} />
+            ) : (
+              <StepTrack
+                current={stage}
+                steps={[
+                  { label: 'Listed', detail: when(detail.submittedAt, detail.submittedBy?.name) },
+                  { label: internal ? 'Collected from your outlet' : 'Dropped off at the collection point', detail: when(detail.handover?.at, detail.handover?.by?.name) },
+                  { label: `Received at ${detail.pointName}`, detail: received ? when(detail.receipt?.at, detail.receipt?.by?.name) : null },
+                  { label: 'Collected by a charity', detail: detail.status === 'COMPLETED' ? `${formatKg(acceptedKg)} kg accepted` : null },
+                ]}
+              />
+            )}
+            {received && detail.receipt?.note ? (
+              <AppText variant="meta" color={palette.stone}>Receiver's note: {detail.receipt.note}</AppText>
+            ) : null}
+          </Surface>
+        </GuideTarget>
 
         {/* Handover */}
         {canHandoverContribution(detail.status) ? (
-          <Surface tone="tint" style={styles.gap12}>
-            <View style={styles.stepHead}>
-              <IconBubble name={internal ? 'walk-outline' : 'archive-outline'} color={palette.white} background={palette.kale} />
-              <View style={styles.flex}>
-                <AppText variant="subheading">{internal ? 'Have your food ready' : 'Drop off your food'}</AppText>
+          <GuideTarget id="contribution.handover">
+            <Surface tone="tint" style={styles.gap12}>
+              <View style={styles.stepHead}>
+                <IconBubble name={internal ? 'walk-outline' : 'archive-outline'} color={palette.white} background={palette.kale} />
+                <View style={styles.flex}>
+                  <AppText variant="subheading">{internal ? 'Have your food ready' : 'Drop off your food'}</AppText>
+                </View>
               </View>
-            </View>
-            <AppText variant="bodySmall" color={palette.midgray}>
-              {handoverInstruction({
-                method: detail.method,
-                point: { name: detail.pointName },
-                handoverStartAt: detail.times.handoverStartAt,
-                handoverEndAt: detail.times.handoverEndAt,
-                timezone: detail.timezone,
-              })}
-            </AppText>
-            <HandoverButton contributionId={detail.id} method={detail.method} timezone={detail.timezone} size="default" onDone={() => { void load(); }} />
-          </Surface>
+              <AppText variant="bodySmall" color={palette.midgray}>
+                {handoverInstruction({
+                  method: detail.method,
+                  point: { name: detail.pointName },
+                  handoverStartAt: detail.times.handoverStartAt,
+                  handoverEndAt: detail.times.handoverEndAt,
+                  timezone: detail.timezone,
+                })}
+              </AppText>
+              <HandoverButton contributionId={detail.id} method={detail.method} timezone={detail.timezone} size="default" onDone={() => { void load(); }} />
+            </Surface>
+          </GuideTarget>
         ) : null}
 
         {/* Food */}
-        <SectionTitle
-          title="Your food"
-          action={canEditContribution(detail.status, detail.collectionStatus) && !editing
-            ? { label: published ? 'Request a change' : 'Edit', onPress: () => setEditing(true) }
-            : null}
-        />
-        {!editing ? (
-          <Surface style={styles.gap10}>
-            {detail.items.map((item: ContributionItem, index) => (
-              <View key={item.foodItemId}>
-                {index > 0 ? <Divider style={styles.itemDivider} /> : null}
-                <View style={styles.itemRow}>
-                  <View style={styles.flex}>
-                    <AppText variant="bodyBold">{item.name}</AppText>
-                    {item.quantityDescription ? <AppText variant="meta" color={palette.stone}>{item.quantityDescription}</AppText> : null}
+        <GuideTarget id="contribution.food" style={styles.gap12}>
+          <SectionTitle
+            title="Your food"
+            action={canEditContribution(detail.status, detail.collectionStatus) && !editing
+              ? { label: published ? 'Request a change' : 'Edit', onPress: () => setEditing(true) }
+              : null}
+          />
+          {!editing ? (
+            <Surface style={styles.gap10}>
+              {detail.items.map((item: ContributionItem, index) => (
+                <View key={item.foodItemId}>
+                  {index > 0 ? <Divider style={styles.itemDivider} /> : null}
+                  <View style={styles.itemRow}>
+                    <View style={styles.flex}>
+                      <AppText variant="bodyBold">{item.name}</AppText>
+                      {item.quantityDescription ? <AppText variant="meta" color={palette.stone}>{item.quantityDescription}</AppText> : null}
+                    </View>
+                    <AppText variant="bodyBold">{formatKg(item.submittedQtyKg)} kg</AppText>
                   </View>
-                  <AppText variant="bodyBold">{formatKg(item.submittedQtyKg)} kg</AppText>
+                  {item.verifiedQtyKg != null || item.acceptedQtyKg != null ? (
+                    <View style={styles.itemPills}>
+                      {item.verifiedQtyKg != null ? (
+                        <Pill label={`Verified ${formatKg(item.verifiedQtyKg)} kg`} color={palette.primary} background={palette.creme3} />
+                      ) : null}
+                      {item.acceptedQtyKg != null ? (
+                        <Pill label={`Accepted ${formatKg(item.acceptedQtyKg)} kg`} color={palette.kale} background={cc.tint} />
+                      ) : null}
+                      {item.rejectedQtyKg ? (
+                        <Pill label={`Not accepted ${formatKg(item.rejectedQtyKg)} kg`} color={cc.warnText} background={cc.warnBg} />
+                      ) : null}
+                      {item.unavailableQtyKg ? (
+                        <Pill label={`Not available ${formatKg(item.unavailableQtyKg)} kg`} color={palette.stone} background={cc.muted} />
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
-                {item.verifiedQtyKg != null || item.acceptedQtyKg != null ? (
-                  <View style={styles.itemPills}>
-                    {item.verifiedQtyKg != null ? (
-                      <Pill label={`Verified ${formatKg(item.verifiedQtyKg)} kg`} color={palette.primary} background={palette.creme3} />
-                    ) : null}
-                    {item.acceptedQtyKg != null ? (
-                      <Pill label={`Accepted ${formatKg(item.acceptedQtyKg)} kg`} color={palette.kale} background={cc.tint} />
-                    ) : null}
-                    {item.rejectedQtyKg ? (
-                      <Pill label={`Not accepted ${formatKg(item.rejectedQtyKg)} kg`} color={cc.warnText} background={cc.warnBg} />
-                    ) : null}
-                    {item.unavailableQtyKg ? (
-                      <Pill label={`Not available ${formatKg(item.unavailableQtyKg)} kg`} color={palette.stone} background={cc.muted} />
-                    ) : null}
+              ))}
+              {detail.collectionNotes ? (
+                <>
+                  <Divider />
+                  <AppText variant="meta" color={palette.stone}>Notes · {detail.collectionNotes}</AppText>
+                </>
+              ) : null}
+            </Surface>
+          ) : (
+            <Surface style={styles.gap12}>
+              {published ? (
+                <Notice tone="tint" title="This collection is already published" body="Your change goes to the manager for approval before it reaches the charity." />
+              ) : null}
+              {draft.map((item, index) => (
+                <View key={`${item.foodItemId || 'new'}-${index}`} style={styles.editRow}>
+                  <View style={styles.rowBetween}>
+                    <AppText variant="bodyBold">Item {index + 1}</AppText>
+                    <Pressable onPress={() => setDraft((rows) => rows.filter((_, i) => i !== index))} hitSlop={8}>
+                      <Ionicons name="trash-outline" size={normalize(18)} color={palette.danger} />
+                    </Pressable>
                   </View>
-                ) : null}
+                  <InputField label="Food" value={item.name} onChangeText={(value) => setDraft((rows) => rows.map((row, i) => i === index ? { ...row, name: value, category: row.category || value } : row))} />
+                  <View style={styles.inline}>
+                    <View style={styles.flex}>
+                      <InputField label="Weight (kg)" value={item.qty} keyboardType="decimal-pad" onChangeText={(value) => setDraft((rows) => rows.map((row, i) => i === index ? { ...row, qty: value } : row))} />
+                    </View>
+                    <View style={styles.flex}>
+                      <InputField label="Quantity" optional value={item.quantityDescription} onChangeText={(value) => setDraft((rows) => rows.map((row, i) => i === index ? { ...row, quantityDescription: value } : row))} placeholder="e.g. 3 trays" />
+                    </View>
+                  </View>
+                </View>
+              ))}
+              <Button label="Add item" icon="add" variant="secondary" size="compact" onPress={() => setDraft((rows) => [...rows, { name: '', category: '', qty: '', quantityDescription: '' }])} />
+              <TextInput value={notes} onChangeText={setNotes} placeholder="Notes for the collection point (optional)" placeholderTextColor={palette.stone} style={styles.notes} multiline />
+              <View style={styles.inline}>
+                <Button label="Cancel" variant="secondary" style={styles.flex} onPress={() => setEditing(false)} />
+                <Button label={published ? 'Send for approval' : 'Save'} style={styles.flex} onPress={() => { void save(); }} />
               </View>
-            ))}
-            {detail.collectionNotes ? (
+            </Surface>
+          )}
+        </GuideTarget>
+
+        {/* Logistics */}
+        <GuideTarget id="contribution.details" style={styles.gap12}>
+          <SectionTitle title="Collection details" />
+          <CollectionTimesCard method={detail.method} timezone={detail.timezone} times={detail.times} status={detail.collectionStatus} />
+          <Surface style={styles.gap10}>
+            <InfoRow icon="location-outline" label="Collection point" value={detail.pointName} sub={[detail.pointAddress, detail.directions].filter(Boolean).join(' · ')} />
+            {detail.suitabilityNotes ? (
               <>
                 <Divider />
-                <AppText variant="meta" color={palette.stone}>Notes · {detail.collectionNotes}</AppText>
+                <InfoRow icon="shield-checkmark-outline" label="Food suitability" value={detail.suitabilityNotes} />
+              </>
+            ) : null}
+            {detail.instructions ? (
+              <>
+                <Divider />
+                <InfoRow icon="document-text-outline" label="Instructions" value={detail.instructions} />
               </>
             ) : null}
           </Surface>
-        ) : (
-          <Surface style={styles.gap12}>
-            {published ? (
-              <Notice tone="tint" title="This collection is already published" body="Your change goes to the manager for approval before it reaches the charity." />
-            ) : null}
-            {draft.map((item, index) => (
-              <View key={`${item.foodItemId || 'new'}-${index}`} style={styles.editRow}>
-                <View style={styles.rowBetween}>
-                  <AppText variant="bodyBold">Item {index + 1}</AppText>
-                  <Pressable onPress={() => setDraft((rows) => rows.filter((_, i) => i !== index))} hitSlop={8}>
-                    <Ionicons name="trash-outline" size={normalize(18)} color={palette.danger} />
-                  </Pressable>
-                </View>
-                <InputField label="Food" value={item.name} onChangeText={(value) => setDraft((rows) => rows.map((row, i) => i === index ? { ...row, name: value, category: row.category || value } : row))} />
-                <View style={styles.inline}>
-                  <View style={styles.flex}>
-                    <InputField label="Weight (kg)" value={item.qty} keyboardType="decimal-pad" onChangeText={(value) => setDraft((rows) => rows.map((row, i) => i === index ? { ...row, qty: value } : row))} />
-                  </View>
-                  <View style={styles.flex}>
-                    <InputField label="Quantity" optional value={item.quantityDescription} onChangeText={(value) => setDraft((rows) => rows.map((row, i) => i === index ? { ...row, quantityDescription: value } : row))} placeholder="e.g. 3 trays" />
-                  </View>
-                </View>
-              </View>
-            ))}
-            <Button label="Add item" icon="add" variant="secondary" size="compact" onPress={() => setDraft((rows) => [...rows, { name: '', category: '', qty: '', quantityDescription: '' }])} />
-            <TextInput value={notes} onChangeText={setNotes} placeholder="Notes for the collection point (optional)" placeholderTextColor={palette.stone} style={styles.notes} multiline />
-            <View style={styles.inline}>
-              <Button label="Cancel" variant="secondary" style={styles.flex} onPress={() => setEditing(false)} />
-              <Button label={published ? 'Send for approval' : 'Save'} style={styles.flex} onPress={() => { void save(); }} />
-            </View>
-          </Surface>
-        )}
-
-        {/* Logistics */}
-        <SectionTitle title="Collection details" />
-        <CollectionTimesCard method={detail.method} timezone={detail.timezone} times={detail.times} status={detail.collectionStatus} />
-        <Surface style={styles.gap10}>
-          <InfoRow icon="location-outline" label="Collection point" value={detail.pointName} sub={[detail.pointAddress, detail.directions].filter(Boolean).join(' · ')} />
-          {detail.suitabilityNotes ? (
-            <>
-              <Divider />
-              <InfoRow icon="shield-checkmark-outline" label="Food suitability" value={detail.suitabilityNotes} />
-            </>
-          ) : null}
-          {detail.instructions ? (
-            <>
-              <Divider />
-              <InfoRow icon="document-text-outline" label="Instructions" value={detail.instructions} />
-            </>
-          ) : null}
-        </Surface>
+        </GuideTarget>
 
         {/* Manager tools */}
         {detail.canReceive || detail.canManage ? (

@@ -14,6 +14,7 @@ import { MethodSelector } from '@/components/consolidated/MethodSelector';
 import { RecurrencePicker } from '@/components/consolidated/RecurrencePicker';
 import { SiteMultiSelect } from '@/components/consolidated/SiteMultiSelect';
 import { Chip, IconBubble, Notice, SectionTitle, Surface, cc, tabular } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { normalize } from '@/utils/responsive';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -291,6 +292,7 @@ export function ScheduleCollectionScreen() {
 
   const internal = method === 'INTERNAL_COLLECTION';
   const selectedGroup = group ?? groups.find((item) => item.id === groupId);
+  const guide = useScreenGuide(tours.scheduleTour, { ready: !loading });
 
   return (
     <Screen scrollable backgroundColor={palette.creme} transparentTop contentStyle={styles.screen}>
@@ -299,11 +301,12 @@ export function ScheduleCollectionScreen() {
         subtitle={mode === 'editSeries'
           ? 'Changes apply to future collections that have not closed'
           : 'Where, how and when the food comes together'}
+        right={<GuideHeaderRight onGuide={guide.start} />}
       />
       {loading ? <ActivityIndicator color={palette.kale} style={styles.loader} /> : (
         <View style={styles.body}>
           {/* 1. Group and point */}
-          <Section step={1} title="Collection group" caption="Which sites, and where their food comes together.">
+          <Section guideId="schedule.group" title="Collection group" caption="Which sites, and where their food comes together.">
             {mode === 'create' && groups.length > 1 ? (
               <WhiteSelect
                 placeholder="Choose a collection group"
@@ -328,14 +331,14 @@ export function ScheduleCollectionScreen() {
 
           {/* 2. Method */}
           {mode !== 'editOccurrence' ? (
-            <Section step={2} title="How will food reach the collection point?">
+            <Section guideId="schedule.method" title="How will food reach the collection point?">
               <MethodSelector value={method} onChange={setMethod} />
             </Section>
           ) : null}
 
           {/* 3. When */}
           {mode !== 'editOccurrence' ? (
-            <Section step={3} title="One-off or recurring" caption="Each date becomes its own collection with its own deadlines, records and declarations.">
+            <Section guideId="schedule.recurrence" title="One-off or recurring" caption="Each date becomes its own collection with its own deadlines, records and declarations.">
               <RecurrencePicker
                 recurrence={recurrence}
                 onRecurrence={setRecurrence}
@@ -364,7 +367,7 @@ export function ScheduleCollectionScreen() {
 
           {/* 4. Times */}
           <Section
-            step={mode === 'editOccurrence' ? 2 : 4}
+            guideId="schedule.times"
             title={internal ? 'Food-ready deadline & collection window' : 'Drop-off window & deadline'}
             caption="Times are in the venue's local time. Tap a time to change it."
           >
@@ -426,7 +429,7 @@ export function ScheduleCollectionScreen() {
 
           {/* 5. Sites */}
           <Section
-            step={mode === 'editOccurrence' ? 3 : 5}
+            guideId="schedule.sites"
             title="Participating sites"
             caption="Only sites that have accepted the group can take part."
           >
@@ -448,7 +451,7 @@ export function ScheduleCollectionScreen() {
 
           {/* 6. Suitability and contact */}
           <Section
-            step={mode === 'editOccurrence' ? 4 : 6}
+            guideId="schedule.suitability"
             title="Suitability & contact"
             caption="Shown to every site when they list food."
           >
@@ -470,12 +473,14 @@ export function ScheduleCollectionScreen() {
             </View>
           </Section>
 
-          <Button
-            label={mode === 'create' ? 'Save consolidated collection' : 'Save changes'}
-            icon="checkmark"
-            onPress={submit}
-            loading={submitting}
-          />
+          <GuideTarget id="schedule.save">
+            <Button
+              label={mode === 'create' ? 'Save consolidated collection' : 'Save changes'}
+              icon="checkmark"
+              onPress={submit}
+              loading={submitting}
+            />
+          </GuideTarget>
         </View>
       )}
     </Screen>
@@ -490,12 +495,12 @@ function to12(hhmm: string): string {
   return `${hour}:${String(m || 0).padStart(2, '0')} ${suffix}`;
 }
 
-function Section({ title, caption, children }: { step?: number; title: string; caption?: string; children: React.ReactNode }) {
+function Section({ title, caption, guideId, children }: { guideId: string; title: string; caption?: string; children: React.ReactNode }) {
   return (
-    <View style={styles.sectionWrap}>
+    <GuideTarget id={guideId} style={styles.sectionWrap}>
       <SectionTitle title={title} caption={caption} />
       <Surface style={styles.section}>{children}</Surface>
-    </View>
+    </GuideTarget>
   );
 }
 

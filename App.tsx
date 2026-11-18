@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import { SplashScreen } from './src/screens/SplashScreen';
 import { CircularImageCropHost } from './src/components/CircularImageCropModal';
 import { AppAlertHost } from './src/components/AppAlertModal';
+import { GuideProvider } from './src/components/guide';
 import { registerNotificationCategories } from './src/services/pushNotifications';
 import { CONSOLIDATED_PREVIEW, ConsolidatedPreviewApp, installConsolidatedFixtures } from './src/dev/consolidatedPreview';
 import { bindAppStateFlush } from './src/store/makeFoodCountStore';
@@ -82,13 +83,15 @@ export default function App() {
       <SafeAreaProvider>
         <AppProvider>
           <StatusBar style="dark" backgroundColor={palette.background} />
-          {CONSOLIDATED_PREVIEW ? (
-            <ConsolidatedPreviewApp />
-          ) : SHOW_MFC_PREVIEW ? (
-            <MakeFoodCountPreviewApp />
-          ) : (
-            <AppNavigator />
-          )}
+          <GuideProvider>
+            {CONSOLIDATED_PREVIEW ? (
+              <ConsolidatedPreviewApp />
+            ) : SHOW_MFC_PREVIEW ? (
+              <MakeFoodCountPreviewApp />
+            ) : (
+              <AppNavigator />
+            )}
+          </GuideProvider>
           <AppAlertHost />
           <CircularImageCropHost />
         </AppProvider>

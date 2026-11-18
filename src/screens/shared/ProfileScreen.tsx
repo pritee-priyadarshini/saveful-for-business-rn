@@ -37,6 +37,8 @@ import { showErrorAlert, showSuccessAlert, showInfoAlert } from '@/utils/apiErro
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { NotificationPermissionSettings } from '@/components/NotificationPermissionSettings';
 import { useConsolidatedAccess } from '@/hooks/useConsolidatedAccess';
+import { GuideToggleRow } from '@/components/guide';
+import { useGuideStore } from '@/store/guideStore';
 import { authService } from '@/services/auth.service';
 import { organizationService } from '@/services/organization.service';
 import { sitesService } from '@/services/sites.service';
@@ -183,7 +185,14 @@ export function ProfileScreen() {
   };
 
   const { selectedRole, logout } = useAppContext();
-  const { canManage: canManageCollections } = useConsolidatedAccess();
+  const {
+    canManage: canManageCollections,
+    hasAccess: hasCollectionAccess,
+    siteIdsWithOpenCollections,
+  } = useConsolidatedAccess();
+  // Anyone who uses Consolidated Collections, or has already met a walkthrough (e.g. a charity's pickup check).
+  const hasSeenGuide = useGuideStore((state) => state.seen.length > 0);
+  const showGuideToggle = canManageCollections || hasCollectionAccess || siteIdsWithOpenCollections.length > 0 || hasSeenGuide;
 
   const isRestaurant = selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi';
   const isRestaurantMulti = selectedRole === 'restaurant_multi';
@@ -1003,6 +1012,8 @@ export function ProfileScreen() {
               <Ionicons name="git-merge-outline" size={18} style={styles.linkRowIcon} />
             </Pressable>
           ) : null}
+
+          {showGuideToggle ? <GuideToggleRow style={styles.linkRow} /> : null}
 
           {[
             { label: 'Privacy Policy', url: 'https://www.saveful.com/privacy-policy' },

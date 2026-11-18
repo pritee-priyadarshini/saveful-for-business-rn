@@ -10,6 +10,7 @@ import { DeclarationCheckbox } from '@/components/consolidated/DeclarationCheckb
 import { QuantityInput } from '@/components/consolidated/QuantityInput';
 import { PendingChangeBanner } from '@/components/consolidated/PendingChangeBanner';
 import { Chip, Divider, InfoRow, Pill, ProgressBar, SectionTitle, Surface, cc } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { normalize } from '@/utils/responsive';
 import { PostCollectSurveyModal } from '@/screens/charity/components/postCollectSurveyModal';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
@@ -128,10 +129,15 @@ export function PickupCheckScreen() {
 
   const totalListed = lines.reduce((sum, line) => sum + line.listed, 0);
   const totalAccepted = lines.reduce((sum, line) => sum + line.accepted, 0);
+  const guide = useScreenGuide(tours.pickupCheckTour, { ready: view != null && !survey });
 
   return (
     <Screen scrollable backgroundColor={palette.creme} transparentTop contentStyle={styles.screen}>
-      <StackHeroHeader title="Confirm collection" subtitle="Inspect the food and record what you accepted" />
+      <StackHeroHeader
+        title="Confirm collection"
+        subtitle="Inspect the food and record what you accepted"
+        right={<GuideHeaderRight onGuide={guide.start} />}
+      />
       {!view ? <ActivityIndicator color={palette.kale} style={styles.loader} /> : (
         <View style={styles.body}>
           <Surface style={styles.gap10}>
@@ -165,92 +171,98 @@ export function PickupCheckScreen() {
             />
           ) : null}
 
-          <Surface tone="tint" style={styles.gap10}>
-            <View style={styles.rowBetween}>
-              <AppText variant="bodyBold">Accepted so far</AppText>
-              <AppText variant="bodyBold" color={palette.kale}>{formatKg(totalAccepted)} of {formatKg(totalListed)} kg</AppText>
-            </View>
-            <ProgressBar value={totalAccepted} total={totalListed} />
-            <View style={styles.chips}>
-              <Chip
-                label="Accept all"
-                icon="checkmark-done"
-                selected={false}
-                onPress={() => setLines((current) => current.map((line) => ({ ...line, accepted: line.listed, rejected: 0, unavailable: 0 })))}
-              />
-              <Chip
-                label="None was there"
-                icon="close"
-                selected={false}
-                onPress={() => setLines((current) => current.map((line) => ({ ...line, accepted: 0, rejected: 0, unavailable: line.listed })))}
-              />
-            </View>
-          </Surface>
+          <GuideTarget id="pickup.summary">
+            <Surface tone="tint" style={styles.gap10}>
+              <View style={styles.rowBetween}>
+                <AppText variant="bodyBold">Accepted so far</AppText>
+                <AppText variant="bodyBold" color={palette.kale}>{formatKg(totalAccepted)} of {formatKg(totalListed)} kg</AppText>
+              </View>
+              <ProgressBar value={totalAccepted} total={totalListed} />
+              <View style={styles.chips}>
+                <Chip
+                  label="Accept all"
+                  icon="checkmark-done"
+                  selected={false}
+                  onPress={() => setLines((current) => current.map((line) => ({ ...line, accepted: line.listed, rejected: 0, unavailable: 0 })))}
+                />
+                <Chip
+                  label="None was there"
+                  icon="close"
+                  selected={false}
+                  onPress={() => setLines((current) => current.map((line) => ({ ...line, accepted: 0, rejected: 0, unavailable: line.listed })))}
+                />
+              </View>
+            </Surface>
+          </GuideTarget>
 
           <SectionTitle title="Items" caption="For each item, split the weight between accepted, not accepted and not available." />
-          {lines.map((line) => {
+          {lines.map((line, lineIndex) => {
             const remaining = round(line.listed - line.accepted - line.rejected - line.unavailable);
             const balanced = Math.abs(remaining) <= 0.01;
             return (
-              <Surface key={line.id} style={[styles.gap12, !balanced && styles.unbalanced]}>
-                <View style={styles.rowBetween}>
-                  <View style={styles.flex}>
-                    <AppText variant="subheading">{line.name}</AppText>
-                    {line.quantityDescription ? (
-                      <AppText variant="meta" color={palette.stone}>{line.quantityDescription}</AppText>
-                    ) : null}
-                  </View>
-                  <Pill label={`${formatKg(line.listed)} kg`} color={palette.primary} background={palette.creme3} />
-                </View>
-                <QuantityInput label="Accepted" value={line.accepted} max={line.listed} onChange={(value) => update(line.id, { accepted: value })} />
-                <QuantityInput label="Not accepted" value={line.rejected} max={line.listed} onChange={(value) => update(line.id, { rejected: value })} />
-                <QuantityInput label="Not available" value={line.unavailable} max={line.listed} onChange={(value) => update(line.id, { unavailable: value })} />
-                {balanced ? (
-                  <Pill label="All weight accounted for" color={palette.kale} background={cc.tint} icon="checkmark-circle" />
-                ) : (
-                  <Pill
-                    label={remaining > 0 ? `${formatKg(remaining)} kg still to assign` : `${formatKg(-remaining)} kg too much`}
-                    color={palette.danger}
-                    background={cc.dangerBg}
-                    icon="alert-circle"
-                  />
-                )}
-                {line.rejected > 0 ? (
-                  <View style={styles.gap8}>
-                    <AppText variant="bodyBold">Why wasn't it accepted?</AppText>
-                    <View style={styles.chips}>
-                      {REJECTION_REASON_OPTIONS.map((option) => (
-                        <Chip
-                          key={option.value}
-                          label={option.label}
-                          selected={line.reason === option.value}
-                          onPress={() => update(line.id, { reason: option.value })}
-                        />
-                      ))}
+              <GuideTarget key={line.id} id="pickup.items" disabled={lineIndex > 0}>
+                <Surface style={[styles.gap12, !balanced && styles.unbalanced]}>
+                  <View style={styles.rowBetween}>
+                    <View style={styles.flex}>
+                      <AppText variant="subheading">{line.name}</AppText>
+                      {line.quantityDescription ? (
+                        <AppText variant="meta" color={palette.stone}>{line.quantityDescription}</AppText>
+                      ) : null}
                     </View>
-                    {line.reason === 'OTHER' ? (
-                      <TextInput
-                        value={line.note}
-                        onChangeText={(note) => update(line.id, { note })}
-                        placeholder="Tell us what was wrong"
-                        placeholderTextColor={palette.stone}
-                        style={styles.note}
-                      />
-                    ) : null}
+                    <Pill label={`${formatKg(line.listed)} kg`} color={palette.primary} background={palette.creme3} />
                   </View>
-                ) : null}
-              </Surface>
+                  <QuantityInput label="Accepted" value={line.accepted} max={line.listed} onChange={(value) => update(line.id, { accepted: value })} />
+                  <QuantityInput label="Not accepted" value={line.rejected} max={line.listed} onChange={(value) => update(line.id, { rejected: value })} />
+                  <QuantityInput label="Not available" value={line.unavailable} max={line.listed} onChange={(value) => update(line.id, { unavailable: value })} />
+                  {balanced ? (
+                    <Pill label="All weight accounted for" color={palette.kale} background={cc.tint} icon="checkmark-circle" />
+                  ) : (
+                    <Pill
+                      label={remaining > 0 ? `${formatKg(remaining)} kg still to assign` : `${formatKg(-remaining)} kg too much`}
+                      color={palette.danger}
+                      background={cc.dangerBg}
+                      icon="alert-circle"
+                    />
+                  )}
+                  {line.rejected > 0 ? (
+                    <View style={styles.gap8}>
+                      <AppText variant="bodyBold">Why wasn't it accepted?</AppText>
+                      <View style={styles.chips}>
+                        {REJECTION_REASON_OPTIONS.map((option) => (
+                          <Chip
+                            key={option.value}
+                            label={option.label}
+                            selected={line.reason === option.value}
+                            onPress={() => update(line.id, { reason: option.value })}
+                          />
+                        ))}
+                      </View>
+                      {line.reason === 'OTHER' ? (
+                        <TextInput
+                          value={line.note}
+                          onChangeText={(note) => update(line.id, { note })}
+                          placeholder="Tell us what was wrong"
+                          placeholderTextColor={palette.stone}
+                          style={styles.note}
+                        />
+                      ) : null}
+                    </View>
+                  ) : null}
+                </Surface>
+              </GuideTarget>
             );
           })}
 
-          <DeclarationCheckbox
-            title="Charity declaration"
-            declaration={view.declaration}
-            checked={acceptedDeclaration}
-            onChange={(value) => { setAcceptedDeclaration(value); setError(null); }}
-            error={error}
-          />
-          <Button label="Confirm pickup" icon="checkmark-circle-outline" onPress={submit} loading={submitting} disabled={mismatches.length > 0} />
+          <GuideTarget id="pickup.confirm" style={styles.gap12}>
+            <DeclarationCheckbox
+              title="Charity declaration"
+              declaration={view.declaration}
+              checked={acceptedDeclaration}
+              onChange={(value) => { setAcceptedDeclaration(value); setError(null); }}
+              error={error}
+            />
+            <Button label="Confirm pickup" icon="checkmark-circle-outline" onPress={submit} loading={submitting} disabled={mismatches.length > 0} />
+          </GuideTarget>
           {mismatches.length ? (
             <AppText variant="meta" color={palette.stone} style={styles.center}>
               Assign all the weight for every item to continue.

@@ -15,6 +15,7 @@ import { ReceiptSheet } from '@/components/consolidated/ReceiptSheet';
 import {
   Divider, IconBubble, InfoRow, Notice, Pill, ProgressBar, SectionTitle, Stat, StatGrid, Surface, cc,
 } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { consolidatedService } from '@/services/consolidated.service';
 import { showConfirmAlert } from '@/store/appAlertStore';
@@ -73,6 +74,19 @@ export function CollectionDashboardScreen() {
       }, 30000);
       return () => clearInterval(timer);
     }, [load]),
+  );
+
+  // The walkthrough follows the collection: its stage, the method and what this person may do.
+  const guide = useScreenGuide(
+    data
+      ? tours.dashboardTour({
+          status: data.status,
+          method: data.method,
+          canManage: Boolean(data.permissions?.canManage),
+          canReceive: Boolean(data.permissions?.canReceive || data.permissions?.canManage),
+        })
+      : null,
+    { ready: !loading && Boolean(data) },
   );
 
   const askReason = (title: string, onSubmit: (text: string) => Promise<void>) => {
@@ -175,69 +189,79 @@ export function CollectionDashboardScreen() {
       <StackHeroHeader
         title={formatDateInZone(data.scheduledDate || data.times.pickupStartAt, data.timezone)}
         subtitle={`${data.group.name} · ${data.point.name}`}
-        right={canManage ? (
-          <Pressable onPress={() => setMenu(true)} hitSlop={10} style={styles.menuBtn} accessibilityLabel="Collection options">
-            <Ionicons name="ellipsis-horizontal" size={normalize(20)} color={palette.white} />
-          </Pressable>
-        ) : undefined}
+        right={
+          <GuideHeaderRight onGuide={guide.start}>
+            {canManage ? (
+              <GuideTarget id="dashboard.menu">
+                <Pressable onPress={() => setMenu(true)} hitSlop={10} style={styles.menuBtn} accessibilityLabel="Collection options">
+                  <Ionicons name="ellipsis-horizontal" size={normalize(20)} color={palette.white} />
+                </Pressable>
+              </GuideTarget>
+            ) : null}
+          </GuideHeaderRight>
+        }
       />
 
       <View style={styles.body}>
         {/* Overview */}
-        <Surface style={styles.gap12}>
-          <View style={styles.rowBetween}>
-            <CollectionStatusBadge status={data.status} />
-            <Pill
-              label={methodLabel(data.method)}
-              color={palette.primary}
-              background={palette.creme3}
-              icon={internal ? 'walk-outline' : 'archive-outline'}
-            />
-          </View>
-          {data.counts ? (
-            <>
-              <View style={styles.rowBetween}>
-                <AppText variant="bodyBold">Sites listed</AppText>
-                <AppText variant="bodyBold" color={palette.kale}>{listed} of {participating}</AppText>
-              </View>
-              <ProgressBar value={listed} total={participating} />
-              <StatGrid>
-                <Stat label="Listed" value={formatKg(data.totals?.submittedKg)} unit="kg" icon="basket-outline" />
-                <Stat label="Verified at the point" value={formatKg(data.totals?.verifiedKg)} unit="kg" icon="shield-checkmark-outline" />
-                <Stat
-                  label={internal ? 'Collected from sites' : 'Dropped off'}
-                  value={String(data.counts.handedOver)}
-                  unit={`of ${listed}`}
-                  icon={internal ? 'walk-outline' : 'archive-outline'}
-                  background={palette.creme3}
-                  accent={palette.primary}
-                />
-                <Stat
-                  label="Received at point"
-                  value={String(data.counts.received)}
-                  unit={`of ${listed}`}
-                  icon="checkmark-done-outline"
-                  background={palette.creme3}
-                  accent={palette.primary}
-                />
-              </StatGrid>
-            </>
-          ) : null}
-        </Surface>
+        <GuideTarget id="dashboard.overview">
+          <Surface style={styles.gap12}>
+            <View style={styles.rowBetween}>
+              <CollectionStatusBadge status={data.status} />
+              <Pill
+                label={methodLabel(data.method)}
+                color={palette.primary}
+                background={palette.creme3}
+                icon={internal ? 'walk-outline' : 'archive-outline'}
+              />
+            </View>
+            {data.counts ? (
+              <>
+                <View style={styles.rowBetween}>
+                  <AppText variant="bodyBold">Sites listed</AppText>
+                  <AppText variant="bodyBold" color={palette.kale}>{listed} of {participating}</AppText>
+                </View>
+                <ProgressBar value={listed} total={participating} />
+                <StatGrid>
+                  <Stat label="Listed" value={formatKg(data.totals?.submittedKg)} unit="kg" icon="basket-outline" />
+                  <Stat label="Verified at the point" value={formatKg(data.totals?.verifiedKg)} unit="kg" icon="shield-checkmark-outline" />
+                  <Stat
+                    label={internal ? 'Collected from sites' : 'Dropped off'}
+                    value={String(data.counts.handedOver)}
+                    unit={`of ${listed}`}
+                    icon={internal ? 'walk-outline' : 'archive-outline'}
+                    background={palette.creme3}
+                    accent={palette.primary}
+                  />
+                  <Stat
+                    label="Received at point"
+                    value={String(data.counts.received)}
+                    unit={`of ${listed}`}
+                    icon="checkmark-done-outline"
+                    background={palette.creme3}
+                    accent={palette.primary}
+                  />
+                </StatGrid>
+              </>
+            ) : null}
+          </Surface>
+        </GuideTarget>
 
         {/* What happens next */}
-        <NextStep
-          data={data}
-          canManage={canManage}
-          blockers={blockers}
-          onClose={closeSubmissions}
-          onReview={() => navigation.navigate('ReviewPublish', { collectionId: data.id })}
-          onReport={() => navigation.navigate('ConsolidatedReport', { groupId: data.group.id })}
-        />
+        <GuideTarget id="dashboard.next">
+          <NextStep
+            data={data}
+            canManage={canManage}
+            blockers={blockers}
+            onClose={closeSubmissions}
+            onReview={() => navigation.navigate('ReviewPublish', { collectionId: data.id })}
+            onReport={() => navigation.navigate('ConsolidatedReport', { groupId: data.group.id })}
+          />
+        </GuideTarget>
 
         {/* Needs a decision */}
         {(late.length || openChanges.length) && canManage ? (
-          <>
+          <GuideTarget id="dashboard.decisions" style={styles.gap12}>
             <SectionTitle title="Needs your decision" />
             {late.map((row) => (
               <Notice
@@ -270,7 +294,7 @@ export function CollectionDashboardScreen() {
                 </View>
               </Notice>
             ))}
-          </>
+          </GuideTarget>
         ) : null}
 
         {/* Sites */}
@@ -279,65 +303,70 @@ export function CollectionDashboardScreen() {
           caption={canReceive && receiptOpen ? 'Tap a site to see its food. Record what physically arrives at the point.' : null}
         />
         {visibleRows.length === 0 ? (
-          <Surface tone="muted">
-            <AppText variant="bodySmall" color={palette.stone}>No site has listed food yet.</AppText>
-          </Surface>
+          <GuideTarget id="dashboard.sites">
+            <Surface tone="muted">
+              <AppText variant="bodySmall" color={palette.stone}>No site has listed food yet.</AppText>
+            </Surface>
+          </GuideTarget>
         ) : null}
-        {visibleRows.map((row) => (
-          <ContributionRow
-            key={row.id}
-            contribution={row}
-            timezone={data.timezone}
-            method={data.method}
-            canReceive={canReceive && receiptOpen && !['COMPLETED', 'CANCELLED', 'EXCLUDED', 'WITHDRAWN'].includes(row.status)}
-            canManage={canManage && ['OPEN', 'SUBMISSIONS_CLOSED'].includes(data.status)}
-            onReceipt={() => setReceipt(row)}
-            onExclude={() => askReason(`Exclude ${row.site.name}`, async (text) => {
-              await consolidatedService.excludeContribution(row.id, text);
-              await load();
-            })}
-          />
+        {visibleRows.map((row, index) => (
+          <GuideTarget key={row.id} id="dashboard.sites" disabled={index > 0}>
+            <ContributionRow
+              contribution={row}
+              timezone={data.timezone}
+              method={data.method}
+              canReceive={canReceive && receiptOpen && !['COMPLETED', 'CANCELLED', 'EXCLUDED', 'WITHDRAWN'].includes(row.status)}
+              canManage={canManage && ['OPEN', 'SUBMISSIONS_CLOSED'].includes(data.status)}
+              onReceipt={() => setReceipt(row)}
+              onExclude={() => askReason(`Exclude ${row.site.name}`, async (text) => {
+                await consolidatedService.excludeContribution(row.id, text);
+                await load();
+              })}
+            />
+          </GuideTarget>
         ))}
 
         {/* Exceptions and reminders */}
         {exceptionRows.length || data.sitesWithoutContribution?.length ? (
           <>
             <SectionTitle title="Exceptions and reminders" />
-            <Surface tone="warn" style={styles.gap10}>
-              {exceptionRows.map((row) => (
-                <View key={`${row.id}-${row.label}`} style={styles.exceptionRow}>
-                  <Ionicons name="alert-circle" size={normalize(16)} color={cc.warnText} />
-                  <AppText variant="bodySmall" style={styles.flex}>
-                    <AppText variant="bodySmall" style={styles.strong}>{row.site}</AppText> · {row.label}
-                  </AppText>
-                </View>
-              ))}
-              {data.sitesWithoutContribution?.length ? (
-                <View style={styles.exceptionRow}>
-                  <Ionicons name="ellipse-outline" size={normalize(16)} color={cc.warnText} />
-                  <AppText variant="bodySmall" style={styles.flex}>
-                    <AppText variant="bodySmall" style={styles.strong}>
-                      {data.status === 'OPEN' || data.status === 'SCHEDULED' ? 'Not listed yet' : 'No contribution'}
+            <GuideTarget id="dashboard.exceptions">
+              <Surface tone="warn" style={styles.gap10}>
+                {exceptionRows.map((row) => (
+                  <View key={`${row.id}-${row.label}`} style={styles.exceptionRow}>
+                    <Ionicons name="alert-circle" size={normalize(16)} color={cc.warnText} />
+                    <AppText variant="bodySmall" style={styles.flex}>
+                      <AppText variant="bodySmall" style={styles.strong}>{row.site}</AppText> · {row.label}
                     </AppText>
-                    {' · '}{data.sitesWithoutContribution.map((site) => site.name).join(', ')}
-                  </AppText>
-                </View>
-              ) : null}
-              {canManage && data.status === 'OPEN' && data.sitesWithoutContribution?.length ? (
-                <Button
-                  label="Send reminder"
-                  size="compact"
-                  variant="secondary"
-                  icon="notifications-outline"
-                  onPress={() => {
-                    void consolidatedService
-                      .remindSites(data.id)
-                      .then(() => showSuccessAlert('Sites that have not listed food were reminded.', 'Sent'))
-                      .catch((error) => showErrorAlert(error, 'Could not send reminder'));
-                  }}
-                />
-              ) : null}
-            </Surface>
+                  </View>
+                ))}
+                {data.sitesWithoutContribution?.length ? (
+                  <View style={styles.exceptionRow}>
+                    <Ionicons name="ellipse-outline" size={normalize(16)} color={cc.warnText} />
+                    <AppText variant="bodySmall" style={styles.flex}>
+                      <AppText variant="bodySmall" style={styles.strong}>
+                        {data.status === 'OPEN' || data.status === 'SCHEDULED' ? 'Not listed yet' : 'No contribution'}
+                      </AppText>
+                      {' · '}{data.sitesWithoutContribution.map((site) => site.name).join(', ')}
+                    </AppText>
+                  </View>
+                ) : null}
+                {canManage && data.status === 'OPEN' && data.sitesWithoutContribution?.length ? (
+                  <Button
+                    label="Send reminder"
+                    size="compact"
+                    variant="secondary"
+                    icon="notifications-outline"
+                    onPress={() => {
+                      void consolidatedService
+                        .remindSites(data.id)
+                        .then(() => showSuccessAlert('Sites that have not listed food were reminded.', 'Sent'))
+                        .catch((error) => showErrorAlert(error, 'Could not send reminder'));
+                    }}
+                  />
+                ) : null}
+              </Surface>
+            </GuideTarget>
           </>
         ) : null}
 

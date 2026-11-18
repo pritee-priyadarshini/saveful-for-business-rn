@@ -374,6 +374,11 @@ export function ConsolidatedPreviewApp() {
   useEffect(() => {
     const open = (url: string | null) => {
       if (!url || !url.includes('://preview/')) return;
+      if (url.includes('://preview/guide-')) {
+        // e.g. preview/guide-next-3 (the suffix only makes repeated targets unique)
+        (globalThis as { __guideGo?: (delta: 1 | -1) => void }).__guideGo?.(url.includes('guide-back') ? -1 : 1);
+        return;
+      }
       if (url.includes('://preview/scroll')) {
         const y = Number(url.split('y=')[1]) || 0;
         (globalThis as { __previewScroll?: { scrollTo: (o: object) => void } | null }).__previewScroll?.scrollTo({ y, animated: false });

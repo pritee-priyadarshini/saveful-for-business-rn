@@ -60,6 +60,7 @@ import {
   type MfcAttemptState,
 } from '@/utils/mfcListing';
 import { navigateToMfcSummary } from '@/utils/mfcNavigation';
+import { GuideButton, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { toListingIconKey } from '@/components/makeFoodCount/MfcArt';
 
 type Step = 1 | 2 | 3;
@@ -270,6 +271,11 @@ export function CreateListingScreen({ navigation, route }: any) {
       });
     }).catch(() => undefined);
   }, [consolidatedCollectionId, fetchDeclarations, isConsolidated]);
+
+  // Shared-collection listings get a short walkthrough for each step of the form.
+  const guide = useScreenGuide(isConsolidated ? tours.listingTour(step, logistics?.method) : null, {
+    ready: isConsolidated && (step !== 2 || logistics != null),
+  });
 
   // Re-seed if the same screen instance is re-opened with a different Make Food Count prefill.
   useEffect(() => {
@@ -734,14 +740,17 @@ export function CreateListingScreen({ navigation, route }: any) {
               <Ionicons name="arrow-back" size={normalize(20)} color={palette.kale} />
             </Pressable>
 
-            <View style={styles.logoCircle}>
-              {businessLogo ? (
-                <Image source={{ uri: businessLogo }} style={styles.logoImage} resizeMode="cover" />
-              ) : (
-                <AppText variant="bodyBold" style={styles.logoFallback}>
-                  {businessInitial}
-                </AppText>
-              )}
+            <View style={styles.headerEnd}>
+              {isConsolidated ? <GuideButton tone="dark" onPress={guide.start} /> : null}
+              <View style={styles.logoCircle}>
+                {businessLogo ? (
+                  <Image source={{ uri: businessLogo }} style={styles.logoImage} resizeMode="cover" />
+                ) : (
+                  <AppText variant="bodyBold" style={styles.logoFallback}>
+                    {businessInitial}
+                  </AppText>
+                )}
+              </View>
             </View>
           </View>
 
@@ -758,41 +767,43 @@ export function CreateListingScreen({ navigation, route }: any) {
             Helping good food go further
           </AppText>
 
-          <View style={styles.stepperRow}>
-            {stepMeta.map((entry, index) => {
-              const isActive = step === entry.id;
-              const isDone = step > entry.id;
+          <GuideTarget id="listing.steps" style={styles.stepperTarget}>
+            <View style={styles.stepperRow}>
+              {stepMeta.map((entry, index) => {
+                const isActive = step === entry.id;
+                const isDone = step > entry.id;
 
-              return (
-                <React.Fragment key={entry.id}>
-                  <Pressable
-                    onPress={() => (entry.id <= step ? setStep(entry.id) : undefined)}
-                    style={[styles.stepDot, adaptive.stepDot, (isActive || isDone) && styles.stepDotActive]}
-                  >
-                    <AppText
-                      variant="bodyBold"
-                      color={isActive || isDone ? palette.white : palette.stone}
-                      style={styles.stepDotText}
+                return (
+                  <React.Fragment key={entry.id}>
+                    <Pressable
+                      onPress={() => (entry.id <= step ? setStep(entry.id) : undefined)}
+                      style={[styles.stepDot, adaptive.stepDot, (isActive || isDone) && styles.stepDotActive]}
                     >
-                      {entry.id}
-                    </AppText>
-                  </Pressable>
+                      <AppText
+                        variant="bodyBold"
+                        color={isActive || isDone ? palette.white : palette.stone}
+                        style={styles.stepDotText}
+                      >
+                        {entry.id}
+                      </AppText>
+                    </Pressable>
 
-                  {index < stepMeta.length - 1 ? (
-                    <View style={[styles.stepLine, adaptive.stepLine, step > entry.id && styles.stepLineActive]} />
-                  ) : null}
-                </React.Fragment>
-              );
-            })}
-          </View>
+                    {index < stepMeta.length - 1 ? (
+                      <View style={[styles.stepLine, adaptive.stepLine, step > entry.id && styles.stepLineActive]} />
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
+            </View>
 
-          <View style={styles.stepTitlesRow}>
-            {stepMeta.map((entry) => (
-              <AppText key={entry.id} variant="bodyBold" color={palette.black} style={styles.stepLabel}>
-                {entry.title}
-              </AppText>
-            ))}
-          </View>
+            <View style={styles.stepTitlesRow}>
+              {stepMeta.map((entry) => (
+                <AppText key={entry.id} variant="bodyBold" color={palette.black} style={styles.stepLabel}>
+                  {entry.title}
+                </AppText>
+              ))}
+            </View>
+          </GuideTarget>
         </View>
 
         {hasPreviousListing && !relistApplied && step === 1 && !isConsolidated ? (
@@ -990,7 +1001,11 @@ export function CreateListingScreen({ navigation, route }: any) {
 
         {step === 2 ? (
           <View style={styles.stepWrap}>
-            {isConsolidated && logistics ? <ConsolidatedLogisticsCard collection={logistics} /> : null}
+            {isConsolidated && logistics ? (
+              <GuideTarget id="listing.logistics">
+                <ConsolidatedLogisticsCard collection={logistics} />
+              </GuideTarget>
+            ) : null}
             {!isConsolidated ? (
               <>
             <AppText variant="h8" color={palette.black} style={styles.sectionTitle}>
@@ -1424,15 +1439,17 @@ export function CreateListingScreen({ navigation, route }: any) {
             </View>
 
             {isConsolidated ? (
-              <DeclarationCheckbox
-                declaration={declarations?.SITE || DECLARATION_FALLBACK.SITE}
-                checked={confirmedSafe}
-                onChange={(value) => {
-                  setConfirmedSafe(value);
-                  setStepErrors((prev) => ({ ...prev, confirmedSafe: undefined }));
-                }}
-                error={stepErrors.confirmedSafe}
-              />
+              <GuideTarget id="listing.declaration">
+                <DeclarationCheckbox
+                  declaration={declarations?.SITE || DECLARATION_FALLBACK.SITE}
+                  checked={confirmedSafe}
+                  onChange={(value) => {
+                    setConfirmedSafe(value);
+                    setStepErrors((prev) => ({ ...prev, confirmedSafe: undefined }));
+                  }}
+                  error={stepErrors.confirmedSafe}
+                />
+              </GuideTarget>
             ) : (
             <Pressable style={styles.confirmWrap} onPress={() => {
               setConfirmedSafe((prev) => !prev);
@@ -1571,6 +1588,8 @@ const styles = StyleSheet.create({
   topPanel: {
     alignItems: 'center',
   },
+  headerEnd: { flexDirection: 'row', alignItems: 'center', gap: normalize(8) },
+  stepperTarget: { alignSelf: 'stretch', alignItems: 'center' },
   headerRow: {
     width: '100%',
     flexDirection: 'row',

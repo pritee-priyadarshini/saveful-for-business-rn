@@ -1,9 +1,20 @@
-import React, { PropsWithChildren, useCallback, useEffect, useRef } from 'react';
+import React, { PropsWithChildren, createContext, useCallback, useEffect, useMemo, useRef } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Edge, SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette } from '../theme/colors';
+
+/**
+ * Lets something inside a scrolling Screen read and move its scroll position —
+ * the walkthrough uses it to bring a highlighted element into view.
+ */
+export type ScreenScrollHandle = {
+  getY: () => number;
+  scrollTo: (y: number) => void;
+};
+
+export const ScreenScrollContext = createContext<ScreenScrollHandle | null>(null);
 
 type ScreenProps = PropsWithChildren<{
   scrollable?: boolean;
@@ -37,6 +48,7 @@ export function Screen({
 }: ScreenProps) {
   const edges: Edge[] | undefined = transparentTop ? [] : undefined;
   const internalScrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
 
   const setScrollRef = useCallback(
     (node: ScrollView | null) => {
@@ -55,7 +67,28 @@ export function Screen({
 
   const scrollToTop = useCallback((animated = false) => {
     internalScrollRef.current?.scrollTo({ y: 0, animated });
+    scrollYRef.current = 0;
   }, []);
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollYRef.current = event.nativeEvent.contentOffset.y;
+      onScroll?.(event);
+    },
+    [onScroll],
+  );
+
+  const scrollHandle = useMemo<ScreenScrollHandle>(
+    () => ({
+      getY: () => scrollYRef.current,
+      scrollTo: (y: number) => {
+        const next = Math.max(0, y);
+        internalScrollRef.current?.scrollTo({ y: next, animated: true });
+        scrollYRef.current = next;
+      },
+    }),
+    [],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -81,11 +114,11 @@ export function Screen({
           automaticallyAdjustKeyboardInsets={keyboardAware && Platform.OS === 'ios'}
           // 'always' adds the iOS status-bar inset, which opens a gap above full-bleed heroes.
           contentInsetAdjustmentBehavior={keyboardAware && !transparentTop ? 'always' : 'never'}
-          onScroll={onScroll}
+          onScroll={handleScroll}
           scrollEventThrottle={16}
           refreshControl={refreshControl}
         >
-          {children}
+          <ScreenScrollContext.Provider value={scrollHandle}>{children}</ScreenScrollContext.Provider>
         </ScrollView>
         {footer}
       </SafeAreaView>

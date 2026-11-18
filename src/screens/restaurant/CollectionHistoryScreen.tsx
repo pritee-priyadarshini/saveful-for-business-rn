@@ -26,6 +26,7 @@ import { useListingsStore } from '../../store/listingsStore';
 import { showErrorAlert } from '@/utils/apiError';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildDashboardShellStyles } from '@/utils/dashboardAdaptive';
+import { useOverlayOrigin } from '@/hooks/useOverlayOrigin';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH_INDEX = new Date().getMonth();
@@ -299,6 +300,9 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     setMonthDropdownAnchor(null);
   };
 
+  // The menu is drawn in a Modal: convert the measured anchor into the Modal's own coordinates.
+  const dropdownOverlay = useOverlayOrigin();
+
   const openYearDropdown = () => {
     if (showYearDropdown) {
       closeDropdowns();
@@ -334,16 +338,16 @@ export default function CollectionHistoryScreen({ navigation }: any) {
     onSelect: (value: string) => void,
   ) => (
     <Modal visible={visible && !!anchor} transparent animationType="fade" onRequestClose={closeDropdowns}>
-      <View style={styles.dropdownModalRoot}>
+      <View ref={dropdownOverlay.ref} onLayout={dropdownOverlay.onLayout} style={styles.dropdownModalRoot}>
         <Pressable style={styles.dropdownBackdropPressable} onPress={closeDropdowns} />
-        {anchor ? (
+        {anchor && dropdownOverlay.ready ? (
           <View
             style={[
               styles.dropdownListOverlay,
               styles.dropdownListOverlayPosition,
               {
-                top: anchor.top,
-                left: anchor.left,
+                top: dropdownOverlay.toLocal(anchor).top,
+                left: dropdownOverlay.toLocal(anchor).left,
                 width: anchor.width,
               },
             ]}

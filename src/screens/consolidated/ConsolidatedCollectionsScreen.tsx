@@ -9,6 +9,7 @@ import { Screen } from '@/components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { CollectionStatusBadge } from '@/components/consolidated/CollectionStatusBadge';
 import { Chip, EmptyState, HeaderAction, ProgressBar, Segmented, SkeletonCard, Surface, cc, tabular } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { useConsolidatedAccess } from '@/hooks/useConsolidatedAccess';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { consolidatedService } from '@/services/consolidated.service';
@@ -68,6 +69,7 @@ export function ConsolidatedCollectionsScreen() {
 
   const schedule = () => navigation.navigate('ScheduleCollection', { mode: 'create', groupId: groupId || undefined });
   const groupChips = useMemo(() => groups.map((group) => ({ id: group.id, name: group.name })), [groups]);
+  const guide = useScreenGuide(tours.collectionsTour, { ready: !loading });
 
   return (
     <Screen
@@ -88,18 +90,28 @@ export function ConsolidatedCollectionsScreen() {
       <StackHeroHeader
         title="Consolidated Collections"
         subtitle="Several sites · one collection point · one charity pickup"
-        right={canManage ? <HeaderAction icon="add" label="Schedule" onPress={schedule} /> : undefined}
+        right={
+          <GuideHeaderRight onGuide={guide.start}>
+            {canManage ? (
+              <GuideTarget id="collections.schedule">
+                <HeaderAction icon="add" label="Schedule" onPress={schedule} />
+              </GuideTarget>
+            ) : null}
+          </GuideHeaderRight>
+        }
       />
       <View style={styles.body}>
-        <Segmented<Tab>
-          value={tab}
-          onChange={(value) => { setTab(value); setLoading(true); }}
-          options={[
-            { value: 'active', label: 'Today' },
-            { value: 'upcoming', label: 'Upcoming' },
-            { value: 'past', label: 'Past' },
-          ]}
-        />
+        <GuideTarget id="collections.tabs">
+          <Segmented<Tab>
+            value={tab}
+            onChange={(value) => { setTab(value); setLoading(true); }}
+            options={[
+              { value: 'active', label: 'Today' },
+              { value: 'upcoming', label: 'Upcoming' },
+              { value: 'past', label: 'Past' },
+            ]}
+          />
+        </GuideTarget>
 
         {groupChips.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -126,7 +138,11 @@ export function ConsolidatedCollectionsScreen() {
           />
         ) : null}
 
-        {!loading && rows.map((row) => <CollectionCard key={row.id} row={row} onPress={() => navigation.navigate('CollectionDashboard', { collectionId: row.id })} />)}
+        {!loading && rows.map((row, index) => (
+          <GuideTarget key={row.id} id="collections.card" disabled={index > 0}>
+            <CollectionCard row={row} onPress={() => navigation.navigate('CollectionDashboard', { collectionId: row.id })} />
+          </GuideTarget>
+        ))}
 
         {!loading && page < totalPages ? (
           <Button label="Load more" variant="ghost" onPress={() => { void load(page + 1, true); }} />

@@ -8,6 +8,7 @@ import { ActionButton as Button } from '@/components/consolidated/ui';
 import { Screen } from '@/components/Screen';
 import { SavefulModal } from '@/components/SavefulModal';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { EmptyState, IconBubble, InfoRow, Pill, Surface, cc } from '@/components/consolidated/ui';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -30,6 +31,7 @@ export function ConsolidatedInvitationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [declining, setDeclining] = useState<SiteInvitation | null>(null);
   const [reason, setReason] = useState('');
+  const guide = useScreenGuide(tours.invitationsTour, { ready: !loading && rows.length > 0 });
   const { withLock, submitting } = useSubmitLock();
 
   const load = useCallback(async () => {
@@ -91,7 +93,11 @@ export function ConsolidatedInvitationsScreen() {
         />
       }
     >
-      <StackHeroHeader title="Collection invitations" subtitle="Join a shared collection point" />
+      <StackHeroHeader
+        title="Collection invitations"
+        subtitle="Join a shared collection point"
+        right={rows.length ? <GuideHeaderRight onGuide={guide.start} /> : undefined}
+      />
       <View style={styles.body}>
         {loading ? <ActivityIndicator color={palette.kale} style={styles.loader} /> : null}
         {!loading && rows.length === 0 ? (
@@ -101,43 +107,45 @@ export function ConsolidatedInvitationsScreen() {
             body="When a manager invites one of your sites to a shared collection, it appears here."
           />
         ) : null}
-        {rows.map((row) => (
+        {rows.map((row, index) => (
           <Surface key={row.id} style={styles.card}>
-            <View style={styles.head}>
-              <IconBubble name="git-merge-outline" size={44} />
-              <View style={styles.flex}>
-                <Pill label={`For ${row.site.name}`} color={palette.kale} background={cc.tint} icon="storefront-outline" />
-                <AppText variant="subheading" style={styles.title}>{row.group.name}</AppText>
-                {row.group.description ? (
-                  <AppText variant="bodySmall" color={palette.midgray}>{row.group.description}</AppText>
+            <GuideTarget id="invites.card" disabled={index > 0} style={styles.cardTop}>
+              <View style={styles.head}>
+                <IconBubble name="git-merge-outline" size={44} />
+                <View style={styles.flex}>
+                  <Pill label={`For ${row.site.name}`} color={palette.kale} background={cc.tint} icon="storefront-outline" />
+                  <AppText variant="subheading" style={styles.title}>{row.group.name}</AppText>
+                  {row.group.description ? (
+                    <AppText variant="bodySmall" color={palette.midgray}>{row.group.description}</AppText>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.rows}>
+                {row.group.point ? (
+                  <InfoRow
+                    icon="location-outline"
+                    label="Shared collection point"
+                    value={row.group.point.name}
+                    sub={[row.group.point.address, row.group.point.directions].filter(Boolean).join(' · ')}
+                  />
+                ) : null}
+                <InfoRow
+                  icon="people-outline"
+                  label="Who's involved"
+                  value={`${row.group.siteCount} site${row.group.siteCount === 1 ? '' : 's'}`}
+                  sub={row.group.managers.length ? `Managed by ${row.group.managers.join(', ')}` : null}
+                />
+                {row.invitedBy || row.invitedAt ? (
+                  <InfoRow
+                    icon="mail-outline"
+                    label="Invited"
+                    value={row.invitedBy || 'A manager'}
+                    sub={row.invitedAt ? formatInTimezone(row.invitedAt, undefined) : null}
+                  />
                 ) : null}
               </View>
-            </View>
-
-            <View style={styles.rows}>
-              {row.group.point ? (
-                <InfoRow
-                  icon="location-outline"
-                  label="Shared collection point"
-                  value={row.group.point.name}
-                  sub={[row.group.point.address, row.group.point.directions].filter(Boolean).join(' · ')}
-                />
-              ) : null}
-              <InfoRow
-                icon="people-outline"
-                label="Who's involved"
-                value={`${row.group.siteCount} site${row.group.siteCount === 1 ? '' : 's'}`}
-                sub={row.group.managers.length ? `Managed by ${row.group.managers.join(', ')}` : null}
-              />
-              {row.invitedBy || row.invitedAt ? (
-                <InfoRow
-                  icon="mail-outline"
-                  label="Invited"
-                  value={row.invitedBy || 'A manager'}
-                  sub={row.invitedAt ? formatInTimezone(row.invitedAt, undefined) : null}
-                />
-              ) : null}
-            </View>
+            </GuideTarget>
 
             <View style={styles.explain}>
               <Ionicons name="information-circle-outline" size={normalize(16)} color={palette.kale} />
@@ -147,7 +155,7 @@ export function ConsolidatedInvitationsScreen() {
               </AppText>
             </View>
 
-            <View style={styles.actions}>
+            <GuideTarget id="invites.actions" disabled={index > 0} style={styles.actions}>
               <Button
                 label="Decline"
                 variant="secondary"
@@ -156,7 +164,7 @@ export function ConsolidatedInvitationsScreen() {
                 style={styles.flex}
               />
               <Button label="Accept" icon="checkmark" onPress={() => accept(row)} disabled={submitting} style={styles.flex} />
-            </View>
+            </GuideTarget>
           </Surface>
         ))}
       </View>
@@ -182,6 +190,7 @@ const styles = StyleSheet.create({
   loader: { marginTop: 24 },
   flex: { flex: 1, minWidth: 0 },
   card: { gap: 14 },
+  cardTop: { gap: 14 },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: { marginTop: 8 },
   rows: { gap: 12 },

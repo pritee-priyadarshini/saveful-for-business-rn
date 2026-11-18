@@ -12,6 +12,7 @@ import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { WhiteSelect } from '@/components/WhiteSelect';
 import { SiteMultiSelect, UserMultiSelect } from '@/components/consolidated/SiteMultiSelect';
 import { Divider, IconBubble, InfoRow, Notice, Pill, SectionTitle, Surface, cc } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { useConsolidatedAccess } from '@/hooks/useConsolidatedAccess';
 import { normalize } from '@/utils/responsive';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
@@ -162,6 +163,8 @@ export function ConsolidatedGroupFormScreen() {
     .map((user) => ({ id: user.id, name: user.name, locked: user.id === myId && !editing }));
   const receiverOptions = eligibleUsers.map((user) => ({ id: user.id, name: user.name }));
 
+  const guide = useScreenGuide(isArchived ? null : tours.groupFormTour, { ready: !loading });
+
   const save = () => {
     const nextErrors: Record<string, string> = {};
     if (!name.trim()) nextErrors.name = 'Name is required.';
@@ -296,6 +299,7 @@ export function ConsolidatedGroupFormScreen() {
       <StackHeroHeader
         title={editing ? name || 'Edit group' : 'Create collection group'}
         subtitle={isArchived ? 'Archived group · read only' : 'Sites that share one collection point and one charity pickup'}
+        right={isArchived ? undefined : <GuideHeaderRight onGuide={guide.start} />}
       />
       {loading ? <ActivityIndicator color={palette.kale} style={{ marginTop: 24 }} /> : (
         <View style={styles.body}>
@@ -304,14 +308,14 @@ export function ConsolidatedGroupFormScreen() {
           ) : (
           <View style={styles.sections}>
           {/* 1. Details */}
-          <FormSection step={1} title="Group details" caption="Sites see this name when they list food.">
+          <FormSection guideId="groupForm.details" title="Group details" caption="Sites see this name when they list food.">
             <InputField label="Group name" value={name} onChangeText={setName} placeholder="e.g. Stadium North" />
             {errors.name ? <AppText variant="meta" color={palette.danger}>{errors.name}</AppText> : null}
             <InputField label="Description" optional value={description} onChangeText={setDescription} multiline placeholder="What this group is for" />
           </FormSection>
 
           {/* 2. Collection point */}
-          <FormSection step={2} title="Shared collection point" caption="Where every site brings its food, and where the charity collects.">
+          <FormSection guideId="groupForm.point" title="Shared collection point" caption="Where every site brings its food, and where the charity collects.">
             {editing && points.length ? points.map((point) => {
               const activePoint = point.isActive !== false;
               return (
@@ -366,7 +370,7 @@ export function ConsolidatedGroupFormScreen() {
 
           {/* 3. Sites */}
           <FormSection
-            step={3}
+            guideId="groupForm.sites"
             title="Participating sites"
             caption="Sites you run join straight away. Any other site gets an invitation and takes part once it accepts."
           >
@@ -379,7 +383,7 @@ export function ConsolidatedGroupFormScreen() {
           </FormSection>
 
           {/* 4. People */}
-          <FormSection step={4} title="People" caption="Who runs the collection on the day.">
+          <FormSection guideId="groupForm.people" title="People" caption="Who runs the collection on the day.">
             <AppText variant="bodyBold" style={styles.subLabel}>Managers</AppText>
             <AppText variant="meta" color={palette.stone}>Schedule collections, approve changes and publish to charities.</AppText>
             <UserMultiSelect options={managerOptions} selected={managerIds} onChange={setManagerIds} />
@@ -393,7 +397,9 @@ export function ConsolidatedGroupFormScreen() {
 
           {!isArchived ? (
             <>
-              <Button label={editing ? 'Save changes' : 'Create group'} icon="checkmark" onPress={save} loading={submitting} />
+              <GuideTarget id="groupForm.save">
+                <Button label={editing ? 'Save changes' : 'Create group'} icon="checkmark" onPress={save} loading={submitting} />
+              </GuideTarget>
               {editing ? (
                 <Button label="Archive group" variant="ghost" icon="archive-outline" onPress={archive} />
               ) : null}
@@ -467,12 +473,12 @@ function ArchivedGroupSummary({
   );
 }
 
-function FormSection({ title, caption, children }: { step?: number; title: string; caption?: string; children: React.ReactNode }) {
+function FormSection({ title, caption, guideId, children }: { guideId: string; title: string; caption?: string; children: React.ReactNode }) {
   return (
-    <View style={styles.sectionWrap}>
+    <GuideTarget id={guideId} style={styles.sectionWrap}>
       <SectionTitle title={title} caption={caption} />
       <Surface style={styles.section}>{children}</Surface>
-    </View>
+    </GuideTarget>
   );
 }
 

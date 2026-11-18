@@ -8,6 +8,7 @@ import { ActionButton as Button } from '@/components/consolidated/ui';
 import { Screen } from '@/components/Screen';
 import { StackHeroHeader } from '@/components/StackHeroHeader';
 import { EmptyState, HeaderAction, IconBubble, NavRow, Pill, SectionTitle, Surface, cc } from '@/components/consolidated/ui';
+import { GuideHeaderRight, GuideTarget, tours, useScreenGuide } from '@/components/guide';
 import { useConsolidatedAccess } from '@/hooks/useConsolidatedAccess';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
 import { consolidatedService } from '@/services/consolidated.service';
@@ -41,6 +42,7 @@ export function ConsolidatedGroupsScreen() {
   const active = groups.filter((group) => group.isActive);
   const archived = groups.filter((group) => !group.isActive);
   const create = () => navigation.navigate('ConsolidatedGroupForm');
+  const guide = useScreenGuide(tours.groupsTour, { ready: !loading });
 
   return (
     <Screen
@@ -62,7 +64,15 @@ export function ConsolidatedGroupsScreen() {
       <StackHeroHeader
         title="Collection groups"
         subtitle="Sites that bring surplus food to one shared collection point"
-        right={canManage && groups.length ? <HeaderAction icon="add" label="New group" onPress={create} /> : undefined}
+        right={
+          <GuideHeaderRight onGuide={guide.start}>
+            {canManage && groups.length ? (
+              <GuideTarget id="groups.create">
+                <HeaderAction icon="add" label="New group" onPress={create} />
+              </GuideTarget>
+            ) : null}
+          </GuideHeaderRight>
+        }
       />
       <View style={styles.body}>
         {loading ? <ActivityIndicator color={palette.kale} style={styles.loader} /> : null}
@@ -72,13 +82,21 @@ export function ConsolidatedGroupsScreen() {
             icon="git-merge-outline"
             title="Create your first collection group"
             body="Group the outlets at one venue — a stadium, zoo or campus — so their surplus goes to one collection point and one charity pickup."
-            action={canManage ? <Button label="Create group" icon="add-circle-outline" onPress={create} /> : null}
+            action={canManage ? (
+              <GuideTarget id="groups.create">
+                <Button label="Create group" icon="add-circle-outline" onPress={create} />
+              </GuideTarget>
+            ) : null}
           />
         ) : null}
 
         {!loading && active.length ? (
           <>
-            {active.map((group) => <GroupCard key={group.id} group={group} onPress={() => navigation.navigate('ConsolidatedGroupForm', { groupId: group.id })} />)}
+            {active.map((group, index) => (
+              <GuideTarget key={group.id} id="groups.card" disabled={index > 0}>
+                <GroupCard group={group} onPress={() => navigation.navigate('ConsolidatedGroupForm', { groupId: group.id })} />
+              </GuideTarget>
+            ))}
           </>
         ) : null}
 
@@ -96,12 +114,14 @@ export function ConsolidatedGroupsScreen() {
         ) : null}
 
         {!loading && groups.length ? (
-          <NavRow
-            icon="calendar-outline"
-            title="Go to collections"
-            subtitle="Schedule, monitor and publish collections"
-            onPress={() => navigation.navigate('ConsolidatedCollections')}
-          />
+          <GuideTarget id="groups.collections">
+            <NavRow
+              icon="calendar-outline"
+              title="Go to collections"
+              subtitle="Schedule, monitor and publish collections"
+              onPress={() => navigation.navigate('ConsolidatedCollections')}
+            />
+          </GuideTarget>
         ) : null}
       </View>
     </Screen>
