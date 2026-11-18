@@ -94,7 +94,7 @@ export function ConsolidatedGroupsScreen() {
           <>
             {active.map((group, index) => (
               <GuideTarget key={group.id} id="groups.card" disabled={index > 0}>
-                <GroupCard group={group} onPress={() => navigation.navigate('ConsolidatedGroupForm', { groupId: group.id })} />
+                <GroupCard group={group} onPress={() => navigation.navigate('ConsolidatedGroupDetail', { groupId: group.id })} />
               </GuideTarget>
             ))}
           </>
@@ -104,7 +104,7 @@ export function ConsolidatedGroupsScreen() {
           <>
             <SectionTitle title="Archived" />
             {archived.map((group) => (
-              <Surface key={group.id} tone="muted" accessibilityLabel={`${group.name}, archived`} onPress={() => navigation.navigate('ConsolidatedGroupForm', { groupId: group.id })} style={styles.archived}>
+              <Surface key={group.id} tone="muted" accessibilityLabel={`${group.name}, archived`} onPress={() => navigation.navigate('ConsolidatedGroupDetail', { groupId: group.id })} style={styles.archived}>
                 <Ionicons name="archive-outline" size={normalize(16)} color={palette.stone} />
                 <AppText variant="bodySmall" color={palette.stone} style={styles.flex}>{group.name}</AppText>
                 <Ionicons name="chevron-forward" size={normalize(16)} color={palette.stone} />

@@ -19,6 +19,7 @@ import {
 } from '@/types/makeFoodCount';
 import { computeTotals, roundKg, validateQtyKg, type MfcTotals } from '@/utils/makeFoodCountTotals';
 import { fileKeyValueStorage } from '@/utils/fileKeyValueStorage';
+import { useAuthStore } from '@/store/authStore';
 import { mfcUuid } from '@/utils/mfcId';
 
 /** Autosave runs this long after the last change (app SPEC §8.1). */
@@ -28,6 +29,25 @@ const RETRY_MAX_MS = 30000;
 const STORAGE_KEY = 'mfc-draft-v1';
 
 const CONFLICT_NOTICE = 'Someone else updated this record. We loaded the latest version.';
+
+/**
+ * Why the open draft can't be saved from this phone, whatever happens next:
+ * - forbidden: the person can see this site's records but not change them (403)
+ * - missing: the draft no longer exists for them, e.g. deleted elsewhere (404)
+ * Retrying never helps, so writes stop until the draft is closed.
+ */
+export type MfcWriteBlock = 'forbidden' | 'missing';
+
+export const MFC_WRITE_BLOCK_MESSAGE: Record<MfcWriteBlock, string> = {
+  forbidden: 'You can view this site’s food records but not change them, so changes to this draft won’t be saved.',
+  missing: 'This draft is no longer available, so changes to it can’t be saved.',
+};
+
+function currentUserId(): number | null {
+  const user = useAuthStore.getState().authUser as { id?: unknown; profile?: { user?: { id?: unknown } } } | null;
+  const id = Number(user?.id ?? user?.profile?.user?.id);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
 
 type MakeFoodCountState = MfcPersistedDraft & {
   syncStatus: MfcSyncStatus;
@@ -40,6 +60,8 @@ type MakeFoodCountState = MfcPersistedDraft & {
   /** Latest server copy (outcomes per kind and line). Not persisted. */
   detail: RecordDetail | null;
   lastError: string | null;
+  /** Set when the server refuses this draft for good (see MfcWriteBlock). Not persisted. */
+  writeBlocked: MfcWriteBlock | null;
   autosaveTimer: ReturnType<typeof setTimeout> | null;
 
   ensureClientRequestId: () => string;
@@ -96,6 +118,7 @@ function emptyDraft(): MfcPersistedDraft {
     sources: [],
     lines: {},
     selectedSource: null,
+    ownerUserId: null,
   };
 }
 
@@ -145,7 +168,8 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
         set({
           ...patch,
           lockedLine: null,
-          lastError: null,
+          // A refused draft keeps saying why, even while the person keeps typing.
+          lastError: get().writeBlocked ? get().lastError : null,
           syncStatus: get().syncStatus === 'offline' ? 'offline' : 'pending',
         });
         get().scheduleAutosave();
@@ -164,6 +188,15 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
       /** Shared failure path for every write. Always resolves false. */
       const failWrite = async (error: unknown): Promise<false> => {
         const info = readMfcError(error);
+        // Not allowed, or gone: no retry will ever succeed, so stop writing and say why.
+        if (info.status === 403 || info.status === 404) {
+          const block: MfcWriteBlock = info.status === 403 ? 'forbidden' : 'missing';
+          clearRetry();
+          const timer = get().autosaveTimer;
+          if (timer) clearTimeout(timer);
+          set({ writeBlocked: block, autosaveTimer: null, syncStatus: 'pending', lastError: MFC_WRITE_BLOCK_MESSAGE[block] });
+          return false;
+        }
         if (info.status === 409) {
           await get().handle409(error);
           return false;
@@ -194,8 +227,10 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
           sources: orderSources(detail.record.sources),
           lines,
           detail,
+          ownerUserId: currentUserId(),
           syncStatus: 'saved',
           lastError: null,
+          writeBlocked: null,
         });
       };
 
@@ -272,6 +307,7 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
         homeImpact: null,
         detail: null,
         lastError: null,
+        writeBlocked: null,
         autosaveTimer: null,
 
         ensureClientRequestId() {
@@ -354,6 +390,7 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
               recordId: record.id,
               version: record.version,
               status: record.status,
+              ownerUserId: currentUserId(),
               syncStatus: revision === syncedRevision ? 'saved' : 'pending',
               lastError: null,
             });
@@ -381,6 +418,8 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
         },
 
         flushLines() {
+          // A draft the server has refused for good is never sent again.
+          if (get().writeBlocked) return Promise.resolve(false);
           if (flushPromise) return flushPromise;
           flushPromise = (async () => {
             try {
@@ -419,6 +458,7 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
         },
 
         scheduleAutosave() {
+          if (get().writeBlocked) return;
           const existing = get().autosaveTimer;
           if (existing) clearTimeout(existing);
           const timer = setTimeout(() => {
@@ -491,6 +531,7 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
             lockedLine: null,
             detail: null,
             lastError: null,
+            writeBlocked: null,
             autosaveTimer: null,
           });
         },
@@ -542,6 +583,7 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
         sources: state.sources,
         lines: state.lines,
         selectedSource: state.selectedSource,
+        ownerUserId: state.ownerUserId ?? null,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state || !selectHasOpenDraft(state)) return;
@@ -573,6 +615,43 @@ export async function completeRecordAfterListing(recordId: number): Promise<void
   }
 }
 
+/**
+ * A draft on this phone belongs to the account that opened it. Logging out, or
+ * signing in as someone else, clears it from the phone (the server keeps it, and
+ * its owner can reopen it from Records). Without this, the next account inherited
+ * a draft it may not be allowed to change, and every save failed.
+ */
+export function bindMfcDraftToAccount(): () => void {
+  const reconcile = () => {
+    if (!useMakeFoodCountStore.persist.hasHydrated()) return;
+    const draft = useMakeFoodCountStore.getState();
+    if (draft.recordId == null && draft.sources.length === 0) return;
+    const userId = currentUserId();
+    if (userId == null) return; // still signing in
+    if (draft.ownerUserId == null) {
+      // A draft saved before drafts had an owner: this account adopts it. If it can't be
+      // changed, the first save is refused and the draft can be closed from the screen.
+      useMakeFoodCountStore.setState({ ownerUserId: userId });
+      return;
+    }
+    if (draft.ownerUserId !== userId) draft.clearDraft();
+  };
+
+  const offAuth = useAuthStore.subscribe((state, previous) => {
+    if (previous.authUser && !state.authUser) {
+      useMakeFoodCountStore.getState().clearDraft(); // logged out
+      return;
+    }
+    if (state.authUser !== previous.authUser) reconcile();
+  });
+  const offHydrate = useMakeFoodCountStore.persist.onFinishHydration(reconcile);
+  reconcile();
+  return () => {
+    offAuth();
+    offHydrate();
+  };
+}
+
 /** Flush the open draft when the app goes to the background; retry when it comes back. */
 export function bindAppStateFlush(): () => void {
   const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
@@ -581,7 +660,7 @@ export function bindAppStateFlush(): () => void {
       void state.flushNow();
       return;
     }
-    if (next === 'active' && (state.syncStatus === 'offline' || state.syncStatus === 'pending')) {
+    if (next === 'active' && !state.writeBlocked && (state.syncStatus === 'offline' || state.syncStatus === 'pending')) {
       void state.flushNow();
     }
   });

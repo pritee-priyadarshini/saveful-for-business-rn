@@ -41,6 +41,7 @@ import { useAuthStore } from '@/store/authStore';
 import { pickDefaultSiteId, getHqOwnerContact, isVirtualHqSiteId, buildVirtualHqSite, isBusinessMultiHeadOffice } from '@/utils/defaultHqSite';
 import { selectCanManageBilling, selectNeedsPlan, useSubscriptionStore } from '@/store/subscriptionStore';
 import { showSubscriptionRequiredPrompt } from '@/utils/subscriptionAccess';
+import { useWhatsNewOnHome } from '@/hooks/useWhatsNewOnHome';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<RestaurantTabsParamList, 'Home'>,
@@ -263,6 +264,9 @@ export default function ManageSitesScreen() {
       setRefreshing(false);
     }
   };
+
+  // "What's new": once per release, after Home has settled (multi-site Home is this screen).
+  useWhatsNewOnHome();
 
   useFocusEffect(
     useCallback(() => {

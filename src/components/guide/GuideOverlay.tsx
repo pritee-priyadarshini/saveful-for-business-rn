@@ -31,7 +31,8 @@ import { useGuideStore } from '@/store/guideStore';
 import { palette } from '@/theme/colors';
 import { normalize } from '@/utils/responsive';
 
-import type { ActiveTour, GuideTargetEntry } from './GuideProvider';
+import type { ActiveTour, GuideTargetEntry, GuideTargets } from './GuideProvider';
+import { COMPASS_TARGET } from './types';
 import { JourneyTrack } from './JourneyTrack';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -67,7 +68,7 @@ export function GuideOverlay({
   onFinish,
 }: {
   active: ActiveTour;
-  targets: Map<string, GuideTargetEntry>;
+  targets: GuideTargets;
   onFinish: () => void;
 }) {
   const { tour, steps, auto } = active;
@@ -176,6 +177,7 @@ export function GuideOverlay({
       }
       setTarget(rect);
       setLocatedIndex(index);
+      if (step.target === COMPASS_TARGET) useGuideStore.getState().markCompassHint();
     };
 
     void run();

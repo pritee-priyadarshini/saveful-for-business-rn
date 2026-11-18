@@ -165,6 +165,17 @@ export function ConsolidatedGroupFormScreen() {
 
   const guide = useScreenGuide(isArchived ? null : tours.groupFormTour, { ready: !loading });
 
+  // Editing: Save only lights up once something has actually changed.
+  // (Collection points are added and switched on or off straight away, with their own controls.)
+  const sameSet = (a: number[], b: number[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
+  const dirty = !editing || !baseline
+    || baseline.name !== name.trim()
+    || baseline.description !== description.trim()
+    || baseline.host !== hostSiteId
+    || !sameSet(baseline.sites, siteIds)
+    || !sameSet(baseline.managers, managerIds)
+    || !sameSet(baseline.receivers, receiverIds);
+
   const save = () => {
     const nextErrors: Record<string, string> = {};
     if (!name.trim()) nextErrors.name = 'Name is required.';
@@ -225,7 +236,9 @@ export function ConsolidatedGroupFormScreen() {
             'Saved',
           );
         }
-        navigation.navigate('ConsolidatedGroups');
+        // Back to where they came from: the group's details after editing, the list after creating.
+        if (editing && navigation.canGoBack()) navigation.goBack();
+        else navigation.navigate('ConsolidatedGroups');
       } catch (error) {
         showErrorAlert(error, 'Could not save group');
       }
@@ -297,8 +310,12 @@ export function ConsolidatedGroupFormScreen() {
   return (
     <Screen scrollable backgroundColor={palette.creme} transparentTop contentStyle={styles.screen}>
       <StackHeroHeader
-        title={editing ? name || 'Edit group' : 'Create collection group'}
-        subtitle={isArchived ? 'Archived group · read only' : 'Sites that share one collection point and one charity pickup'}
+        title={editing ? 'Edit group' : 'Create collection group'}
+        subtitle={isArchived
+          ? 'Archived group · read only'
+          : editing
+            ? baseline?.name || name || 'Collection group'
+            : 'Sites that share one collection point and one charity pickup'}
         right={isArchived ? undefined : <GuideHeaderRight onGuide={guide.start} />}
       />
       {loading ? <ActivityIndicator color={palette.kale} style={{ marginTop: 24 }} /> : (
@@ -398,7 +415,18 @@ export function ConsolidatedGroupFormScreen() {
           {!isArchived ? (
             <>
               <GuideTarget id="groupForm.save">
-                <Button label={editing ? 'Save changes' : 'Create group'} icon="checkmark" onPress={save} loading={submitting} />
+                <Button
+                  label={editing ? 'Save changes' : 'Create group'}
+                  icon="checkmark"
+                  onPress={save}
+                  loading={submitting}
+                  disabled={!dirty}
+                />
+                {editing && !dirty ? (
+                  <AppText variant="meta" color={palette.stone} style={styles.centerText}>
+                    Make a change above to save it.
+                  </AppText>
+                ) : null}
               </GuideTarget>
               {editing ? (
                 <Button label="Archive group" variant="ghost" icon="archive-outline" onPress={archive} />

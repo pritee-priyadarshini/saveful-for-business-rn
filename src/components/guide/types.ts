@@ -2,6 +2,9 @@ import type { Ionicons } from '@expo/vector-icons';
 
 export type GuideIcon = keyof typeof Ionicons.glyphMap;
 
+/** GuideTarget id of the compass button in each header. */
+export const COMPASS_TARGET = 'guide.compass';
+
 /**
  * Where a step sits in the whole journey, drawn as the five-stop track:
  * 0 Set up · 1 Schedule · 2 List food · 3 Publish · 4 Collect.

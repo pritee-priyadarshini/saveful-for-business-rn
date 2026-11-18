@@ -65,6 +65,7 @@ import FarmerManageAccessScreen from '@/screens/farmer/FarmerManageAccessScreen'
 import ForgotPasswordScreen from '@/screens/shared/ForgotPasswordScreen';
 import { ConsolidatedGroupsScreen } from '@/screens/consolidated/ConsolidatedGroupsScreen';
 import { ConsolidatedGroupFormScreen } from '@/screens/consolidated/ConsolidatedGroupFormScreen';
+import { ConsolidatedGroupDetailScreen } from '@/screens/consolidated/ConsolidatedGroupDetailScreen';
 import { ConsolidatedCollectionsScreen } from '@/screens/consolidated/ConsolidatedCollectionsScreen';
 import { ScheduleCollectionScreen } from '@/screens/consolidated/ScheduleCollectionScreen';
 import { CollectionDashboardScreen } from '@/screens/consolidated/CollectionDashboardScreen';
@@ -160,6 +161,7 @@ export type RootStackParamList = {
   };
   ConsolidatedGroups: undefined;
   ConsolidatedGroupForm: { groupId?: number } | undefined;
+  ConsolidatedGroupDetail: { groupId: number };
   ConsolidatedCollections: { groupId?: number; tab?: 'upcoming' | 'active' | 'past' } | undefined;
   ScheduleCollection: {
     groupId?: number;
@@ -529,6 +531,7 @@ export function AppNavigator() {
             <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
             <RootStack.Screen name="ConsolidatedGroups" component={ConsolidatedGroupsScreen} />
             <RootStack.Screen name="ConsolidatedGroupForm" component={ConsolidatedGroupFormScreen} />
+            <RootStack.Screen name="ConsolidatedGroupDetail" component={ConsolidatedGroupDetailScreen} />
             <RootStack.Screen name="ConsolidatedCollections" component={ConsolidatedCollectionsScreen} />
             <RootStack.Screen name="ScheduleCollection" component={ScheduleCollectionScreen} />
             <RootStack.Screen name="CollectionDashboard" component={CollectionDashboardScreen} />

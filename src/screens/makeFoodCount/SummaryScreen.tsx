@@ -18,6 +18,7 @@ import {
   MfcPageTitle,
   MfcSectionLabel,
 } from '@/components/makeFoodCount/MfcAppUi';
+import { BlockedDraftNotice } from '@/components/makeFoodCount/BlockedDraftNotice';
 import { MFC } from '@/constants/makeFoodCount';
 import { OutcomeProgress } from '@/components/makeFoodCount/OutcomeProgress';
 import { Screen } from '@/components/Screen';
@@ -45,6 +46,7 @@ export function SummaryScreen() {
   const routeNotice = (route.params as { notice?: string } | undefined)?.notice;
   /** Opened from Recent records on a finished record: show what happened, don't ask again. */
   const viewOnly = (route.params as { mode?: string } | undefined)?.mode === 'view';
+  const writeBlocked = useMakeFoodCountStore((state) => state.writeBlocked);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     if (!routeNotice) return;
@@ -202,7 +204,8 @@ export function SummaryScreen() {
         ) : null}
         {lockedLine ? <MfcNotice tone="warn" icon="lock-closed" title={lockedLine.message} /> : null}
         {syncStatus === 'offline' ? <MfcNotice tone="muted" icon="cloud-offline" title="Saved on this phone, will sync" /> : null}
-        {error ? <MfcNotice tone="danger" title={error} /> : null}
+        {!viewOnly ? <BlockedDraftNotice onClosed={() => navigation.navigate('MfcRecentRecords')} /> : null}
+        {error && !(writeBlocked && !viewOnly) ? <MfcNotice tone="danger" title={error} /> : null}
 
         {sources.length === 0 ? (
           <MfcEmpty

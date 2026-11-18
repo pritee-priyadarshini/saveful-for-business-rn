@@ -5,6 +5,7 @@ import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { AppText } from '@/components/AppText';
+import { BlockedDraftNotice } from '@/components/makeFoodCount/BlockedDraftNotice';
 import { Screen } from '@/components/Screen';
 import { tabular } from '@/components/consolidated/ui';
 import {
@@ -88,6 +89,7 @@ export function RecordScreen() {
   const conflictNotice = useMakeFoodCountStore((state) => state.conflictNotice);
   const lockedLine = useMakeFoodCountStore((state) => state.lockedLine);
   const lastError = useMakeFoodCountStore((state) => state.lastError);
+  const writeBlocked = useMakeFoodCountStore((state) => state.writeBlocked);
   const setLineQty = useMakeFoodCountStore((state) => state.setLineQty);
   const setLineFit = useMakeFoodCountStore((state) => state.setLineFit);
   const selectSource = useMakeFoodCountStore((state) => state.selectSource);
@@ -428,7 +430,8 @@ export function RecordScreen() {
           </MfcNotice>
         ) : null}
         {syncStatus === 'offline' ? <MfcNotice tone="muted" icon="cloud-offline-outline" title={MFC_OFFLINE_NOTICE} /> : null}
-        {lastError && syncStatus !== 'offline' ? <MfcNotice tone="danger" title={lastError} /> : null}
+        <BlockedDraftNotice onClosed={() => navigation.navigate('MfcRecentRecords')} />
+        {lastError && syncStatus !== 'offline' && !writeBlocked ? <MfcNotice tone="danger" title={lastError} /> : null}
         {lockedLine && lockedLine.lineId == null ? <MfcNotice tone="danger" title={lockedLine.message} /> : null}
 
         <View style={[styles.section, styles.sectionOpen, hasErrors && styles.sectionError]}>

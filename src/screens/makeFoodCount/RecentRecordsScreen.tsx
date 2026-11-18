@@ -93,8 +93,18 @@ export function RecentRecordsScreen() {
       // Opening a record replaces the open draft, so make sure the server has the draft first.
       const synced = await useMakeFoodCountStore.getState().flushNow();
       if (!synced) {
-        setError("Your current draft hasn't synced yet. Try again once you're back online.");
-        return;
+        const draft = useMakeFoodCountStore.getState();
+        if (draft.writeBlocked) {
+          // The server will never take that draft from this account (not allowed, or it's gone),
+          // so it must not block opening anything else. It stays on the server as it was.
+          draft.clearDraft();
+        } else if (draft.syncStatus === 'offline') {
+          setError("Your current draft hasn't synced yet. Try again once you're back online.");
+          return;
+        } else {
+          setError(draft.lastError ?? "Your current draft couldn't be saved. Open it to check it, then try again.");
+          return;
+        }
       }
       const detail = await useMakeFoodCountStore.getState().loadRecord(record.id);
       if (!detail) {
@@ -132,10 +142,19 @@ export function RecentRecordsScreen() {
       if (useMakeFoodCountStore.getState().recordId === record.id) useMakeFoodCountStore.getState().clearDraft();
     } catch (e) {
       const info = readMfcError(e);
+      const routeMissing = info.status === 404 && /^Cannot DELETE/i.test(info.message);
+      if (info.status === 404 && !routeMissing) {
+        // Already gone (deleted on another phone): the list just catches up.
+        setRecords((current) => current.filter((row) => row.id !== record.id));
+        if (useMakeFoodCountStore.getState().recordId === record.id) useMakeFoodCountStore.getState().clearDraft();
+        return;
+      }
       setError(
-        info.status === 404 && !info.body?.code
-          ? "Deleting drafts needs the latest server update. Please try again after it's deployed."
-          : info.message,
+        info.status === 403
+          ? `Only people who work at ${record.siteName || 'this site'} can delete its drafts. You can still open it to look at it.`
+          : routeMissing
+            ? "Deleting drafts needs the latest server update. Please try again after it's deployed."
+            : info.message,
       );
       onFail?.();
     } finally {

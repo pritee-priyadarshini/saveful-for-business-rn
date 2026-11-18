@@ -28,12 +28,49 @@ export const groupsTour: GuideTour = {
     {
       target: 'groups.card',
       title: 'Your groups at a glance',
-      body: 'See how many sites are taking part, who has not answered their invitation yet, and when the next collection is. Tap a group to change it.',
+      body: 'See how many sites are taking part, who has not answered their invitation yet, and when the next collection is. Tap a group to see everything about it.',
     },
     {
       target: 'groups.collections',
       title: 'Then schedule collections',
       body: 'When a group is ready, go to Collections to set the dates and times.',
+    },
+  ],
+};
+
+export const groupDetailTour: GuideTour = {
+  id: 'cc.groupDetail',
+  title: 'Group details',
+  steps: [
+    {
+      target: 'groupDetail.overview',
+      title: 'The group at a glance',
+      body: 'How many sites are taking part, who is still deciding, and when the next collection is.',
+    },
+    {
+      target: 'groupDetail.points',
+      title: 'Where the food goes',
+      body: 'Every site brings its food here, and the charity collects it from here. Directions are shown to sites when they list.',
+    },
+    {
+      target: 'groupDetail.sites',
+      title: 'Who’s in',
+      body: 'Each site’s status: taking part, invited, or declined. The host site owns the listing charities see.',
+    },
+    {
+      target: 'groupDetail.people',
+      title: 'Who runs it',
+      body: 'Managers schedule and publish. Receivers confirm what arrives at the collection point.',
+    },
+    {
+      target: 'groupDetail.edit',
+      title: 'Need to change something?',
+      body: 'Tap Edit to rename the group, add a collection point, or change its sites and people.',
+    },
+    {
+      target: 'groupDetail.actions',
+      title: 'Ready for a collection?',
+      body: 'Schedule one for this group, or see the collections it already has.',
     },
   ],
 };

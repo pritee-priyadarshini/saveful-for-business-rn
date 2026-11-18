@@ -5,12 +5,23 @@ import type { ScreenScrollHandle } from '@/components/Screen';
 import { useGuideStore } from '@/store/guideStore';
 
 import { GuideOverlay } from './GuideOverlay';
-import type { GuideStep, GuideTour } from './types';
+import { COMPASS_TARGET, type GuideStep, type GuideTour } from './types';
 
 export type GuideTargetEntry = {
   ref: React.RefObject<View | null>;
   /** The scrolling Screen the target sits in, if any. */
   scroll: ScreenScrollHandle | null;
+};
+
+/** Looks up the element a step points at. */
+export type GuideTargets = { get: (id: string) => GuideTargetEntry | undefined };
+
+/** The step that introduces the compass itself. Added once, to the first walkthrough that opens by itself. */
+const COMPASS_STEP: GuideStep = {
+  target: COMPASS_TARGET,
+  title: 'Your guide, any time',
+  body: 'Tap the compass at the top of any collection screen to walk through it again, step by step.',
+  tip: 'Rather explore on your own? Turn Guide me off in Profile.',
 };
 
 export type ActiveTour = {
@@ -37,22 +48,36 @@ export function useGuideContext() {
  * Mount once, above the navigator.
  */
 export function GuideProvider({ children }: { children: React.ReactNode }) {
-  const targets = useRef(new Map<string, GuideTargetEntry>());
+  // Several copies of one target can be mounted at once (the same header on stacked screens):
+  // the most recent wins, which is the screen on top. Lists register only their first item.
+  const targets = useRef(new Map<string, GuideTargetEntry[]>());
+  const lookup = useRef<GuideTargets>({
+    get: (id) => {
+      const list = targets.current.get(id);
+      return list?.[list.length - 1];
+    },
+  });
   const [active, setActive] = useState<ActiveTour | null>(null);
   const activeRef = useRef<ActiveTour | null>(null);
   activeRef.current = active;
 
   const register = useCallback((id: string, entry: GuideTargetEntry) => {
-    // First one wins (e.g. only the first card in a list is highlighted).
-    if (!targets.current.has(id)) targets.current.set(id, entry);
+    targets.current.set(id, [...(targets.current.get(id) ?? []), entry]);
     return () => {
-      if (targets.current.get(id) === entry) targets.current.delete(id);
+      const rest = (targets.current.get(id) ?? []).filter((row) => row !== entry);
+      if (rest.length) targets.current.set(id, rest);
+      else targets.current.delete(id);
     };
   }, []);
 
   const start = useCallback((tour: GuideTour, options?: { auto?: boolean }) => {
     if (activeRef.current) return false;
     const steps = tour.steps.filter((step) => !step.target || targets.current.has(step.target));
+    // The first walkthrough that opens by itself ends by showing where to find help again.
+    const guide = useGuideStore.getState();
+    if (options?.auto && guide.enabled && !guide.compassHintSeen && targets.current.has(COMPASS_TARGET)) {
+      steps.push(COMPASS_STEP);
+    }
     if (!steps.length) return false;
     const next = { tour, steps, auto: Boolean(options?.auto) };
     activeRef.current = next;
@@ -80,7 +105,7 @@ export function GuideProvider({ children }: { children: React.ReactNode }) {
   return (
     <GuideContext.Provider value={value}>
       {children}
-      {active ? <GuideOverlay key={active.tour.id} active={active} targets={targets.current} onFinish={finish} /> : null}
+      {active ? <GuideOverlay key={active.tour.id} active={active} targets={lookup.current} onFinish={finish} /> : null}
     </GuideContext.Provider>
   );
 }

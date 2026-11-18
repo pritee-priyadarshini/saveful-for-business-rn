@@ -16,6 +16,7 @@ export function useScreenGuide(tour: GuideTour | null, { ready = true }: { ready
   const enabled = useGuideStore((state) => state.enabled);
   const hydrated = useGuideStore((state) => state.hydrated);
   const seen = useGuideStore((state) => (tour ? state.seen.includes(tour.id) : true));
+  const compassHintSeen = useGuideStore((state) => state.compassHintSeen);
   const tourRef = useRef(tour);
   tourRef.current = tour;
 
@@ -24,17 +25,21 @@ export function useScreenGuide(tour: GuideTour | null, { ready = true }: { ready
   }, [guide]);
 
   const tourId = tour?.id ?? null;
-  const shouldAutoStart = Boolean(guide && tourId && ready && enabled && hydrated && !seen);
+  const canAuto = Boolean(guide && tourId && ready && enabled && hydrated);
+  // A new screen: its walkthrough. A screen already walked through, by someone who has not yet
+  // been shown the compass (e.g. they finished every tour before it existed): just that one step.
+  const autoMode: 'tour' | 'compass' | null = !canAuto ? null : !seen ? 'tour' : !compassHintSeen ? 'compass' : null;
 
   useFocusEffect(
     useCallback(() => {
-      if (!shouldAutoStart) return undefined;
+      if (!autoMode) return undefined;
       // Let the screen settle (navigation transition, first layout) before measuring.
       const timer = setTimeout(() => {
-        if (tourRef.current) guide?.start(tourRef.current, { auto: true });
+        if (autoMode === 'tour' && tourRef.current) guide?.start(tourRef.current, { auto: true });
+        if (autoMode === 'compass') guide?.start({ id: 'cc.compass', title: 'Guide me', steps: [] }, { auto: true });
       }, 650);
       return () => clearTimeout(timer);
-    }, [guide, shouldAutoStart]),
+    }, [guide, autoMode]),
   );
 
   // Leaving the screen (blur or unmount) ends its walkthrough, e.g. when a notification opens another screen.

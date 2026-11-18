@@ -374,4 +374,6 @@ export type MfcPersistedDraft = {
   sources: FoodSource[];
   lines: Record<string, MfcDraftLine>;
   selectedSource: FoodSource | null;
+  /** The account that opened this draft on this phone; another account never inherits it. */
+  ownerUserId?: number | null;
 };

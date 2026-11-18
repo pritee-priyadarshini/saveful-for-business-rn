@@ -17,7 +17,7 @@ import { AppAlertHost } from './src/components/AppAlertModal';
 import { GuideProvider } from './src/components/guide';
 import { registerNotificationCategories } from './src/services/pushNotifications';
 import { CONSOLIDATED_PREVIEW, ConsolidatedPreviewApp, installConsolidatedFixtures } from './src/dev/consolidatedPreview';
-import { bindAppStateFlush } from './src/store/makeFoodCountStore';
+import { bindAppStateFlush, bindMfcDraftToAccount } from './src/store/makeFoodCountStore';
 import { MFC_PREVIEW, MakeFoodCountPreviewApp, installMakeFoodCountFixtures } from './src/dev/makeFoodCountPreview';
 
 // Dev-only visual preview of the Consolidated Collections screens (inert unless the env flag is set in __DEV__).
@@ -54,6 +54,8 @@ export default function App() {
 
   // Make Food Count: flush the open draft when the app goes to the background (app SPEC §8.1).
   useEffect(() => bindAppStateFlush(), []);
+  // A Make Food Count draft belongs to the account that opened it (cleared on logout or account switch).
+  useEffect(() => bindMfcDraftToAccount(), []);
 
   const [fontsLoaded, fontError] = useFonts({
     'Saveful-Bold': require('./assets/fonts/Saveful-Bold.ttf'),

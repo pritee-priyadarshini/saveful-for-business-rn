@@ -21,6 +21,7 @@ import { CollectionDashboardScreen } from '@/screens/consolidated/CollectionDash
 import { ConsolidatedCollectionsScreen } from '@/screens/consolidated/ConsolidatedCollectionsScreen';
 import { ConsolidatedGroupFormScreen } from '@/screens/consolidated/ConsolidatedGroupFormScreen';
 import { ConsolidatedGroupsScreen } from '@/screens/consolidated/ConsolidatedGroupsScreen';
+import { ConsolidatedGroupDetailScreen } from '@/screens/consolidated/ConsolidatedGroupDetailScreen';
 import { ConsolidatedInvitationsScreen } from '@/screens/consolidated/ConsolidatedInvitationsScreen';
 import { ConsolidatedReportScreen } from '@/screens/consolidated/ConsolidatedReportScreen';
 import { ContributionDetailScreen } from '@/screens/consolidated/ContributionDetailScreen';
@@ -360,6 +361,7 @@ const SCREENS: Record<string, React.ComponentType<any>> = {
   PreviewComponents,
   ConsolidatedGroups: ConsolidatedGroupsScreen,
   ConsolidatedGroupForm: ConsolidatedGroupFormScreen,
+  ConsolidatedGroupDetail: ConsolidatedGroupDetailScreen,
   ConsolidatedCollections: ConsolidatedCollectionsScreen,
   ScheduleCollection: ScheduleCollectionScreen,
   CollectionDashboard: CollectionDashboardScreen,
