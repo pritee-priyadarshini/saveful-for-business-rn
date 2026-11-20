@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   pillDraft: { backgroundColor: '#FFF4E5' },
   pillSaved: { backgroundColor: MFC.doneBg },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
-  pillText: { fontFamily: 'Saveful-SemiBold', fontSize: normalize(12) },
+  pillText: { fontFamily: 'Saveful-SemiBold', fontSize: normalize(13) },
   deleteAction: {
     width: DELETE_WIDTH,
     marginLeft: 8,

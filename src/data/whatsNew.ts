@@ -17,6 +17,8 @@ export type WhatsNewBenefit = {
 export type WhatsNewFeature = {
   id: WhatsNewFeatureId;
   name: string;
+  /** Two short lines on the intro card. */
+  teaser: [string, string];
   headline: string;
   benefits: WhatsNewBenefit[];
   /** Small line under the benefits. */
@@ -26,13 +28,14 @@ export type WhatsNewFeature = {
 export const WHATS_NEW_INTRO = {
   sticker: 'New in Saveful',
   headline: 'Two new ways to make your food count',
-  body: 'Take 30 seconds to see what’s new, or skip and find it later in Profile.',
+  subhead: 'More savings. Less admin. Greater impact.',
 };
 
 export const WHATS_NEW_FEATURES: WhatsNewFeature[] = [
   {
     id: 'makeFoodCount',
     name: 'Make Food Count',
+    teaser: ['Track food loss.', 'Find more savings.'],
     headline: 'Know your food loss. find more savings.',
     benefits: [
       {
@@ -55,6 +58,7 @@ export const WHATS_NEW_FEATURES: WhatsNewFeature[] = [
   {
     id: 'consolidated',
     name: 'Consolidated Collections',
+    teaser: ['Simplify collections.', 'Save time.'],
     headline: 'MORE SITES. LESS ADMIN. GREATER IMPACT.',
     benefits: [
       {

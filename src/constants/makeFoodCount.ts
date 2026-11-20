@@ -19,25 +19,25 @@ export type MfcSourceMeta = {
 export const SOURCE_META: Record<FoodSource, MfcSourceMeta> = {
   OVERPRODUCTION: {
     label: 'Overproduction',
-    description: 'Food prepared or cooked but not used',
+    description: 'Prepared food that wasn’t used.',
     example: 'cooked meals, baked goods, prepared ingredients',
     image: require('../../assets/newmfc/mfc-source-overproduction.png'),
   },
   SPOILAGE: {
     label: 'Spoilage',
-    description: 'Food that has gone off or is no longer safe to eat',
+    description: 'Food no longer suitable to eat.',
     example: 'expired fresh produce, damaged packaging',
     image: require('../../assets/newmfc/mfc-source-spoilage.png'),
   },
   PREPARATION: {
     label: 'Preparation',
-    description: 'Peels, trimmings, offcuts and preparation mistakes',
+    description: 'Peels, trimmings and offcuts.',
     example: 'vegetable peelings, meat offcuts, bones, shells, coffee grounds',
     image: require('../../assets/newmfc/mfc-source-preparation.png'),
   },
   PLATE_SCRAPS: {
     label: 'Plate Scraps',
-    description: 'Food left on plates after service',
+    description: 'Food left on plates after service.',
     example: 'uneaten meals, plate returns',
     image: require('../../assets/newmfc/mfc-source-plate-scraps.png'),
   },
@@ -47,7 +47,7 @@ export const SOURCE_META: Record<FoodSource, MfcSourceMeta> = {
 export const SOURCES_META = SOURCE_META;
 
 /** The four steps of the stepper (C2: no "Choose destination" step). */
-export const MFC_STEPS = ['Select sources', 'Add quantities', 'Review', 'List'] as const;
+export const MFC_STEPS = ['Select sources', 'Add quantities', 'Review', 'Finish'] as const;
 
 /** Index of each stepper step, so screens don't pass magic numbers. */
 export const MFC_STEP_INDEX = {
@@ -64,7 +64,7 @@ export const MFC_LILAC = {
 } as const;
 
 export const MFC_OVERPRODUCTION_SUBTITLE =
-  'All Overproduction quantities will be offered for review in the people listing, where you can edit the amounts.';
+  'Record prepared food that wasn\'t used. You can choose what to make available through Saveful Connect later.';
 
 export const MFC_OVERPRODUCTION_NOTICE =
   'These are recorded quantities, not a declaration that the food is safe to donate. You can adjust the quantities when preparing the people listing; food safety is checked before publication.';
@@ -124,7 +124,8 @@ export const MFC = {
   muted: '#70677D',
   /** Table header labels on the summary. */
   label: '#5D4D70',
-  page: '#FFFFFF',
+  /** Page background: Saveful cream (palette.creme). Cards stay true white on it. */
+  page: '#FEFFED',
   /** True white for cards and inputs (the app's palette.white is a cream). */
   white: '#FFFFFF',
   /** Lilac panels (food table, "What would you like to do next?"). */

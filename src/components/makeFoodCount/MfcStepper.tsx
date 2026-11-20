@@ -92,6 +92,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dotOn: { backgroundColor: MFC.purple, borderColor: MFC.purple },
-  dotNumber: { fontSize: normalize(12), lineHeight: normalize(14), textAlign: 'center' },
-  label: { textAlign: 'center', paddingHorizontal: 2, fontSize: normalize(12), lineHeight: normalize(15) },
+  dotNumber: { fontSize: normalize(13), lineHeight: normalize(15), textAlign: 'center' },
+  label: { textAlign: 'center', paddingHorizontal: 2, fontSize: normalize(13), lineHeight: normalize(16) },
 });

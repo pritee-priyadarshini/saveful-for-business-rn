@@ -316,16 +316,17 @@ function SummaryTable({
           }, ${formatKg(row.otherKg)} other recorded food. Open ${row.label}`}
           style={({ pressed }) => [styles.tr, styles.bodyRow, pressed && styles.pressed]}
         >
-          <AppText variant="meta" color={MFC.ink} style={[styles.cellSource, styles.bold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {/* A long name wraps to a second line rather than shrinking (iOS shrank it far too small). */}
+          <AppText variant="bodySmall" color={MFC.ink} style={[styles.cellSource, styles.bold]} numberOfLines={2}>
             {row.label}
           </AppText>
-          <AppText variant="meta" color={MFC.ink} style={[styles.cell, tabular]}>
+          <AppText variant="bodySmall" color={MFC.ink} style={[styles.cell, tabular]}>
             {formatKg(row.totalKg)}
           </AppText>
-          <AppText variant="meta" color={MFC.ink} style={[styles.cellWide, tabular]}>
+          <AppText variant="bodySmall" color={MFC.ink} style={[styles.cellWide, tabular]}>
             {row.forPeopleKg == null ? '—' : formatKg(row.forPeopleKg)}
           </AppText>
-          <AppText variant="meta" color={MFC.ink} style={[styles.cell, tabular]}>
+          <AppText variant="bodySmall" color={MFC.ink} style={[styles.cell, tabular]}>
             {formatKg(row.otherKg)}
           </AppText>
         </Pressable>
@@ -336,16 +337,16 @@ function SummaryTable({
         accessible
         accessibilityLabel={`Total: ${formatKg(total.totalKg)} recorded, ${formatKg(total.forPeopleKg)} for people, ${formatKg(total.otherKg)} other recorded food`}
       >
-        <AppText variant="meta" color={MFC.ink} style={[styles.cellSource, styles.bold]}>
+        <AppText variant="bodySmall" color={MFC.ink} style={[styles.cellSource, styles.bold]}>
           Total
         </AppText>
-        <AppText variant="meta" color={MFC.ink} style={[styles.cell, styles.bold, tabular]}>
+        <AppText variant="bodySmall" color={MFC.ink} style={[styles.cell, styles.bold, tabular]}>
           {formatKg(total.totalKg)}
         </AppText>
-        <AppText variant="meta" color={MFC.ink} style={[styles.cellWide, styles.bold, tabular]}>
+        <AppText variant="bodySmall" color={MFC.ink} style={[styles.cellWide, styles.bold, tabular]}>
           {formatKg(total.forPeopleKg)}
         </AppText>
-        <AppText variant="meta" color={MFC.ink} style={[styles.cell, styles.bold, tabular]}>
+        <AppText variant="bodySmall" color={MFC.ink} style={[styles.cell, styles.bold, tabular]}>
           {formatKg(total.otherKg)}
         </AppText>
       </View>
@@ -471,7 +472,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: MFC.divider,
   },
-  th: { fontFamily: 'Saveful-Bold', fontSize: normalize(11), lineHeight: normalize(14) },
+  th: { fontFamily: 'Saveful-Bold', fontSize: normalize(13), lineHeight: normalize(16) },
   bodyRow: {
     minHeight: TOUCH,
     borderBottomWidth: 1,

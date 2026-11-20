@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Image,
   ImageBackground,
   Modal,
   Pressable,
@@ -11,10 +12,11 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
+  FadeInDown,
   interpolate,
   interpolateColor,
   useAnimatedScrollHandler,
@@ -35,9 +37,9 @@ import { useWhatsNewStore } from '@/store/whatsNewStore';
 import { palette } from '@/theme/colors';
 import { normalize } from '@/utils/responsive';
 
-import { CC_ART, CollectionBoard, INTRO_ART, IntroCollage, MFC_ART, MfcPhone, Scaled } from './WhatsNewArt';
+import { CC_ART, CollectionBoard, MFC_ART, MfcPhone, Scaled } from './WhatsNewArt';
 
-export type WhatsNewDestination = 'makeFoodCount' | 'consolidatedGroups' | 'consolidatedCollections';
+export type WhatsNewDestination = 'makeFoodCount' | 'consolidatedGroups' | 'consolidatedCollections' | 'dashboard';
 
 const PURPLE_BG = require('../../../assets/placeholder/purple-bg.png');
 const KALE_BG = require('../../../assets/placeholder/kale-header.png');
@@ -175,6 +177,7 @@ export function WhatsNewAnnouncement({ onNavigate }: { onNavigate: (to: WhatsNew
               manual={manual}
               scrollX={scrollX}
               onNext={() => goTo(1)}
+              onOpenFeature={(index) => goTo(index + 1)}
               onClose={() => dismiss()}
             />
             {WHATS_NEW_FEATURES.map((feature, index) => {
@@ -191,8 +194,8 @@ export function WhatsNewAnnouncement({ onNavigate }: { onNavigate: (to: WhatsNew
                   safeBottom={safeBottom}
                   scrollX={scrollX}
                   cta={cta ? { label: cta.label, onPress: () => dismiss(() => onNavigate(cta.to)) } : null}
-                  nextLabel={last ? 'Let’s go' : 'Next'}
-                  onNext={() => (last ? dismiss() : goTo(index + 2))}
+                  nextLabel={last ? 'Go to dashboard' : 'Next'}
+                  onNext={() => (last ? dismiss(() => onNavigate('dashboard')) : goTo(index + 2))}
                 />
               );
             })}
@@ -291,7 +294,7 @@ function useParallax(scrollX: SharedValue<number>, index: number, width: number)
 // ─── Slides ──────────────────────────────────────────────────────────────────
 
 function IntroSlide({
-  width, height, safeTop, safeBottom, manual, scrollX, onNext, onClose,
+  width, height, safeTop, safeBottom, manual, scrollX, onNext, onOpenFeature, onClose,
 }: {
   width: number;
   height: number;
@@ -300,38 +303,47 @@ function IntroSlide({
   manual: boolean;
   scrollX: SharedValue<number>;
   onNext: () => void;
+  /** Jump straight to a feature's page (index in WHATS_NEW_FEATURES). */
+  onOpenFeature: (index: number) => void;
   onClose: () => void;
 }) {
   const parallax = useParallax(scrollX, 0, width);
+  const reduceMotion = useReducedMotion();
   return (
     <ImageBackground source={PURPLE_BG} resizeMode="cover" style={[styles.visual, { width, height }]}>
       <View style={[styles.introBody, { paddingTop: safeTop + 54, paddingBottom: Math.max(safeBottom, 16) + 8 }]}>
         <View style={styles.sticker}>
-          <Ionicons name="sparkles" size={normalize(14)} color={palette.black} />
-          <AppText variant="caption" color={palette.black} style={styles.stickerText} maxFontSizeMultiplier={1.3}>
+          <Ionicons name="sparkles" size={normalize(14)} color={palette.eggplant} />
+          <AppText variant="caption" color={palette.eggplant} style={styles.stickerText} maxFontSizeMultiplier={1.3}>
             {WHATS_NEW_INTRO.sticker}
           </AppText>
         </View>
         <AppText variant="h3" color={palette.white} style={styles.introHeadline} accessibilityRole="header" maxFontSizeMultiplier={1.25}>
           {WHATS_NEW_INTRO.headline}
         </AppText>
-        <AppText variant="bodySmall" color="rgba(255,255,255,0.86)" style={styles.introText} maxFontSizeMultiplier={1.4}>
-          {WHATS_NEW_INTRO.body}
+        <AppText variant="bodyBold" color={palette.white} style={styles.introSubhead} maxFontSizeMultiplier={1.3}>
+          {WHATS_NEW_INTRO.subhead}
         </AppText>
 
-        <Animated.View style={[styles.flexFill, parallax]}>
-          <Stage art={INTRO_ART} max={1.3}>
-            <IntroCollage />
-          </Stage>
+        {/* The two features, each a card that opens its own page. */}
+        <Animated.View style={[styles.introCards, parallax]}>
+          {WHATS_NEW_FEATURES.map((feature, index) => (
+            <Animated.View
+              key={feature.id}
+              entering={reduceMotion ? undefined : FadeInDown.delay(180 + index * 120).duration(420).easing(EASE)}
+            >
+              <IntroFeatureCard feature={feature} onPress={() => onOpenFeature(index)} />
+            </Animated.View>
+          ))}
         </Animated.View>
 
         <Pressable
           onPress={onNext}
           accessibilityRole="button"
-          style={({ pressed }) => [styles.lemonButton, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.greenButton, pressed && styles.pressed]}
         >
-          <AppText variant="bodyBold" color={palette.black} maxFontSizeMultiplier={1.3}>Show me what’s new</AppText>
-          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.black} />
+          <AppText variant="bodyBold" color={palette.white} maxFontSizeMultiplier={1.3}>Show me what’s new</AppText>
+          <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
         </Pressable>
         <Pressable onPress={onClose} hitSlop={8} style={styles.laterLink} accessibilityRole="button">
           <AppText variant="bodySmall" color="rgba(255,255,255,0.8)" style={styles.semibold} maxFontSizeMultiplier={1.3}>
@@ -340,6 +352,65 @@ function IntroSlide({
         </Pressable>
       </View>
     </ImageBackground>
+  );
+}
+
+const INTRO_CARD: Record<WhatsNewFeatureId, { bg: string; icon: React.ComponentProps<typeof Ionicons>['name'] | 'chef-hat'; color: string }> = {
+  makeFoodCount: { bg: '#EFE4FB', icon: 'chef-hat', color: MFC.purple },
+  consolidated: { bg: '#DDF3E5', icon: 'git-merge-outline', color: palette.kale },
+};
+
+const MFC_HOME_ART = require('../../../assets/newmfc/make-food-count-home.png');
+
+/** One feature on the intro page: icon, name, two short lines, a small picture; opens its page. */
+function IntroFeatureCard({ feature, onPress }: { feature: WhatsNewFeature; onPress: () => void }) {
+  const look = INTRO_CARD[feature.id];
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${feature.name}. ${feature.teaser.join(' ')}`}
+      accessibilityHint="Shows how it works"
+      style={({ pressed }) => [styles.introCard, { backgroundColor: look.bg }, pressed && styles.pressed]}
+    >
+      <View style={styles.introCardIcon}>
+        {look.icon === 'chef-hat' ? (
+          <MaterialCommunityIcons name="chef-hat" size={normalize(22)} color={look.color} />
+        ) : (
+          <Ionicons name={look.icon} size={normalize(21)} color={look.color} />
+        )}
+      </View>
+      <View style={styles.introCardCopy}>
+        <AppText variant="bodyBold" color={MFC.ink} style={styles.introCardTitle} maxFontSizeMultiplier={1.3}>
+          {feature.name}
+        </AppText>
+        {feature.teaser.map((line) => (
+          <AppText key={line} variant="bodySmall" color={palette.midgray} maxFontSizeMultiplier={1.3}>
+            {line}
+          </AppText>
+        ))}
+      </View>
+      <View style={styles.introCardArt} pointerEvents="none">
+        {feature.id === 'makeFoodCount' ? (
+          <Image source={MFC_HOME_ART} style={styles.introCardImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.flowMini}>
+            <View style={styles.flowMiniOutlets}>
+              {[0, 1, 2].map((i) => (
+                <View key={i} style={styles.flowMiniOutlet}>
+                  <Ionicons name="storefront-outline" size={normalize(11)} color={palette.kale} />
+                </View>
+              ))}
+            </View>
+            <Ionicons name="arrow-forward" size={normalize(12)} color={palette.kale} />
+            <View style={styles.flowMiniPin}>
+              <Ionicons name="location" size={normalize(16)} color={palette.white} />
+            </View>
+          </View>
+        )}
+      </View>
+      <Ionicons name="chevron-forward" size={normalize(16)} color={look.color} style={styles.introCardChevron} />
+    </Pressable>
   );
 }
 
@@ -403,8 +474,8 @@ function FeatureSlide({
                   <Ionicons name={benefit.icon} size={normalize(18)} color={accent.color} />
                 </View>
                 <View style={styles.benefitCopy}>
-                  <AppText variant="bodyBold" color={accent.ink} maxFontSizeMultiplier={1.5}>{benefit.title}</AppText>
-                  <AppText variant="bodySmall" color={palette.midgray} style={styles.benefitBody} maxFontSizeMultiplier={1.5}>
+                  <AppText variant="bodyBold" color={accent.ink} style={styles.benefitTitle} maxFontSizeMultiplier={1.5}>{benefit.title}</AppText>
+                  <AppText variant="body1" color={palette.midgray} style={styles.benefitBody} maxFontSizeMultiplier={1.5}>
                     {benefit.body}
                   </AppText>
                 </View>
@@ -420,15 +491,28 @@ function FeatureSlide({
           ) : null}
         </ScrollView>
 
-        <View style={styles.footer}>
-          {cta ? <ActionButton label={cta.label} variant="secondary" onPress={cta.onPress} style={styles.footerCta} /> : null}
-          <ActionButton
-            label={nextLabel}
-            icon={nextLabel === 'Next' ? undefined : 'checkmark'}
-            onPress={onNext}
-            style={styles.footerNext}
-          />
-        </View>
+        {/* Short labels share a row; longer ones (e.g. "Explore Collections" + "Go to dashboard")
+            stack, main action on top, so neither is ever cut off. */}
+        {cta && cta.label.length + nextLabel.length > 22 ? (
+          <View style={styles.footerStacked}>
+            <ActionButton
+              label={nextLabel}
+              icon={nextLabel === 'Next' ? undefined : 'home-outline'}
+              onPress={onNext}
+            />
+            <ActionButton label={cta.label} variant="secondary" onPress={cta.onPress} />
+          </View>
+        ) : (
+          <View style={styles.footer}>
+            {cta ? <ActionButton label={cta.label} variant="secondary" onPress={cta.onPress} style={styles.footerCta} /> : null}
+            <ActionButton
+              label={nextLabel}
+              icon={nextLabel === 'Next' ? undefined : 'home-outline'}
+              onPress={onNext}
+              style={styles.footerNext}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -474,7 +558,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 6,
-    backgroundColor: palette.lemon,
+    backgroundColor: palette.radish,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
@@ -483,15 +567,62 @@ const styles = StyleSheet.create({
   },
   stickerText: { letterSpacing: 1 },
   introHeadline: { maxWidth: 420 },
-  introText: { marginTop: 10, maxWidth: 380, lineHeight: normalize(20) },
-  lemonButton: {
+  introSubhead: { marginTop: 10, maxWidth: 380, fontSize: normalize(17), lineHeight: normalize(23) },
+  introCards: { flex: 1, justifyContent: 'center', gap: 14, paddingVertical: 16 },
+  introCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 96,
+    paddingVertical: 14,
+    paddingLeft: 14,
+    paddingRight: 10,
+    borderRadius: 22,
+    shadowColor: '#12061F',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  introCardIcon: {
+    width: normalize(44),
+    height: normalize(44),
+    borderRadius: normalize(14),
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introCardCopy: { flex: 1, minWidth: 0, gap: 1 },
+  introCardTitle: { fontSize: normalize(17), marginBottom: 2 },
+  introCardArt: { width: normalize(76), alignItems: 'center', justifyContent: 'center' },
+  introCardImage: { width: normalize(76), height: normalize(56) },
+  introCardChevron: { marginLeft: -2 },
+  flowMini: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  flowMiniOutlets: { gap: 3 },
+  flowMiniOutlet: {
+    width: normalize(19),
+    height: normalize(19),
+    borderRadius: 6,
+    backgroundColor: palette.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flowMiniPin: {
+    width: normalize(28),
+    height: normalize(28),
+    borderRadius: normalize(14),
+    backgroundColor: palette.kale,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  greenButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     minHeight: 54,
     borderRadius: 16,
-    backgroundColor: palette.lemon,
+    backgroundColor: palette.kale,
     marginTop: 8,
   },
   laterLink: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 16, marginBottom: -4 },
@@ -528,9 +659,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   benefitCopy: { flex: 1, minWidth: 0, gap: 2, paddingTop: 1 },
-  benefitBody: { lineHeight: normalize(19) },
+  benefitTitle: { fontSize: normalize(17), lineHeight: normalize(22) },
+  benefitBody: { lineHeight: normalize(21) },
   note: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 18 },
   footer: { flexDirection: 'row', gap: 10, paddingTop: 12 },
+  footerStacked: { gap: 8, paddingTop: 12 },
   footerCta: { flex: 1, minWidth: 0 },
   footerNext: { flex: 1.5, minWidth: 0 },
 });

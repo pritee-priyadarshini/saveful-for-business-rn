@@ -7,10 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { MFC } from '@/constants/makeFoodCount';
+import { palette } from '@/theme/colors';
 import { normalize } from '@/utils/responsive';
 
-/** Soft lilac: clearly a header against the white page, light enough to stay calm. */
-const HEADER_BG = '#EFE6FA';
+/** Saveful eggplant, on every Make Food Count screen; the page beneath is the brand cream. */
+const HEADER_BG = palette.eggplant;
+/** Breathing room under the status bar and below the row, so the bar never feels cramped. */
+const HEADER_GAP_TOP = 6;
 
 type Props = {
   title?: string;
@@ -22,8 +25,7 @@ type Props = {
 
 /**
  * Compact top bar for Make Food Count: back, title and site on one 56pt row.
- * A soft lilac (the app's purple, tinted) sets it apart from the white page
- * without being heavy; the controls sit on white so they read as buttons.
+ * Eggplant bar with a white title; the controls sit on white so they read as buttons.
  */
 export function MfcHeader({ title = 'Make Food Count', siteName, onSitePress }: Props) {
   const navigation = useNavigation();
@@ -48,8 +50,8 @@ export function MfcHeader({ title = 'Make Food Count', siteName, onSitePress }: 
 
   return (
     <>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
-      <View style={[styles.bar, { paddingTop: insets.top }]}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <View style={[styles.bar, { paddingTop: insets.top + HEADER_GAP_TOP }]}>
         <View style={styles.row}>
           <Pressable
             onPress={onBack}
@@ -58,9 +60,9 @@ export function MfcHeader({ title = 'Make Food Count', siteName, onSitePress }: 
             accessibilityLabel="Go back"
             style={({ pressed }) => [styles.back, pressed && styles.pressed]}
           >
-            <Ionicons name="chevron-back" size={normalize(22)} color={MFC.purple} />
+            <Ionicons name="arrow-back" size={normalize(24)} color={palette.white} />
           </Pressable>
-          <AppText variant="bodyBold" color={MFC.purple} style={styles.title} numberOfLines={1} accessibilityRole="header">
+          <AppText variant="bodyBold" color={palette.white} style={styles.title} numberOfLines={1} accessibilityRole="header">
             {title}
           </AppText>
           {site && onSitePress ? (
@@ -87,21 +89,20 @@ export function MfcHeader({ title = 'Make Food Count', siteName, onSitePress }: 
 const styles = StyleSheet.create({
   bar: {
     backgroundColor: HEADER_BG,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#DCCDEE',
+    paddingBottom: 4,
   },
   row: {
-    height: 56,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: normalize(12),
+    paddingHorizontal: normalize(16),
   },
+  // A plain white arrow on the eggplant bar; the 44pt box keeps it easy to tap.
   back: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: MFC.white,
+    width: 44,
+    height: 44,
+    marginLeft: -10,
     alignItems: 'center',
     justifyContent: 'center',
   },

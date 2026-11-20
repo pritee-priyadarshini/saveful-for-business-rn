@@ -119,63 +119,6 @@ function Chip({ icon, iconBg, label, sub }: { icon: keyof typeof Ionicons.glyphM
   );
 }
 
-// ─── Intro collage ───────────────────────────────────────────────────────────
-
-export const INTRO_ART = { width: 320, height: 250 };
-
-export function IntroCollage() {
-  return (
-    <View style={{ width: INTRO_ART.width, height: INTRO_ART.height }}>
-      <Float delay={0} style={[styles.introCard, styles.introCardLeft]}>
-        <View style={[styles.introCardInner, { backgroundColor: '#F4EEFB' }]}>
-          <View style={styles.introCardHead}>
-            <MaterialCommunityIcons name="chef-hat" size={18} color={MFC.purple} />
-            <T size={12} weight="bold" color={MFC.ink}>Make Food Count</T>
-          </View>
-          <View style={styles.introArt}>
-            <MfcArt art="produce" size={74} tile={false} />
-          </View>
-          <View style={styles.introBar}>
-            <View style={[styles.introBarFill, { width: '72%', backgroundColor: MFC_IMPACT_COLORS.recovered }]} />
-          </View>
-          <T size={10} color={MFC.muted}>72% recovered</T>
-        </View>
-      </Float>
-
-      <Float delay={500} style={[styles.introCard, styles.introCardRight]}>
-        <View style={[styles.introCardInner, { backgroundColor: '#EEF7F2' }]}>
-          <View style={styles.introCardHead}>
-            <Ionicons name="git-merge-outline" size={16} color={palette.kale} />
-            <T size={12} weight="bold">Consolidated</T>
-          </View>
-          <View style={styles.introSites}>
-            {[0, 1, 2].map((i) => (
-              <View key={i} style={styles.introSite}>
-                <Ionicons name="storefront-outline" size={12} color={palette.kale} />
-              </View>
-            ))}
-            <Ionicons name="arrow-forward" size={12} color={palette.kale} />
-            <View style={styles.introPin}>
-              <Ionicons name="location" size={16} color={palette.white} />
-            </View>
-          </View>
-          <T size={10} color={palette.midgray}>4 sites · 1 pickup</T>
-        </View>
-      </Float>
-
-      <Float delay={900} distance={8} style={styles.introStickerA}>
-        <MfcArt art="bakery" size={46} radius={12} />
-      </Float>
-      <Float delay={300} distance={7} style={styles.introStickerB}>
-        <MfcArt art="meal" size={52} radius={14} />
-      </Float>
-      <Float delay={1200} distance={5} style={styles.introSpark}>
-        <Ionicons name="sparkles" size={22} color={palette.lemon} />
-      </Float>
-    </View>
-  );
-}
-
 // ─── Make Food Count phone ───────────────────────────────────────────────────
 
 export const MFC_ART = { width: 300, height: 340 };
@@ -229,9 +172,6 @@ export function MfcPhone() {
 
       <Float delay={200} style={styles.mfcChip}>
         <Chip icon="heart" iconBg={palette.kale} label="8.2 kg to charity" sub="Listed from overproduction" />
-      </Float>
-      <Float delay={900} distance={5} style={styles.mfcSticker}>
-        <MfcArt art="produce" size={50} tile={false} />
       </Float>
     </View>
   );
@@ -317,29 +257,6 @@ const styles = StyleSheet.create({
   },
   chipIcon: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 
-  // Intro
-  introCard: { position: 'absolute', ...shadow },
-  introCardLeft: { left: 18, top: 34, transform: [{ rotate: '-7deg' }] },
-  introCardRight: { right: 14, top: 64, transform: [{ rotate: '6deg' }] },
-  introCardInner: { width: 148, borderRadius: 20, padding: 12, gap: 6, backgroundColor: palette.white },
-  introCardHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  introArt: { alignItems: 'center', paddingVertical: 2 },
-  introBar: { height: 6, borderRadius: 3, backgroundColor: '#E5D9F2', overflow: 'hidden' },
-  introBarFill: { height: '100%', borderRadius: 3 },
-  introSites: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 18 },
-  introSite: {
-    width: 24,
-    height: 24,
-    borderRadius: 7,
-    backgroundColor: palette.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  introPin: { width: 32, height: 32, borderRadius: 16, backgroundColor: palette.kale, alignItems: 'center', justifyContent: 'center' },
-  introStickerA: { position: 'absolute', left: 120, top: 0, transform: [{ rotate: '-12deg' }], ...shadow },
-  introStickerB: { position: 'absolute', left: 116, bottom: 6, transform: [{ rotate: '8deg' }], ...shadow },
-  introSpark: { position: 'absolute', right: 30, top: 18 },
-
   // Make Food Count phone
   phone: {
     width: 212,
@@ -366,7 +283,6 @@ const styles = StyleSheet.create({
   impact: { marginTop: 4, gap: 5, paddingTop: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E7DFEF' },
   impactBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', gap: 2 },
   mfcChip: { position: 'absolute', left: 0, bottom: 34 },
-  mfcSticker: { position: 'absolute', right: 6, top: 12, transform: [{ rotate: '10deg' }] },
 
   // Consolidated board
   board: {

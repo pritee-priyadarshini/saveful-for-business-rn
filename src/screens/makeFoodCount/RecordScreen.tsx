@@ -208,7 +208,9 @@ export function RecordScreen() {
     return { collapsible: true, list };
   }, [taxonomy, current]);
 
-  const openForCurrent = current ? openGroups[current] ?? [groups.list[0]?.key].filter(Boolean) : [];
+  // Every group starts closed on each source; people open the ones they need.
+  // (Groups that can't collapse — a source with no groups — are always shown.)
+  const openForCurrent = current ? openGroups[current] ?? [] : [];
 
   const sourceErrors = (source: FoodSource) => Object.keys(errors).filter((key) => key.startsWith(`${source}:`));
 
@@ -225,7 +227,7 @@ export function RecordScreen() {
   const toggleGroup = (key: string) => {
     if (!current) return;
     setOpenGroups((previous) => {
-      const open = previous[current] ?? [groups.list[0]?.key].filter(Boolean);
+      const open = previous[current] ?? [];
       return { ...previous, [current]: open.includes(key) ? open.filter((entry) => entry !== key) : [...open, key] };
     });
   };
@@ -441,7 +443,7 @@ export function RecordScreen() {
               <AppText variant="bodyBold" color={MFC.ink} style={styles.sectionTitle} numberOfLines={1}>
                 {meta.label}
               </AppText>
-              <AppText variant="meta" color={MFC.muted} numberOfLines={2}>
+              <AppText variant="bodySmall" color={MFC.muted} numberOfLines={2}>
                 {meta.description}
               </AppText>
               <StatusPill
@@ -504,7 +506,7 @@ export function RecordScreen() {
                           tile={false}
                         />
                         <View style={styles.flex}>
-                          <AppText variant="bodySmall" color={MFC.ink} style={styles.bold} numberOfLines={1}>
+                          <AppText variant="body1" color={MFC.ink} style={styles.bold} numberOfLines={1}>
                             {group.label}
                           </AppText>
                           {group.entries.length === 1 && group.entries[0].subtypes?.length ? (
@@ -618,7 +620,7 @@ function FoodRow({
     <View style={styles.rowWrap}>
       <View style={[styles.row, indent && styles.rowIndent]}>
         <MfcArt art={art} size={indent ? 40 : ART_SIZE} tile={false} />
-        <AppText variant="bodySmall" color={MFC.ink} style={styles.flex} numberOfLines={2}>
+        <AppText variant="body1" color={MFC.ink} style={styles.flex} numberOfLines={2}>
           {label}
         </AppText>
         <TextInput
@@ -721,13 +723,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
-  pillText: { fontFamily: 'Saveful-SemiBold', fontSize: normalize(12) },
+  pillText: { fontFamily: 'Saveful-SemiBold', fontSize: normalize(13) },
   sectionTitle: { fontFamily: 'Saveful-Bold', fontSize: normalize(17), flexShrink: 1 },
   sectionBody: { paddingHorizontal: normalize(10), paddingBottom: normalize(12), gap: normalize(10) },
   pressed: { opacity: 0.85 },
   selectAll: { width: FIT_WIDTH, alignItems: 'center', gap: 3 },
   selectAllRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  selectAllText: { fontFamily: 'Saveful-Bold', fontSize: normalize(11) },
+  selectAllText: { fontFamily: 'Saveful-Bold', fontSize: normalize(13) },
   checkBoxSmall: { width: normalize(16), height: normalize(16), borderRadius: 4 },
   panel: {
     backgroundColor: MFC.panel,
@@ -747,7 +749,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: normalize(10),
     paddingVertical: normalize(8),
   },
-  headText: { fontFamily: 'Saveful-Bold', fontSize: normalize(12) },
+  headText: { fontFamily: 'Saveful-Bold', fontSize: normalize(13) },
   qtyHead: { width: QTY_WIDTH + KG_WIDTH + 6 },
   centerText: { textAlign: 'center' },
   fitCol: { width: FIT_WIDTH },
@@ -759,7 +761,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: normalize(10),
     paddingVertical: normalize(8),
   },
-  groupHint: { fontSize: normalize(11) },
+  groupHint: { fontSize: normalize(13) },
   rowWrap: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: MFC.divider },
   row: {
     flexDirection: 'row',

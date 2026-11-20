@@ -554,9 +554,11 @@ export function AppNavigator() {
               onNavigate={(to: WhatsNewDestination) => {
                 if (!navigationRef.current?.isReady()) return;
                 const route =
-                  to === 'makeFoodCount'
-                    ? { name: 'MakeFoodCount', params: { screen: 'MfcSources' } }
-                    : { name: to === 'consolidatedGroups' ? 'ConsolidatedGroups' : 'ConsolidatedCollections' };
+                  to === 'dashboard'
+                    ? { name: 'Tabs', params: { screen: 'Home' } }
+                    : to === 'makeFoodCount'
+                      ? { name: 'MakeFoodCount', params: { screen: 'MfcSources' } }
+                      : { name: to === 'consolidatedGroups' ? 'ConsolidatedGroups' : 'ConsolidatedCollections' };
                 navigationRef.current.dispatch(CommonActions.navigate(route));
               }}
             />

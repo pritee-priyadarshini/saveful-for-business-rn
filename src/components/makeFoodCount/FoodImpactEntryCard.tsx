@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { flexShrink: 1, fontFamily: 'Saveful-Bold', fontSize: normalize(17) },
   tag: { backgroundColor: MFC.lilac, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 1 },
-  tagText: { fontFamily: 'Saveful-SemiBold', fontSize: normalize(11) },
+  tagText: { fontFamily: 'Saveful-SemiBold', fontSize: normalize(12) },
   chevron: {
     width: normalize(32),
     height: normalize(32),

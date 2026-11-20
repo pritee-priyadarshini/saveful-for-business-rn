@@ -22,8 +22,7 @@ import { normalize, useResponsiveLayout } from '@/utils/responsive';
 
 type Navigation = NativeStackNavigationProp<MakeFoodCountStackParamList, 'MfcSources'>;
 
-const CARD_MIN = 96;
-const CARD_GAP = 10;
+const CARD_GAP = 12;
 
 function positiveId(value: unknown): number | null {
   const parsed = Number(value);
@@ -68,19 +67,14 @@ export function SourcesScreen() {
 
   const count = selected.length;
 
-  // Responsive fill: phones one column of four, tablets a 2 x 2 grid. Each card takes its share of
-  // the free height (never less than CARD_MIN, so small phones scroll instead of squashing).
+  // Phones: one column of four cards at their natural height. Tablets: a 2 x 2 grid.
+  // Cards never stretch to fill the screen (tall phones used to get big empty cards).
   const columns = r.isTablet ? 2 : 1;
   const rows = useMemo(() => {
     const out: FoodSource[][] = [];
     for (let i = 0; i < FOOD_SOURCES.length; i += columns) out.push(FOOD_SOURCES.slice(i, i + columns));
     return out;
   }, [columns]);
-  const [cardsHeight, setCardsHeight] = useState(0);
-  const cardHeight = cardsHeight > 0 ? Math.max(CARD_MIN, (cardsHeight - CARD_GAP * (rows.length - 1)) / rows.length) : CARD_MIN;
-  const artSize = Math.round(Math.min(120, Math.max(60, cardHeight * 0.62)) / normalize(1));
-  const roomy = cardHeight >= 130;
-  const titleSize = normalize(roomy ? 19 : 17);
 
   const onContinue = () =>
     withLock(async () => {
@@ -136,17 +130,12 @@ export function SourcesScreen() {
 
         <MfcPageTitle
           eyebrow="Make Food Count / Select sources"
-          title="What sources of food waste do you have?"
-          subtitle="Select all that apply. You can record several sources in one session."
+          title="What would you like to track?"
+          subtitle="Select one or more categories."
           compact
         />
 
-        {/* The four options share the space between the title and the pinned button. */}
-        <View
-          style={styles.cardsWrap}
-          accessibilityRole="list"
-          onLayout={(event) => setCardsHeight(event.nativeEvent.layout.height)}
-        >
+        <View style={styles.cardsWrap} accessibilityRole="list">
           {rows.map((row, rowIndex) => (
             <View key={rowIndex} style={[styles.cardRow, columns > 1 && styles.cardRowTablet]}>
               {row.map((source) => {
@@ -159,28 +148,29 @@ export function SourcesScreen() {
                     onPress={() => toggle(source)}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: isOn }}
-                    accessibilityLabel={`${meta.label}. ${meta.description}. For example ${meta.example}`}
+                    accessibilityLabel={`${meta.label}. ${meta.description}`}
                     style={({ pressed }) => [
                       styles.card,
-                      { backgroundColor: tint.bg, borderColor: isOn ? MFC.purple : tint.border, minHeight: CARD_MIN },
+                      columns > 1 && styles.cardTablet,
+                      isOn ? { backgroundColor: tint.bg, borderColor: MFC.purple } : null,
                       isOn && styles.cardOn,
                       pressed && styles.pressed,
                     ]}
                   >
-                    <MfcArt art={SOURCE_ART[source]} size={artSize} tile={false} />
+                    {/* The photo sits on its source's colour, so the four read apart at a glance. */}
+                    <View style={[styles.photo, { backgroundColor: isOn ? MFC.white : tint.bg, borderColor: tint.border }]}>
+                      <MfcArt art={SOURCE_ART[source]} size={64} tile={false} />
+                    </View>
                     <View style={styles.cardText}>
-                      <AppText variant="bodyBold" color={MFC.ink} style={[styles.cardTitle, { fontSize: titleSize }]}>
+                      <AppText variant="bodyBold" color={MFC.ink} style={styles.cardTitle}>
                         {meta.label}
                       </AppText>
-                      <AppText variant="bodySmall" color={MFC.ink} numberOfLines={2} style={styles.cardDesc}>
+                      <AppText variant="bodySmall" color={MFC.muted} numberOfLines={2} style={styles.cardDesc}>
                         {meta.description}
-                      </AppText>
-                      <AppText variant="meta" color={MFC.muted} numberOfLines={roomy ? 2 : 1} style={styles.cardExample}>
-                        {`e.g. ${meta.example}`}
                       </AppText>
                     </View>
                     <View style={[styles.check, isOn && styles.checkOn]}>
-                      {isOn ? <Ionicons name="checkmark" size={normalize(16)} color={palette.white} /> : null}
+                      {isOn ? <Ionicons name="checkmark" size={normalize(15)} color={palette.white} /> : null}
                     </View>
                   </Pressable>
                 );
@@ -200,31 +190,44 @@ const styles = StyleSheet.create({
   screenContent: { flexGrow: 1, paddingBottom: 16 },
   flex: { flex: 1 },
   contentWrap: { flex: 1, width: '100%', alignSelf: 'center', gap: 12 },
-  cardsWrap: { flex: 1, gap: CARD_GAP },
-  cardRow: { flex: 1, gap: CARD_GAP },
+  cardsWrap: { gap: CARD_GAP, marginTop: 4 },
+  cardRow: { gap: CARD_GAP },
   cardRowTablet: { flexDirection: 'row' },
-  cardOn: { borderWidth: 2 },
   card: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderRadius: 14,
+    gap: normalize(14),
+    borderRadius: normalize(18),
     borderWidth: 1,
-    paddingVertical: normalize(10),
-    paddingLeft: normalize(10),
-    paddingRight: normalize(14),
+    borderColor: '#E7DFEF',
+    backgroundColor: MFC.white,
+    padding: normalize(12),
+    paddingRight: normalize(16),
+    shadowColor: MFC.purple,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  cardTablet: { flex: 1 },
+  cardOn: { borderWidth: 2, padding: normalize(12) - 1, paddingRight: normalize(16) - 1 },
+  photo: {
+    width: normalize(76),
+    height: normalize(76),
+    borderRadius: normalize(16),
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardDesc: { lineHeight: normalize(19) },
-  cardExample: { fontSize: normalize(12) },
-  cardText: { flex: 1, minWidth: 0, gap: 2 },
-  cardTitle: { fontFamily: 'Saveful-Bold', fontSize: normalize(16) },
+  cardText: { flex: 1, minWidth: 0, gap: 3 },
+  cardTitle: { fontFamily: 'Saveful-Bold', fontSize: normalize(17) },
   check: {
-    width: normalize(24),
-    height: normalize(24),
-    borderRadius: 6,
+    width: normalize(26),
+    height: normalize(26),
+    borderRadius: normalize(13),
     borderWidth: 1.5,
-    borderColor: '#B8AEC6',
+    borderColor: '#C9BFD6',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: MFC.white,
