@@ -33,44 +33,44 @@ export const WHATS_NEW_FEATURES: WhatsNewFeature[] = [
   {
     id: 'makeFoodCount',
     name: 'Make Food Count',
-    headline: 'Know your waste. Waste less.',
+    headline: 'Know your food loss. find more savings.',
     benefits: [
       {
         icon: 'create-outline',
-        title: 'Record it in seconds',
-        body: 'Log food by where it came from: overproduction, spoilage, prep or plate scraps.',
+        title: 'Track food loss in seconds',
+        body: 'Record what how much and why - from preparation to plate scraps.',
       },
       {
         icon: 'heart-outline',
-        title: 'Give it a second life',
-        body: 'Overproduction goes straight into a listing for charities to collect.',
+        title: 'Turn Surplus into Opportunity',
+        body: 'Redirect suitable surplus food to charities through Saveful Connect.',
       },
       {
         icon: 'bar-chart-outline',
-        title: 'See your impact',
-        body: 'Food Impact shows what was recovered, and where it went.',
+        title: 'Identify more savings',
+        body: 'See where food is being lost and uncover opportunities to reduce costs.',
       },
     ],
   },
   {
     id: 'consolidated',
     name: 'Consolidated Collections',
-    headline: 'Lots of outlets. One pickup.',
+    headline: 'MORE SITES. LESS ADMIN. GREATER IMPACT.',
     benefits: [
       {
         icon: 'git-merge-outline',
-        title: 'Group your outlets',
-        body: 'Outlets at one venue, like a stadium or campus, share one collection point.',
+        title: 'Bring your sites together',
+        body: 'Connect multiple kitchens or outlets to one central collection point.',
       },
       {
         icon: 'storefront-outline',
-        title: 'Sites list and drop off',
-        body: 'Each site adds its surplus on the day and brings it to the point.',
+        title: 'Simplify Collections',
+        body: 'Each site lists its surplus. One collection brings it all together.',
       },
       {
         icon: 'megaphone-outline',
-        title: 'One listing, one charity',
-        body: 'Publish it all as one listing. Every site still gets the credit.',
+        title: 'Track every site\'s Impact',
+        body: 'See individual site contributions and your combined results.',
       },
     ],
     note: 'Guide me walks you through every screen the first time.',

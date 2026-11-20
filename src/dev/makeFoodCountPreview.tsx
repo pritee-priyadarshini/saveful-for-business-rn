@@ -20,6 +20,9 @@ import { AppText } from '@/components/AppText';
 import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard';
 import { RestaurantHomeScreen } from '@/screens/restaurant/RestaurantHomeScreen';
 import { RestaurantAnalyticsScreen } from '@/screens/restaurant/RestaurantAnalyticsScreen';
+import { CreateListingScreen } from '@/screens/restaurant/CreateListingScreen';
+import { CreateFarmListingScreen } from '@/screens/restaurant/CreateFarmListingScreen';
+import { normalizeListingPrefill } from '@/services/makeFoodCount.service';
 import { MFC_ART_KEYS, MfcArt } from '@/components/makeFoodCount/MfcArt';
 import { MFC_STACK_SCREENS, mfcStackScreenOptions } from '@/navigation/MakeFoodCountStack';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
@@ -139,22 +142,33 @@ function recordDetail() {
 
 // ─── Listing prefill: EDIBLE 7 kg, NON_EDIBLE 9 kg ───────────────────────────
 
+// Shaped like svforb's listing-prefill (name, category, subtype per line), as in the client's screenshots.
 const prefillEdible = {
   items: [
-    { lineId: 101, name: 'Chicken', category: 'meat_poultry', iconKey: 'chicken', countedKg: '5.00', availableKg: '5.00' },
-    { lineId: 103, name: 'Fish', category: 'seafood', iconKey: 'fish', countedKg: '2.00', availableKg: '2.00' },
+    { lineId: 101, name: 'Chicken', category: 'meat_poultry', subtype: 'chicken', iconKey: 'chicken', countedKg: '12.00', availableKg: '12.00' },
+    { lineId: 102, name: 'Beef', category: 'meat_poultry', subtype: 'beef', iconKey: 'beef', countedKg: '5.00', availableKg: '5.00' },
+    { lineId: 103, name: 'Lamb', category: 'meat_poultry', subtype: 'lamb', iconKey: 'lamb', countedKg: '7.00', availableKg: '7.00' },
+    { lineId: 108, name: 'Fish', category: 'seafood', subtype: 'fish', iconKey: 'fish', countedKg: '5.00', availableKg: '5.00' },
+    { lineId: 109, name: 'Dairy', category: 'dairy', subtype: null, iconKey: 'dairy', countedKg: '3.00', availableKg: '3.00' },
   ],
-  totalKg: '7.00',
+  totalKg: '32.00',
 };
 
 const prefillNonEdible = {
   items: [
-    { lineId: 102, name: 'Beef', category: 'meat_poultry', iconKey: 'beef', countedKg: '3.00', availableKg: '3.00' },
-    { lineId: 104, name: 'Peels & trimmings', category: 'peels_trimmings', iconKey: 'produce', countedKg: '4.00', availableKg: '4.00' },
-    { lineId: 105, name: 'Plate scraps', category: 'plate_scraps', iconKey: 'other', countedKg: '2.00', availableKg: '2.00' },
+    { lineId: 104, name: 'Fruit & vegetables', category: 'fruit_veg', subtype: null, iconKey: 'produce', countedKg: '21.00', availableKg: '21.00' },
+    { lineId: 105, name: 'Peels & trimmings', category: 'peels_trimmings', subtype: null, iconKey: 'peels', countedKg: '15.00', availableKg: '15.00' },
+    { lineId: 106, name: 'Bread & baked goods', category: 'bread_bakery', subtype: null, iconKey: 'bakery', countedKg: '2.00', availableKg: '2.00' },
+    { lineId: 107, name: 'Plate scraps', category: 'plate_scraps', subtype: null, iconKey: 'other', countedKg: '10.00', availableKg: '10.00' },
   ],
-  totalKg: '9.00',
+  totalKg: '48.00',
 };
+
+/** Route params for opening a listing screen as Make Food Count's Summary does. */
+function mfcListingParams(kind: 'EDIBLE' | 'NON_EDIBLE') {
+  const prefill = normalizeListingPrefill(kind === 'EDIBLE' ? prefillEdible : prefillNonEdible, kind);
+  return { mfc: { recordId: RECORD_ID, kind, items: prefill.items } };
+}
 
 // ─── Home impact and insights ────────────────────────────────────────────────
 
@@ -312,8 +326,23 @@ function route(method: string, url: string, params: Record<string, unknown>, bod
   return {};
 }
 
+/**
+ * `forbid=1` in the autostart: the server refuses every change to a record, exactly
+ * as svforb does for someone who can view a site's records but not change them (403).
+ */
+let fixtureForbidWrites = false;
+
 const fixtureAdapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => {
   await new Promise((resolve) => setTimeout(resolve, 120));
+  const method = String(config.method || 'get').toLowerCase();
+  if (fixtureForbidWrites && method !== 'get' && /\/mfc\/records/.test(String(config.url || ''))) {
+    const message = 'You can view this site’s food records but not change them.';
+    throw Object.assign(new Error(message), {
+      isAxiosError: true,
+      config,
+      response: { status: 403, statusText: 'Forbidden', headers: {}, config, data: { statusCode: 403, message, error: 'Forbidden' } },
+    });
+  }
   const data = route(
     String(config.method || 'get').toLowerCase(),
     String(config.url || ''),
@@ -413,12 +442,20 @@ export function MakeFoodCountPreviewApp() {
       const item = ENTRIES.find((entry) => entry.screen === name);
       if (name === 'PreviewHomeCard') useMakeFoodCountStore.getState().clearDraft();
       fixtureListed = query.includes('listed=1');
+      fixtureForbidWrites = query.includes('forbid=1');
       const params = Object.fromEntries(query.split('&').filter(Boolean).map((pair: string) => pair.split('=')));
       void (async () => {
         const store = useMakeFoodCountStore.getState();
         await store.loadTaxonomy();
         if (item?.loadDraft || query.includes('draft=1')) await store.loadRecord(RECORD_ID);
-        setTimeout(() => (ref.current as any)?.navigate(name, params), 300);
+        // Reproduce a draft the server refuses: the first save attempt gets the 403.
+        if (fixtureForbidWrites) void useMakeFoodCountStore.getState().saveRecord();
+        // Listing screens: `mfc=1` opens them with Make Food Count's carried-forward food.
+        const routeParams =
+          (name === 'CreateListing' || name === 'CreateFarmListing') && params.mfc === '1'
+            ? mfcListingParams(name === 'CreateListing' ? 'EDIBLE' : 'NON_EDIBLE')
+            : params;
+        setTimeout(() => (ref.current as any)?.navigate(name, routeParams), 300);
         const y = Number(params.scroll);
         if (y > 0) {
           setTimeout(() => {
@@ -439,6 +476,8 @@ export function MakeFoodCountPreviewApp() {
         <Stack.Screen name="PreviewArt" component={PreviewArt} options={{ headerShown: false }} />
         <Stack.Screen name="PreviewRestaurantHome" component={RestaurantHomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PreviewInsights" component={RestaurantAnalyticsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="CreateListing" component={CreateListingScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="CreateFarmListing" component={CreateFarmListingScreen} options={{ headerShown: false }} />
         {MFC_STACK_SCREENS.map(({ name, component }) => (
           <Stack.Screen key={name} name={name} component={component} />
         ))}

@@ -12,7 +12,7 @@ export type MfcSourceMeta = {
   description: string;
   /** "e.g." line on the Sources tile. */
   example: string;
-  /** Source tile / panel image. Placeholder art until the client's Drive icons land in assets/make-food-count/. */
+  /** Source tile / panel image: the client's photograph (assets/newmfc). */
   image: ImageSourcePropType;
 };
 
@@ -21,25 +21,25 @@ export const SOURCE_META: Record<FoodSource, MfcSourceMeta> = {
     label: 'Overproduction',
     description: 'Food prepared or cooked but not used',
     example: 'cooked meals, baked goods, prepared ingredients',
-    image: require('../../assets/placeholder/meal_icon.png'),
+    image: require('../../assets/newmfc/mfc-source-overproduction.png'),
   },
   SPOILAGE: {
     label: 'Spoilage',
     description: 'Food that has gone off or is no longer safe to eat',
     example: 'expired fresh produce, damaged packaging',
-    image: require('../../assets/placeholder/bin_icon.png'),
+    image: require('../../assets/newmfc/mfc-source-spoilage.png'),
   },
   PREPARATION: {
     label: 'Preparation',
     description: 'Peels, trimmings, offcuts and preparation mistakes',
     example: 'vegetable peelings, meat offcuts, bones, shells, coffee grounds',
-    image: require('../../assets/placeholder/veggie_basket_icon.png'),
+    image: require('../../assets/newmfc/mfc-source-preparation.png'),
   },
   PLATE_SCRAPS: {
     label: 'Plate Scraps',
     description: 'Food left on plates after service',
     example: 'uneaten meals, plate returns',
-    image: require('../../assets/placeholder/food_scraps_icon.png'),
+    image: require('../../assets/newmfc/mfc-source-plate-scraps.png'),
   },
 };
 

@@ -1,6 +1,7 @@
 import type { ListingDetail } from '../services/foodListing.service';
 import type { FoodIconKey } from './foodListing';
 import { isAnimalListing } from './foodListing';
+import { mergeSavedFoodItems } from '../constants/listingFoodCatalogue';
 
 export { isAnimalListing };
 
@@ -10,60 +11,31 @@ export function parseListingDate(val: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-const normalizeName = (value: string) => value.trim().toLowerCase();
-
-export function mergePeopleFoodItems(
-  apiItems: Array<{ category?: string; totalQtyKg?: number }>,
-  seedItems: Array<{ name: string; qty: number; iconKey: FoodIconKey }>,
-) {
-  const merged = seedItems.map((seed) => {
-    const found = apiItems.find(
-      (item) => normalizeName(item.category || '') === normalizeName(seed.name),
-    );
-    return { ...seed, qty: found?.totalQtyKg ?? 0 };
-  });
-
-  const extras = apiItems
-    .filter(
-      (item) =>
-        !seedItems.some(
-          (seed) => normalizeName(seed.name) === normalizeName(item.category || ''),
-        ),
-    )
-    .map((item) => ({
-      name: item.category || 'Other',
-      qty: item.totalQtyKg ?? 0,
-      iconKey: 'preparedMeals' as FoodIconKey,
-    }));
-
-  return [...merged, ...extras];
+/**
+ * Saved items back onto the form's rows, matched by item name (a group such as
+ * "Meat" is now the category of several items, so category can't be the key).
+ * Nothing is dropped: an item without a row comes back as an extra row.
+ */
+export function mergePeopleFoodItems<T extends { name: string; qty: number; iconKey: FoodIconKey }>(
+  apiItems: Array<{ name?: string; category?: string; totalQtyKg?: number }>,
+  seedItems: T[],
+): T[] {
+  return mergeSavedFoodItems('people', apiItems, seedItems, (name, qty) => ({
+    name,
+    qty,
+    iconKey: 'preparedMeals' as FoodIconKey,
+  }) as T);
 }
 
-export function mergeFarmFoodItems(
-  apiItems: Array<{ category?: string; totalQtyKg?: number }>,
-  seedItems: Array<{ name: string; qty: number; icon: any }>,
-) {
-  const merged = seedItems.map((seed) => {
-    const found = apiItems.find(
-      (item) => normalizeName(item.category || '') === normalizeName(seed.name),
-    );
-    return { ...seed, qty: found?.totalQtyKg ?? 0 };
-  });
-
-  const extras = apiItems
-    .filter(
-      (item) =>
-        !seedItems.some(
-          (seed) => normalizeName(seed.name) === normalizeName(item.category || ''),
-        ),
-    )
-    .map((item) => ({
-      name: item.category || 'Other',
-      qty: item.totalQtyKg ?? 0,
-      icon: require('../../assets/placeholder/veggie_basket.png'),
-    }));
-
-  return [...merged, ...extras];
+export function mergeFarmFoodItems<T extends { name: string; qty: number; icon: any }>(
+  apiItems: Array<{ name?: string; category?: string; totalQtyKg?: number }>,
+  seedItems: T[],
+): T[] {
+  return mergeSavedFoodItems('farm', apiItems, seedItems, (name, qty) => ({
+    name,
+    qty,
+    icon: require('../../assets/placeholder/veggie_basket.png'),
+  }) as T);
 }
 
 export function getListingPickupFrom(data: ListingDetail): string | undefined {

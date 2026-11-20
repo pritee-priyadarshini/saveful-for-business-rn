@@ -150,6 +150,8 @@ export type ListingPrefillItem = {
   lineId: number;
   name: string;
   category: string;
+  /** Taxonomy subtype key (e.g. "beef"), when the line has one. */
+  subtype?: string | null;
   iconKey: string | null;
   countedKg: number;
   availableKg: number;

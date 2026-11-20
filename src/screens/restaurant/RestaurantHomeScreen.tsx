@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   Image,
-  ImageBackground,
   Platform,
   RefreshControl,
   type ViewStyle,
@@ -13,8 +12,7 @@ import {
   type ImageStyle,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { AppText } from '../../components/AppText';
 import { Screen } from '../../components/Screen';
@@ -26,6 +24,7 @@ import { useAppContext } from '../../store/AppContext';
 import { useSitesStore } from '@/store/sitesStore';
 import { connectionsService } from '@/services/connections.service';
 import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard';
+import { SavefulConnectCard } from '@/components/home/SavefulConnectCard';
 import { useWhatsNewOnHome } from '@/hooks/useWhatsNewOnHome';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
@@ -55,13 +54,6 @@ type AdaptiveStyles = {
   heroOrg: TextStyle;
   logoCircle: ViewStyle;
   logoImage: ImageStyle;
-  surplusBanner: ViewStyle;
-  surplusBannerContent: ViewStyle;
-  surplusBannerTitle: TextStyle;
-  surplusBody: ViewStyle;
-  surplusDescription: TextStyle;
-  surplusCta: ViewStyle;
-  surplusCtaText: TextStyle;
   sectionHeading: ViewStyle;
   sectionHeadingBg: ImageStyle;
   sectionHeadingText: TextStyle;
@@ -94,13 +86,6 @@ function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
     heroOrg: {},
     logoCircle: {},
     logoImage: {},
-    surplusBanner: {},
-    surplusBannerContent: {},
-    surplusBannerTitle: {},
-    surplusBody: {},
-    surplusDescription: {},
-    surplusCta: {},
-    surplusCtaText: {},
     sectionHeading: {},
     sectionHeadingBg: {},
     sectionHeadingText: {},
@@ -163,52 +148,7 @@ function buildAdaptiveStyles(r: ResponsiveLayout): AdaptiveStyles {
     logoImage: {
       borderRadius: logoSize / 2,
     },
-    surplusBanner: {
-      height: Math.min(r.height * 0.16, isLargeTablet ? 180 : 156),
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      justifyContent: 'space-between',
-      paddingHorizontal: space(18, 22, 26),
-      paddingBottom: space(14, 16, 18),
-      gap: space(12, 14, 16),
-    },
-    surplusBannerContent: {
-      flex: 1,
-      minWidth: 0,
-      maxWidth: '100%',
-      paddingHorizontal: 0,
-      paddingBottom: 0,
-    },
-    surplusBannerTitle: {
-      fontSize: font(22, 26, 28),
-      lineHeight: font(28, 32, 34),
-    },
-    surplusBody: {
-      paddingHorizontal: space(18, 22, 26),
-      paddingTop: space(16, 18, 20),
-      paddingBottom: space(18, 20, 22),
-      gap: space(14, 16, 18),
-    },
-    surplusDescription: {
-      fontSize: font(14, 15, 16),
-      lineHeight: font(21, 22, 24),
-    },
     // Fixed tap height — avoid hp() blow-up on tall tablets.
-    surplusCta: {
-      alignSelf: 'stretch',
-      width: '100%',
-      maxWidth: ctaMax,
-      height: 48,
-      minHeight: 48,
-      paddingVertical: 0,
-      paddingHorizontal: 20,
-      borderRadius: 14,
-      gap: 8,
-    },
-    surplusCtaText: {
-      fontSize: font(16, 17, 18),
-      lineHeight: 20,
-    },
     sectionHeading: {
       minHeight: space(88, 96, 104),
       paddingVertical: space(16, 18, 20),
@@ -596,97 +536,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
             <View style={[styles.mainContent, adaptive.mainContent]}>
               <View style={r.isTablet ? styles.topCardsRow : styles.topCardsColumn}>
               <MakeFoodCountCard style={r.isTablet ? styles.topCardTablet : undefined} />
-              <View style={r.isTablet ? styles.topCardTablet : undefined}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.surplusCard,
-                  r.isTablet && styles.surplusCardFill,
-                  pressed && styles.pressed,
-                ]}
-                onPress={() =>
-                  navigation.navigate('Listings', {
-                    screen: 'Surplus',
-                  })
-                }
-              >
-                <ImageBackground
-                  source={require('../../../assets/home/restaurant_home_banner.png')}
-                  style={[styles.surplusBanner, adaptive.surplusBanner]}
-                  imageStyle={styles.surplusBannerImage}
-                  resizeMode="cover"
-                >
-                  <LinearGradient
-                    colors={['rgba(255, 255, 255, 0.05)', 'rgba(26, 26, 27, 0.5)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <View style={[styles.surplusBannerContent, adaptive.surplusBannerContent]}>
-                    <View style={styles.surplusBadge}>
-                      <MaterialIcons name="lunch-dining" size={normalize(14)} color={palette.middlegreen} />
-                      <AppText variant="caption" color={palette.middlegreen} style={styles.surplusBadgeText}>
-                        Today's surplus
-                      </AppText>
-                    </View>
-                    <AppText
-                      variant="h6"
-                      style={[styles.surplusBannerTitle, adaptive.surplusBannerTitle]}
-                      numberOfLines={2}
-                    >
-                      Got surplus food?
-                    </AppText>
-                  </View>
-                </ImageBackground>
-
-                <View style={[styles.surplusBody, adaptive.surplusBody]}>
-                  <AppText
-                    variant="bodySmall"
-                    color={palette.textMuted}
-                    style={[styles.surplusDescription, adaptive.surplusDescription]}
-                  >
-                    List what you have - local charities get notified to arrange pickup.
-                  </AppText>
-
-                  <View style={styles.surplusSteps}>
-                    <View style={styles.surplusStep}>
-                      <View style={[styles.surplusStepDot, styles.surplusStepDotActive]} />
-                      <AppText variant="caption" color={palette.textMuted} style={styles.surplusStepLabel}>
-                        List items
-                      </AppText>
-                    </View>
-                    <View style={styles.surplusStepLine} />
-                    <View style={styles.surplusStep}>
-                      <View style={styles.surplusStepDot} />
-                      <AppText variant="caption" color={palette.textMuted} style={styles.surplusStepLabel}>
-                        Charities notified
-                      </AppText>
-                    </View>
-                    <View style={styles.surplusStepLine} />
-                    <View style={styles.surplusStep}>
-                      <View style={styles.surplusStepDot} />
-                      <AppText variant="caption" color={palette.textMuted} style={styles.surplusStepLabel}>
-                        Pickup arranged
-                      </AppText>
-                    </View>
-                  </View>
-
-                  <View style={[styles.surplusCta, adaptive.surplusCta]}>
-                    <AppText
-                      variant="bodyBold"
-                      style={[styles.surplusCtaText, adaptive.surplusCtaText]}
-                    >
-                      List Surplus
-                    </AppText>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={18}
-                      color={palette.white}
-                      style={styles.surplusCtaArrow}
-                    />
-                  </View>
-                </View>
-              </Pressable>
-              </View>
+              <SavefulConnectCard style={r.isTablet ? styles.topCardTablet : undefined} />
               </View>
 
               {selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi' ? (
@@ -959,162 +809,6 @@ const styles = StyleSheet.create({
   topCardTablet: {
     flex: 1,
     minWidth: 0,
-  },
-
-  surplusCardFill: {
-    flex: 1,
-  },
-
-  surplusCard: {
-    borderRadius: normalize(24),
-    overflow: 'hidden',
-    backgroundColor: palette.white,
-    borderWidth: 1,
-    borderColor: palette.strokecream,
-    width: '100%',
-    ...cardShadow,
-  },
-
-  surplusBanner: {
-    width: '100%',
-    height: hp(16),
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-    backgroundColor: palette.creme2,
-  },
-
-  surplusBannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-
-  surplusBannerContent: {
-    paddingHorizontal: wp(4.5),
-    paddingBottom: hp(1.8),
-    gap: hp(0.6),
-    zIndex: 1,
-    maxWidth: '100%',
-  },
-
-  surplusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: wp(1.5),
-    backgroundColor: palette.white,
-    paddingVertical: hp(0.45),
-    paddingHorizontal: wp(2.8),
-    borderRadius: normalize(20),
-  },
-
-  surplusBadgeText: {
-    textTransform: 'none',
-    fontSize: normalize(10),
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-
-  surplusBannerTitle: {
-    color: palette.white,
-    textTransform: 'none',
-    fontSize: normalize(22),
-    lineHeight: normalize(28),
-  },
-
-  surplusBody: {
-    paddingHorizontal: wp(4.5),
-    paddingTop: hp(2),
-    paddingBottom: hp(2.2),
-    gap: hp(1.6),
-    backgroundColor: palette.white,
-  },
-
-  surplusDescription: {
-    textTransform: 'none',
-    lineHeight: normalize(21),
-    fontSize: normalize(14),
-  },
-
-  surplusSteps: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    backgroundColor: '#F7FBF8',
-    borderRadius: normalize(14),
-    borderWidth: 1,
-    borderColor: '#D9EDE1',
-    paddingVertical: hp(1.4),
-    paddingHorizontal: wp(2),
-  },
-
-  surplusStep: {
-    flex: 1,
-    alignItems: 'center',
-    gap: hp(0.55),
-  },
-
-  surplusStepDot: {
-    width: normalize(8),
-    height: normalize(8),
-    borderRadius: normalize(4),
-    backgroundColor: '#C5D9CB',
-  },
-
-  surplusStepDotActive: {
-    backgroundColor: palette.middlegreen,
-    width: normalize(10),
-    height: normalize(10),
-    borderRadius: normalize(5),
-  },
-
-  surplusStepLine: {
-    width: wp(5),
-    height: 1,
-    backgroundColor: '#C5D9CB',
-    marginTop: normalize(5),
-  },
-
-  surplusStepLabel: {
-    textTransform: 'none',
-    fontSize: normalize(10),
-    lineHeight: normalize(14),
-    textAlign: 'center',
-  },
-
-  surplusCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: palette.eggplant,
-    borderRadius: 14,
-    height: 48,
-    paddingVertical: 0,
-    paddingHorizontal: 20,
-    gap: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: palette.eggplant,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-
-  surplusCtaText: {
-    color: palette.white,
-    textTransform: 'none',
-    fontSize: 16,
-    lineHeight: 20,
-    letterSpacing: 0.2,
-    includeFontPadding: false,
-  },
-
-  surplusCtaArrow: {
-    marginTop: 1,
   },
 
   impactSection: {

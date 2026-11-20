@@ -298,10 +298,10 @@ function SummaryTable({
           Total recorded
         </AppText>
         <AppText variant="meta" color={MFC.label} style={[styles.cellWide, styles.th]}>
-          Overproduction for review
+          Potential edible surplus
         </AppText>
         <AppText variant="meta" color={MFC.label} style={[styles.cell, styles.th]}>
-          Other recorded food
+          Potential non-edible surplus
         </AppText>
       </View>
 

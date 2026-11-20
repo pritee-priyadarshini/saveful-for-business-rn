@@ -24,8 +24,11 @@ import {
 import { takePhoto } from '@/utils/pickSquareImage';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildFormShellStyles } from '@/utils/dashboardAdaptive';
+import { GroupedFoodRows } from '@/components/listing/GroupedFoodRows';
+import { FoodQuantityRow, PEOPLE_FOOD_THEME } from '@/components/listing/FoodQuantityRow';
+import { expandGroupedSeeds, type GroupableFoodRow } from '@/constants/listingFoodCatalogue';
 
-type FoodItem = { name: string; qty: number; iconKey: FoodIconKey };
+type FoodItem = GroupableFoodRow & { iconKey: FoodIconKey };
 type Storage = 'Fridge' | 'Freezer' | 'Ambient' | 'Hot';
 type Reheating = 'Yes' | 'No' | 'Not sure';
 
@@ -82,7 +85,7 @@ export function AddDailySurplusScreen({ route }: any) {
   const dayId = Number(route?.params?.dayId);
   const charityName = String(route?.params?.charityName || 'Preferred charity');
 
-  const [items, setItems] = useState<FoodItem[]>(seedItems);
+  const [items, setItems] = useState<FoodItem[]>(() => expandGroupedSeeds(seedItems, 'people'));
   const [customItem, setCustomItem] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [storage, setStorage] = useState<Storage | null>(null);
@@ -102,14 +105,11 @@ export function AddDailySurplusScreen({ route }: any) {
   const estimatedMeals = estimateMealsSaved(totalQuantity);
   const hasSelectedAllergens = selectedAllergens.length > 0;
 
-  const updateQty = (index: number, delta: number) => {
-    setItems((current) =>
-      current.map((item, i) =>
-        i === index ? { ...item, qty: Math.max(0, Math.round((item.qty + delta) * 10) / 10) } : item,
-      ),
-    );
-    setErrors((prev) => ({ ...prev, foodItems: undefined }));
+  /** An exact quantity (typed, or − / +); FoodQuantityRow has already rounded and capped it. */
+  const setQty = (index: number, qty: number) => {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, qty } : item)));
   };
+
 
   const addCustomItem = () => {
     const name = customItem.trim();
@@ -124,7 +124,7 @@ export function AddDailySurplusScreen({ route }: any) {
 
   const useLastCollection = () => {
     if (!previousListing) return;
-    const values = getPeopleRelistFormValues(previousListing, seedItems);
+    const values = getPeopleRelistFormValues(previousListing, expandGroupedSeeds(seedItems, 'people'));
     setItems(values.items);
     setStorage(values.storage);
     setReheating(values.reheating);
@@ -188,7 +188,7 @@ export function AddDailySurplusScreen({ route }: any) {
             .map((item) => ({
               name: item.name,
               quantityKg: item.qty,
-              category: item.name,
+              category: item.group ?? item.name,
             })),
           collectionNotes: collectionNotes.trim() || undefined,
           needsRefrigeration: storage === 'Fridge',
@@ -276,34 +276,23 @@ export function AddDailySurplusScreen({ route }: any) {
             WHAT FOOD DO YOU HAVE?
           </AppText>
           <View style={styles.card}>
-            <View style={styles.kgHeaderRow}>
-              <View style={styles.foodNameColumn} />
-              <AppText variant="body1" color={palette.stone} style={{ marginRight: wp(8) }}>
-                KG
-              </AppText>
-            </View>
 
-            {items.map((item, index) => (
-              <View key={`${item.name}-${index}`} style={styles.foodRow}>
-                <View style={styles.foodNameWrap}>
-                  <Image source={resolveFoodIconSource(item.iconKey)} style={styles.foodIcon} />
-                  <AppText variant="body1" color={palette.midgray} style={styles.foodLabel}>
-                    {item.name}
-                  </AppText>
-                </View>
-                <View style={styles.qtyWrap}>
-                  <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, -0.5)}>
-                    <AppText variant="h6" color={palette.stone}>-</AppText>
-                  </Pressable>
-                  <AppText variant="bodyBold" color={palette.midgray} style={styles.qtyValue}>
-                    {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
-                  </AppText>
-                  <Pressable style={[styles.qtyBtn, adaptive.qtyBtn]} onPress={() => updateQty(index, 0.5)}>
-                    <AppText variant="h6" color={palette.stone}>+</AppText>
-                  </Pressable>
-                </View>
-              </View>
-            ))}
+            <GroupedFoodRows
+              items={items}
+              theme={PEOPLE_FOOD_THEME}
+              groupIcon={(_group, first) => ({ source: resolveFoodIconSource(first.iconKey) })}
+              renderRow={(item, index, { nested, first }) => (
+                <FoodQuantityRow
+                  name={item.label ?? item.name}
+                  icon={nested && item.art ? { art: item.art } : { source: resolveFoodIconSource(item.iconKey) }}
+                  qty={item.qty}
+                  onChange={(qty) => setQty(index, qty)}
+                  theme={PEOPLE_FOOD_THEME}
+                  nested={nested}
+                  first={first}
+                />
+              )}
+            />
 
             <View style={styles.addRow}>
               <TextInput
@@ -662,22 +651,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     gap: hp(0.8),
   },
-  kgHeaderRow: { flexDirection: 'row', alignItems: 'center' },
-  foodNameColumn: { flex: 1 },
-  foodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  foodNameWrap: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  foodLabel: { marginLeft: wp(2), textTransform: 'none' },
-  qtyWrap: { flexDirection: 'row', alignItems: 'center', gap: wp(1.8) },
-  foodIcon: { width: normalize(22), height: normalize(22) },
-  qtyBtn: {
-    width: wp(12),
-    height: wp(12),
-    borderRadius: normalize(12),
-    backgroundColor: '#E6E2F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qtyValue: { minWidth: wp(5), textAlign: 'center' },
   addRow: { marginTop: hp(0.4), flexDirection: 'row', alignItems: 'center', gap: wp(2) },
   addInput: {
     flex: 1,

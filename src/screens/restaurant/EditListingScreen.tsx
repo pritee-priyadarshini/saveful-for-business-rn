@@ -52,14 +52,15 @@ import {
 } from '../../utils/listingDateValidation';
 import { hp, normalize, useResponsiveLayout, wp } from '@/utils/responsive';
 import { buildFormShellStyles, formColumnWidth } from '@/utils/dashboardAdaptive';
+import { GroupedFoodRows } from '@/components/listing/GroupedFoodRows';
+import { FARM_FOOD_THEME, FoodQuantityRow, PEOPLE_FOOD_THEME } from '@/components/listing/FoodQuantityRow';
+import { expandGroupedSeeds, type GroupableFoodRow } from '@/constants/listingFoodCatalogue';
 
 
 type Step = 1 | 2 | 3;
 type PickerTarget = 'bestBefore' | 'bestBeforeTime' | 'from' | 'to' | null;
 
-type FoodItem = {
-  name: string;
-  qty: number;
+type FoodItem = GroupableFoodRow & {
   iconKey: FoodIconKey;
 };
 
@@ -166,9 +167,7 @@ const getGridLayout = (contentWidth: number, pagePadH: number) => {
 const FARM_ACCENT = palette.orange;
 const FARM_BG = palette.surface;
 
-type FarmItem = {
-  name: string;
-  qty: number;
+type FarmItem = GroupableFoodRow & {
   icon: any;
 };
 
@@ -217,7 +216,7 @@ function EditPeopleListingForm({
   const adaptive = useMemo(() => buildFormShellStyles(r), [r]);
   const { submitting, withLock } = useSubmitLock();
   const [step, setStep] = useState<Step>(1);
-  const [items, setItems] = useState<FoodItem[]>(seedItems);
+  const [items, setItems] = useState<FoodItem[]>(() => expandGroupedSeeds(seedItems, 'people'));
   const [customItem, setCustomItem] = useState('');
   const [images, setImages] = useState<string[]>([]);
 
@@ -247,7 +246,7 @@ function EditPeopleListingForm({
 
   useEffect(() => {
     const data = initialListing;
-    setItems(mergePeopleFoodItems(data.foodItems ?? [], seedItems));
+    setItems(mergePeopleFoodItems(data.foodItems ?? [], expandGroupedSeeds(seedItems, 'people')));
     setLocation(getListingPickupAddress(data));
     const parsedBestBefore = parseListingDate(data.bestBefore);
     setBestBeforeDate(parsedBestBefore);
@@ -261,16 +260,11 @@ function EditPeopleListingForm({
     setImages(extractListingImages(data));
   }, [initialListing]);
 
-  const updateQty = (index: number, delta: number) => {
-    setItems((prev) => {
-      const next = [...prev];
-      next[index] = {
-        ...next[index],
-        qty: Math.max(0, Math.round((next[index].qty + delta) * 10) / 10),
-      };
-      return next;
-    });
+  /** An exact quantity (typed, or − / +); FoodQuantityRow has already rounded and capped it. */
+  const setQty = (index: number, qty: number) => {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, qty } : item)));
   };
+
 
   const addCustomItem = () => {
     if (!customItem.trim()) return;
@@ -487,7 +481,8 @@ function EditPeopleListingForm({
       try {
         await foodListingService.updateListing(listingId, {
           foodItems: activeItems.map((item) => ({
-            category: item.name,
+            name: item.name,
+            category: item.group ?? item.name,
             totalQtyKg: item.qty,
             remainingQtyKg: item.qty,
           })),
@@ -585,41 +580,23 @@ function EditPeopleListingForm({
               WHAT FOOD DO YOU HAVE?
             </AppText>
             <View style={peopleStyles.card}>
-              <View style={peopleStyles.kgHeaderRow}>
-                <View style={peopleStyles.foodNameColumn} />
-                <AppText variant="body1" color={palette.stone} style={{ marginRight: wp(8) }}>
-                  KG
-                </AppText>
-              </View>
 
-              {items.map((item, index) => (
-                <View key={`${item.name}-${index}`} style={peopleStyles.foodRow}>
-                  <View style={peopleStyles.foodNameWrap}>
-                    <Image source={resolveFoodIconSource(item.iconKey)} style={peopleStyles.foodIcon} />
-                    <AppText variant="body1" color={palette.midgray} style={peopleStyles.foodLabel}>
-                      {item.name}
-                    </AppText>
-                  </View>
-
-                  <View style={peopleStyles.qtyWrap}>
-                    <Pressable style={peopleStyles.qtyBtn} onPress={() => updateQty(index, -0.5)}>
-                      <AppText variant="h6" color={palette.stone}>
-                        -
-                      </AppText>
-                    </Pressable>
-
-                    <AppText variant="bodyBold" color={palette.midgray} style={peopleStyles.qtyValue}>
-                      {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
-                    </AppText>
-
-                    <Pressable style={peopleStyles.qtyBtn} onPress={() => updateQty(index, 0.5)}>
-                      <AppText variant="h6" color={palette.stone}>
-                        +
-                      </AppText>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
+              <GroupedFoodRows
+                items={items}
+                theme={PEOPLE_FOOD_THEME}
+                groupIcon={(_group, first) => ({ source: resolveFoodIconSource(first.iconKey) })}
+                renderRow={(item, index, { nested, first }) => (
+                  <FoodQuantityRow
+                    name={item.label ?? item.name}
+                    icon={nested && item.art ? { art: item.art } : { source: resolveFoodIconSource(item.iconKey) }}
+                    qty={item.qty}
+                    onChange={(qty) => setQty(index, qty)}
+                    theme={PEOPLE_FOOD_THEME}
+                    nested={nested}
+                    first={first}
+                  />
+                )}
+              />
 
               <View style={peopleStyles.addRow}>
                 <TextInput
@@ -1228,16 +1205,11 @@ function EditFarmListingForm({
     navigation.goBack();
   };
 
-  const updateQty = (index: number, delta: number) => {
-    setItems((prev) => {
-      const next = [...prev];
-      next[index] = {
-        ...next[index],
-        qty: Math.max(0, Math.round((next[index].qty + delta) * 10) / 10),
-      };
-      return next;
-    });
+  /** An exact quantity (typed, or − / +); FoodQuantityRow has already rounded and capped it. */
+  const setQty = (index: number, qty: number) => {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, qty } : item)));
   };
+
 
   const addCustomItem = () => {
     if (!customItem.trim()) return;
@@ -1413,7 +1385,8 @@ function EditFarmListingForm({
       try {
         await foodListingService.updateListing(listingId, {
           foodItems: activeItems.map((item) => ({
-            category: item.name,
+            name: item.name,
+            category: item.group ?? item.name,
             totalQtyKg: item.qty,
             remainingQtyKg: item.qty,
           })),
@@ -1519,34 +1492,23 @@ function EditFarmListingForm({
               WHAT FOOD DO YOU HAVE?
             </AppText>
             <View style={farmStyles.card}>
-              <View style={farmStyles.kgHeaderRow}>
-                <View style={farmStyles.foodNameColumn} />
-                <AppText variant="body1" color={palette.stone} style={{ marginRight: wp(8) }}>
-                  KG
-                </AppText>
-              </View>
 
-              {items.map((item, index) => (
-                <View key={`${item.name}-${index}`} style={farmStyles.foodRow}>
-                  <View style={farmStyles.foodNameWrap}>
-                    <Image source={item.icon} style={farmStyles.foodIcon} />
-                    <AppText variant="body1" color={palette.midgray} style={farmStyles.foodLabel} numberOfLines={2}>
-                      {item.name}
-                    </AppText>
-                  </View>
-                  <View style={farmStyles.qtyWrap}>
-                    <Pressable style={farmStyles.qtyBtn} onPress={() => updateQty(index, -0.5)}>
-                      <AppText variant="h6" color={palette.stone}>-</AppText>
-                    </Pressable>
-                    <AppText variant="bodyBold" color={palette.midgray} style={farmStyles.qtyValue}>
-                      {item.qty % 1 === 0 ? item.qty.toFixed(0) : item.qty.toFixed(1)}
-                    </AppText>
-                    <Pressable style={farmStyles.qtyBtn} onPress={() => updateQty(index, 0.5)}>
-                      <AppText variant="h6" color={palette.stone}>+</AppText>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
+              <GroupedFoodRows
+                items={items}
+                theme={FARM_FOOD_THEME}
+                groupIcon={(group, first) => ({ source: (farmSeedItems.find((seed) => seed.name === group) ?? first).icon })}
+                renderRow={(item, index, { nested, first }) => (
+                  <FoodQuantityRow
+                    name={item.label ?? item.name}
+                    icon={nested && item.art ? { art: item.art } : { source: item.icon }}
+                    qty={item.qty}
+                    onChange={(qty) => setQty(index, qty)}
+                    theme={FARM_FOOD_THEME}
+                    nested={nested}
+                    first={first}
+                  />
+                )}
+              />
 
               <View style={farmStyles.addRow}>
                 <TextInput
@@ -2246,48 +2208,6 @@ const peopleStyles = StyleSheet.create({
     paddingHorizontal: wp(3),
     gap: hp(0.8),
   },
-  kgHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  foodNameColumn: {
-    flex: 1,
-  },
-  foodRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  foodNameWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  foodLabel: {
-    marginLeft: wp(2),
-    textTransform: 'none',
-  },
-  qtyWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.8),
-  },
-  foodIcon: {
-    width: normalize(22),
-    height: normalize(22),
-  },
-  qtyBtn: {
-    width: wp(12),
-    height: wp(12),
-    borderRadius: normalize(12),
-    backgroundColor: '#E6E2F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qtyValue: {
-    minWidth: wp(5),
-    textAlign: 'center',
-  },
   addRow: {
     marginTop: hp(0.4),
     flexDirection: 'row',
@@ -2837,54 +2757,6 @@ const farmStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
-  },
-  kgHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  foodNameColumn: {
-    flex: 1,
-  },
-  foodRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  foodNameWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
-  },
-  foodIcon: {
-    width: normalize(22),
-    height: normalize(22),
-    flexShrink: 0,
-  },
-  foodLabel: {
-    flex: 1,
-    flexShrink: 1,
-    marginLeft: wp(2),
-    textTransform: 'none',
-  },
-  qtyWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.8),
-    flexShrink: 0,
-    marginLeft: wp(1.5),
-  },
-  qtyBtn: {
-    width: wp(12),
-    height: wp(12),
-    borderRadius: normalize(12),
-    backgroundColor: '#F9E0C0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qtyValue: {
-    minWidth: wp(5),
-    textAlign: 'center',
   },
   addRow: {
     marginTop: hp(0.4),

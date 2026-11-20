@@ -322,6 +322,7 @@ export function normalizeListingPrefill(value: unknown, kind: FoodListingKind): 
       lineId: num(record.lineId ?? record.id),
       name: str(record.name, 'Food'),
       category: str(record.category),
+      subtype: strOrNull(record.subtype),
       iconKey: strOrNull(record.iconKey),
       countedKg,
       availableKg: record.availableKg == null ? countedKg : kg(record.availableKg),

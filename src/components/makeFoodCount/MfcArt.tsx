@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -171,6 +171,7 @@ export function MfcArt({
   const height = width / aspect;
   const drawn = Math.min(width, height) * (tile ? 0.92 : 1);
   const Art = ART[art];
+  const photo = PHOTOS[art];
   return (
     <View
       style={[styles.box, { width, height, borderRadius: radius }, tile && styles.tile, style]}
@@ -179,9 +180,13 @@ export function MfcArt({
       accessibilityLabel={accessibilityLabel}
       importantForAccessibility={accessibilityLabel ? 'yes' : 'no-hide-descendants'}
     >
-      <Svg width={drawn} height={drawn} viewBox="0 0 64 64">
-        <Art />
-      </Svg>
+      {photo ? (
+        <Image source={photo} style={{ width: drawn, height: drawn }} resizeMode="contain" />
+      ) : (
+        <Svg width={drawn} height={drawn} viewBox="0 0 64 64">
+          <Art />
+        </Svg>
+      )}
     </View>
   );
 }
@@ -674,6 +679,13 @@ function Coffee() {
     </G>
   );
 }
+
+const PHOTOS: Partial<Record<MfcArtKey, ImageSourcePropType>> = {
+  sourceOverproduction: require('../../../assets/newmfc/mfc-source-overproduction.png'),
+  sourceSpoilage: require('../../../assets/newmfc/mfc-source-spoilage.png'),
+  sourcePreparation: require('../../../assets/newmfc/mfc-source-preparation.png'),
+  sourcePlateScraps: require('../../../assets/newmfc/mfc-source-plate-scraps.png'),
+};
 
 const ART: Record<MfcArtKey, () => React.ReactElement> = {
   sourceOverproduction: SourceOverproduction,

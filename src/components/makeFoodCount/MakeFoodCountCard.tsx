@@ -1,19 +1,20 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { AppText } from '@/components/AppText';
-import { MfcArt } from '@/components/makeFoodCount/MfcArt';
+import { HomeFeatureCard } from '@/components/home/HomeFeatureCard';
 import { MFC } from '@/constants/makeFoodCount';
-import { palette } from '@/theme/colors';
 import { selectHasOpenDraft, useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { normalize } from '@/utils/responsive';
 
+const ART = require('../../../assets/newmfc/make-food-count-home.png');
+
 /**
- * Home card for Make Food Count, as in the deck's mobile Home: lilac card,
- * NEW pill, chef-hat mark, title and line, food picture on the right, purple
- * "Record Food Waste →" button.
+ * Home card for Make Food Count: NEW pill, chef-hat mark, title and line, its
+ * picture on the right, the purple "Record Food Waste →" button and two shortcuts.
+ * Same frame as the Saveful Connect card beside it (HomeFeatureCard).
  */
 export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
   const navigation = useNavigation<any>();
@@ -37,29 +38,22 @@ export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
   const openRecent = () => navigation.navigate('MakeFoodCount', { screen: 'MfcRecentRecords' });
 
   return (
-    <View style={[styles.card, style]}>
-      <View style={styles.top}>
-        <View style={styles.copy}>
-          <View style={styles.newPill}>
-            <AppText variant="meta" color={MFC.white} style={styles.newText}>
-              NEW
-            </AppText>
-          </View>
-          <View style={styles.titleRow}>
-            <MaterialCommunityIcons name="chef-hat" size={normalize(26)} color={MFC.purple} />
-            <AppText variant="subheading" color={MFC.ink} style={styles.title} numberOfLines={2}>
-              Make Food Count
-            </AppText>
-          </View>
-          <AppText variant="bodySmall" color={MFC.ink} style={styles.body}>
-            Record food waste, understand where it comes from and choose the best next step.
+    <HomeFeatureCard
+      style={style}
+      pill={
+        <View style={styles.newPill}>
+          <AppText variant="meta" color={MFC.white} style={styles.newText}>
+            NEW
           </AppText>
         </View>
-        <View style={styles.art} pointerEvents="none">
-          <MfcArt art="produce" size={96} tile={false} />
-        </View>
-      </View>
-
+      }
+      icon={<MaterialCommunityIcons name="chef-hat" size={normalize(26)} color={MFC.purple} />}
+      title="Make Food Count"
+      titleColor={MFC.ink}
+      body="Record food waste, understand where it comes from and choose the best next step."
+      bodyColor={MFC.ink}
+      image={ART}
+    >
       {/* One row: the main action, then two icon buttons that say what they are at a glance. */}
       <View style={styles.actionsRow}>
         <Pressable
@@ -88,7 +82,7 @@ export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
           onPress={() => navigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
         />
       </View>
-    </View>
+    </HomeFeatureCard>
   );
 }
 
@@ -132,22 +126,6 @@ function IconButton({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    width: '100%',
-    // Same card as "Got surplus food?" on Home.
-    borderRadius: normalize(24),
-    borderWidth: 1,
-    borderColor: palette.strokecream,
-    backgroundColor: palette.white,
-    padding: normalize(16),
-    gap: normalize(12),
-    ...Platform.select({
-      ios: { shadowColor: palette.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
-      android: { elevation: 2 },
-    }),
-  },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  copy: { flex: 1, minWidth: 0, gap: 6 },
   newPill: {
     alignSelf: 'flex-start',
     backgroundColor: MFC.purple,
@@ -156,10 +134,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   newText: { fontFamily: 'Saveful-Bold', letterSpacing: 0.6 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { flex: 1, fontSize: normalize(21), lineHeight: normalize(26) },
-  body: { lineHeight: normalize(20) },
-  art: { width: normalize(96), alignItems: 'center' },
   actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   ctaText: { flexShrink: 1 },
   iconBtn: {

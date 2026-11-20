@@ -211,9 +211,9 @@ export function WhatsNewAnnouncement({ onNavigate }: { onNavigate: (to: WhatsNew
 }
 
 function ctaFor(id: WhatsNewFeatureId, access: { canManage: boolean; inGroup: boolean }): { label: string; to: WhatsNewDestination } | null {
-  if (id === 'makeFoodCount') return { label: 'Try it', to: 'makeFoodCount' };
-  if (access.inGroup) return { label: 'Take a look', to: 'consolidatedCollections' };
-  if (access.canManage) return { label: 'Set it up', to: 'consolidatedGroups' };
+  if (id === 'makeFoodCount') return { label: 'Explore MFC', to: 'makeFoodCount' };
+  if (access.inGroup) return { label: 'Explore Collections', to: 'consolidatedCollections' };
+  if (access.canManage) return { label: 'Set up Collections', to: 'consolidatedGroups' };
   // Site staff join through an invitation that shows on Home: nothing to open yet.
   return null;
 }

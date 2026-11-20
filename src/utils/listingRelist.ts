@@ -28,9 +28,9 @@ export async function fetchLatestListingForRelist(
   return useListingsStore.getState().fetchLatestForRelist(audience);
 }
 
-export function getPeopleRelistFormValues(
+export function getPeopleRelistFormValues<T extends { name: string; qty: number; iconKey: FoodIconKey }>(
   data: ListingDetail,
-  seedItems: Array<{ name: string; qty: number; iconKey: FoodIconKey }>,
+  seedItems: T[],
 ) {
   return {
     items: mergePeopleFoodItems(data.foodItems ?? [], seedItems),
@@ -47,9 +47,9 @@ export function getPeopleRelistFormValues(
   };
 }
 
-export function getFarmRelistFormValues(
+export function getFarmRelistFormValues<T extends { name: string; qty: number; icon: any }>(
   data: ListingDetail,
-  seedItems: Array<{ name: string; qty: number; icon: any }>,
+  seedItems: T[],
 ) {
   const contaminants =
     inferContaminants(data).length > 0
