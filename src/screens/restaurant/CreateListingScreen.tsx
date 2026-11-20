@@ -809,7 +809,8 @@ export function CreateListingScreen({ navigation, route }: any) {
           </GuideTarget>
         </View>
 
-        {hasPreviousListing && !relistApplied && step === 1 && !isConsolidated ? (
+        {/* Not for Make Food Count food: "list again" would replace the carried-forward lines and unlink them. */}
+        {hasPreviousListing && !relistApplied && step === 1 && !isConsolidated && !mfc ? (
           <View style={styles.relistCard}>
             <AppText variant="bodyBold" color={palette.midgray}>
               Same as last time?

@@ -5,7 +5,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  UIManager,
   View,
   type ImageSourcePropType,
 } from 'react-native';
@@ -19,10 +18,6 @@ import { palette } from '@/theme/colors';
 import { normalize } from '@/utils/responsive';
 
 import { FoodIcon, QTY_KEYBOARD_ACCESSORY_ID, formatQty, type FoodRowTheme } from './FoodQuantityRow';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 type Block<T> =
   | { kind: 'row'; item: T; index: number }
