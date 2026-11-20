@@ -44,7 +44,11 @@ export type MfcArtKey =
   | 'peels'
   | 'bones'
   | 'shells'
-  | 'coffee';
+  | 'coffee'
+  /** "Other" inside Meat & poultry / Seafood, and Preparation's "Preparation mistake": each has its own photo. */
+  | 'meatOther'
+  | 'seafoodOther'
+  | 'prepMistake';
 
 // ─── Resolving a row to its picture ──────────────────────────────────────────
 
@@ -67,11 +71,11 @@ const CATEGORY_ART: Record<string, MfcArtKey> = {
   pantry: 'pantry',
   other: 'other',
   peels_trimmings: 'peels',
-  meat_offcuts: 'meat',
+  meat_offcuts: 'bones',
   bones: 'bones',
   shells: 'shells',
   coffee_grounds: 'coffee',
-  preparation_mistake: 'meal',
+  preparation_mistake: 'prepMistake',
   plate_scraps: 'sourcePlateScraps',
   mixed_plate_scraps: 'sourcePlateScraps',
 };
@@ -113,6 +117,9 @@ export function resolveMfcArt(row: {
   iconKey?: string | null;
 }): MfcArtKey {
   if (row.subtype && SUBTYPE_ART[row.subtype]) return SUBTYPE_ART[row.subtype];
+  // "Other" is a subtype of more than one group: the group decides which photo it gets.
+  if (row.subtype === 'other' && row.category === 'meat_poultry') return 'meatOther';
+  if (row.subtype === 'other' && row.category === 'seafood') return 'seafoodOther';
   if (row.category && CATEGORY_ART[row.category]) return CATEGORY_ART[row.category];
   if (row.iconKey && ICON_KEY_ART[row.iconKey]) return ICON_KEY_ART[row.iconKey];
   return 'other';
@@ -127,6 +134,7 @@ export function toListingIconKey(iconKey: string | null | undefined, category?: 
     case 'lamb':
     case 'pork':
     case 'bones':
+    case 'meatOther':
       return 'meat';
     case 'produce':
     case 'peels':
@@ -680,11 +688,40 @@ function Coffee() {
   );
 }
 
+/**
+ * Real food photographs (assets/newmfc and assets/placeholder), used everywhere
+ * Make Food Count shows a food or a source: Sources, Record, Summary, Food Impact,
+ * drill-downs and listings. Drawings remain only for keys without a photo ('other', 'pantry').
+ */
 const PHOTOS: Partial<Record<MfcArtKey, ImageSourcePropType>> = {
+  // Sources
   sourceOverproduction: require('../../../assets/newmfc/mfc-source-overproduction.png'),
   sourceSpoilage: require('../../../assets/newmfc/mfc-source-spoilage.png'),
   sourcePreparation: require('../../../assets/newmfc/mfc-source-preparation.png'),
   sourcePlateScraps: require('../../../assets/newmfc/mfc-source-plate-scraps.png'),
+  // Meat & poultry
+  meat: require('../../../assets/newmfc/mfc-meat-poultry.png'),
+  chicken: require('../../../assets/newmfc/mfc-chicken.png'),
+  beef: require('../../../assets/newmfc/mfc-beef.png'),
+  lamb: require('../../../assets/newmfc/mfc-lamb.png'),
+  pork: require('../../../assets/newmfc/mfc-pork.png'),
+  meatOther: require('../../../assets/newmfc/mfc-meat-other.png'),
+  // Seafood
+  seafood: require('../../../assets/newmfc/mfc-seafood.png'),
+  fish: require('../../../assets/newmfc/mfc-fish.png'),
+  shellfish: require('../../../assets/newmfc/mfc-shellfish.png'),
+  seafoodOther: require('../../../assets/newmfc/mfc-seafood-other.png'),
+  // Preparation
+  peels: require('../../../assets/newmfc/mfc-prep-peels.png'),
+  bones: require('../../../assets/newmfc/mfc-prep-offcuts.png'),
+  shells: require('../../../assets/newmfc/mfc-prep-shells.png'),
+  coffee: require('../../../assets/newmfc/mfc-prep-coffee.png'),
+  prepMistake: require('../../../assets/newmfc/mfc-prep-mistake.png'),
+  // The listing screens' own food icons
+  produce: require('../../../assets/placeholder/fruit_veg_icon.png'),
+  dairy: require('../../../assets/placeholder/milk_icon.png'),
+  bakery: require('../../../assets/placeholder/bread_icon.png'),
+  meal: require('../../../assets/placeholder/meal_icon.png'),
 };
 
 const ART: Record<MfcArtKey, () => React.ReactElement> = {
@@ -710,6 +747,9 @@ const ART: Record<MfcArtKey, () => React.ReactElement> = {
   bones: Bones,
   shells: Shells,
   coffee: Coffee,
+  meatOther: Meat,
+  seafoodOther: Seafood,
+  prepMistake: Peels,
 };
 
 /** Every picture, for the dev preview gallery. */

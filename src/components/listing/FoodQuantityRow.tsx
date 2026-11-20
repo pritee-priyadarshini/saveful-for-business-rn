@@ -39,25 +39,29 @@ export function formatQty(kg: number): string {
   return String(Math.round(kg * 100) / 100);
 }
 
-/** Small rounded tile with the food's picture, the same size for every row. */
+/**
+ * The food's picture, the same size for every row. No tile behind it: the
+ * picture itself is the icon, large enough to recognise at a glance.
+ */
 export function FoodIcon({
   source,
   art,
-  tint,
   small,
 }: {
   source?: ImageSourcePropType;
   art?: MfcArtKey;
-  tint: string;
+  /** Kept for callers; the icon no longer sits on a coloured tile. */
+  tint?: string;
   small?: boolean;
 }) {
-  const box = normalize(small ? 32 : 38);
+  const box = normalize(small ? 40 : 46);
+  const picture = Math.round(box * 0.95);
   return (
-    <View style={[styles.iconTile, { width: box, height: box, borderRadius: box * 0.3, backgroundColor: tint }]}>
+    <View style={[styles.iconTile, { width: box, height: box }]}>
       {art ? (
-        <MfcArt art={art} size={small ? 24 : 28} tile={false} />
+        <MfcArt art={art} size={small ? 38 : 44} tile={false} />
       ) : source ? (
-        <Image source={source} style={{ width: box * 0.68, height: box * 0.68 }} resizeMode="contain" />
+        <Image source={source} style={{ width: picture, height: picture }} resizeMode="contain" />
       ) : null}
     </View>
   );
@@ -218,7 +222,7 @@ const styles = StyleSheet.create({
   },
   rowNested: { paddingVertical: normalize(8) },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E4DFD5' },
-  iconTile: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  iconTile: { alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0, gap: 1 },
   name: { fontFamily: 'Saveful-SemiBold' },
   caption: { fontSize: normalize(12) },

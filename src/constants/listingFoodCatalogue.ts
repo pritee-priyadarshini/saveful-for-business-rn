@@ -10,7 +10,7 @@
  * links one line to one item: svforb mfc-listing-link.service.ts). Grouping is
  * how the screen shows them; `category` on each item records the group.
  */
-import type { MfcArtKey } from '@/components/makeFoodCount/MfcArt';
+import { resolveMfcArt, type MfcArtKey } from '@/components/makeFoodCount/MfcArt';
 
 export type ListingAudience = 'people' | 'farm';
 
@@ -90,16 +90,6 @@ const FARM_PLACEMENT: Record<string, Placement> = {
   preparation_mistake: { group: 'Food scraps – with meat', nest: true },
 };
 
-const SUBTYPE_ART: Record<string, MfcArtKey> = {
-  chicken: 'chicken', beef: 'beef', lamb: 'lamb', pork: 'pork', fish: 'fish', shellfish: 'shellfish',
-};
-
-const CATEGORY_ART: Record<string, MfcArtKey> = {
-  meat_poultry: 'meat', seafood: 'seafood', fruit_veg: 'produce', dairy: 'dairy', bread_bakery: 'bakery',
-  prepared_meals: 'meal', peels_trimmings: 'peels', coffee_grounds: 'coffee', meat_offcuts: 'bones',
-  shells: 'shells', plate_scraps: 'sourcePlateScraps', preparation_mistake: 'sourcePreparation',
-};
-
 /** The groups' own "mixed" wording, for a line with no particular type. */
 const MIXED_LABEL: Record<string, string> = { Meat: 'Mixed / other meat', Seafood: 'Mixed / other seafood' };
 
@@ -127,7 +117,8 @@ export function placeMfcLines(
 
   const seen = new Map<string, number>();
   return placed.map(({ group, nest, line }) => {
-    const art = SUBTYPE_ART[line.subtype ?? ''] ?? CATEGORY_ART[line.category];
+    // The same picture Make Food Count shows for this line (one place decides: resolveMfcArt).
+    const art = resolveMfcArt({ category: line.category, subtype: line.subtype });
     if (!group) return { name: line.name, art };
     if (!nest && (plainCount.get(group) ?? 0) < 2) return { name: group, art };
 

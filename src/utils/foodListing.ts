@@ -9,6 +9,8 @@ export type FoodIconKey =
   | 'dairy'
   | 'sandwiches'
   | 'salads'
+  | 'snacks'
+  | 'drinks'
   | 'defaultMeal';
 
 const FOOD_ICON_SOURCES: Record<FoodIconKey, any> = {
@@ -20,6 +22,8 @@ const FOOD_ICON_SOURCES: Record<FoodIconKey, any> = {
   dairy: require('../../assets/placeholder/milk_icon.png'),
   sandwiches: require('../../assets/placeholder/sandwich_icon.png'),
   salads: require('../../assets/placeholder/salad.png'),
+  snacks: require('../../assets/placeholder/snacks_icon.png'),
+  drinks: require('../../assets/placeholder/drinks_icon.png'),
   defaultMeal: require('../../assets/placeholder/meal_icon.png'),
 };
 
@@ -53,6 +57,8 @@ export function resolveFoodIconFromLabel(
     .toLowerCase();
 
   if (text.includes('sandwich')) return FOOD_ICON_SOURCES.sandwiches;
+  if (text.includes('snack')) return FOOD_ICON_SOURCES.snacks;
+  if (text.includes('drink') || text.includes('beverage') || text.includes('juice')) return FOOD_ICON_SOURCES.drinks;
   if (text.includes('salad')) return FOOD_ICON_SOURCES.salads;
   if (text.includes('baked')) return FOOD_ICON_SOURCES.bakedGoods;
   if (text.includes('bread')) return FOOD_ICON_SOURCES.bread;

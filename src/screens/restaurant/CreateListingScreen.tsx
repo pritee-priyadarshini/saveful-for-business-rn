@@ -96,8 +96,8 @@ const seedItems: FoodItem[] = [
   { name: 'Dairy', qty: 0, iconKey: 'dairy' },
   { name: 'Sandwiches', qty: 0, iconKey: 'sandwiches' },
   { name: 'Salads', qty: 0, iconKey: 'salads' },
-  { name: 'Snacks', qty: 0, iconKey: 'defaultMeal' },
-  { name: 'Drinks', qty: 0, iconKey: 'defaultMeal' },
+  { name: 'Snacks', qty: 0, iconKey: 'snacks' },
+  { name: 'Drinks', qty: 0, iconKey: 'drinks' },
 ];
 
 /** The form's rows: the list above, with Meat opening onto its types (Chicken, Beef …). */
