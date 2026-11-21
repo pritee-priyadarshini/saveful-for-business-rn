@@ -230,8 +230,10 @@ function ctaFor(id: WhatsNewFeatureId, access: { canManage: boolean; inGroup: bo
 
 function TopBar({ width, top, scrollX, onSkip }: { width: number; top: number; scrollX: SharedValue<number>; onSkip: () => void }) {
   // White on the purple and green pages, purple on the light lilac page.
-  const range = PAGES.map((_, i) => i * width);
-  const tones = PAGES.map((name) => (name === 'makeFoodCount' ? MFC.purple : palette.white));
+  // Reanimated needs two points to interpolate: a single page repeats its own.
+  const points = PAGES.length > 1 ? PAGES : [PAGES[0], PAGES[0]];
+  const range = points.map((_, i) => i * width);
+  const tones = points.map((name) => (name === 'makeFoodCount' ? MFC.purple : palette.white));
   const skipStyle = useAnimatedStyle(() => ({ color: interpolateColor(scrollX.value, range, tones) }));
 
   return (
