@@ -24,6 +24,7 @@ import { useBottomTabPadding, useSafeBottomPadding } from '@/hooks/useBottomTabP
 import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { FoodImpactEntryCard } from '@/components/makeFoodCount/FoodImpactEntryCard';
+import { MFC_ENABLED } from '@/config/features';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import { DonationRecipients } from '@/components/DonationRecipients';
@@ -611,10 +612,12 @@ export function RestaurantAnalyticsScreen({
           ) : null}
 
           {/* Make Food Count insights (the deck's Insights page). */}
-          <FoodImpactEntryCard
-            onPress={() => stackNavigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
-            style={styles.foodImpactCard}
-          />
+          {MFC_ENABLED ? (
+            <FoodImpactEntryCard
+              onPress={() => stackNavigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
+              style={styles.foodImpactCard}
+            />
+          ) : null}
 
           <View style={styles.siteSelectorSlot}>
             <ImpactSiteSelector

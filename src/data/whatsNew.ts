@@ -4,7 +4,13 @@
  */
 import type { Ionicons } from '@expo/vector-icons';
 
-export const WHATS_NEW_RELEASE = '2026-11-make-food-count-consolidated';
+import { MFC_ENABLED } from '@/config/features';
+
+/**
+ * Until Make Food Count launches, the announcement is about Consolidated
+ * Collections only. Launching it changes this id, so everyone sees it again.
+ */
+export const WHATS_NEW_RELEASE = MFC_ENABLED ? '2026-11-make-food-count-consolidated' : '2026-11-consolidated';
 
 export type WhatsNewFeatureId = 'makeFoodCount' | 'consolidated';
 
@@ -27,11 +33,11 @@ export type WhatsNewFeature = {
 
 export const WHATS_NEW_INTRO = {
   sticker: 'New in Saveful',
-  headline: 'Two new ways to make your food count',
+  headline: MFC_ENABLED ? 'Two new ways to make your food count' : 'One collection for all your sites',
   subhead: 'More savings. Less admin. Greater impact.',
 };
 
-export const WHATS_NEW_FEATURES: WhatsNewFeature[] = [
+const ALL_FEATURES: WhatsNewFeature[] = [
   {
     id: 'makeFoodCount',
     name: 'Make Food Count',
@@ -80,3 +86,7 @@ export const WHATS_NEW_FEATURES: WhatsNewFeature[] = [
     note: 'Guide me walks you through every screen the first time.',
   },
 ];
+
+export const WHATS_NEW_FEATURES: WhatsNewFeature[] = ALL_FEATURES.filter(
+  (feature) => MFC_ENABLED || feature.id !== 'makeFoodCount',
+);

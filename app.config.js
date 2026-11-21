@@ -93,7 +93,7 @@ export default {
   expo: {
     name: 'Saveful For Business',
     slug: 'saveful-business',
-    version: '1.1.1',
+    version: '2.0.0',
     // OTA updates only reach builds with the same `version`. Bump `version` whenever
     // native code changes (new native package, plugin or permission) and ship a store build.
     runtimeVersion: {

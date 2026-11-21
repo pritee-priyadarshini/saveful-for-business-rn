@@ -27,6 +27,7 @@ import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard'
 import { SavefulConnectCard } from '@/components/home/SavefulConnectCard';
 import { useWhatsNewOnHome } from '@/hooks/useWhatsNewOnHome';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
+import { MFC_ENABLED } from '@/config/features';
 import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
 import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { isVirtualHqSiteId } from '@/utils/defaultHqSite';
@@ -266,7 +267,9 @@ export function RestaurantHomeScreen({ navigation }: any) {
     fetchBusinessImpact,
   } = useDashboardStore();
 
-  const homeImpact = useMakeFoodCountStore((state) => state.homeImpact);
+  const storedHomeImpact = useMakeFoodCountStore((state) => state.homeImpact);
+  // Make Food Count's figures only once it has launched (config/features).
+  const homeImpact = MFC_ENABLED ? storedHomeImpact : null;
 
   const impact = businessImpact ?? {
     kgSaved: 0,
@@ -300,20 +303,20 @@ export function RestaurantHomeScreen({ navigation }: any) {
   const showInsightsLink = true;
 
   const impactStats = [
-    {
+    ...(MFC_ENABLED ? [{
       key: 'recorded',
       icon: IMPACT_ICONS.recorded,
       value: formatImpactValue(homeImpact?.recordedKg ?? 0),
       unit: 'kg',
       label: 'Food recorded',
       tint: '#FFF4E8',
-    },
+    }] : []),
     {
       key: 'food',
       icon: IMPACT_ICONS.food,
       value: formatImpactValue(homeImpact?.divertedKg ?? impact.kgSaved),
       unit: 'kg',
-      label: 'Food diverted',
+      label: MFC_ENABLED ? 'Food diverted' : 'Food saved',
       tint: '#E8F8EE',
     },
     {
@@ -376,7 +379,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       fetchBusinessImpact(true).catch(() => undefined);
-      void useMakeFoodCountStore.getState().loadHomeImpact();
+      if (MFC_ENABLED) void useMakeFoodCountStore.getState().loadHomeImpact();
       void loadConnections();
     }, [fetchBusinessImpact, loadConnections]),
   );
@@ -387,7 +390,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
       await Promise.all([
         fetchBusinessImpact(true),
         loadConnections(),
-        useMakeFoodCountStore.getState().loadHomeImpact(),
+        MFC_ENABLED ? useMakeFoodCountStore.getState().loadHomeImpact() : undefined,
       ]);
     } catch (e) {
       showErrorAlert(e, 'Could not load dashboard', 'Could not load dashboard data');
@@ -535,7 +538,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
             <View style={[styles.mainContent, adaptive.mainContent]}>
               <View style={r.isTablet ? styles.topCardsRow : styles.topCardsColumn}>
-              <MakeFoodCountCard style={r.isTablet ? styles.topCardTablet : undefined} />
+              {MFC_ENABLED ? <MakeFoodCountCard style={r.isTablet ? styles.topCardTablet : undefined} /> : null}
               <SavefulConnectCard style={r.isTablet ? styles.topCardTablet : undefined} />
               </View>
 
@@ -644,7 +647,11 @@ export function RestaurantHomeScreen({ navigation }: any) {
                 ) : (
                   <Pressable
                     style={({ pressed }) => [styles.insightsLink, pressed && styles.pressed]}
-                    onPress={() => navigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
+                    onPress={() =>
+                      MFC_ENABLED
+                        ? navigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })
+                        : navigation.navigate('Insights')
+                    }
                   >
                     <View style={[styles.insightsLinkLeft, adaptive.insightsLinkLeft]}>
                       <Ionicons name="bar-chart-outline" size={normalize(20)} color={palette.primary} />
