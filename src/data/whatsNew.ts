@@ -33,7 +33,7 @@ export type WhatsNewFeature = {
 
 export const WHATS_NEW_INTRO = {
   sticker: 'New in Saveful',
-  headline: MFC_ENABLED ? 'Two new ways to make your food count' : 'One collection for all your sites',
+  headline: 'Two new ways to make your food count',
   subhead: 'More savings. Less admin. Greater impact.',
 };
 

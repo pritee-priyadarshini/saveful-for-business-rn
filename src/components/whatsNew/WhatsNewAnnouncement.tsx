@@ -44,7 +44,10 @@ export type WhatsNewDestination = 'makeFoodCount' | 'consolidatedGroups' | 'cons
 const PURPLE_BG = require('../../../assets/placeholder/purple-bg.png');
 const KALE_BG = require('../../../assets/placeholder/kale-header.png');
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
-const PAGES = ['intro', ...WHATS_NEW_FEATURES.map((feature) => feature.id)] as const;
+/** The overview page only earns its place with more than one feature to introduce. */
+const HAS_INTRO = WHATS_NEW_FEATURES.length > 1;
+const FIRST_FEATURE_PAGE = HAS_INTRO ? 1 : 0;
+const PAGES: string[] = [...(HAS_INTRO ? ['intro'] : []), ...WHATS_NEW_FEATURES.map((feature) => feature.id)];
 
 const ACCENT: Record<WhatsNewFeatureId, { color: string; tint: string; ink: string }> = {
   makeFoodCount: { color: MFC.purple, tint: '#F1E8FB', ink: MFC.ink },
@@ -118,7 +121,7 @@ export function WhatsNewAnnouncement({ onNavigate }: { onNavigate: (to: WhatsNew
   useEffect(() => {
     if (!__DEV__) return undefined;
     const handle = globalThis as { __whatsNewGo?: (page: string) => void };
-    handle.__whatsNewGo = (name) => goTo(name === 'overview' ? 0 : PAGES.indexOf(name as never));
+    handle.__whatsNewGo = (name) => goTo(name === 'overview' ? 0 : Math.max(0, PAGES.indexOf(name)));
     return () => {
       handle.__whatsNewGo = undefined;
     };
@@ -169,17 +172,19 @@ export function WhatsNewAnnouncement({ onNavigate }: { onNavigate: (to: WhatsNew
             scrollEventThrottle={16}
             onMomentumScrollEnd={onMomentumEnd}
           >
-            <IntroSlide
-              width={frameWidth}
-              height={frameHeight}
-              safeTop={safeTop}
-              safeBottom={safeBottom}
-              manual={manual}
-              scrollX={scrollX}
-              onNext={() => goTo(1)}
-              onOpenFeature={(index) => goTo(index + 1)}
-              onClose={() => dismiss()}
-            />
+            {HAS_INTRO ? (
+              <IntroSlide
+                width={frameWidth}
+                height={frameHeight}
+                safeTop={safeTop}
+                safeBottom={safeBottom}
+                manual={manual}
+                scrollX={scrollX}
+                onNext={() => goTo(1)}
+                onOpenFeature={(index) => goTo(index + 1)}
+                onClose={() => dismiss()}
+              />
+            ) : null}
             {WHATS_NEW_FEATURES.map((feature, index) => {
               const cta = ctaFor(feature.id, { canManage, inGroup });
               const last = index === WHATS_NEW_FEATURES.length - 1;
@@ -187,7 +192,7 @@ export function WhatsNewAnnouncement({ onNavigate }: { onNavigate: (to: WhatsNew
                 <FeatureSlide
                   key={feature.id}
                   feature={feature}
-                  index={index + 1}
+                  index={index + FIRST_FEATURE_PAGE}
                   width={frameWidth}
                   height={frameHeight}
                   safeTop={safeTop}
@@ -195,7 +200,7 @@ export function WhatsNewAnnouncement({ onNavigate }: { onNavigate: (to: WhatsNew
                   scrollX={scrollX}
                   cta={cta ? { label: cta.label, onPress: () => dismiss(() => onNavigate(cta.to)) } : null}
                   nextLabel={last ? 'Go to dashboard' : 'Next'}
-                  onNext={() => (last ? dismiss(() => onNavigate('dashboard')) : goTo(index + 2))}
+                  onNext={() => (last ? dismiss(() => onNavigate('dashboard')) : goTo(index + FIRST_FEATURE_PAGE + 1))}
                 />
               );
             })}
@@ -232,7 +237,8 @@ function TopBar({ width, top, scrollX, onSkip }: { width: number; top: number; s
   return (
     <View style={[styles.topBar, { top }]} pointerEvents="box-none">
       <View style={styles.progress}>
-        {PAGES.map((_, i) => (
+        {/* A single page needs no progress bar. */}
+        {PAGES.length > 1 && PAGES.map((_, i) => (
           <ProgressSegment key={i} index={i} width={width} scrollX={scrollX} range={range} tones={tones} />
         ))}
       </View>
