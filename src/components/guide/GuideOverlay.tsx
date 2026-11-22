@@ -372,7 +372,7 @@ export function GuideOverlay({
         <Pressable
           onPress={() => go(1)}
           accessibilityRole="button"
-          accessibilityLabel={last ? 'Finish the walkthrough' : 'Next step'}
+          accessibilityLabel={last ? (step.doneLabel ?? 'Finish the walkthrough') : 'Next step'}
           style={[styles.holeHit, { top: hole.top, left: hole.left, width: hole.width, height: hole.height }]}
         />
       ) : null}
@@ -460,8 +460,8 @@ export function GuideOverlay({
                 style={styles.back}
               />
               <ActionButton
-                label={last ? 'Done' : 'Next'}
-                icon={last ? 'checkmark' : undefined}
+                label={last ? (step.doneLabel ?? 'Done') : 'Next'}
+                icon={last && !step.doneLabel ? 'checkmark' : undefined}
                 size="compact"
                 onPress={() => go(1)}
                 style={styles.next}

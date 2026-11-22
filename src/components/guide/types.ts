@@ -20,6 +20,8 @@ export type GuideStep = {
   /** A short practical hint, shown under the body. */
   tip?: string;
   journey?: JourneyStage;
+  /** Primary button label when this step closes the walkthrough. Defaults to "Done". */
+  doneLabel?: string;
 };
 
 export type GuideTour = {

@@ -15,7 +15,7 @@ import { consolidatedService } from '@/services/consolidated.service';
 import { palette } from '@/theme/colors';
 import { showErrorAlert } from '@/utils/apiError';
 import { formatDateInZone } from '@/utils/consolidated';
-import { normalize } from '@/utils/responsive';
+import { hp, normalize } from '@/utils/responsive';
 import type { ConsolidatedGroup } from '@/types/consolidated';
 
 /** Canva CM1 — one-time setup: the groups of sites that share a collection point. */
@@ -62,8 +62,9 @@ export function ConsolidatedGroupsScreen() {
       }
     >
       <StackHeroHeader
-        title="Collection groups"
-        subtitle="Sites that bring surplus food to one shared collection point"
+        title="Consolidated Collections"
+        subtitle="Bring surplus food from multiple outlets together at one shared collection point."
+        height={hp(16)}
         right={
           <GuideHeaderRight onGuide={guide.start}>
             {canManage && groups.length ? (
@@ -80,8 +81,8 @@ export function ConsolidatedGroupsScreen() {
         {!loading && groups.length === 0 ? (
           <EmptyState
             icon="git-merge-outline"
-            title="Create your first collection group"
-            body="Group the outlets at one venue — a stadium, zoo or campus — so their surplus goes to one collection point and one charity pickup."
+            title="One collection point. Multiple outlets."
+            body="Coordinate collections across multiple outlets, making it easier for your team and charity partners while tracking each outlet's contribution and your combined impact."
             action={canManage ? (
               <GuideTarget id="groups.create">
                 <Button label="Create group" icon="add-circle-outline" onPress={create} />

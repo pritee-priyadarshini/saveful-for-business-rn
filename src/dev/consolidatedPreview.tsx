@@ -311,7 +311,7 @@ export function installConsolidatedFixtures() {
 const Stack = createNativeStackNavigator<any>();
 
 const ENTRIES: { title: string; screen: string; params?: Record<string, unknown> }[] = [
-  { title: 'Collection groups', screen: 'ConsolidatedGroups' },
+  { title: 'Consolidated Collections', screen: 'ConsolidatedGroups' },
   { title: 'Group form (edit)', screen: 'ConsolidatedGroupForm', params: { groupId: 3 } },
   { title: 'Collections list', screen: 'ConsolidatedCollections' },
   { title: 'Schedule collection', screen: 'ScheduleCollection', params: { mode: 'create', groupId: 3 } },

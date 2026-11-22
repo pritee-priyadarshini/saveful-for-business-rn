@@ -17,13 +17,14 @@ export const groupsTour: GuideTour = {
   steps: [
     {
       journey: 0,
-      title: 'Start with a collection group',
-      body: 'A group is the outlets at one venue (a stadium, zoo or campus) that bring their surplus to one shared spot. You set it up once, then schedule as many collections as you need.',
+      title: 'Set up once. Collect as often as you need.',
+      body: 'Create your collection group, select the participating outlets and choose a shared collection point. Then schedule collections and list surplus food whenever you’re ready.',
     },
     {
       target: 'groups.create',
-      title: 'Create a group here',
-      body: 'Give it a name, choose the shared collection point, pick the sites and say who runs it on the day.',
+      title: 'Ready to create your collection group?',
+      body: 'Give your group a name, select the participating outlets and nominate your shared collection point.',
+      doneLabel: 'Get Started',
     },
     {
       target: 'groups.card',
@@ -81,34 +82,34 @@ export const groupFormTour: GuideTour = {
   steps: [
     {
       journey: 0,
-      title: 'Four parts to a group',
-      body: 'The group name, the shared collection point, the sites taking part and the people who run it. Here is what each one does.',
+      title: 'Just four things to set up',
+      body: 'Give your group a name, choose a shared collection point, select the participating sites and decide who manages collections.',
     },
     {
       target: 'groupForm.details',
       title: 'Use a name staff know',
-      body: 'Sites see this name every time they list food, so pick the one people already use, like “Stadium North”.',
+      body: 'Choose a name your team will recognise, such as “Stadium North”.',
     },
     {
       target: 'groupForm.point',
       title: 'Where the food comes together',
-      body: 'Every site brings its food here, and the charity collects it from here.',
-      tip: 'Add directions such as “rear gate, next to the cool room” so nobody gets lost on the day.',
+      body: 'Choose where participating sites will bring their surplus food for collection by your charity partner.',
+      tip: 'Include clear directions, such as “Rear gate, next to the cool room”, so everyone knows where to go.',
     },
     {
       target: 'groupForm.sites',
       title: 'Choose the sites',
-      body: 'Sites you run join straight away. Other sites get an invitation and take part once they accept. The host site owns the one listing that charities see.',
+      body: 'Select the sites joining this collection group. Other sites will receive an invitation and can join once they accept.',
     },
     {
       target: 'groupForm.people',
       title: 'Who runs it on the day',
-      body: 'Managers schedule collections, approve changes and publish to charities. Receivers stand at the collection point and confirm what actually arrives.',
+      body: 'Managers schedule collections and publish food listings. Receivers confirm what’s been collected at the shared collection point.',
     },
     {
       target: 'groupForm.save',
       title: 'Save and you’re set up',
-      body: 'You only do this once. After that, schedule your first collection.',
+      body: 'That’s it! Create your group, then schedule your first collection whenever you’re ready.',
     },
   ],
 };
