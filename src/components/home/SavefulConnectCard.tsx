@@ -7,6 +7,7 @@ import { AppText } from '@/components/AppText';
 import { HomeFeatureCard } from '@/components/home/HomeFeatureCard';
 import { palette } from '@/theme/colors';
 import { normalize } from '@/utils/responsive';
+import { useModuleGate } from '@/hooks/useModuleGate';
 
 const ART = require('../../../assets/newmfc/saveful-connect-home.png');
 
@@ -22,6 +23,9 @@ const CONNECT = {
  */
 export function SavefulConnectCard({ style }: { style?: StyleProp<ViewStyle> }) {
   const navigation = useNavigation<any>();
+  // Not in the org's plan (Make Food Count only): same card, locked.
+  const { locked, requireModule } = useModuleGate('CONNECT');
+  const listSurplus = () => navigation.navigate('Listings', { screen: 'Surplus' });
 
   return (
     <HomeFeatureCard
@@ -34,13 +38,16 @@ export function SavefulConnectCard({ style }: { style?: StyleProp<ViewStyle> }) 
       image={ART}
     >
       <Pressable
-        onPress={() => navigation.navigate('Listings', { screen: 'Surplus' })}
+        onPress={() => requireModule(listSurplus)}
         accessibilityRole="button"
-        accessibilityLabel="List surplus food"
+        accessibilityLabel={
+          locked ? 'Saveful Connect is not in your plan. See what it includes' : 'List surplus food'
+        }
         style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
       >
+        {locked ? <Ionicons name="lock-closed" size={normalize(16)} color={palette.white} /> : null}
         <AppText variant="bodyBold" color={palette.white} numberOfLines={1} style={styles.ctaText}>
-          List Surplus
+          {locked ? 'Not in your plan' : 'List Surplus'}
         </AppText>
         <Ionicons name="arrow-forward" size={normalize(18)} color={palette.white} />
       </Pressable>

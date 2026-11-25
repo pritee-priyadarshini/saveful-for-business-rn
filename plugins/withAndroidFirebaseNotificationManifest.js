@@ -45,6 +45,35 @@ function findMetaDataIndex(metaData, name) {
   return metaData.findIndex((item) => item.$?.['android:name'] === name);
 }
 
+const PORTRAIT_FEATURE = 'android.hardware.screen.portrait';
+
+/**
+ * screenOrientation="portrait" makes the manifest merger imply
+ * android.hardware.screen.portrait as required. Play then hides the app from
+ * phones, tablets, desktop and Android XR. The app still locks to portrait;
+ * the feature is just not a device requirement.
+ */
+function markPortraitFeatureOptional(manifest) {
+  const current = manifest.manifest['uses-feature'];
+  const features = current ? (Array.isArray(current) ? current : [current]) : [];
+  const existing = features.find((item) => item.$?.['android:name'] === PORTRAIT_FEATURE);
+
+  if (existing) {
+    existing.$['android:required'] = 'false';
+    existing.$['tools:replace'] = 'android:required';
+  } else {
+    features.push({
+      $: {
+        'android:name': PORTRAIT_FEATURE,
+        'android:required': 'false',
+        'tools:replace': 'android:required',
+      },
+    });
+  }
+
+  manifest.manifest['uses-feature'] = features;
+}
+
 function upsertFcmMetaData(application) {
   const metaData = normalizeMetaData(application);
 
@@ -151,6 +180,7 @@ function withAndroidFirebaseNotificationManifest(config) {
 
     const application = AndroidConfig.Manifest.getMainApplicationOrThrow(manifest);
     upsertFcmMetaData(application);
+    markPortraitFeatureOptional(manifest);
 
     return modConfig;
   });

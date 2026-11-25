@@ -39,6 +39,8 @@ import { elevation } from '@/theme/elevation';
 import { FOOD_SOURCES, type InsightsPayload, type InsightsSourceRow } from '@/types/makeFoodCount';
 import { formatKg } from '@/utils/makeFoodCountSummary';
 import { normalize, useResponsiveLayout } from '@/utils/responsive';
+import { useModuleGate } from '@/hooks/useModuleGate';
+import { ModuleUpsellPanel } from '@/components/plans/ModuleUpsellPanel';
 
 type ViewKey = 'overview' | 'happened' | 'redistributed';
 
@@ -60,6 +62,7 @@ function useOrganisationName(): string {
 
 export function FoodImpactScreen() {
   const layout = useResponsiveLayout();
+  const connectGate = useModuleGate('CONNECT');
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const organisationName = useOrganisationName();
   const route = useRoute();
@@ -161,7 +164,14 @@ export function FoodImpactScreen() {
               />
             ) : null}
             {view === 'happened' ? <HappenedView insights={insights} isTablet={layout.isTablet} /> : null}
-            {view === 'redistributed' ? <RedistributedView insights={insights} isTablet={layout.isTablet} /> : null}
+            {view === 'redistributed' ? (
+              // Redistribution is Saveful Connect; without it there is nothing to show.
+              connectGate.locked ? (
+                <ModuleUpsellPanel module="CONNECT" variant="inline" />
+              ) : (
+                <RedistributedView insights={insights} isTablet={layout.isTablet} />
+              )
+            ) : null}
           </>
         ) : null}
       </View>

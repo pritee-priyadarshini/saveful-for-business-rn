@@ -36,11 +36,18 @@ const CONFLICT_NOTICE = 'Someone else updated this record. We loaded the latest 
  * - missing: the draft no longer exists for them, e.g. deleted elsewhere (404)
  * Retrying never helps, so writes stop until the draft is closed.
  */
-export type MfcWriteBlock = 'forbidden' | 'missing';
+/**
+ * Why the server refuses the open draft.
+ * - forbidden / missing: for good, on this account
+ * - unpaid: 402 — the organisation's plan lacks Make Food Count (or has lapsed).
+ *   Lifted when the app returns to the foreground, e.g. back from checkout.
+ */
+export type MfcWriteBlock = 'forbidden' | 'missing' | 'unpaid';
 
 export const MFC_WRITE_BLOCK_MESSAGE: Record<MfcWriteBlock, string> = {
   forbidden: 'You can view this site’s food records but not change them, so changes to this draft won’t be saved.',
   missing: 'This draft is no longer available, so changes to it can’t be saved.',
+  unpaid: 'Your organisation’s plan doesn’t include Make Food Count, so changes to this draft won’t be saved.',
 };
 
 function currentUserId(): number | null {
@@ -188,9 +195,11 @@ export const useMakeFoodCountStore = create<MakeFoodCountState>()(
       /** Shared failure path for every write. Always resolves false. */
       const failWrite = async (error: unknown): Promise<false> => {
         const info = readMfcError(error);
-        // Not allowed, or gone: no retry will ever succeed, so stop writing and say why.
-        if (info.status === 403 || info.status === 404) {
-          const block: MfcWriteBlock = info.status === 403 ? 'forbidden' : 'missing';
+        // Not allowed, gone, or not paid for: retrying can't succeed, so stop writing
+        // (one 402 already showed the upsell — every keystroke must not repeat it).
+        if (info.status === 403 || info.status === 404 || info.status === 402) {
+          const block: MfcWriteBlock =
+            info.status === 403 ? 'forbidden' : info.status === 404 ? 'missing' : 'unpaid';
           clearRetry();
           const timer = get().autosaveTimer;
           if (timer) clearTimeout(timer);
@@ -658,6 +667,13 @@ export function bindAppStateFlush(): () => void {
     const state = useMakeFoodCountStore.getState();
     if (next === 'background' || next === 'inactive') {
       void state.flushNow();
+      return;
+    }
+    // The plan may have changed while away (e.g. Make Food Count bought on the
+    // website or in checkout): lift a payment block and try once more.
+    if (next === 'active' && state.writeBlocked === 'unpaid') {
+      useMakeFoodCountStore.setState({ writeBlocked: null, lastError: null });
+      void useMakeFoodCountStore.getState().flushNow();
       return;
     }
     if (next === 'active' && !state.writeBlocked && (state.syncStatus === 'offline' || state.syncStatus === 'pending')) {

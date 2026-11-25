@@ -9,7 +9,7 @@ import {
 import { useAuthStore } from './authStore';
 import { useSitesStore } from './sitesStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
-import { isSubscriptionGateError } from '../utils/billingErrors';
+import { isGloballyHandledBillingError } from '../utils/billingErrors';
 import {
   isAnimalListing,
   isPeopleListing,
@@ -79,7 +79,7 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
         siteLastFetched: Date.now(),
       });
     } catch (error: unknown) {
-      if (isSubscriptionGateError(error)) {
+      if (isGloballyHandledBillingError(error)) {
         return;
       }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load listings');
@@ -115,7 +115,7 @@ export const useListingsStore = create<ListingsState & ListingsActions>((set, ge
         : all;
       set({ orgListings: sortListingsByNewest(visible), orgLastFetched: Date.now() });
     } catch (error: unknown) {
-      if (isSubscriptionGateError(error)) {
+      if (isGloballyHandledBillingError(error)) {
         return;
       }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load listing history');

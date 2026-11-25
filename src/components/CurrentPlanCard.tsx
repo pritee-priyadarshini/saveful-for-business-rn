@@ -8,6 +8,8 @@ import { hp, normalize, wp } from '@/utils/responsive';
 import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
 import { billingCycleLabel, formatBillingDate } from '@/utils/billingHelpers';
 import { usePlanCancellation } from '@/hooks/usePlanCancellation';
+import { MODULE_LABEL, missingModule, PRODUCT_MODULES } from '@/utils/moduleAccess';
+import { MODULE_THEME } from '@/screens/subscription/singleSitePlans';
 
 const ACCENT = palette.kale;
 
@@ -42,6 +44,7 @@ export function CurrentPlanCard({ showActions = true }: { showActions?: boolean 
   const name =
     entitlements.planDisplayName || entitlements.planName || 'Your plan';
   const pill = statusPill(entitlements.status, entitlements.trialEndsAt);
+  const missing = missingModule(entitlements);
 
   const meta: string[] = [];
   if (entitlements.billingCycle) {
@@ -79,6 +82,28 @@ export function CurrentPlanCard({ showActions = true }: { showActions?: boolean 
         </View>
       </View>
 
+      {/* Which modules the plan includes — "Make Food Count · Saveful Connect". */}
+      {entitlements.modules.length ? (
+        <View style={styles.chips}>
+          {PRODUCT_MODULES.filter((module) => entitlements.modules.includes(module)).map((module) => (
+            <View
+              key={module}
+              style={[styles.chip, { backgroundColor: MODULE_THEME[module].tint, borderColor: MODULE_THEME[module].border }]}
+            >
+              <AppText color={MODULE_THEME[module].color} style={styles.chipText}>
+                {MODULE_LABEL[module]}
+              </AppText>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {missing ? (
+        <AppText color={palette.midgray} style={styles.detail}>
+          {`${MODULE_LABEL[missing]} isn't in your plan. Complete Solution includes both.`}
+        </AppText>
+      ) : null}
+
       {pill.detail ? (
         <AppText color={pill.text} style={styles.detail}>
           {pill.detail}
@@ -97,7 +122,14 @@ export function CurrentPlanCard({ showActions = true }: { showActions?: boolean 
           : 'Choose a different plan below to upgrade or change your subscription.'}
       </AppText>
 
-      {showActions && canManageBilling && (canCancel || canResume) ? (
+      {showActions && canManageBilling && !entitlements.hasBillingAccount ? (
+        // Set up by Saveful directly: no self-serve cancel, which would end it immediately.
+        <AppText color={palette.midgray} style={styles.hint}>
+          This plan is managed by Saveful. Contact Saveful support to change or cancel it.
+        </AppText>
+      ) : null}
+
+      {showActions && canManageBilling && entitlements.hasBillingAccount && (canCancel || canResume) ? (
         <Pressable
           style={styles.actionBtn}
           onPress={canResume ? resumePlan : cancelPlan}
@@ -116,6 +148,22 @@ export function CurrentPlanCard({ showActions = true }: { showActions?: boolean 
 }
 
 const styles = StyleSheet.create({
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(1.5),
+  },
+  chip: {
+    borderWidth: 1,
+    borderRadius: normalize(999),
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.3),
+  },
+  chipText: {
+    fontFamily: 'Saveful-Bold',
+    fontSize: normalize(11),
+    textTransform: 'none',
+  },
   wrap: {
     backgroundColor: palette.white,
     borderWidth: 1.5,

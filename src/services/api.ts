@@ -16,8 +16,14 @@ type BillingRequiredHandler = (payload: {
   message?: string;
 }) => void | Promise<void>;
 
+type ModuleRequiredHandler = (payload: {
+  module: 'MFC' | 'CONNECT';
+  message?: string;
+}) => void | Promise<void>;
+
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let billingRequiredHandler: BillingRequiredHandler | null = null;
+let moduleRequiredHandler: ModuleRequiredHandler | null = null;
 
 /** Called from AppContext so a 401 clears session and redirects to login. */
 export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
@@ -27,6 +33,15 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
 /** Called from AppNavigator so 402 / subscription-required routes to Plans. */
 export function setBillingRequiredHandler(handler: BillingRequiredHandler | null) {
   billingRequiredHandler = handler;
+}
+
+/**
+ * Called from AppNavigator so a 402 MODULE_REQUIRED (the plan lacks Make Food
+ * Count or Saveful Connect) opens that module's upsell. Until one is registered,
+ * the plan-required handler shows the server's message instead.
+ */
+export function setModuleRequiredHandler(handler: ModuleRequiredHandler | null) {
+  moduleRequiredHandler = handler;
 }
 
 const api = axios.create({
@@ -86,17 +101,20 @@ api.interceptors.response.use(
 
     const status = error.response?.status;
     const body = error.response?.data as
-      | { error?: string; message?: string }
+      | { error?: string; message?: string; module?: string }
       | undefined;
     const billingCode = typeof body?.error === 'string' ? body.error : undefined;
     const billingMessage = typeof body?.message === 'string' ? body.message : '';
+    // The org has a plan, just not this module — an upsell, not "choose a plan".
+    const isModuleRequired = billingCode === 'MODULE_REQUIRED';
     const isSubscriptionGate =
-      status === 402 ||
-      billingCode === 'SUBSCRIPTION_REQUIRED' ||
-      billingCode === 'SUBSCRIPTION_INACTIVE' ||
-      /subscription|choose a plan|free trial|billing required/i.test(
-        billingMessage,
-      );
+      !isModuleRequired &&
+      (status === 402 ||
+        billingCode === 'SUBSCRIPTION_REQUIRED' ||
+        billingCode === 'SUBSCRIPTION_INACTIVE' ||
+        /subscription|choose a plan|free trial|billing required/i.test(
+          billingMessage,
+        ));
 
     // A missing plan can come back as 401. Never treat that as a signed-out session.
     if (error.response?.status === 401 && !isSubscriptionGate && !config?.skipUnauthorizedHandler) {
@@ -126,6 +144,19 @@ api.interceptors.response.use(
           message: billingMessage || undefined,
         }),
       ).catch(() => undefined);
+    }
+
+    if (isModuleRequired && !config?.skipBillingHandler && !isReadRequest) {
+      const module = body?.module === 'MFC' || body?.module === 'CONNECT' ? body.module : null;
+      if (module && moduleRequiredHandler) {
+        void Promise.resolve(
+          moduleRequiredHandler({ module, message: billingMessage || undefined }),
+        ).catch(() => undefined);
+      } else {
+        void Promise.resolve(
+          billingRequiredHandler?.({ code: billingCode, message: billingMessage || undefined }),
+        ).catch(() => undefined);
+      }
     }
 
     const isPlanLimit =

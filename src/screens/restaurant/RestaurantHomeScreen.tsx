@@ -28,6 +28,7 @@ import { SavefulConnectCard } from '@/components/home/SavefulConnectCard';
 import { useWhatsNewOnHome } from '@/hooks/useWhatsNewOnHome';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { MFC_ENABLED } from '@/config/features';
+import { useModuleGate } from '@/hooks/useModuleGate';
 import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
 import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { isVirtualHqSiteId } from '@/utils/defaultHqSite';
@@ -268,8 +269,12 @@ export function RestaurantHomeScreen({ navigation }: any) {
   } = useDashboardStore();
 
   const storedHomeImpact = useMakeFoodCountStore((state) => state.homeImpact);
-  // Make Food Count's figures only once it has launched (config/features).
-  const homeImpact = MFC_ENABLED ? storedHomeImpact : null;
+  // Make Food Count's figures only once it has launched (config/features) and
+  // only when it is in the org's plan.
+  const mfcGate = useModuleGate('MFC');
+  const connectGate = useModuleGate('CONNECT');
+  const mfcActive = MFC_ENABLED && !mfcGate.locked;
+  const homeImpact = mfcActive ? storedHomeImpact : null;
 
   const impact = businessImpact ?? {
     kgSaved: 0,
@@ -303,7 +308,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
   const showInsightsLink = true;
 
   const impactStats = [
-    ...(MFC_ENABLED ? [{
+    ...(mfcActive ? [{
       key: 'recorded',
       icon: IMPACT_ICONS.recorded,
       value: formatImpactValue(homeImpact?.recordedKg ?? 0),
@@ -316,7 +321,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
       icon: IMPACT_ICONS.food,
       value: formatImpactValue(homeImpact?.divertedKg ?? impact.kgSaved),
       unit: 'kg',
-      label: MFC_ENABLED ? 'Food diverted' : 'Food saved',
+      label: mfcActive ? 'Food diverted' : 'Food saved',
       tint: '#E8F8EE',
     },
     {
@@ -379,9 +384,9 @@ export function RestaurantHomeScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       fetchBusinessImpact(true).catch(() => undefined);
-      if (MFC_ENABLED) void useMakeFoodCountStore.getState().loadHomeImpact();
+      if (mfcActive) void useMakeFoodCountStore.getState().loadHomeImpact();
       void loadConnections();
-    }, [fetchBusinessImpact, loadConnections]),
+    }, [fetchBusinessImpact, loadConnections, mfcActive]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -390,14 +395,14 @@ export function RestaurantHomeScreen({ navigation }: any) {
       await Promise.all([
         fetchBusinessImpact(true),
         loadConnections(),
-        MFC_ENABLED ? useMakeFoodCountStore.getState().loadHomeImpact() : undefined,
+        mfcActive ? useMakeFoodCountStore.getState().loadHomeImpact() : undefined,
       ]);
     } catch (e) {
       showErrorAlert(e, 'Could not load dashboard', 'Could not load dashboard data');
     } finally {
       setRefreshing(false);
     }
-  }, [fetchBusinessImpact, loadConnections]);
+  }, [fetchBusinessImpact, loadConnections, mfcActive]);
 
   const renderSkeleton = () => (
     <View style={styles.skeletonWrap}>
@@ -544,7 +549,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
 
               {selectedRole === 'restaurant_single' || selectedRole === 'restaurant_multi' ? (
                 <Pressable
-                  onPress={() => navigation.navigate('Connections')}
+                  onPress={() => connectGate.requireModule(() => navigation.navigate('Connections'))}
                   style={({ pressed }) => [styles.connectionsCard, pressed && styles.pressed]}
                 >
                   <View style={styles.connectionsIcon}>
@@ -648,7 +653,7 @@ export function RestaurantHomeScreen({ navigation }: any) {
                   <Pressable
                     style={({ pressed }) => [styles.insightsLink, pressed && styles.pressed]}
                     onPress={() =>
-                      MFC_ENABLED
+                      mfcActive
                         ? navigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })
                         : navigation.navigate('Insights')
                     }

@@ -23,6 +23,8 @@ import { MFC } from '@/constants/makeFoodCount';
 import { OutcomeProgress } from '@/components/makeFoodCount/OutcomeProgress';
 import { Screen } from '@/components/Screen';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
+import { useModuleGate } from '@/hooks/useModuleGate';
+import { ModuleUpsellPanel } from '@/components/plans/ModuleUpsellPanel';
 import { makeFoodCountService, readMfcError } from '@/services/makeFoodCount.service';
 import { useMakeFoodCountStore } from '@/store/makeFoodCountStore';
 import { palette } from '@/theme/colors';
@@ -54,6 +56,8 @@ export function SummaryScreen() {
     navigation.setParams({ notice: undefined } as never);
   }, [routeNotice, navigation]);
   const { submitting, withLock } = useSubmitLock();
+  // Listing a record's surplus is Saveful Connect: without it, only "save".
+  const connectGate = useModuleGate('CONNECT');
   const [busyKind, setBusyKind] = useState<FoodListingKind | 'SAVE' | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** True once the outcomes were reloaded after the latest edit; until then local lines are used. */
@@ -113,6 +117,8 @@ export function SummaryScreen() {
 
   const openListing = (kind: FoodListingKind) =>
     withLock(async () => {
+      // Never start a listing the plan can't publish (the cards are hidden too).
+      if (connectGate.locked) return;
       setError(null);
       setBusyKind(kind);
       try {
@@ -225,10 +231,14 @@ export function SummaryScreen() {
               <View style={styles.nextHead}>
                 <MfcSectionLabel>What would you like to do next?</MfcSectionLabel>
                 <AppText variant="bodySmall" color={MFC.muted}>
-                  Create one or both listings, or save the record without listing.
+                  {connectGate.locked
+                    ? 'Save the record. Listing surplus for charities and recovery partners is part of Saveful Connect.'
+                    : 'Create one or both listings, or save the record without listing.'}
                 </AppText>
               </View>
               <View style={[styles.cards, layout.isTablet && styles.cardsTablet]}>
+                {connectGate.locked ? null : (
+                <>
                 <ActionCard
                   icon="people-outline"
                   tone="green"
@@ -253,6 +263,8 @@ export function SummaryScreen() {
                   outcomeLabel="Not-fit listing"
                   wide={layout.isTablet}
                 />
+                </>
+                )}
                 <ActionCard
                   icon="document-text-outline"
                   tone="plain"
@@ -264,6 +276,7 @@ export function SummaryScreen() {
                   wide={layout.isTablet}
                 />
               </View>
+              {connectGate.locked ? <ModuleUpsellPanel module="CONNECT" variant="inline" /> : null}
             </View>
 
             )}

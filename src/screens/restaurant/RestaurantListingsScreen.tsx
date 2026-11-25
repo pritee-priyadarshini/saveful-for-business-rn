@@ -41,7 +41,7 @@ import {
 } from '../../utils/foodListing';
 import { formatListingPickupDateRange } from '../../utils/dateFormat';
 import { showErrorAlert, showSuccessAlert } from '../../utils/apiError';
-import { isSubscriptionGateError } from '../../utils/billingErrors';
+import { isGloballyHandledBillingError } from '../../utils/billingErrors';
 import { showConfirmAlert } from '../../store/appAlertStore';
 import { CollectionStatusBadge } from '@/components/consolidated/CollectionStatusBadge';
 import { HandoverButton } from '@/components/consolidated/HandoverButton';
@@ -447,7 +447,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
         try {
           await loadListings(true);
         } catch (e) {
-          if (!isSubscriptionGateError(e)) {
+          if (!isGloballyHandledBillingError(e)) {
             showErrorAlert(e, 'Could not load listings', 'Could not load listings');
           }
         }
@@ -543,7 +543,7 @@ export function RestaurantListingsScreen({ navigation }: any) {
       const todayRows = await loadToday();
       await hydrateReservedListings(todayRows);
     } catch (e) {
-      if (!isSubscriptionGateError(e)) {
+      if (!isGloballyHandledBillingError(e)) {
         showErrorAlert(e, 'Could not load listings', 'Could not load listings');
       }
     } finally {

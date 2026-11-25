@@ -1,5 +1,7 @@
 import { isAxiosError } from 'axios';
 
+import type { ProductModule } from '@/services/subscriptions.service';
+
 /** Machine-readable billing error codes from svforb subscriptions module. */
 export const BILLING_ERROR = {
   SUBSCRIPTION_REQUIRED: 'SUBSCRIPTION_REQUIRED',
@@ -12,6 +14,12 @@ export const BILLING_ERROR = {
   SITE_LIMIT_REACHED: 'SITE_LIMIT_REACHED',
   USER_LIMIT_REACHED: 'USER_LIMIT_REACHED',
   FEATURE_NOT_IN_PLAN: 'FEATURE_NOT_IN_PLAN',
+  /** Upgrading off a card-free trial — a card must be added first. */
+  PAYMENT_METHOD_REQUIRED: 'PAYMENT_METHOD_REQUIRED',
+  /** 402: the plan does not include the module this action belongs to. Body has `module`. */
+  MODULE_REQUIRED: 'MODULE_REQUIRED',
+  /** /billing/trial on a plan sold without a trial (Make Food Count) — use checkout. */
+  TRIAL_NOT_OFFERED: 'TRIAL_NOT_OFFERED',
 } as const;
 
 export type BillingErrorCode = (typeof BILLING_ERROR)[keyof typeof BILLING_ERROR];
@@ -26,6 +34,8 @@ export type BillingApiError = {
   current?: number;
   /** Present on PLAN_CHANGE_REQUIRED so the client can jump straight to switching. */
   currentPlanId?: number;
+  /** Present on MODULE_REQUIRED: the module the action needs. */
+  module?: ProductModule;
 };
 
 export function getBillingErrorPayload(error: unknown): BillingApiError | null {
@@ -45,15 +55,46 @@ export function getBillingErrorCode(error: unknown): BillingErrorCode | null {
   return null;
 }
 
+/**
+ * The org has no usable plan at all (402 SUBSCRIPTION_*). A missing module is
+ * also a 402 but is not this — see isModuleRequiredError.
+ */
 export function isSubscriptionGateError(error: unknown): boolean {
   if (!isAxiosError(error)) return false;
   const status = error.response?.status;
   const code = getBillingErrorCode(error);
+  if (code === BILLING_ERROR.MODULE_REQUIRED) return false;
   if (status === 402) return true;
   return (
     code === BILLING_ERROR.SUBSCRIPTION_REQUIRED ||
     code === BILLING_ERROR.SUBSCRIPTION_INACTIVE
   );
+}
+
+/** 402 MODULE_REQUIRED: the plan lacks Make Food Count or Saveful Connect. */
+export function isModuleRequiredError(error: unknown): boolean {
+  return getBillingErrorCode(error) === BILLING_ERROR.MODULE_REQUIRED;
+}
+
+/** The module a MODULE_REQUIRED error asks for. */
+export function getRequiredModule(error: unknown): ProductModule | null {
+  if (!isModuleRequiredError(error)) return null;
+  const module = getBillingErrorPayload(error)?.module;
+  return module === 'MFC' || module === 'CONNECT' ? module : null;
+}
+
+/** The plan is sold without a free trial — fall back to paid checkout. */
+export function isTrialNotOfferedError(error: unknown): boolean {
+  return getBillingErrorCode(error) === BILLING_ERROR.TRIAL_NOT_OFFERED;
+}
+
+/**
+ * Billing errors the global API handler already showed to the user (plan
+ * required, or module required on a write). Screens use this to skip their own
+ * error alert so the user does not see two.
+ */
+export function isGloballyHandledBillingError(error: unknown): boolean {
+  return isSubscriptionGateError(error) || isModuleRequiredError(error);
 }
 
 export function isPlanLimitError(error: unknown): boolean {
@@ -132,7 +173,9 @@ export function getBillingErrorMessage(
   if (
     isPlanChangeRequiredError(error) ||
     isNoActiveSubscriptionError(error) ||
-    isAlreadyOnPlanError(error)
+    isAlreadyOnPlanError(error) ||
+    isModuleRequiredError(error) ||
+    isTrialNotOfferedError(error)
   ) {
     return raw || fallback;
   }

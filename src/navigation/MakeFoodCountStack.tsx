@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
+import { StackActions, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
 import { MfcHeader } from '@/components/makeFoodCount/MfcHeader';
+import { useModuleGate } from '@/hooks/useModuleGate';
+import { palette } from '@/theme/colors';
 import { MfcSitePicker, type MfcSiteOption } from '@/components/makeFoodCount/MfcSitePicker';
 import { FoodImpactScreen } from '@/screens/makeFoodCount/FoodImpactScreen';
 import { RecentRecordsScreen } from '@/screens/makeFoodCount/RecentRecordsScreen';
@@ -134,12 +137,25 @@ export const MFC_STACK_SCREENS: { name: keyof MakeFoodCountStackParamList; compo
 const Stack = createNativeStackNavigator<MakeFoodCountStackParamList>();
 
 export function MakeFoodCountStack() {
+  const navigation = useNavigation();
+  // Every way in (Home card, insights links, What's new, deep links) lands
+  // here, so one check covers them all.
+  const { locked } = useModuleGate('MFC');
+
   useEffect(() => {
     void unlockMfcOrientation();
     return () => {
       void restorePortraitOrientation();
     };
   }, []);
+
+  // Not in the plan: swap this route for the bottom sheet, so closing it lands
+  // back where the person was (Home, insights) rather than on an empty stack.
+  useEffect(() => {
+    if (locked) navigation.dispatch(StackActions.replace('ModuleUpsell', { module: 'MFC' }));
+  }, [locked, navigation]);
+
+  if (locked) return <View style={{ flex: 1, backgroundColor: palette.creme }} />;
 
   return (
     <Stack.Navigator initialRouteName="MfcSources" screenOptions={mfcStackScreenOptions}>

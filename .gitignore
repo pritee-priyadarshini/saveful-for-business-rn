@@ -40,3 +40,5 @@ coverage/
 # Firebase (download from Firebase Console — do not commit if policy requires)
 google-services.json
 GoogleService-Info.plist
+
+/docs 

@@ -33,7 +33,7 @@ import { useSubmitLock } from '../../hooks/useSubmitLock';
 import { usePreviousListingRelist } from '../../hooks/usePreviousListingRelist';
 import { getPeopleRelistFormValues } from '../../utils/listingRelist';
 import { showErrorAlert } from '../../utils/apiError';
-import { isSubscriptionGateError } from '../../utils/billingErrors';
+import { isGloballyHandledBillingError } from '../../utils/billingErrors';
 import { showSubscriptionRequiredPrompt } from '../../utils/subscriptionAccess';
 import { selectCanManageBilling } from '../../store/subscriptionStore';
 import { ListingPhotoGallery } from '@/components/ListingPhotoGallery';
@@ -641,7 +641,7 @@ export function CreateListingScreen({ navigation, route }: any) {
             },
           });
         } catch (error: any) {
-          if (isSubscriptionGateError(error)) return;
+          if (isGloballyHandledBillingError(error)) return;
           showErrorAlert(error, 'Could not add food', 'Please try again.');
         }
       });
@@ -722,7 +722,7 @@ export function CreateListingScreen({ navigation, route }: any) {
         useListingsStore.getState().invalidateSite();
         navigation.replace('RestaurantListings');
       } catch (error: any) {
-        if (isSubscriptionGateError(error)) return;
+        if (isGloballyHandledBillingError(error)) return;
         showErrorAlert(error, 'Could not create listing', 'Please try again.');
       }
     });

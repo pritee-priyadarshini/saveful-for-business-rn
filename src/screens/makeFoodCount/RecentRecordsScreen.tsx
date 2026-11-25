@@ -94,7 +94,11 @@ export function RecentRecordsScreen() {
       const synced = await useMakeFoodCountStore.getState().flushNow();
       if (!synced) {
         const draft = useMakeFoodCountStore.getState();
-        if (draft.writeBlocked) {
+        if (draft.writeBlocked === 'unpaid') {
+          // It can still be saved once Make Food Count is on the plan — keep it.
+          setError(draft.lastError);
+          return;
+        } else if (draft.writeBlocked) {
           // The server will never take that draft from this account (not allowed, or it's gone),
           // so it must not block opening anything else. It stays on the server as it was.
           draft.clearDraft();

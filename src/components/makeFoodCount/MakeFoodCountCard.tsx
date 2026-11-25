@@ -7,6 +7,7 @@ import { AppText } from '@/components/AppText';
 import { HomeFeatureCard } from '@/components/home/HomeFeatureCard';
 import { MFC } from '@/constants/makeFoodCount';
 import { selectHasOpenDraft, useMakeFoodCountStore } from '@/store/makeFoodCountStore';
+import { useModuleGate } from '@/hooks/useModuleGate';
 import { normalize } from '@/utils/responsive';
 
 const ART = require('../../../assets/newmfc/make-food-count-home.png');
@@ -18,6 +19,9 @@ const ART = require('../../../assets/newmfc/make-food-count-home.png');
  */
 export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
   const navigation = useNavigation<any>();
+  // Not in the org's plan: same card, locked — it opens what Make Food Count is.
+  // Not sold to this kind of org (farms): not shown at all.
+  const { locked, hidden, requireModule } = useModuleGate('MFC');
   const hasDraft = useMakeFoodCountStore(selectHasOpenDraft);
   const hasSources = useMakeFoodCountStore((state) => state.sources.length > 0);
   const selectedSource = useMakeFoodCountStore((state) => state.selectedSource);
@@ -37,6 +41,8 @@ export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
 
   const openRecent = () => navigation.navigate('MakeFoodCount', { screen: 'MfcRecentRecords' });
 
+  if (hidden) return null;
+
   return (
     <HomeFeatureCard
       style={style}
@@ -54,7 +60,21 @@ export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
       bodyColor={MFC.ink}
       image={ART}
     >
-      {/* One row: the main action, then two icon buttons that say what they are at a glance. */}
+      {locked ? (
+        <Pressable
+          onPress={() => requireModule(open)}
+          accessibilityRole="button"
+          accessibilityLabel="Make Food Count is not in your plan. See what it includes"
+          style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
+        >
+          <Ionicons name="lock-closed" size={normalize(16)} color={MFC.white} />
+          <AppText variant="bodyBold" color={MFC.white} numberOfLines={1} style={styles.ctaText}>
+            Not in your plan
+          </AppText>
+          <Ionicons name="arrow-forward" size={normalize(18)} color={MFC.white} />
+        </Pressable>
+      ) : (
+      /* One row: the main action, then two icon buttons that say what they are at a glance. */
       <View style={styles.actionsRow}>
         <Pressable
           onPress={open}
@@ -82,6 +102,7 @@ export function MakeFoodCountCard({ style }: { style?: StyleProp<ViewStyle> }) {
           onPress={() => navigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
         />
       </View>
+      )}
     </HomeFeatureCard>
   );
 }

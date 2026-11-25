@@ -10,12 +10,14 @@ import {
 } from '@/store/subscriptionStore';
 import { runCheckoutSession } from '@/utils/billingFlow';
 import {
+  addModuleLabel,
   billingCycleLabel,
-  findPlanById,
   formatBillingDate,
   formatPlanPrice,
   fromApiBillingCycle,
   getPlanRelation,
+  planCtaLabel,
+  resolveCurrentPlanRef,
   toApiBillingCycle,
   type PlanRelation,
 } from '@/utils/billingHelpers';
@@ -25,6 +27,7 @@ import {
   isNoActiveSubscriptionError,
   isPlanChangeRequiredError,
   isTrialAlreadyUsedError,
+  isTrialNotOfferedError,
 } from '@/utils/billingErrors';
 import { showConfirmAlert } from '@/store/appAlertStore';
 import { showErrorAlert, showInfoAlert, showSuccessAlert } from '@/utils/apiError';
@@ -66,16 +69,16 @@ export function usePlanPurchase(selection?: Selection) {
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const blockedFromBilling = selectIsKnownNonBillingAdmin();
-  const trialAvailable = Boolean(entitlements?.freeTrialAvailable) && !hasLiveSubscription;
 
-  const currentPlan = findPlanById(
-    plans,
-    entitlements?.entitled ? entitlements.planId : null,
-  );
+  // May be a legacy plan that is no longer listed — see resolveCurrentPlanRef.
+  const currentPlan = resolveCurrentPlanRef(plans, entitlements);
   const currentCycle = fromApiBillingCycle(entitlements?.billingCycle);
 
   const selectedPlan = selection?.plan ?? null;
   const selectedCycle = selection?.billingCycle ?? currentCycle;
+
+  // Per plan: Make Food Count is never trialled, and each org gets one trial.
+  const trialAvailable = Boolean(selectedPlan?.trialAvailable) && !hasLiveSubscription;
 
   const relation: PlanRelation = selectedPlan
     ? getPlanRelation({
@@ -132,13 +135,18 @@ export function usePlanPurchase(selection?: Selection) {
       const apiCycle = toApiBillingCycle(billingCycle);
       let checkoutUrl: string;
 
+      // Decided by the plan being bought, not the hook's selection.
+      const offersTrial = Boolean(plan.trialAvailable) && !hasLiveSubscription;
+      let startedTrial = offersTrial;
       try {
-        checkoutUrl = trialAvailable
+        checkoutUrl = offersTrial
           ? await startTrial(plan.id, apiCycle)
           : await startCheckout(plan.id, apiCycle);
       } catch (error) {
-        // The trial was already consumed — go straight to paid checkout.
-        if (trialAvailable && isTrialAlreadyUsedError(error)) {
+        // The trial was already consumed, or this plan is sold without one —
+        // go straight to paid checkout.
+        if (offersTrial && (isTrialAlreadyUsedError(error) || isTrialNotOfferedError(error))) {
+          startedTrial = false;
           checkoutUrl = await startCheckout(plan.id, apiCycle);
         } else {
           throw error;
@@ -151,10 +159,10 @@ export function usePlanPurchase(selection?: Selection) {
 
       if (outcome === 'activated') {
         showSuccessAlert(
-          trialAvailable
-            ? `Your 30-day free trial of ${plan.displayName} has started. No card was charged — add payment details before the trial ends to stay on your plan.`
+          startedTrial
+            ? `Your ${plan.trialDays}-day free trial of ${plan.displayName} has started. No card was charged — add payment details before the trial ends to stay on your plan.`
             : `${plan.displayName} is now active for your organisation.`,
-          trialAvailable ? 'Trial started' : 'Payment confirmed',
+          startedTrial ? 'Trial started' : 'Payment confirmed',
           onSettled,
         );
         return;
@@ -171,7 +179,7 @@ export function usePlanPurchase(selection?: Selection) {
         'Awaiting confirmation',
       );
     },
-    [startCheckout, startTrial, trialAvailable],
+    [hasLiveSubscription, startCheckout, startTrial],
   );
 
   /** Previews the proration, confirms with the user, then applies the switch. */
@@ -189,8 +197,18 @@ export function usePlanPurchase(selection?: Selection) {
       const effective = formatBillingDate(quote.effectiveAt);
       const nextBilling = formatBillingDate(quote.nextBillingDate);
 
-      const message =
-        quote.direction === 'UPGRADE'
+      // Saveful Connect trial → Complete: the trial carries over, nothing is billed.
+      const keepsTrial =
+        quote.direction === 'UPGRADE' &&
+        quote.endsTrialEarly === false &&
+        String(entitlements?.status ?? '').toUpperCase() === 'TRIALING';
+      const trialEnds = formatBillingDate(quote.nextBillingDate ?? entitlements?.trialEndsAt);
+
+      const message = keepsTrial
+        ? `Nothing is charged today. Your free trial continues on ${quote.planDisplayName}` +
+          (trialEnds ? ` until ${trialEnds}` : '') +
+          `, then it renews at ${recurring}.`
+        : quote.direction === 'UPGRADE'
           ? `You'll be charged ${formatPlanPrice(quote.amountDueToday, quote.currency)} today — ` +
             `the cost of ${quote.planDisplayName} less credit for the unused part of your current plan.\n\n` +
             `${quote.planDisplayName} then renews at ${recurring}` +
@@ -199,16 +217,28 @@ export function usePlanPurchase(selection?: Selection) {
             `${effective ?? 'the end of this billing period'}, then move to ` +
             `${quote.planDisplayName} at ${recurring}.`;
 
+      const isSwitch = quote.changeType === 'SWITCH';
+
       showConfirmAlert({
-        title: quote.direction === 'UPGRADE' ? 'Confirm upgrade' : 'Confirm plan change',
+        title:
+          quote.direction === 'UPGRADE'
+            ? 'Confirm upgrade'
+            : isSwitch
+              ? 'Confirm switch'
+              : 'Confirm plan change',
         message,
-        confirmLabel: quote.direction === 'UPGRADE' ? 'Upgrade now' : 'Schedule change',
+        confirmLabel:
+          quote.direction === 'UPGRADE' ? 'Upgrade now' : isSwitch ? 'Schedule switch' : 'Schedule change',
         onConfirm: async () => {
           try {
             const result = await changePlan(plan.id, apiCycle);
             showSuccessAlert(
               result.message,
-              result.type === 'UPGRADED' ? 'Plan upgraded' : 'Change scheduled',
+              result.type === 'UPGRADED'
+                ? 'Plan upgraded'
+                : result.changeType === 'SWITCH'
+                  ? 'Switch scheduled'
+                  : 'Change scheduled',
               onSettled,
             );
           } catch (error) {
@@ -221,7 +251,7 @@ export function usePlanPurchase(selection?: Selection) {
         },
       });
     },
-    [changePlan, preview, previewPlanChange],
+    [changePlan, entitlements?.status, entitlements?.trialEndsAt, preview, previewPlanChange],
   );
 
   const purchase = useCallback(
@@ -293,10 +323,10 @@ export function usePlanPurchase(selection?: Selection) {
         ? isSameTier
           ? `Switch to ${cycleWord} billing`
           : relation === 'UPGRADE'
-            ? 'Upgrade to this plan'
+            ? (selectedPlan && addModuleLabel(selectedPlan, currentPlan)) ?? 'Upgrade to this plan'
             : 'Switch to this plan'
-        : trialAvailable
-          ? 'Start Free 30 Day Trial'
+        : selectedPlan
+          ? planCtaLabel(selectedPlan, { relation: 'NEW', currentPlan: null, trialAvailable })
           : 'Continue to checkout';
 
   return {

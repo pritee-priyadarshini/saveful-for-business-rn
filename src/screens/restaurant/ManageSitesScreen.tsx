@@ -30,6 +30,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ConsolidatedHomeCard } from '@/components/consolidated/ConsolidatedHomeCard';
 import { MakeFoodCountCard } from '@/components/makeFoodCount/MakeFoodCountCard';
 import { MFC_ENABLED } from '@/config/features';
+import { useModuleGate } from '@/hooks/useModuleGate';
 import { ConsolidatedInvitationsCard } from '@/components/consolidated/ConsolidatedInvitationsCard';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import { useTransparentStatusBar } from '@/hooks/useTransparentStatusBar';
@@ -227,6 +228,8 @@ export default function ManageSitesScreen() {
   ];
 
   const needsPlan = useSubscriptionStore(selectNeedsPlan);
+  // Connections are Saveful Connect; "Create listing" lands on the gated Listings tab.
+  const connectGate = useModuleGate('CONNECT');
   const entitled = useSubscriptionStore((s) => s.entitlements?.entitled === true);
   const billedLocked = selectedRole === 'restaurant_multi' ? !entitled : needsPlan;
 
@@ -547,7 +550,7 @@ export default function ManageSitesScreen() {
         ) : null}
 
         <Pressable
-          onPress={() => navigation.navigate('Connections')}
+          onPress={() => connectGate.requireModule(() => navigation.navigate('Connections'))}
           style={({ pressed }) => [styles.connectionsCard, tabletInsetReset, pressed && { opacity: 0.92 }]}
           accessibilityRole="button"
           accessibilityLabel="Connections"

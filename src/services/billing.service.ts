@@ -19,6 +19,13 @@ export type StartTrialResponse = CheckoutSessionResponse & {
 
 export type PlanChangeDirection = 'UPGRADE' | 'DOWNGRADE';
 
+/**
+ * What the change means to the customer. SWITCH (Make Food Count ↔ Saveful
+ * Connect) is billed like a downgrade — at the period end — but worded as a switch.
+ * Older backends omit it.
+ */
+export type PlanChangeType = 'UPGRADE' | 'DOWNGRADE' | 'SWITCH';
+
 /** `UPGRADED` applies today and is prorated; `SCHEDULED` waits for the period end. */
 export type ChangePlanResponse = {
   type: 'UPGRADED' | 'SCHEDULED';
@@ -28,6 +35,7 @@ export type ChangePlanResponse = {
   effectiveAt: string;
   nextBillingDate: string | null;
   message: string;
+  changeType?: PlanChangeType;
 };
 
 export type ChangePlanPreview = {
@@ -40,6 +48,11 @@ export type ChangePlanPreview = {
   nextBillingDate: string | null;
   planDisplayName: string;
   billingCycle: BillingCycleApi;
+  changeType?: PlanChangeType;
+  /** The org must add a card before this upgrade can go through. */
+  requiresPaymentMethod?: boolean;
+  /** Upgrading ends the free trial today. false when the trial carries over. */
+  endsTrialEarly?: boolean;
 };
 
 export type CancelPendingChangeResponse = {
@@ -99,6 +112,14 @@ export type EnterpriseEnquiryResponse = {
   enquiryId: number;
 };
 
+/**
+ * Billing calls show their own errors (usePlanPurchase, the plans screens), and
+ * some refusals are expected steps — e.g. a preview for an org whose plan has no
+ * Stripe subscription answers "Please choose a plan." and the flow falls back to
+ * checkout. Without this the global 402/plan-required prompt would pop on top.
+ */
+const OWN_ERRORS = { skipBillingHandler: true } as const;
+
 function unwrapData<T>(payload: unknown): T {
   if (payload && typeof payload === 'object' && 'data' in (payload as object)) {
     return (payload as { data: T }).data;
@@ -111,7 +132,7 @@ export const billingService = {
     planId: number,
     billingCycle?: BillingCycleApi,
   ): Promise<StartTrialResponse> {
-    const res = await api.post('/billing/trial', { planId, billingCycle });
+    const res = await api.post('/billing/trial', { planId, billingCycle }, OWN_ERRORS);
     return unwrapData<StartTrialResponse>(res.data);
   },
 
@@ -119,7 +140,7 @@ export const billingService = {
     planId: number,
     billingCycle: BillingCycleApi,
   ): Promise<CheckoutSessionResponse> {
-    const res = await api.post('/billing/checkout', { planId, billingCycle });
+    const res = await api.post('/billing/checkout', { planId, billingCycle }, OWN_ERRORS);
     return unwrapData<CheckoutSessionResponse>(res.data);
   },
 
@@ -127,7 +148,7 @@ export const billingService = {
     planId: number,
     billingCycle?: BillingCycleApi,
   ): Promise<ChangePlanResponse> {
-    const res = await api.post('/billing/change-plan', { planId, billingCycle });
+    const res = await api.post('/billing/change-plan', { planId, billingCycle }, OWN_ERRORS);
     return unwrapData<ChangePlanResponse>(res.data);
   },
 
@@ -139,28 +160,28 @@ export const billingService = {
     planId: number,
     billingCycle?: BillingCycleApi,
   ): Promise<ChangePlanPreview> {
-    const res = await api.post('/billing/change-plan/preview', { planId, billingCycle });
+    const res = await api.post('/billing/change-plan/preview', { planId, billingCycle }, OWN_ERRORS);
     return unwrapData<ChangePlanPreview>(res.data);
   },
 
   async cancelPendingChange(): Promise<CancelPendingChangeResponse> {
-    const res = await api.delete('/billing/change-plan/pending');
+    const res = await api.delete('/billing/change-plan/pending', OWN_ERRORS);
     return unwrapData<CancelPendingChangeResponse>(res.data);
   },
 
   async createPortal(): Promise<PortalSessionResponse> {
-    const res = await api.post('/billing/portal');
+    const res = await api.post('/billing/portal', undefined, OWN_ERRORS);
     return unwrapData<PortalSessionResponse>(res.data);
   },
 
   async cancelSubscription(): Promise<CancelSubscriptionResponse> {
-    const res = await api.post('/billing/cancel');
+    const res = await api.post('/billing/cancel', undefined, OWN_ERRORS);
     return unwrapData<CancelSubscriptionResponse>(res.data);
   },
 
   /** Undoes a scheduled cancellation while the paid period is still running. */
   async resumeSubscription(): Promise<ResumeSubscriptionResponse> {
-    const res = await api.post('/billing/resume');
+    const res = await api.post('/billing/resume', undefined, OWN_ERRORS);
     return unwrapData<ResumeSubscriptionResponse>(res.data);
   },
 

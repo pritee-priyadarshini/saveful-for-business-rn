@@ -1,56 +1,15 @@
 import type { Entitlements } from '@/services/subscriptions.service';
-
-/** Backend PlanFeature keys that unlock advanced impact (plus / multi / enterprise). */
-export const IMPACT_FEATURE = {
-  COST_SAVING_INSIGHTS: 'cost_saving_insights',
-  ESG_REPORTS: 'esg_reports',
-} as const;
+import { hasModule } from '@/utils/moduleAccess';
 
 /**
- * Base Single Site → Impact metrics + graphs only.
- * Single Site +, Multi Site, Enterprise → also Specific Food Savings + report download.
+ * Advanced impact — specific food savings, donation recipients and report
+ * downloads — comes with Saveful Connect (its own plan, Complete Solution, or a
+ * legacy Single Site / Multi Site plan). Orgs that are never billed always see it.
  */
 export function hasAdvancedImpactAccess(entitlements: Entitlements | null | undefined): boolean {
   if (!entitlements) return false;
-
-  // Charities / free-forever orgs are never limited on impact.
   if (!entitlements.billingRequired) return true;
-  if (!entitlements.entitled) return false;
-
-  const features = entitlements.features ?? [];
-  if (
-    features.includes(IMPACT_FEATURE.COST_SAVING_INSIGHTS) ||
-    features.includes(IMPACT_FEATURE.ESG_REPORTS)
-  ) {
-    return true;
-  }
-
-  const label = `${entitlements.planName ?? ''} ${entitlements.planDisplayName ?? ''}`.toLowerCase();
-
-  if (
-    label.includes('plus') ||
-    label.includes('single_plus') ||
-    label.includes('single-plus') ||
-    label.includes('multi') ||
-    label.includes('enterprise')
-  ) {
-    return true;
-  }
-
-  // Explicit base single-site plan names.
-  if (
-    label.includes('single') &&
-    !label.includes('plus') &&
-    !label.includes('multi')
-  ) {
-    return false;
-  }
-
-  // Catalogue fallbacks when feature keys are not seeded yet.
-  if (entitlements.maxSites != null && entitlements.maxSites > 1) return true;
-  if (entitlements.maxUserPerSite != null && entitlements.maxUserPerSite > 2) return true;
-
-  return false;
+  return entitlements.entitled && hasModule(entitlements, 'CONNECT');
 }
 
 export function canShowSpecificFoodSavings(

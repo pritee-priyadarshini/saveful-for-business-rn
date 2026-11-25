@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { NavigationHelpers, ParamListBase } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, type NavigationHelpers, type ParamListBase } from '@react-navigation/native';
 
 import { CharityAnalyticsScreen } from '../screens/charity/CharityAnalyticsScreen';
 import { CharityDiscoverScreen } from '../screens/charity/CharityDiscoverScreen';
@@ -18,6 +18,12 @@ import { useAppContext } from '../store/AppContext';
 import { CharityTabsParamList, FarmerTabsParamList, RestaurantTabsParamList } from './types';
 import { palette } from '../theme/colors';
 import { RestaurantStack } from './RestaurantStack';
+import { useModuleGate } from '@/hooks/useModuleGate';
+import { useAuthStore } from '@/store/authStore';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
+import { resolveUserRole } from '@/utils/authSession';
+import { canAccessSubscription } from '@/utils/subscriptionAccess';
+import { isModuleLocked } from '@/utils/moduleAccess';
 import { CharityStack } from './CharityStack';
 import { RestaurantUpdatesScreen } from '@/screens/restaurant/RestaurantUpdatesScreen';
 import { FarmerStack } from './FarmerStack';
@@ -56,6 +62,50 @@ function TabBarIcon({
       <Ionicons name={name} size={TAB_ICON_SIZE} color={color} />
     </View>
   );
+}
+
+/** Saveful Connect is not in the org's plan right now (read outside React, for tab listeners). */
+function connectLockedNow(): boolean {
+  const { authUser, selectedRole } = useAuthStore.getState();
+  const role = resolveUserRole(authUser, selectedRole);
+  return canAccessSubscription(role) && isModuleLocked(useSubscriptionStore.getState().entitlements, 'CONNECT');
+}
+
+/**
+ * The Listings tab is Saveful Connect. For an org whose plan lacks it (Make
+ * Food Count only) the tab stays, but pressing it opens the Connect sheet over
+ * the current screen instead of switching. Anything that navigates here by code
+ * (notifications, prompts, "List surplus") is sent back to Home with the sheet.
+ */
+function ConnectListingsTab() {
+  const { locked } = useModuleGate('CONNECT');
+  const navigation = useNavigation<any>();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!locked) return;
+      navigation.navigate('Home');
+      navigation.navigate('ModuleUpsell', { module: 'CONNECT' });
+    }, [locked, navigation]),
+  );
+
+  if (!locked) return <RestaurantStack />;
+  return <View style={styles.lockedTab} />;
+}
+
+/** The Listings tab: sheet instead of the tab when Connect is locked, else reset to its root. */
+function listingsTabListeners(tabName: string, rootScreen: string) {
+  const reset = resetNestedStackOnTabPress(tabName, rootScreen);
+  return (props: { navigation: NavigationHelpers<ParamListBase> }) => ({
+    tabPress: (e: { preventDefault: () => void }) => {
+      if (connectLockedNow()) {
+        e.preventDefault();
+        props.navigation.navigate('ModuleUpsell', { module: 'CONNECT' });
+        return;
+      }
+      reset(props).tabPress(e);
+    },
+  });
 }
 
 /**
@@ -201,10 +251,10 @@ export function RoleTabs() {
       <RestaurantTab.Navigator screenOptions={screenOptions}>
         <RestaurantTab.Screen component={ManageSitesScreen} name="Home" />
         <RestaurantTab.Screen
-          component={RestaurantStack}
+          component={ConnectListingsTab}
           name="Listings"
           options={{ unmountOnBlur: true }}
-          listeners={resetNestedStackOnTabPress('Listings', 'RestaurantListings')}
+          listeners={listingsTabListeners('Listings', 'RestaurantListings')}
         />
         <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
         <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
@@ -218,10 +268,10 @@ export function RoleTabs() {
       <RestaurantTab.Navigator screenOptions={screenOptions}>
         <RestaurantTab.Screen component={RestaurantHomeScreen} name="Home" />
         <RestaurantTab.Screen
-          component={RestaurantStack}
+          component={ConnectListingsTab}
           name="Listings"
           options={{ unmountOnBlur: true }}
-          listeners={resetNestedStackOnTabPress('Listings', 'RestaurantListings')}
+          listeners={listingsTabListeners('Listings', 'RestaurantListings')}
         />
         <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
         <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
@@ -234,10 +284,10 @@ export function RoleTabs() {
     <RestaurantTab.Navigator screenOptions={screenOptions}>
       <RestaurantTab.Screen component={RestaurantHomeScreen} name="Home" />
       <RestaurantTab.Screen
-        component={RestaurantStack}
+        component={ConnectListingsTab}
         name="Listings"
         options={{ unmountOnBlur: true }}
-        listeners={resetNestedStackOnTabPress('Listings', 'RestaurantListings')}
+        listeners={listingsTabListeners('Listings', 'RestaurantListings')}
       />
       <RestaurantTab.Screen component={RestaurantAnalyticsScreen} name="Insights" />
       <RestaurantTab.Screen component={RestaurantUpdatesScreen} name="Updates" />
@@ -247,6 +297,10 @@ export function RoleTabs() {
 }
 
 const styles = StyleSheet.create({
+  lockedTab: {
+    flex: 1,
+    backgroundColor: palette.creme,
+  },
   iconWrap: {
     width: TAB_ICON_SIZE + 4,
     height: TAB_ICON_SIZE + 4,

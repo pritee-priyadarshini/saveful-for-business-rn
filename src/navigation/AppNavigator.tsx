@@ -12,7 +12,7 @@ import { useAppContext } from '../store/AppContext';
 import { AuthStack } from './AuthStack';
 import { RoleTabs } from './RoleTabs';
 import { MakeFoodCountStack, type MakeFoodCountStackParamList } from './MakeFoodCountStack';
-import { setBillingRequiredHandler } from '../services/api';
+import { setBillingRequiredHandler, setModuleRequiredHandler } from '../services/api';
 import {
   selectCanManageBilling,
   selectNeedsPlan,
@@ -37,8 +37,11 @@ import { FarmerHistoryScreen } from '../screens/farmer/FarmerHistoryScreen';
 
 import { palette } from '../theme/colors';
 import { SingleSitePlansScreen } from '@/screens/subscription/SingleSitePlansScreen';
-import { SingleSiteCompareScreen } from '@/screens/subscription/SingleSiteCompareScreen';
 import { SingleSiteConfirmScreen } from '@/screens/subscription/SingleSiteConfirmScreen';
+import type { BillingCycle } from '@/screens/subscription/singleSitePlans';
+import { ModuleUpsellScreen } from '@/screens/subscription/ModuleUpsellScreen';
+import { withModuleGuard } from '@/components/plans/withModuleGuard';
+import type { ProductModule } from '@/services/subscriptions.service';
 import { MultiSitePlansScreen } from '@/screens/subscription/MultiSitePlansScreen';
 import { MultiSiteConfirmScreen } from '@/screens/subscription/MultiSiteConfirmScreen';
 import { EnterpriseConsultScreen } from '@/screens/subscription/EnterpriseConsultScreen';
@@ -91,6 +94,14 @@ import { showConfirmAlert } from '../store/appAlertStore';
 import { showErrorAlert, showSuccessAlert } from '@/utils/apiError';
 import type { UserRole } from '../types';
 
+/** Saveful Connect routes reachable outside the Listings tab (prompts, links, notifications). */
+const ConnectionsGuarded = withModuleGuard(ConnectionsScreen, 'CONNECT');
+const ConnectionDetailGuarded = withModuleGuard(ConnectionDetailScreen, 'CONNECT');
+const AddDailySurplusGuarded = withModuleGuard(AddDailySurplusScreen, 'CONNECT');
+
+/** Concurrent 402s (autosave, uploads) open one upsell, not a stack of them. */
+const MODULE_UPSELL_DEBOUNCE_MS = 1500;
+
 export type RootStackParamList = {
   Tabs: { screen?: string; params?: Record<string, unknown> } | undefined;
   CharityHistory: undefined;
@@ -98,12 +109,15 @@ export type RootStackParamList = {
   CharityPostCollectSurvey: undefined;
   RestaurantPlan: undefined;
   SingleSitePlans: undefined;
-  SingleSiteCompare: { planId?: number } | undefined;
-  SingleSiteConfirm: { planId?: number } | undefined;
+  /** cycle: the billing cycle shown on the plans screen when the card was chosen. */
+  SingleSiteConfirm: { planId?: number; cycle?: BillingCycle } | undefined;
   MultiSitePlans: undefined;
-  MultiSiteConfirm: { planId?: number } | undefined;
+  /** cycle: the billing cycle shown on the plans screen when the card was chosen. */
+  MultiSiteConfirm: { planId?: number; cycle?: BillingCycle } | undefined;
   EnterpriseConsult: undefined;
   EnterpriseThanks: undefined;
+  /** A module the organisation's plan doesn't include (Make Food Count, Saveful Connect). */
+  ModuleUpsell: { module: ProductModule };
   //ManageAccess: undefined;
   ManageSites: undefined;
   Connections: { siteId?: number } | undefined;
@@ -482,6 +496,24 @@ export function AppNavigator() {
     return () => setBillingRequiredHandler(null);
   }, []);
 
+  // 402 MODULE_REQUIRED from a write → that module's upsell. Several requests
+  // can fail together (autosave, uploads), so only one upsell opens at a time.
+  useEffect(() => {
+    let lastShownAt = 0;
+    setModuleRequiredHandler(({ module }) => {
+      if (!isAuthenticatedRef.current) return;
+      if (!canAccessSubscription(effectiveRoleRef.current)) return;
+      const nav = navigationRef.current;
+      if (!nav?.isReady()) return;
+      const now = Date.now();
+      if (now - lastShownAt < MODULE_UPSELL_DEBOUNCE_MS) return;
+      if (nav.getCurrentRoute()?.name === 'ModuleUpsell') return;
+      lastShownAt = now;
+      nav.navigate('ModuleUpsell', { module });
+    });
+    return () => setModuleRequiredHandler(null);
+  }, []);
+
   return (
     <NavigationContainer
       ref={navigationRef}
@@ -504,19 +536,24 @@ export function AppNavigator() {
             <RootStack.Screen name="CharityHistory" component={CharityHistoryScreen} />
             <RootStack.Screen name="FarmerHistory" component={FarmerHistoryScreen} />
             <RootStack.Screen name="SingleSitePlans" component={SingleSitePlansScreen} />
-            <RootStack.Screen name="SingleSiteCompare" component={SingleSiteCompareScreen} />
             <RootStack.Screen name="SingleSiteConfirm" component={SingleSiteConfirmScreen} />
             <RootStack.Screen name="MultiSitePlans" component={MultiSitePlansScreen} />
             <RootStack.Screen name="MultiSiteConfirm" component={MultiSiteConfirmScreen} />
             <RootStack.Screen name="EnterpriseConsult" component={EnterpriseConsultScreen} />
             <RootStack.Screen name="EnterpriseThanks" component={EnterpriseThanksScreen} />
+            <RootStack.Screen
+              name="ModuleUpsell"
+              component={ModuleUpsellScreen}
+              // A bottom sheet over the current screen: it animates itself.
+              options={{ presentation: 'transparentModal', animation: 'none', gestureEnabled: false }}
+            />
             <RootStack.Screen name="RestaurantPlan" component={RestaurantPlanRouter} />
             <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
             <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
-            <RootStack.Screen name="Connections" component={ConnectionsScreen} />
+            <RootStack.Screen name="Connections" component={ConnectionsGuarded} />
             <RootStack.Screen name="CreateConnection" component={CreateConnectionScreen} />
-            <RootStack.Screen name="ConnectionDetail" component={ConnectionDetailScreen} />
-            <RootStack.Screen name="AddDailySurplus" component={AddDailySurplusScreen} />
+            <RootStack.Screen name="ConnectionDetail" component={ConnectionDetailGuarded} />
+            <RootStack.Screen name="AddDailySurplus" component={AddDailySurplusGuarded} />
             <RootStack.Screen name="ReservedListing" component={ReservedListingScreen} />
             <RootStack.Screen name="CharityConnections" component={CharityConnectionsScreen} />
             <RootStack.Screen name="CharityConnectionDetail" component={CharityConnectionDetailScreen} />

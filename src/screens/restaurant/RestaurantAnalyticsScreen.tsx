@@ -25,6 +25,7 @@ import { useImpactAnalytics } from '@/hooks/useImpactAnalytics';
 import { ImpactDateFilter } from '@/components/ImpactDateFilter';
 import { FoodImpactEntryCard } from '@/components/makeFoodCount/FoodImpactEntryCard';
 import { MFC_ENABLED } from '@/config/features';
+import { useModuleGate } from '@/hooks/useModuleGate';
 import { ImpactSiteSelector } from '@/components/ImpactSiteSelector';
 import { SpecificFoodSavings } from '@/components/SpecificFoodSavings';
 import { DonationRecipients } from '@/components/DonationRecipients';
@@ -138,6 +139,7 @@ export function RestaurantAnalyticsScreen({
   const { currentProfile, selectedRole } = useAppContext();
   const authUser = useAuthStore((state) => state.authUser);
   const entitlements = useSubscriptionStore((s) => s.entitlements);
+  const mfcGate = useModuleGate('MFC');
   const showFoodSavings = canShowSpecificFoodSavings(entitlements);
   const showRecipients = canShowDonationRecipients(entitlements);
   const showReportDownload = canDownloadImpactReports(entitlements);
@@ -612,9 +614,13 @@ export function RestaurantAnalyticsScreen({
           ) : null}
 
           {/* Make Food Count insights (the deck's Insights page). */}
-          {MFC_ENABLED ? (
+          {MFC_ENABLED && !mfcGate.hidden ? (
             <FoodImpactEntryCard
-              onPress={() => stackNavigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' })}
+              onPress={() =>
+                mfcGate.requireModule(() =>
+                  stackNavigation.navigate('MakeFoodCount', { screen: 'MfcFoodImpact' }),
+                )
+              }
               style={styles.foodImpactCard}
             />
           ) : null}

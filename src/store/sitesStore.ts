@@ -9,7 +9,7 @@ import {
 import { useAuthStore } from './authStore';
 import { useSubscriptionStore } from './subscriptionStore';
 import { getUserFriendlyErrorMessage } from '../utils/apiError';
-import { isSubscriptionGateError } from '../utils/billingErrors';
+import { isGloballyHandledBillingError } from '../utils/billingErrors';
 import {
   buildDefaultHqSitePayload,
   buildVirtualHqSite,
@@ -227,7 +227,7 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
         lastFetched: Date.now(),
       });
     } catch (error: unknown) {
-      if (isSubscriptionGateError(error)) {
+      if (isGloballyHandledBillingError(error)) {
         return;
       }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load sites');
@@ -302,7 +302,7 @@ export const useSitesStore = create<SitesState & SitesActions>((set, get) => ({
         managersLastFetched: Date.now(),
       });
     } catch (error: unknown) {
-      if (isSubscriptionGateError(error)) {
+      if (isGloballyHandledBillingError(error)) {
         return;
       }
       const message = getUserFriendlyErrorMessage(error, 'Failed to load sites');

@@ -167,7 +167,10 @@ export const useSubscriptionStore = create<SubscriptionStoreState & Subscription
 
       set({ isFetchingPlans: true, error: null });
       try {
-        const available = await subscriptionsService.getAvailable();
+        // Older backends have no per-plan trial flag; the org flag stands in.
+        const available = await subscriptionsService.getAvailable(
+          Boolean(get().entitlements?.freeTrialAvailable),
+        );
         set({
           available,
           plans: available.plans,
