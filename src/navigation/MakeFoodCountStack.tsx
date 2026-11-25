@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, View } from 'react-native';
-import { StackActions, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { useUpsellSheetStore } from '@/store/upsellSheetStore';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
@@ -149,10 +150,12 @@ export function MakeFoodCountStack() {
     };
   }, []);
 
-  // Not in the plan: swap this route for the bottom sheet, so closing it lands
-  // back where the person was (Home, insights) rather than on an empty stack.
+  // Not in the plan (reached by a link or notification — cards open the sheet
+  // themselves): step back to where the person was and show the sheet there.
   useEffect(() => {
-    if (locked) navigation.dispatch(StackActions.replace('ModuleUpsell', { module: 'MFC' }));
+    if (!locked) return;
+    if (navigation.canGoBack()) navigation.goBack();
+    useUpsellSheetStore.getState().show('MFC');
   }, [locked, navigation]);
 
   if (locked) return <View style={{ flex: 1, backgroundColor: palette.creme }} />;

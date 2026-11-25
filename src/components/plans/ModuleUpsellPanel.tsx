@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 
 import { AppText } from '@/components/AppText';
 import { IN_APP_PLANS_ENABLED } from '@/config/features';
@@ -10,7 +9,7 @@ import { useAppContext } from '@/store/AppContext';
 import { selectCanManageBilling, useSubscriptionStore } from '@/store/subscriptionStore';
 import { palette } from '@/theme/colors';
 import { hp, normalize, wp } from '@/utils/responsive';
-import { getSubscriptionRoute } from '@/utils/subscriptionAccess';
+import { getSubscriptionRoute, type SubscriptionRoute } from '@/utils/subscriptionAccess';
 import { isModuleOffered, MODULE_LABEL } from '@/utils/moduleAccess';
 import {
   MODULE_FALLBACK_COPY,
@@ -45,7 +44,7 @@ export function moduleUpsellMessage(params: {
 
 /**
  * Explains a module the organisation's plan doesn't include.
- * - `sheet`: the body of the bottom sheet (ModuleUpsellScreen)
+ * - `sheet`: the body of the bottom sheet (ModuleUpsellSheet)
  * - `inline`: a small card inside a screen (MFC summary, Food Impact "Redistributed")
  *
  * While IN_APP_PLANS_ENABLED is false it never offers a way to buy.
@@ -54,6 +53,7 @@ export function ModuleUpsellPanel({
   module,
   variant = 'sheet',
   onClose,
+  onOpenPlans,
   closeLabel = 'OK',
   style,
 }: {
@@ -61,10 +61,11 @@ export function ModuleUpsellPanel({
   variant?: 'sheet' | 'inline';
   /** Shows a close button (sheet only). */
   onClose?: () => void;
+  /** Opens a plans screen; only used while IN_APP_PLANS_ENABLED is true. */
+  onOpenPlans?: (route: SubscriptionRoute) => void;
   closeLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
-  const navigation = useNavigation<any>();
   const { selectedRole } = useAppContext();
   const plans = useSubscriptionStore((s) => s.plans);
   const canManageBilling = selectCanManageBilling();
@@ -84,7 +85,8 @@ export function ModuleUpsellPanel({
 
   const message = moduleUpsellMessage({ module, offered, canManageBilling });
   const plansRoute = getSubscriptionRoute(selectedRole);
-  const canAddInApp = IN_APP_PLANS_ENABLED && offered && canManageBilling && plansRoute != null;
+  const canAddInApp =
+    IN_APP_PLANS_ENABLED && offered && canManageBilling && plansRoute != null && onOpenPlans != null;
 
   return (
     <View
@@ -140,7 +142,7 @@ export function ModuleUpsellPanel({
 
       {canAddInApp ? (
         <Pressable
-          onPress={() => navigation.navigate(plansRoute)}
+          onPress={() => plansRoute && onOpenPlans?.(plansRoute)}
           style={({ pressed }) => [styles.primary, { backgroundColor: theme.color }, pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel={`Add ${label}`}

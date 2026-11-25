@@ -21,6 +21,7 @@ import { RestaurantStack } from './RestaurantStack';
 import { useModuleGate } from '@/hooks/useModuleGate';
 import { useAuthStore } from '@/store/authStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
+import { useUpsellSheetStore } from '@/store/upsellSheetStore';
 import { resolveUserRole } from '@/utils/authSession';
 import { canAccessSubscription } from '@/utils/subscriptionAccess';
 import { isModuleLocked } from '@/utils/moduleAccess';
@@ -85,7 +86,7 @@ function ConnectListingsTab() {
     useCallback(() => {
       if (!locked) return;
       navigation.navigate('Home');
-      navigation.navigate('ModuleUpsell', { module: 'CONNECT' });
+      useUpsellSheetStore.getState().show('CONNECT');
     }, [locked, navigation]),
   );
 
@@ -100,7 +101,7 @@ function listingsTabListeners(tabName: string, rootScreen: string) {
     tabPress: (e: { preventDefault: () => void }) => {
       if (connectLockedNow()) {
         e.preventDefault();
-        props.navigation.navigate('ModuleUpsell', { module: 'CONNECT' });
+        useUpsellSheetStore.getState().show('CONNECT');
         return;
       }
       reset(props).tabPress(e);

@@ -39,9 +39,9 @@ import { palette } from '../theme/colors';
 import { SingleSitePlansScreen } from '@/screens/subscription/SingleSitePlansScreen';
 import { SingleSiteConfirmScreen } from '@/screens/subscription/SingleSiteConfirmScreen';
 import type { BillingCycle } from '@/screens/subscription/singleSitePlans';
-import { ModuleUpsellScreen } from '@/screens/subscription/ModuleUpsellScreen';
 import { withModuleGuard } from '@/components/plans/withModuleGuard';
-import type { ProductModule } from '@/services/subscriptions.service';
+import { ModuleUpsellSheet } from '@/components/plans/ModuleUpsellSheet';
+import { useUpsellSheetStore } from '@/store/upsellSheetStore';
 import { MultiSitePlansScreen } from '@/screens/subscription/MultiSitePlansScreen';
 import { MultiSiteConfirmScreen } from '@/screens/subscription/MultiSiteConfirmScreen';
 import { EnterpriseConsultScreen } from '@/screens/subscription/EnterpriseConsultScreen';
@@ -116,8 +116,6 @@ export type RootStackParamList = {
   MultiSiteConfirm: { planId?: number; cycle?: BillingCycle } | undefined;
   EnterpriseConsult: undefined;
   EnterpriseThanks: undefined;
-  /** A module the organisation's plan doesn't include (Make Food Count, Saveful Connect). */
-  ModuleUpsell: { module: ProductModule };
   //ManageAccess: undefined;
   ManageSites: undefined;
   Connections: { siteId?: number } | undefined;
@@ -503,13 +501,10 @@ export function AppNavigator() {
     setModuleRequiredHandler(({ module }) => {
       if (!isAuthenticatedRef.current) return;
       if (!canAccessSubscription(effectiveRoleRef.current)) return;
-      const nav = navigationRef.current;
-      if (!nav?.isReady()) return;
       const now = Date.now();
       if (now - lastShownAt < MODULE_UPSELL_DEBOUNCE_MS) return;
-      if (nav.getCurrentRoute()?.name === 'ModuleUpsell') return;
       lastShownAt = now;
-      nav.navigate('ModuleUpsell', { module });
+      useUpsellSheetStore.getState().show(module);
     });
     return () => setModuleRequiredHandler(null);
   }, []);
@@ -541,12 +536,6 @@ export function AppNavigator() {
             <RootStack.Screen name="MultiSiteConfirm" component={MultiSiteConfirmScreen} />
             <RootStack.Screen name="EnterpriseConsult" component={EnterpriseConsultScreen} />
             <RootStack.Screen name="EnterpriseThanks" component={EnterpriseThanksScreen} />
-            <RootStack.Screen
-              name="ModuleUpsell"
-              component={ModuleUpsellScreen}
-              // A bottom sheet over the current screen: it animates itself.
-              options={{ presentation: 'transparentModal', animation: 'none', gestureEnabled: false }}
-            />
             <RootStack.Screen name="RestaurantPlan" component={RestaurantPlanRouter} />
             <RootStack.Screen name="ManageAccess" component={ManageAccessScreen} />
             <RootStack.Screen name="CreateSite" component={CreateSiteScreen} />
@@ -674,6 +663,8 @@ export function AppNavigator() {
       ) : (
         <AuthStack />
       )}
+      {/* Module upsell bottom sheet: an overlay, so closing it never reloads the screen beneath. */}
+      <ModuleUpsellSheet onOpenPlans={(route) => navigationRef.current?.navigate(route)} />
     </NavigationContainer>
   );
 }

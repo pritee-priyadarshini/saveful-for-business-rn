@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
-import { useNavigation } from '@react-navigation/native';
 
 import type { ProductModule } from '@/services/subscriptions.service';
 import { useAppContext } from '@/store/AppContext';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
+import { useUpsellSheetStore } from '@/store/upsellSheetStore';
 import { canAccessSubscription } from '@/utils/subscriptionAccess';
 import { isModuleLocked, isModuleOffered } from '@/utils/moduleAccess';
 
@@ -26,7 +26,6 @@ export type ModuleGate = {
  * write with 402 MODULE_REQUIRED if it gets that far.
  */
 export function useModuleGate(module: ProductModule): ModuleGate {
-  const navigation = useNavigation<any>();
   const { selectedRole } = useAppContext();
   const entitlements = useSubscriptionStore((s) => s.entitlements);
 
@@ -39,9 +38,9 @@ export function useModuleGate(module: ProductModule): ModuleGate {
         onAllowed();
         return;
       }
-      navigation.navigate('ModuleUpsell', { module });
+      useUpsellSheetStore.getState().show(module);
     },
-    [locked, module, navigation],
+    [locked, module],
   );
 
   return { locked, hidden, requireModule };
